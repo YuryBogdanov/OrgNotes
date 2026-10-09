@@ -30,7 +30,11 @@ ORG_DIR=~/notes npx tauri dev
 ```bash
 npm test                 # парсер и правки (vitest)
 (cd src-tauri && cargo test)   # безопасное сохранение файлов
+npm run e2e              # редактор в WebKit (движок WKWebView) с имитацией Tauri-бэкенда
 ```
+
+Для e2e один раз: `npx playwright install webkit`. Тесты используют уже запущенный dev-сервер на порту 1420
+(например, `tauri dev`) или поднимают свой; порт задаётся переменной `E2E_PORT`.
 
 ## Принципы
 
