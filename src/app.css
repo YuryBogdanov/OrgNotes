@@ -1,0 +1,74 @@
+:root {
+  --bg: #ffffff; --side: #f4f4f6; --bar: #ececef; --line: #dcdce1;
+  --fg: #1d1d1f; --fg2: #5f5f66; --fg3: #6e6e76;
+  --cur: #eef4ff; --field: #e3e3e8; --sel: rgba(10,100,214,0.14); --acc: #0a64d6; --onacc: #ffffff;
+  --h1: #0a58c2; --h2: #0b7a6f; --h3: #a4510a;
+  --todo: #c4262e; --done: #1d7f3a; --next: #0a58c2; --wait: #935300;
+  --ts: #a3187a; --tagbg: #e6e6eb; --tagfg: #4a4a52; --link: #0a58c2;
+  --segon: #ffffff; --shadow: 0 1px 2px rgba(0,0,0,0.18);
+  --mono: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+  --ui: -apple-system, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e22; --side: #27272c; --bar: #2d2d33; --line: #3b3b43;
+    --fg: #ececef; --fg2: #a9a9b3; --fg3: #9a9aa5;
+    --cur: #2a3347; --field: #37373e; --sel: rgba(10,132,255,0.30); --acc: #6cb4ff; --onacc: #0b1626;
+    --h1: #6cb4ff; --h2: #5fd3c2; --h3: #f0a45d;
+    --todo: #ff7b80; --done: #6fd58a; --next: #6cb4ff; --wait: #f0b04d;
+    --ts: #f58ad4; --tagbg: #3d3d46; --tagfg: #c9c9d2; --link: #6cb4ff;
+    --segon: #55555e; --shadow: none;
+    color-scheme: dark;
+  }
+}
+/* Inside the native window the sidebar/toolbar are see-through so the macOS vibrancy shows. */
+html.tauri { --side-bg: transparent; --bar-bg: transparent; }
+html:not(.tauri) { --side-bg: var(--side); --bar-bg: var(--bar); }
+html.tauri, html.tauri body { background: transparent; }
+
+* { box-sizing: border-box; }
+html, body, #app { margin: 0; height: 100%; }
+body {
+  font: 13px/1.35 var(--ui);
+  color: var(--fg);
+  background: var(--bg);
+  overflow: hidden;
+  -webkit-user-select: none; user-select: none;
+  cursor: default;
+  -webkit-font-smoothing: antialiased;
+}
+button, select, input { font: inherit; color: inherit; }
+button { cursor: default; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg) 22%, transparent); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- editor (CodeMirror) ---- */
+.cm-editor { height: 100%; background: var(--bg) !important; color: var(--fg); font-family: var(--mono); font-size: 13px; }
+.cm-editor.cm-focused { outline: none; }
+.cm-editor .cm-scroller { font-family: var(--mono); line-height: 22px; padding: 10px 0; background: var(--bg); }
+.cm-editor .cm-content { -webkit-user-select: text; user-select: text; cursor: text; caret-color: var(--acc); padding: 0 24px 0 0; }
+.cm-editor .cm-cursor { border-left-color: var(--acc); }
+.cm-editor .cm-gutters { background: var(--bg) !important; border: 0; color: var(--fg3); font-size: 11.5px; }
+.cm-editor .cm-lineNumbers .cm-gutterElement { padding: 0 12px 0 8px; min-width: 40px; }
+.cm-editor .cm-activeLine { background: var(--cur); }
+.cm-editor .cm-activeLineGutter { background: var(--cur) !important; color: var(--fg); }
+.cm-editor .cm-selectionBackground, .cm-editor.cm-focused .cm-selectionBackground { background: var(--sel) !important; }
+.cm-editor .cm-foldGutter .cm-gutterElement { padding: 0 4px; color: var(--fg3); }
+.cm-editor .cm-foldPlaceholder { background: var(--field); border: 0; color: var(--fg2); border-radius: 4px; padding: 0 6px; }
+.cm-h1 { color: var(--h1); font-weight: 700; }
+.cm-h2 { color: var(--h2); font-weight: 700; }
+.cm-h3 { color: var(--h3); font-weight: 700; }
+.cm-kw { font-weight: 700; }
+.cm-kw-todo { color: var(--todo); } .cm-kw-next { color: var(--next); }
+.cm-kw-wait { color: var(--wait); } .cm-kw-done { color: var(--done); } .cm-kw-cancelled { color: var(--fg3); }
+.cm-prio { color: var(--wait); }
+.cm-tags { color: var(--tagfg); font-weight: 400; }
+.cm-cookie { color: var(--fg3); font-weight: 400; }
+.cm-plan { color: var(--fg3); }
+.cm-ts { color: var(--ts); }
+.cm-drawer { color: var(--fg3); }
+.cm-meta { color: var(--fg3); }
+.cm-link { color: var(--link); text-decoration: underline; }
+.cm-tablesep { color: var(--fg3); }

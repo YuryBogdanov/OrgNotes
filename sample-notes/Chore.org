@@ -1,0 +1,20 @@
+#+TITLE: Регулярные задачи
+#+TODO: TODO NEXT WAIT | DONE CANCELLED
+
+* Каждую неделю
+** TODO Проверить доски команд
+SCHEDULED: <2026-10-12 Mon +1w>
+** TODO Написать недельный отчёт
+SCHEDULED: <2026-10-16 Fri +1w>
+** TODO Разобрать входящие
+SCHEDULED: <2026-10-10 Sat +1w>
+* Каждый месяц
+** TODO Обновить метрики по командам
+SCHEDULED: <2026-10-30 Fri +1m>
+** TODO Подвести итоги месяца
+SCHEDULED: <2026-10-31 Sat +1m>
+* Раз в квартал
+** TODO Ревизия целей команд
+SCHEDULED: <2026-12-14 Mon +3m>
+** TODO Калибровка оценок
+SCHEDULED: <2026-12-18 Fri +3m>
