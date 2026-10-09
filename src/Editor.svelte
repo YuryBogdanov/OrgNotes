@@ -158,7 +158,18 @@
         while (a < max && cur[a] === t[a]) a++;
         let b = 0;
         while (b < max - a && cur[cur.length - 1 - b] === t[t.length - 1 - b]) b++;
+        // The change replaces [a, cur.length - b). Positions inside it would be mapped to its start, which
+        // for a big rewrite means "top of the file": keep the cursor on the same line and column instead.
+        const sel = view.state.selection.main;
+        const inside = sel.head > a && sel.head < cur.length - b;
+        const line = view.state.doc.lineAt(sel.head);
+        const col = sel.head - line.from;
         view.dispatch({ changes: { from: a, to: cur.length - b, insert: t.slice(a, t.length - b) } });
+        if (inside) {
+          const doc = view.state.doc;
+          const ln = doc.line(Math.min(line.number, doc.lines));
+          view.dispatch({ selection: { anchor: Math.min(ln.from + col, ln.to) } });
+        }
       }
     }
   });
