@@ -70,5 +70,6 @@ button { cursor: default; }
 .cm-ts { color: var(--ts); }
 .cm-drawer { color: var(--fg3); }
 .cm-meta { color: var(--fg3); }
-.cm-link { color: var(--link); text-decoration: underline; }
+.cm-link { color: var(--link); text-decoration: underline; cursor: pointer; }
+.cm-linkmark { color: var(--fg3); }
 .cm-tablesep { color: var(--fg3); }

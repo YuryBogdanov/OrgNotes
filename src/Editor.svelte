@@ -5,13 +5,15 @@
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
   import { foldGutter, foldKeymap, foldService, toggleFold } from '@codemirror/language';
   import { headingLines, type Workflow } from './org';
+  import { extractLinks, type OrgLink } from './links';
   import type { Text } from '@codemirror/state';
 
-  let { text, fileKey, wf, reveal, onchange, oncursor }: {
+  let { text, fileKey, wf, reveal, onchange, oncursor, onfollow }: {
     text: string; fileKey: string; wf: Workflow;
     reveal: { line: number; n: number } | null;
     onchange: (t: string) => void;
     oncursor: (line: number, col: number) => void;
+    onfollow: (link: OrgLink) => void;
   } = $props();
 
   let host: HTMLDivElement;
@@ -28,6 +30,14 @@
     return s;
   };
 
+  const linkCache = new WeakMap<Text, OrgLink[]>();
+  const linksIn = (doc: Text) => {
+    let l = linkCache.get(doc);
+    if (!l) linkCache.set(doc, (l = extractLinks(doc.toString())));
+    return l;
+  };
+  const linkAt = (doc: Text, pos: number) => linksIn(doc).find((l) => pos >= l.from && pos <= l.to);
+
   const orgFold = foldService.of((state, lineStart) => {
     const line = state.doc.lineAt(lineStart);
     const heads = headingSet(state.doc);
@@ -43,8 +53,9 @@
     return end > line.to ? { from: line.to, to: end } : null;
   });
 
-  function decorate(v: EditorView, words: Workflow): DecorationSet {
+  function decorate(v: EditorView, words: Workflow): { all: DecorationSet; atomic: DecorationSet } {
     const items: Range<Decoration>[] = [];
+    const hidden: Range<Decoration>[] = [];
     const open = new Set(words.open);
     const done = new Set(words.done);
     const heads = headingSet(v.state.doc);
@@ -87,27 +98,64 @@
           if (/^\s*\|/.test(t)) {
             if (/^\s*\|[-+]+\|?\s*$/.test(t)) mark(line.from, line.to, 'cm-tablesep');
           }
-          for (const m of t.matchAll(/\[\[[^\]]+\](?:\[[^\]]+\])?\]/g)) mark(line.from + m.index!, line.from + m.index! + m[0].length, 'cm-link');
         }
         for (const m of t.matchAll(/[<\[]\d{4}-\d{2}-\d{2}[^>\]\n]*[>\]]/g)) mark(line.from + m.index!, line.from + m.index! + m[0].length, 'cm-ts');
         if (line.to + 1 > to) break;
         pos = line.to + 1;
       }
     }
+    // links: show only the description (like org-link-descriptive) unless the cursor is on the link
+    const sel = v.state.selection.main;
+    const hide = (a: number, b: number) => {
+      if (b <= a) return;
+      const r = Decoration.replace({}).range(a, b);
+      items.push(r);
+      hidden.push(r);
+    };
+    for (const l of linksIn(v.state.doc)) {
+      if (!v.visibleRanges.some((r) => l.to >= r.from && l.from <= r.to)) continue;
+      const oneLine = v.state.doc.lineAt(l.from).number === v.state.doc.lineAt(l.to).number;
+      if (l.format === 'bracket' && oneLine) {
+        const a = l.descFrom ?? l.from + 2;
+        const b = l.descTo ?? l.to - 2;
+        mark(a, b, 'cm-link');
+        if (sel.from <= l.to && sel.to >= l.from) {
+          mark(l.from, a, 'cm-linkmark');
+          mark(b, l.to, 'cm-linkmark');
+        } else {
+          hide(l.from, a);
+          hide(b, l.to);
+        }
+      } else {
+        mark(l.from, l.to, 'cm-link');
+      }
+    }
     // builder needs ordering by position (line decorations first at equal position)
-    items.sort((a, b) => a.from - b.from || a.value.startSide - b.value.startSide);
-    const b = new RangeSetBuilder<Decoration>();
-    for (const r of items) b.add(r.from, r.to, r.value);
-    return b.finish();
+    const build = (rs: Range<Decoration>[]) => {
+      rs.sort((a, b) => a.from - b.from || a.value.startSide - b.value.startSide);
+      const b = new RangeSetBuilder<Decoration>();
+      for (const r of rs) b.add(r.from, r.to, r.value);
+      return b.finish();
+    };
+    return { all: build(items), atomic: build(hidden) };
   }
 
   function makeState(doc: string, words: Workflow) {
     const plugin = ViewPlugin.fromClass(
       class {
         decorations: DecorationSet;
-        constructor(v: EditorView) { this.decorations = decorate(v, words); }
+        atomic: DecorationSet;
+        constructor(v: EditorView) {
+          const d = decorate(v, words);
+          this.decorations = d.all;
+          this.atomic = d.atomic;
+        }
         update(u: ViewUpdate) {
-          if (u.docChanged || u.viewportChanged) this.decorations = decorate(u.view, words);
+          if (u.docChanged || u.viewportChanged || u.selectionSet) {
+            const d = decorate(u.view, words);
+            this.decorations = d.all;
+            this.atomic = d.atomic;
+          }
         }
       },
       { decorations: (p) => p.decorations },
@@ -117,8 +165,26 @@
       extensions: [
         lineNumbers(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(),
         history(), orgFold, foldGutter(), plugin,
+        EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
+        EditorView.domEventHandlers({
+          mousedown(e, v) {
+            if (!(e.metaKey || e.ctrlKey)) return false;
+            const pos = v.posAtCoords({ x: e.clientX, y: e.clientY });
+            const l = pos == null ? undefined : linkAt(v.state.doc, pos);
+            if (!l) return false;
+            e.preventDefault();
+            onfollow(l);
+            return true;
+          },
+        }),
         EditorView.lineWrapping,
         keymap.of([
+          { key: 'Mod-Enter', run: (v) => {
+              const l = linkAt(v.state.doc, v.state.selection.main.head);
+              if (!l) return false;
+              onfollow(l);
+              return true;
+            } },
           { key: 'Tab', run: (v) => {
               const l = v.state.doc.lineAt(v.state.selection.main.head);
               return headingSet(v.state.doc).has(l.number - 1) ? toggleFold(v) : false;

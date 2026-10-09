@@ -1,3 +1,4 @@
+import { resolveLink, type OrgLink } from './links';
 import { headingAt, parseHeadings, parseWorkflow, setKeyword, setPriority, type Heading, type Workflow } from './org';
 
 export interface NoteFile {
@@ -30,6 +31,15 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
   return invoke<T>(cmd, args);
 }
 
+async function openExternal(url: string) {
+  if (isTauri) {
+    const { openUrl } = await import('@tauri-apps/plugin-opener');
+    await openUrl(url);
+  } else {
+    window.open(url, '_blank');
+  }
+}
+
 type Listed = { name: string; path: string; text: string };
 
 class Store {
@@ -47,6 +57,7 @@ class Store {
   needFolder = $state(false);
   hasSample = $state(false);
   loaded = $state(false);
+  history = $state.raw<{ path: string; line: number }[]>([]);
   notice = $state('');
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
   private noticeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -169,6 +180,34 @@ class Store {
     this.mode = 'notes';
     this.cursor = { line, col: 0 };
     this.reveal = { line, n: Date.now() };
+  }
+
+  /** Open another place and remember where we came from (⌘[ goes back). */
+  jump(fileIdx: number, line = 0) {
+    const f = this.file;
+    if (f) this.history = [...this.history.slice(-49), { path: f.path, line: this.cursor.line }];
+    this.open(fileIdx, line);
+  }
+
+  back() {
+    const last = this.history[this.history.length - 1];
+    if (!last) return;
+    this.history = this.history.slice(0, -1);
+    const i = this.files.findIndex((f) => f.path === last.path);
+    if (i >= 0) this.open(i, last.line);
+  }
+
+  follow(link: OrgLink) {
+    if (!this.file) return;
+    const t = resolveLink(link, this.cur, this.files);
+    if (t.kind === 'url') {
+      openExternal(t.url).catch((e) => this.say('Не удалось открыть ссылку: ' + e));
+    } else if (t.kind === 'missing') {
+      this.say(`Не найдено: ${t.what}`);
+    } else {
+      this.jump(t.file, t.line ?? 0);
+      if (t.missingSection) this.say(`Раздел «${t.missingSection.replace(/^[*#]/, '')}» не найден — открыт файл целиком`);
+    }
   }
 
   private scheduleSave(path: string) {
