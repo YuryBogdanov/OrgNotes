@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headingAt, headingLines, parseHeadings, parseWorkflow, setKeyword, setPriority, shiftTimestamp, subtreeProgress } from './org';
+import { headingAt, headingLines, joinEol, parseHeadings, parseWorkflow, setKeyword, setPriority, shiftTimestamp, splitEol, subtreeProgress } from './org';
 
 // Saturday, 10 October 2026, 12:00
 const NOW = new Date(2026, 9, 10, 12, 0);
@@ -153,5 +153,23 @@ describe('setPriority', () => {
     expect(t).toBe('* TODO [#B] a\n');
     t = setPriority(t, hs(t), null);
     expect(t).toBe('* TODO a\n');
+  });
+});
+
+describe('line endings', () => {
+  it('normalises CRLF and restores it exactly', () => {
+    const raw = '* TODO a\r\nSCHEDULED: <2026-10-12 Mon>\r\ntext\r\n';
+    const { text, eol } = splitEol(raw);
+    expect(text).toBe('* TODO a\nSCHEDULED: <2026-10-12 Mon>\ntext\n');
+    expect(eol).toBe('\r\n');
+    expect(joinEol(text, eol)).toBe(raw);
+  });
+  it('leaves LF files alone', () => {
+    expect(splitEol('* a\nb\n')).toEqual({ text: '* a\nb\n', eol: '\n' });
+  });
+  it('parses CRLF text without crashing, as if it were LF', () => {
+    const hs = parseHeadings(splitEol('* TODO a\r\n** NEXT b\r\n').text, WF);
+    expect(hs.map((h) => h.title)).toEqual(['a', 'b']);
+    expect(() => parseHeadings('* TODO a\r\n** NEXT b\r\n', WF)).not.toThrow();
   });
 });
