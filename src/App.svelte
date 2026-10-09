@@ -6,6 +6,7 @@
   import Inspector from './Inspector.svelte';
   import Agenda from './Agenda.svelte';
   import Splitter from './Splitter.svelte';
+  import Dialogs from './Dialogs.svelte';
 
   const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
   const file = $derived(store.file);
@@ -24,6 +25,12 @@
     const key = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === '0') { e.preventDefault(); e.altKey ? (store.showInspector = !store.showInspector) : (store.showNav = !store.showNav); }
       if (e.metaKey && e.key === '[') { e.preventDefault(); store.back(); }
+      if (e.metaKey && e.key === 'n' && store.canManageFiles) {
+        e.preventDefault();
+        const dir = store.file && store.file.name.includes('/') ? store.file.name.slice(0, store.file.name.lastIndexOf('/')) : '';
+        store.showNav = true;
+        store.creating = { dir, kind: 'file' };
+      }
       if (e.metaKey && e.key === 'o') { e.preventDefault(); store.chooseFolder(); }
       if (e.metaKey && e.key === '1') { e.preventDefault(); store.mode = 'notes'; }
       if (e.metaKey && e.key === '2') { e.preventDefault(); store.mode = 'agenda'; }
@@ -43,6 +50,7 @@
 </script>
 
 <div class="win">
+  <Dialogs />
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="toolbar" data-tauri-drag-region onmousedown={drag}>
     <div class="lights-gap"></div>

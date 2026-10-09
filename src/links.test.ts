@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backlinks, extractLinks, resolveLink, type NoteRef } from './links';
+import { backlinks, extractLinks, mapperFor, resolveLink, rewriteFileLinks, type NoteRef } from './links';
 import { DEFAULT_WORKFLOW, parseHeadings } from './org';
 
 const note = (path: string, text: string, name = path.split('/').pop()!): NoteRef => ({
@@ -78,5 +78,43 @@ describe('backlinks', () => {
     expect(bl).toEqual([{ file: 1, line: 1, heading: 'Встреча', label: 'план' }]);
     // whole-file links
     expect(backlinks(files, 0, null)).toEqual([{ file: 1, line: 1, heading: 'Встреча', label: 'a.org' }]);
+  });
+});
+
+describe('rewriteFileLinks', () => {
+  const rename = mapperFor('/n/Weekly.org', '/n/Неделя.org');
+
+  it('retargets links to a renamed note and keeps search and description', () => {
+    const t = 'См. [[file:Weekly.org::*Задачи][задачи]] и [[file:Weekly.org]] и [[file:Other.org]].';
+    const r = rewriteFileLinks(t, '/n/Index.org', '/n/Index.org', rename);
+    expect(r.count).toBe(2);
+    expect(r.text).toBe('См. [[file:Неделя.org::*Задачи][задачи]] и [[file:Неделя.org]] и [[file:Other.org]].');
+  });
+
+  it('recomputes relative links of a note that moved into a folder', () => {
+    const t = '[[file:Weekly.org][w]] [[file:./Chore.org]] [[file:Sub/x.org::5]] [[https://a.b]]';
+    const r = rewriteFileLinks(t, '/n/Index.org', '/n/Team/Index.org', (a) => a);
+    expect(r.text).toBe('[[file:../Weekly.org][w]] [[file:../Chore.org]] [[file:../Sub/x.org::5]] [[https://a.b]]');
+    expect(r.count).toBe(3);
+  });
+
+  it('follows a moved folder and leaves unrelated and absolute outside links alone', () => {
+    const move = mapperFor('/n/Team', '/n/Archive/Team');
+    const t = '[[file:Team/a.org]] [[file:/n/Team/b.org]] [[file:/tmp/x.org]] [[file:Other.org]]';
+    const r = rewriteFileLinks(t, '/n/Index.org', '/n/Index.org', move);
+    expect(r.text).toBe('[[file:Archive/Team/a.org]] [[file:/n/Archive/Team/b.org]] [[file:/tmp/x.org]] [[file:Other.org]]');
+  });
+
+  it('handles a note that is itself inside a moved folder', () => {
+    // /n/Team/a.org links to a sibling and to a note outside; the whole folder moves one level down
+    const move = mapperFor('/n/Team', '/n/Archive/Team');
+    const t = '[[file:b.org]] [[file:../Weekly.org]]';
+    const r = rewriteFileLinks(t, '/n/Team/a.org', '/n/Archive/Team/a.org', move);
+    expect(r.text).toBe('[[file:b.org]] [[file:../../Weekly.org]]');
+  });
+
+  it('does nothing when nothing changed', () => {
+    const t = '[[file:Other.org][o]]';
+    expect(rewriteFileLinks(t, '/n/A.org', '/n/A.org', rename)).toEqual({ text: t, count: 0 });
   });
 });
