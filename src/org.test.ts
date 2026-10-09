@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { headingAt, headingLines, joinEol, parseHeadings, parseWorkflow, setKeyword, setPriority, shiftTimestamp, splitEol, subtreeProgress } from './org';
+import { DEFAULT_WORKFLOW, firstOpen, headingAt, headingLines, joinEol, kwTone, parseHeadings, parseProjectConfig, parseWorkflow, resolveWorkflow, sequenceFor, setKeyword, setPriority, shiftTimestamp, splitEol, subtreeProgress } from './org';
 
 // Saturday, 10 October 2026, 12:00
 const NOW = new Date(2026, 9, 10, 12, 0);
@@ -11,13 +11,13 @@ const kw = (text: string, idx: number, to: string | null, now = NOW) => {
 
 describe('parseWorkflow', () => {
   it('reads open and done keywords, strips shortcuts', () => {
-    expect(parseWorkflow('#+TODO: NEW(n) TODO(t) | DONE(d) CANCELLED(c)\n')).toEqual({
+    expect(parseWorkflow('#+TODO: NEW(n) TODO(t) | DONE(d) CANCELLED(c)\n')).toMatchObject({
       open: ['NEW', 'TODO'],
       done: ['DONE', 'CANCELLED'],
     });
   });
   it('treats the last word as done when there is no bar', () => {
-    expect(parseWorkflow('#+TODO: TODO WAIT DONE\n')).toEqual({ open: ['TODO', 'WAIT'], done: ['DONE'] });
+    expect(parseWorkflow('#+TODO: TODO WAIT DONE\n')).toMatchObject({ open: ['TODO', 'WAIT'], done: ['DONE'] });
   });
   it('merges several sequences', () => {
     const wf = parseWorkflow('#+TODO: TODO | DONE\n#+TODO: MEETING | FINISHED\n');
@@ -180,5 +180,81 @@ describe('line endings', () => {
     const hs = parseHeadings(splitEol('* TODO a\r\n** NEXT b\r\n').text, WF);
     expect(hs.map((h) => h.title)).toEqual(['a', 'b']);
     expect(() => parseHeadings('* TODO a\r\n** NEXT b\r\n', WF)).not.toThrow();
+  });
+});
+
+describe('project workflows', () => {
+  const json = JSON.stringify({
+    version: 1,
+    workflows: [
+      { name: 'Задачи', states: [{ name: 'NEW' }, { name: 'TODO' }, { name: 'IN PROGRESS', color: 'blue' }, { name: 'DONE', done: true, color: 'green' }] },
+      { name: 'Встречи', states: [{ name: 'MEETING' }, { name: 'FINISHED', done: true }, { name: 'CANCELLED', done: true }] },
+      { name: 'Цели', states: [{ name: 'BACKLOG' }, { name: 'ACTIVE' }, { name: 'COMPLETED', done: true }] },
+    ],
+  });
+  const { config, warnings } = parseProjectConfig(json);
+
+  it('reads workflows, turns spaces in names into dashes and keeps colours', () => {
+    expect(warnings).toEqual([]);
+    expect(config.workflows.map((w) => w.name)).toEqual(['Задачи', 'Встречи', 'Цели']);
+    expect(config.workflows[0].states.map((s) => s.name)).toEqual(['NEW', 'TODO', 'IN-PROGRESS', 'DONE']);
+    expect(config.workflows[0].states[2].color).toBe('blue');
+    expect(config.workflows[0].states[3].done).toBe(true);
+  });
+  it('keeps a status in one workflow only: the first declaration wins and the clash is reported', () => {
+    const r = parseProjectConfig(
+      JSON.stringify({
+        workflows: [
+          { name: 'A', states: [{ name: 'TODO' }, { name: 'DONE', done: true }] },
+          { name: 'B', states: [{ name: 'MEETING' }, { name: 'DONE', done: true }, { name: 'FINISHED', done: true }] },
+        ],
+      }),
+    );
+    expect(r.config.workflows[1].states.map((s) => s.name)).toEqual(['MEETING', 'FINISHED']);
+    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings[0]).toContain('DONE');
+    expect(r.warnings[0]).toContain('«A»');
+  });
+  it('survives broken json and bad entries', () => {
+    expect(parseProjectConfig('{ not json').config.workflows).toEqual([]);
+    expect(parseProjectConfig('{ not json').warnings).toHaveLength(1);
+    const r = parseProjectConfig(JSON.stringify({ workflows: [{ name: 'A', states: [{ name: 'a(b' }, { name: 'OK' }] }, { states: [] }, 5] }));
+    expect(r.config.workflows).toEqual([{ name: 'A', states: [{ name: 'OK', done: false, key: undefined, color: undefined }] }]);
+    expect(r.warnings.length).toBeGreaterThan(0);
+  });
+
+  it('recognises every project status in a file that declares none', () => {
+    const text = '* IN-PROGRESS a\n* MEETING b\n* ACTIVE c\n';
+    const wf = resolveWorkflow(text, 'x.org', config);
+    expect(wf.source).toBe('project');
+    expect(parseHeadings(text, wf).map((h) => h.keyword)).toEqual(['IN-PROGRESS', 'MEETING', 'ACTIVE']);
+  });
+  it('starts headings without a status in the first workflow', () => {
+    const wf = resolveWorkflow('* a\n', 'Регулярные встречи/x.org', config);
+    expect(sequenceFor(wf, null).name).toBe('Задачи');
+    expect(firstOpen(sequenceFor(wf, null))).toBe('NEW');
+  });
+  it('lets #+TODO in the file override the project', () => {
+    const wf = resolveWorkflow('#+TODO: A B | C\n* A x\n', 'Weekly.org', config);
+    expect(wf.source).toBe('file');
+    expect(wf.open).toEqual(['A', 'B']);
+  });
+  it('finds the sequence of a keyword and the start of that sequence', () => {
+    const wf = resolveWorkflow('', 'Weekly.org', config);
+    expect(sequenceFor(wf, 'COMPLETED').name).toBe('Цели');
+    expect(firstOpen(sequenceFor(wf, 'FINISHED'))).toBe('MEETING');
+  });
+  it('resets a repeating task to the start of its own workflow', () => {
+    const wf = resolveWorkflow('', 'x.org', config);
+    const t = '* MEETING Планёрка\nSCHEDULED: <2026-10-12 Mon +1w>\n';
+    const out = setKeyword(t, parseHeadings(t, wf)[0], 'FINISHED', wf, new Date(2026, 9, 10, 12, 0));
+    expect(out.startsWith('* MEETING Планёрка\nSCHEDULED: <2026-10-19 Mon +1w>')).toBe(true);
+  });
+  it('colours states by their colour, then by name', () => {
+    const wf = resolveWorkflow('', 'x.org', config);
+    expect(kwTone('IN-PROGRESS', wf)).toBe('--next');
+    expect(kwTone('FINISHED', wf)).toBe('--done');
+    expect(kwTone('MEETING', wf)).toBe('--todo');
+    expect(kwTone('TODO', DEFAULT_WORKFLOW)).toBe('--todo');
   });
 });

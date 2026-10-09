@@ -3,7 +3,7 @@
   --fg: #1d1d1f; --fg2: #5f5f66; --fg3: #6e6e76;
   --cur: #eef4ff; --field: #e3e3e8; --sel: rgba(10,100,214,0.14); --acc: #0a64d6; --onacc: #ffffff;
   --h1: #0a58c2; --h2: #0b7a6f; --h3: #a4510a;
-  --todo: #c4262e; --done: #1d7f3a; --next: #0a58c2; --wait: #935300;
+  --todo: #c4262e; --done: #1d7f3a; --next: #0a58c2; --wait: #935300; --purple: #7a3fc4;
   --ts: #a3187a; --tagbg: #e6e6eb; --tagfg: #4a4a52; --link: #0a58c2;
   --segon: #ffffff; --shadow: 0 1px 2px rgba(0,0,0,0.18);
   --mono: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
@@ -16,7 +16,7 @@
     --fg: #ececef; --fg2: #a9a9b3; --fg3: #9a9aa5;
     --cur: #2a3347; --field: #37373e; --sel: rgba(10,132,255,0.30); --acc: #6cb4ff; --onacc: #0b1626;
     --h1: #6cb4ff; --h2: #5fd3c2; --h3: #f0a45d;
-    --todo: #ff7b80; --done: #6fd58a; --next: #6cb4ff; --wait: #f0b04d;
+    --todo: #ff7b80; --done: #6fd58a; --next: #6cb4ff; --wait: #f0b04d; --purple: #c39bff;
     --ts: #f58ad4; --tagbg: #3d3d46; --tagfg: #c9c9d2; --link: #6cb4ff;
     --segon: #55555e; --shadow: none;
     color-scheme: dark;

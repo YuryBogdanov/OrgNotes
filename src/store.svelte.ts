@@ -1,5 +1,5 @@
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
-import { headingAt, joinEol, parseHeadings, parseWorkflow, setKeyword, setPriority, splitEol, type Eol, type Heading, type Workflow } from './org';
+import { EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, splitEol, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
 export interface NoteFile {
   name: string; // relative path inside the notes folder
@@ -15,8 +15,8 @@ export interface NoteFile {
 
 const isTauri = '__TAURI_INTERNALS__' in window;
 
-function build(name: string, path: string, text: string, disk: string, diskRaw: string, eol: Eol): NoteFile {
-  const wf = parseWorkflow(text);
+function build(name: string, path: string, text: string, disk: string, diskRaw: string, eol: Eol, cfg: ProjectConfig): NoteFile {
+  const wf = resolveWorkflow(text, name, cfg);
   const ft = /^#\+FILETAGS:\s*(.+)$/m.exec(text);
   return {
     name, path, text, disk, diskRaw, eol, wf,
@@ -44,14 +44,16 @@ async function openExternal(url: string) {
 
 type Listed = { name: string; path: string; text: string };
 
-function fromDisk(l: Listed): NoteFile {
+function fromDisk(l: Listed, cfg: ProjectConfig): NoteFile {
   const { text, eol } = splitEol(l.text);
-  return build(l.name, l.path, text, text, l.text, eol);
+  return build(l.name, l.path, text, text, l.text, eol, cfg);
 }
 
 class Store {
   files = $state.raw<NoteFile[]>([]);
   folders = $state.raw<string[]>([]); // relative paths of all sub-folders, including empty ones
+  config = $state.raw<ProjectConfig>(EMPTY_CONFIG); // <notes>/.orgnotes/config.json
+  private configRaw: string | null = null;
   creating = $state<{ dir: string; kind: 'file' | 'folder' } | null>(null); // inline "new" row in the navigator
   renaming = $state<string | null>(null); // relative path of the entry being renamed inline
   dialog = $state<{ type: 'delete' | 'move'; rel: string; isDir: boolean } | null>(null);
@@ -100,6 +102,23 @@ class Store {
     return Object.entries(raw).map(([k, text]) => ({ name: k.replace('../sample-notes/', ''), path: k, text }));
   }
 
+  private async readConfig(): Promise<string | null> {
+    if (isTauri) return invoke<string | null>('read_project_config');
+    // browser fallback: the bundled sample project's config
+    const raw = import.meta.glob('../sample-notes/.orgnotes/config.json', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+    return Object.values(raw)[0] ?? null;
+  }
+
+  /** Parse the project config text; reports problems. Returns true when the effective config changed. */
+  private takeConfig(raw: string | null): boolean {
+    if (raw === this.configRaw) return false;
+    this.configRaw = raw;
+    const { config, warnings } = raw ? parseProjectConfig(raw) : { config: EMPTY_CONFIG, warnings: [] as string[] };
+    this.config = config;
+    if (warnings.length) this.say('.orgnotes/config.json: ' + warnings[0] + (warnings.length > 1 ? ` (и ещё ${warnings.length - 1})` : ''));
+    return true;
+  }
+
   private sorted(list: Listed[]) {
     const order = (n: string) => (n.includes('/') ? 1 : 0);
     return list.sort((a, b) => order(a.name) - order(b.name) || a.name.localeCompare(b.name, 'ru'));
@@ -120,7 +139,10 @@ class Store {
     // gather everything first and publish it in one go: the UI becomes usable the moment `files` is set,
     // and anything the user does after that must not be overwritten by the tail of this function
     const list = this.sorted(await this.listFiles());
-    const files = list.map(fromDisk);
+    this.configRaw = null;
+    this.takeConfig(await this.readConfig());
+    const cfg = this.config;
+    const files = list.map((l) => fromDisk(l, cfg));
     const folders = await this.readFolders(files);
     const last = lsGet('lastFile:' + (this.dir ?? ''));
     const pick = files.find((f) => f.path === last) ?? files.find((f) => f.name === 'Weekly.org') ?? files[0];
@@ -154,7 +176,13 @@ class Store {
       const seq = this.writes;
       const list = this.sorted(await this.listFiles());
       const folders = await this.readFolders(list);
+      const cfgRaw = await this.readConfig();
       if (this.saving > 0 || this.writes !== seq) continue; // stale snapshot, take a new one
+      if (this.takeConfig(cfgRaw)) {
+        // statuses changed: every note is re-read with them (unsaved edits stay)
+        const cfg = this.config;
+        this.files = this.files.map((f) => build(f.name, f.path, f.text, f.disk, f.diskRaw, f.eol, cfg));
+      }
       this.applySnapshot(list, folders);
       return;
     }
@@ -166,12 +194,12 @@ class Store {
     let adopted = '';
     this.files = list.map((n) => {
       const o = old.get(n.path);
-      if (!o) return fromDisk(n);
+      if (!o) return fromDisk(n, this.config);
       if (n.text === o.diskRaw) return o; // nothing new on disk (untouched, or the echo of our own save)
       const { text } = splitEol(n.text);
       if (text === o.text) return { ...o, disk: text, diskRaw: n.text };
       if (o.text !== o.disk) adopted = n.name; // we had unsaved edits: disk wins, but say so
-      return fromDisk(n);
+      return fromDisk(n, this.config);
     });
     this.folders = folders;
     if (adopted) this.say(`«${adopted.split('/').pop()}» изменён снаружи — загружена версия с диска`);
@@ -204,7 +232,7 @@ class Store {
   setText(text: string, path = this.curPath) {
     const f = this.files.find((x) => x.path === path);
     if (!f || f.text === text) return;
-    const next = build(f.name, f.path, text, f.disk, f.diskRaw, f.eol);
+    const next = build(f.name, f.path, text, f.disk, f.diskRaw, f.eol, this.config);
     this.files = this.files.map((x) => (x.path === path ? next : x));
     this.scheduleSave(path);
   }

@@ -13,6 +13,10 @@ use notify_debouncer_mini::{
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+/// Per-project settings live with the notes: `<notes folder>/.orgnotes/config.json`.
+const CONFIG_DIR: &str = ".orgnotes";
+const CONFIG_FILE: &str = "config.json";
+
 #[derive(Serialize)]
 struct OrgFile {
     name: String,
@@ -303,6 +307,24 @@ mod tests {
     }
 
     #[test]
+    fn project_config_roundtrip_and_isolation() {
+        let d = tmp("config");
+        assert_eq!(read_config_in(&d), None);
+        write_config_in(&d, "{\"version\":1}").unwrap();
+        assert_eq!(read_config_in(&d).as_deref(), Some("{\"version\":1}"));
+        write_config_in(&d, "{\"version\":2}").unwrap();
+        assert_eq!(read_config_in(&d).as_deref(), Some("{\"version\":2}"));
+        // the config folder is hidden, so it never shows up as notes or folders
+        let mut files = Vec::new();
+        collect(&d, &d, &mut files);
+        assert!(files.is_empty());
+        let mut dirs = Vec::new();
+        dirs_in(&d, &d, &mut dirs);
+        assert!(dirs.is_empty());
+        assert!(!d.join(".orgnotes/config.json.tmp").exists());
+    }
+
+    #[test]
     fn lists_folders_including_empty_ones() {
         let d = tmp("dirs");
         let root = d.to_str().unwrap();
@@ -496,6 +518,33 @@ fn trash_entry(state: State<AppState>, path: String) -> Result<(), String> {
     trash_in(&root_of(&state)?, &path)
 }
 
+
+// ---- project config ---------------------------------------------------------------
+
+fn read_config_in(root: &Path) -> Option<String> {
+    fs::read_to_string(root.join(CONFIG_DIR).join(CONFIG_FILE)).ok()
+}
+
+fn write_config_in(root: &Path, text: &str) -> Result<(), String> {
+    let dir = root.join(CONFIG_DIR);
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let target = dir.join(CONFIG_FILE);
+    let tmp = dir.join(format!("{CONFIG_FILE}.tmp"));
+    fs::write(&tmp, text).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, &target).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_project_config(state: State<AppState>) -> Option<String> {
+    let root = state.dir.lock().unwrap().clone()?;
+    read_config_in(&root)
+}
+
+#[tauri::command]
+fn write_project_config(state: State<AppState>, text: String) -> Result<(), String> {
+    write_config_in(&root_of(&state)?, &text)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -508,6 +557,8 @@ pub fn run() {
             list_org_files,
             save_org_file,
             list_folders,
+            read_project_config,
+            write_project_config,
             create_entry,
             rename_entry,
             move_entry,

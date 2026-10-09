@@ -44,7 +44,9 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           if (cmd === 'sample_notes_dir') return null;
           if (cmd === 'list_org_files') {
             // snapshot first, answer later: like a slow disk read racing with the user's typing
-            const snapshot = Object.entries(disk).map(([path, text]) => ({ name: path.replace('/mock/', ''), path, text }));
+            const snapshot = Object.entries(disk)
+              .filter(([path]) => path.endsWith('.org') && !path.replace('/mock/', '').split('/').some((p) => p.startsWith('.')))
+              .map(([path, text]) => ({ name: path.replace('/mock/', ''), path, text }));
             if (listDelay) await new Promise((r) => setTimeout(r, listDelay));
             return snapshot;
           }
@@ -62,11 +64,18 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             emit();
             return;
           }
+          if (cmd === 'read_project_config') return disk['/mock/.orgnotes/config.json'] ?? null;
+          if (cmd === 'write_project_config') {
+            disk['/mock/.orgnotes/config.json'] = args.text;
+            emit();
+            return;
+          }
           if (cmd === 'list_folders') {
             if (listDelay) await new Promise((r) => setTimeout(r, listDelay));
             const out = new Set<string>(folders);
             for (const p of Object.keys(disk)) {
               const parts = p.replace('/mock/', '').split('/').slice(0, -1);
+              if (parts.some((x) => x.startsWith('.'))) continue;
               parts.forEach((_, i) => out.add(parts.slice(0, i + 1).join('/')));
             }
             return [...out];

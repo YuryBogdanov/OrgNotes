@@ -1,11 +1,15 @@
 <script lang="ts">
   import { store } from './store.svelte';
   import { backlinks, linkLabel, linksOf, resolveLink } from './links';
-  import { dayDiff, fmtShort, kwTone, subtreeProgress, toJs } from './org';
+  import { dayDiff, firstDone, firstOpen, fmtShort, kwTone, sequenceFor, subtreeProgress, toJs } from './org';
 
   const f = $derived(store.file);
   const h = $derived(f && store.selected >= 0 ? f.headings[store.selected] : undefined);
-  const states = $derived(f ? [...f.wf.open, ...f.wf.done] : []);
+  // the heading's own workflow (the file's first one while it has no status yet)
+  const seq = $derived(f ? sequenceFor(f.wf, h?.keyword ?? null) : undefined);
+  const groups = $derived(
+    f?.wf.sequences && f.wf.sequences.length > 1 ? f.wf.sequences : f ? [{ name: '', states: seq!.states }] : [],
+  );
   const tone = $derived(h?.keyword && f ? kwTone(h.keyword, f.wf) : '--fg2');
   const progress = $derived(h && f ? subtreeProgress(f.headings, store.selected, f.wf) : { done: 0, total: 0 });
   const inherited = $derived.by(() => {
@@ -41,7 +45,13 @@
         <span class="k">Состояние</span>
         <select class="pick" style="color:var({tone});font-weight:600" value={h.keyword ?? ''} onchange={(e) => store.setKeyword(e.currentTarget.value || null)}>
           <option value="">—</option>
-          {#each states as s}<option value={s}>{s}</option>{/each}
+          {#each groups as g}
+            {#if g.name && groups.length > 1}
+              <optgroup label={g.name}>{#each g.states as s}<option value={s.name}>{s.name}</option>{/each}</optgroup>
+            {:else}
+              {#each g.states as s}<option value={s.name}>{s.name}</option>{/each}
+            {/if}
+          {/each}
         </select>
       </label>
       <label class="row">
@@ -51,9 +61,14 @@
           {#each ['A', 'B', 'C'] as p}<option value={p}>{p}</option>{/each}
         </select>
       </label>
-      <button class="primary" onclick={() => store.setKeyword(isDone ? f.wf.open[0] : f.wf.done[0])}>
-        {isDone ? 'Вернуть в работу' : 'Выполнено'}
-      </button>
+      {#if f.wf.source === 'project' && seq && groups.length > 1}
+        <div class="hint right">workflow: {seq.name}</div>
+      {/if}
+      {#if seq && firstDone(seq)}
+        <button class="primary" onclick={() => store.setKeyword(isDone ? firstOpen(seq) : firstDone(seq))}>
+          {isDone ? 'Вернуть в работу' : 'Выполнено'}
+        </button>
+      {/if}
     </section>
 
     <section>

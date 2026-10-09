@@ -4,7 +4,7 @@
   import { Decoration, EditorView, ViewPlugin, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
   import { foldGutter, foldKeymap, foldService, toggleFold } from '@codemirror/language';
-  import { headingLines, type Workflow } from './org';
+  import { headingLines, kwTone, type Workflow } from './org';
   import { extractLinks, type OrgLink } from './links';
   import type { Text } from '@codemirror/state';
 
@@ -72,7 +72,9 @@
           let i = hm[0].length;
           const w = /^(\S+)/.exec(t.slice(i));
           if (w && (open.has(w[1]) || done.has(w[1]))) {
-            mark(line.from + i, line.from + i + w[1].length, 'cm-kw cm-kw-' + w[1].toLowerCase().replace(/[^a-z]/g, '') + (done.has(w[1]) ? ' cm-kw-done' : ''));
+            items.push(
+              Decoration.mark({ class: 'cm-kw', attributes: { style: `color:var(${kwTone(w[1], words)})` } }).range(line.from + i, line.from + i + w[1].length),
+            );
             i += w[1].length;
             if (done.has(w[1])) items.push(Decoration.line({ class: 'cm-doneline' }).range(line.from));
           }
