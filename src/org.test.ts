@@ -74,6 +74,15 @@ describe('parseHeadings', () => {
   });
 });
 
+describe('own properties', () => {
+  it("does not leak a child's drawer into its parent", () => {
+    const hs = parseHeadings('* A\n** B\n:PROPERTIES:\n:ID: b-id\n:Effort: 2:00\n:END:\n', WF);
+    expect(hs[0].id).toBeUndefined();
+    expect(hs[0].effort).toBeUndefined();
+    expect(hs[1]).toMatchObject({ id: 'b-id', effort: '2:00' });
+  });
+});
+
 describe('setKeyword', () => {
   it('changes only the keyword and keeps the rest of the line', () => {
     const t = '* TODO [#A] Бюджет     :a:\nтекст\n';

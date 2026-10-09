@@ -6,6 +6,7 @@
 DEADLINE: <2026-10-30 Fri>
 :PROPERTIES:
 :Effort:   10:00
+:ID:       budget-2027
 :END:
 *** DONE Собрать заявки от тимлидов
 CLOSED: [2026-10-08 Thu 18:20]

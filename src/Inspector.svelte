@@ -1,5 +1,6 @@
 <script lang="ts">
   import { store } from './store.svelte';
+  import { backlinks, linkLabel, linksOf, resolveLink } from './links';
   import { dayDiff, fmtShort, kwTone, subtreeProgress, toJs } from './org';
 
   const f = $derived(store.file);
@@ -19,6 +20,15 @@
     const n = dayDiff(toJs(h.deadline), new Date());
     return n < 0 ? `просрочено на ${-n} дн.` : n === 0 ? 'дедлайн сегодня' : `до дедлайна ${n} дн.`;
   });
+  // links written in this heading's own text, and links from elsewhere that point here
+  const own = $derived.by(() => {
+    if (!f || !h) return [];
+    const next = f.headings[store.selected + 1]?.line ?? Infinity;
+    return linksOf(f)
+      .filter((l) => l.line >= h.line && l.line < next)
+      .map((l) => ({ l, t: resolveLink(l, store.cur, store.files) }));
+  });
+  const back = $derived(h ? backlinks(store.files, store.cur, h.line) : []);
   const isDone = $derived(!!h?.keyword && !!f?.wf.done.includes(h.keyword));
 </script>
 
@@ -66,6 +76,30 @@
       </section>
     {/if}
 
+    {#if own.length}
+      <section>
+        <div class="cap">ССЫЛКИ</div>
+        {#each own as { l, t }}
+          <button class="link" class:bad={t.kind === 'missing'} onclick={() => store.follow(l)} title={l.raw}>
+            <span class="lic">{t.kind === 'url' ? '↗' : t.kind === 'missing' ? '⚠' : '→'}</span>
+            <span class="ltx">{linkLabel(l)}</span>
+          </button>
+        {/each}
+      </section>
+    {/if}
+
+    {#if back.length}
+      <section>
+        <div class="cap">ОБРАТНЫЕ ССЫЛКИ</div>
+        {#each back as b}
+          <button class="link" onclick={() => store.jump(b.file, b.line)}>
+            <span class="lic">←</span>
+            <span class="ltx">{b.heading || store.files[b.file].name}<span class="src"> · {store.files[b.file].name.split('/').pop()}</span></span>
+          </button>
+        {/each}
+      </section>
+    {/if}
+
     {#if progress.total}
       <section>
         <div class="cap">ПОДЗАДАЧИ</div>
@@ -105,5 +139,11 @@
   .tag.inh { background: transparent; border: 1px dashed var(--line); color: var(--fg2); }
   .bar { height: 6px; border-radius: 3px; background: var(--field); overflow: hidden; }
   .bar div { height: 100%; background: var(--done); }
+  .link { display: flex; gap: 8px; align-items: baseline; text-align: left; border: 0; background: transparent; padding: 3px 6px; margin: 0 -6px; border-radius: 6px; font-size: 12.5px; color: var(--link); }
+  .link:hover { background: var(--field); }
+  .link.bad { color: var(--todo); }
+  .lic { flex: 0 0 auto; color: var(--fg3); }
+  .ltx { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .src { color: var(--fg2); }
   .empty { color: var(--fg2); font-size: 12px; line-height: 1.5; padding-top: 6px; }
 </style>

@@ -23,6 +23,7 @@
     store.listen();
     const key = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === '0') { e.preventDefault(); e.altKey ? (store.showInspector = !store.showInspector) : (store.showNav = !store.showNav); }
+      if (e.metaKey && e.key === '[') { e.preventDefault(); store.back(); }
       if (e.metaKey && e.key === 'o') { e.preventDefault(); store.chooseFolder(); }
       if (e.metaKey && e.key === '1') { e.preventDefault(); store.mode = 'notes'; }
       if (e.metaKey && e.key === '2') { e.preventDefault(); store.mode = 'agenda'; }
@@ -47,6 +48,9 @@
     <div class="lights-gap"></div>
     <button class="ibtn" aria-label="Показать или скрыть навигатор" onclick={() => (store.showNav = !store.showNav)}>
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5" /><path d="M8 3.5v13" /></svg>
+    </button>
+    <button class="ibtn" aria-label="Назад (⌘[)" title="Назад (⌘[)" disabled={store.history.length === 0} onclick={() => store.back()}>
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6" /></svg>
     </button>
     <div class="path">
       <span class="pfirst">{store.mode === 'agenda' ? 'Агенда' : 'Заметки'}</span>
@@ -99,7 +103,7 @@
         </div></div>
         <div class="ed">
           <Editor text={file.text} fileKey={file.path} wf={file.wf} reveal={store.reveal}
-            onchange={(t) => store.setText(t)} oncursor={(line, col) => { store.cursor = { line, col }; }} />
+            onchange={(t) => store.setText(t)} oncursor={(line, col) => { store.cursor = { line, col }; }} onfollow={(l) => store.follow(l)} />
         </div>
         <div class="status">
           <span>Стр. {store.cursor.line + 1}, кол. {store.cursor.col}</span><span>Org</span><span>UTF-8</span>
@@ -125,7 +129,8 @@
   .lights-gap { flex: 0 0 68px; }
   :global(html:not(.tauri)) .lights-gap { flex-basis: 4px; }
   .ibtn { width: 30px; height: 28px; border: 0; background: transparent; color: var(--fg2); border-radius: 6px; padding: 0; display: flex; align-items: center; justify-content: center; }
-  .ibtn:hover { background: var(--field); }
+  .ibtn:hover:not(:disabled) { background: var(--field); }
+  .ibtn:disabled { opacity: 0.35; }
   .path {
     flex: 1 1 360px; max-width: 640px; min-width: 200px; height: 28px; display: flex; align-items: center; gap: 8px;
     padding: 0 12px; background: var(--field); border-radius: 7px; color: var(--fg2); font-size: 12.5px; white-space: nowrap; overflow: hidden;
