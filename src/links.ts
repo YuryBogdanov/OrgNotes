@@ -92,11 +92,11 @@ export interface NoteRef {
 
 const URL_TYPES = new Set(['http', 'https', 'mailto', 'tel', 'ftp']);
 
-function dirname(p: string) {
+export function dirname(p: string) {
   const i = p.lastIndexOf('/');
   return i <= 0 ? '/' : p.slice(0, i);
 }
-function normalize(p: string) {
+export function normalize(p: string) {
   const out: string[] = [];
   for (const part of p.split('/')) {
     if (part === '' || part === '.') continue;
@@ -214,4 +214,59 @@ export function backlinks(files: NoteRef[], file: number, line: number | null): 
     }
   });
   return out;
+}
+
+// ---- keeping file links valid when notes are renamed or moved --------------------
+
+function relativePath(fromDir: string, to: string): string {
+  const a = normalize(fromDir).split('/').filter(Boolean);
+  const b = normalize(to).split('/').filter(Boolean);
+  let i = 0;
+  while (i < a.length && i < b.length - 1 && a[i] === b[i]) i++;
+  return [...a.slice(i).map(() => '..'), ...b.slice(i)].join('/');
+}
+
+/**
+ * Rewrites `[[file:…]]` links of one note after notes were renamed/moved.
+ * `oldPath`/`newPath` are the note's own location before/after (equal if it did not move);
+ * `mapTarget` maps an absolute target path to where it lives now.
+ * Relative links stay relative, `::search` and descriptions are preserved.
+ */
+export function rewriteFileLinks(
+  text: string,
+  oldPath: string,
+  newPath: string,
+  mapTarget: (abs: string) => string,
+): { text: string; count: number } {
+  const links = extractLinks(text)
+    .filter((l) => l.type === 'file' && l.format === 'bracket' && l.path)
+    .sort((a, b) => b.from - a.from); // back to front keeps earlier offsets valid
+  let out = text;
+  let count = 0;
+  for (const l of links) {
+    const [p, search] = splitSearch(l.path);
+    if (!p) continue;
+    const absolute = p.startsWith('/');
+    const abs = absolute ? normalize(p) : normalize(dirname(oldPath) + '/' + p);
+    const target = mapTarget(abs);
+    let np: string;
+    if (absolute) np = target;
+    else {
+      np = relativePath(dirname(newPath), target);
+      if (p.startsWith('./') && !np.startsWith('..')) np = './' + np;
+    }
+    if (np === p) continue;
+    const next = 'file:' + np + (search != null ? '::' + search : '');
+    const slice = out.slice(l.from, l.to);
+    const at = slice.indexOf(l.raw);
+    if (at < 0) continue;
+    out = out.slice(0, l.from + at) + next + out.slice(l.from + at + l.raw.length);
+    count++;
+  }
+  return { text: out, count };
+}
+
+/** Target mapper for renaming/moving one file or a whole folder. */
+export function mapperFor(oldAbs: string, newAbs: string) {
+  return (abs: string) => (abs === oldAbs ? newAbs : abs.startsWith(oldAbs + '/') ? newAbs + abs.slice(oldAbs.length) : abs);
 }

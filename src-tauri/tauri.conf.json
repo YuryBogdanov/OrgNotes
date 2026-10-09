@@ -22,14 +22,24 @@
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "transparent": true,
-        "trafficLightPosition": { "x": 18, "y": 20 }
+        "trafficLightPosition": {
+          "x": 18,
+          "y": 20
+        },
+        "dragDropEnabled": false
       }
     ],
-    "security": { "csp": null }
+    "security": {
+      "csp": null
+    }
   },
   "bundle": {
     "active": true,
     "targets": "app",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.icns"]
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.icns"
+    ]
   }
 }
