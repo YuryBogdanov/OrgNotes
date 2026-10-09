@@ -19,6 +19,13 @@ npm run dev              # только веб-версия на http://localhos
 ORG_DIR=~/notes npx tauri dev
 ```
 
+## Тесты
+
+```bash
+npm test                 # парсер и правки (vitest)
+(cd src-tauri && cargo test)   # безопасное сохранение файлов
+```
+
 ## Принципы
 
 - `.org`-файлы остаются источником истины, формат 1:1 с Emacs.
