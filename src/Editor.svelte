@@ -4,7 +4,8 @@
   import { Decoration, EditorView, ViewPlugin, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
   import { foldGutter, foldKeymap, foldService, toggleFold } from '@codemirror/language';
-  import type { Workflow } from './org';
+  import { headingLines, type Workflow } from './org';
+  import type { Text } from '@codemirror/state';
 
   let { text, fileKey, wf, reveal, onchange, oncursor }: {
     text: string; fileKey: string; wf: Workflow;
@@ -19,15 +20,23 @@
   let lastReveal = 0;
 
   const HEAD = /^(\*+)\s/;
+  // heading lines per document version; ignores `* x` inside #+BEGIN_…/#+END_… blocks
+  const cache = new WeakMap<Text, Set<number>>();
+  const headingSet = (doc: Text) => {
+    let s = cache.get(doc);
+    if (!s) cache.set(doc, (s = headingLines(doc.toString().split('\n'))));
+    return s;
+  };
 
   const orgFold = foldService.of((state, lineStart) => {
     const line = state.doc.lineAt(lineStart);
-    const m = HEAD.exec(line.text);
-    if (!m) return null;
+    const heads = headingSet(state.doc);
+    if (!heads.has(line.number - 1)) return null;
+    const m = HEAD.exec(line.text)!;
     let end = line.to;
     for (let n = line.number + 1; n <= state.doc.lines; n++) {
       const l = state.doc.line(n);
-      const mm = HEAD.exec(l.text);
+      const mm = heads.has(n - 1) ? HEAD.exec(l.text) : null;
       if (mm && mm[1].length <= m[1].length) break;
       end = l.to;
     }
@@ -38,13 +47,14 @@
     const items: Range<Decoration>[] = [];
     const open = new Set(words.open);
     const done = new Set(words.done);
+    const heads = headingSet(v.state.doc);
     const mark = (from: number, to: number, cls: string) => items.push(Decoration.mark({ class: cls }).range(from, to));
     for (const { from, to } of v.visibleRanges) {
       let pos = from;
       while (pos <= to) {
         const line = v.state.doc.lineAt(pos);
         const t = line.text;
-        const hm = HEAD.exec(t);
+        const hm = heads.has(line.number - 1) ? HEAD.exec(t) : null;
         if (hm) {
           const lvl = Math.min(hm[1].length, 3);
           items.push(Decoration.line({ class: 'cm-h' + lvl }).range(line.from));
@@ -111,7 +121,7 @@
         keymap.of([
           { key: 'Tab', run: (v) => {
               const l = v.state.doc.lineAt(v.state.selection.main.head);
-              return HEAD.test(l.text) ? toggleFold(v) : false;
+              return headingSet(v.state.doc).has(l.number - 1) ? toggleFold(v) : false;
             } },
           ...foldKeymap, ...historyKeymap, ...defaultKeymap,
         ]),

@@ -60,15 +60,34 @@ function toDate(m: RegExpMatchArray | null): OrgDate | undefined {
   return { y: +m[1], m: +m[2], d: +m[3], time: m[4], repeater: m[5] };
 }
 
+/** 0-based indices of real heading lines; `* foo` inside #+BEGIN_…/#+END_… blocks is plain text. */
+export function headingLines(lines: Iterable<string>): Set<number> {
+  const out = new Set<number>();
+  let block: RegExp | null = null;
+  let i = 0;
+  for (const l of lines) {
+    if (block) {
+      if (block.test(l)) block = null;
+    } else {
+      const b = /^\s*#\+BEGIN_(\w+)/i.exec(l);
+      if (b) block = new RegExp(`^\\s*#\\+END_${b[1]}\\b`, 'i');
+      else if (/^\*+\s/.test(l)) out.add(i);
+    }
+    i++;
+  }
+  return out;
+}
+
 export function parseHeadings(text: string, wf: Workflow): Heading[] {
   const lines = text.split('\n');
+  const real = headingLines(lines);
   const kws = new Set([...wf.open, ...wf.done]);
   const out: Heading[] = [];
   const stack: number[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const m = /^(\*+)\s+(.*)$/.exec(lines[i]);
-    if (!m) continue;
+    if (!real.has(i)) continue;
+    const m = /^(\*+)\s+(.*)$/.exec(lines[i])!;
     const level = m[1].length;
     let rest = m[2];
     let keyword: string | null = null;
@@ -153,22 +172,105 @@ export function inactiveStamp(d = new Date()): string {
   return `[${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${WD[d.getDay()]} ${pad(d.getHours())}:${pad(d.getMinutes())}]`;
 }
 
-/** Change (or remove) the TODO keyword of one heading; maintains CLOSED: like Org does. */
-export function setKeyword(text: string, h: Heading, keyword: string | null, wf: Workflow): string {
+const WD_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WD_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
+function addUnit(d: Date, n: number, unit: string): Date {
+  const r = new Date(d);
+  if (unit === 'h') r.setHours(r.getHours() + n);
+  else if (unit === 'd') r.setDate(r.getDate() + n);
+  else if (unit === 'w') r.setDate(r.getDate() + 7 * n);
+  else {
+    // months/years: clamp to the end of a shorter month instead of overflowing
+    const day = r.getDate();
+    r.setDate(1);
+    if (unit === 'm') r.setMonth(r.getMonth() + n);
+    else r.setFullYear(r.getFullYear() + n);
+    r.setDate(Math.min(day, new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate()));
+  }
+  return r;
+}
+
+/**
+ * Next occurrence of a repeating active timestamp, as Org does when the task is completed:
+ * `+1w` shifts once, `++1w` until it is in the future, `.+1w` counts from now.
+ * Returns null when the timestamp has no (valid) repeater.
+ */
+export function shiftTimestamp(ts: string, now: Date): string | null {
+  const m = /^<(\d{4})-(\d{2})-(\d{2})((?:\s+[^\s\d>]+)?)((?:\s+\d{2}:\d{2}(?:-\d{2}:\d{2})?)?)\s+(\+\+|\.\+|\+)(\d+)([hdwmy])((?:\s+-{1,2}\d+[hdwmy])?)>$/.exec(ts);
+  if (!m) return null;
+  const [, y, mo, d, wk, time, kind, nStr, unit, warn] = m;
+  const n = +nStr;
+  if (n <= 0) return null;
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const hm = /(\d{2}):(\d{2})/.exec(time);
+  const at = (x: Date) => (hm ? new Date(x.getFullYear(), x.getMonth(), x.getDate(), +hm[1], +hm[2]) : x);
+  let date = new Date(+y, +mo - 1, +d);
+  if (kind === '+') date = addUnit(date, n, unit);
+  else if (kind === '++') {
+    const limit = hm ? now : startOfDay(now);
+    do date = addUnit(date, n, unit);
+    while (at(date) <= limit);
+  } else date = addUnit(startOfDay(now), n, unit);
+  const ru = WD_RU.includes(wk.trim());
+  const name = wk ? ' ' + (ru ? WD_RU : WD_EN)[date.getDay()] : '';
+  const pad2 = (v: number) => String(v).padStart(2, '0');
+  return `<${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}${name}${time} ${kind}${n}${unit}${warn}>`;
+}
+
+/** Set (or add) a property in the heading's :PROPERTIES: drawer, creating the drawer if needed. */
+function setProperty(lines: string[], h: Heading, key: string, value: string) {
+  let i = h.line + 1;
+  if (/^\s*(SCHEDULED|DEADLINE|CLOSED):/.test(lines[i] ?? '')) i++;
+  if (/^\s*:PROPERTIES:\s*$/i.test(lines[i] ?? '')) {
+    let j = i + 1;
+    for (; j < lines.length && !/^\s*:END:\s*$/i.test(lines[j]); j++) {
+      const m = new RegExp(`^(\\s*:${key}:)\\s*.*$`, 'i').exec(lines[j]);
+      if (m) {
+        lines[j] = `${m[1]} ${value}`;
+        return;
+      }
+    }
+    lines.splice(j, 0, `:${key}: ${value}`);
+  } else {
+    lines.splice(i, 0, ':PROPERTIES:', `:${key}: ${value}`, ':END:');
+  }
+}
+
+/** Change (or remove) the TODO keyword of one heading. Maintains CLOSED: and repeaters like Org does. */
+export function setKeyword(text: string, h: Heading, keyword: string | null, wf: Workflow, now = new Date()): string {
   const lines = text.split('\n');
   const m = /^(\*+\s+)(.*)$/.exec(lines[h.line]);
   if (!m) return text;
   let rest = m[2];
   if (h.keyword && rest.startsWith(h.keyword)) rest = rest.slice(h.keyword.length).replace(/^\s+/, '');
-  lines[h.line] = m[1] + (keyword ? keyword + ' ' : '') + rest;
+  const write = (kw: string | null) => (lines[h.line] = m[1] + (kw ? kw + ' ' : '') + rest);
+
+  // Completing a repeating task: move the date forward and go back to the first open state.
+  if (keyword !== null && wf.done.includes(keyword) && /^\s*(SCHEDULED|DEADLINE):/.test(lines[h.line + 1] ?? '')) {
+    let shifted = false;
+    lines[h.line + 1] = lines[h.line + 1].replace(/(SCHEDULED|DEADLINE):(\s*)(<[^>]*>)/g, (all, k: string, sp: string, ts: string) => {
+      const next = shiftTimestamp(ts, now);
+      if (!next) return all;
+      shifted = true;
+      return `${k}:${sp}${next}`;
+    });
+    if (shifted) {
+      write(wf.open[0] ?? 'TODO');
+      setProperty(lines, h, 'LAST_REPEAT', inactiveStamp(now));
+      return lines.join('\n');
+    }
+  }
+
+  write(keyword);
 
   const next = lines[h.line + 1] ?? '';
   const hasPlanning = /^\s*(SCHEDULED|DEADLINE|CLOSED):/.test(next);
   const isDone = keyword !== null && wf.done.includes(keyword);
-  const stripClosed = (s: string) => s.replace(/\s*CLOSED:\s*\[[^\]]*\]/, '');
+  const stripClosed = (s: string) => s.replace(/CLOSED:\s*\[[^\]]*\]\s*/, '').replace(/\s+$/, '');
 
   if (isDone && !(hasPlanning && /CLOSED:/.test(next))) {
-    const stamp = `CLOSED: ${inactiveStamp()}`;
+    const stamp = `CLOSED: ${inactiveStamp(now)}`;
     if (hasPlanning) lines[h.line + 1] = next.replace(/^(\s*)/, `$1${stamp} `);
     else lines.splice(h.line + 1, 0, stamp);
   } else if (!isDone && hasPlanning && /CLOSED:/.test(next)) {
