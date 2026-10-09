@@ -1,11 +1,13 @@
 import { resolveLink, type OrgLink } from './links';
-import { headingAt, parseHeadings, parseWorkflow, setKeyword, setPriority, type Heading, type Workflow } from './org';
+import { headingAt, joinEol, parseHeadings, parseWorkflow, setKeyword, setPriority, splitEol, type Eol, type Heading, type Workflow } from './org';
 
 export interface NoteFile {
   name: string; // relative path inside the notes folder
   path: string;
   text: string; // current (possibly edited) text
-  disk: string; // text as last read from / written to disk
+  disk: string; // same, as last read from / written to disk (LF-normalised)
+  diskRaw: string; // exactly what is on disk (original line endings)
+  eol: Eol; // line ending style of the file, restored on save
   wf: Workflow;
   headings: Heading[];
   filetags: string[];
@@ -13,11 +15,11 @@ export interface NoteFile {
 
 const isTauri = '__TAURI_INTERNALS__' in window;
 
-function build(name: string, path: string, text: string, disk = text): NoteFile {
+function build(name: string, path: string, text: string, disk: string, diskRaw: string, eol: Eol): NoteFile {
   const wf = parseWorkflow(text);
   const ft = /^#\+FILETAGS:\s*(.+)$/m.exec(text);
   return {
-    name, path, text, disk, wf,
+    name, path, text, disk, diskRaw, eol, wf,
     headings: parseHeadings(text, wf),
     filetags: ft ? ft[1].split(':').map((s) => s.trim()).filter(Boolean) : [],
   };
@@ -41,6 +43,11 @@ async function openExternal(url: string) {
 }
 
 type Listed = { name: string; path: string; text: string };
+
+function fromDisk(l: Listed): NoteFile {
+  const { text, eol } = splitEol(l.text);
+  return build(l.name, l.path, text, text, l.text, eol);
+}
 
 class Store {
   files = $state.raw<NoteFile[]>([]);
@@ -105,7 +112,7 @@ class Store {
       }
     }
     const list = this.sorted(await this.listFiles());
-    this.files = list.map((f) => build(f.name, f.path, f.text));
+    this.files = list.map(fromDisk);
     const last = lsGet('lastFile:' + (this.dir ?? ''));
     const pick = this.files.find((f) => f.path === last) ?? this.files.find((f) => f.name === 'Weekly.org') ?? this.files[0];
     this.curPath = pick?.path ?? '';
@@ -121,11 +128,12 @@ class Store {
     let adopted = '';
     this.files = list.map((n) => {
       const o = old.get(n.path);
-      if (!o) return build(n.name, n.path, n.text);
-      if (n.text === o.disk) return o; // nothing new on disk (untouched)
-      if (n.text === o.text) return { ...o, disk: n.text }; // echo of our own save
+      if (!o) return fromDisk(n);
+      if (n.text === o.diskRaw) return o; // nothing new on disk (untouched)
+      const { text } = splitEol(n.text);
+      if (text === o.text) return { ...o, disk: text, diskRaw: n.text }; // echo of our own save
       if (o.text !== o.disk) adopted = n.name; // we had unsaved edits: disk wins, but say so
-      return build(n.name, n.path, n.text);
+      return fromDisk(n);
     });
     if (adopted) this.say(`«${adopted.split('/').pop()}» изменён снаружи — загружена версия с диска`);
     if (!this.files.some((f) => f.path === this.curPath)) this.curPath = this.files[0]?.path ?? '';
@@ -157,7 +165,7 @@ class Store {
   setText(text: string, path = this.curPath) {
     const f = this.files.find((x) => x.path === path);
     if (!f || f.text === text) return;
-    const next = build(f.name, f.path, text, f.disk);
+    const next = build(f.name, f.path, text, f.disk, f.diskRaw, f.eol);
     this.files = this.files.map((x) => (x.path === path ? next : x));
     this.scheduleSave(path);
   }
@@ -224,9 +232,10 @@ class Store {
       return;
     }
     const text = f.text;
+    const out = joinEol(text, f.eol);
     try {
-      await invoke('save_org_file', { path, text, base: f.disk });
-      this.files = this.files.map((x) => (x.path === path ? { ...x, disk: text } : x));
+      await invoke('save_org_file', { path, text: out, base: f.diskRaw });
+      this.files = this.files.map((x) => (x.path === path ? { ...x, disk: text, diskRaw: out } : x));
       // typed more while the write was in flight: keep going
       const now = this.files.find((x) => x.path === path);
       if (now && now.text !== now.disk) this.scheduleSave(path);

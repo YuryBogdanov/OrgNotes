@@ -1,6 +1,14 @@
 // Minimal Org parsing + text patching. The file text stays the source of truth:
 // every edit is a targeted string patch, nothing is re-serialised from a tree.
 
+/** Files may use CRLF; inside the app text is always LF and the original style is restored on save. */
+export type Eol = '\n' | '\r\n';
+export function splitEol(raw: string): { text: string; eol: Eol } {
+  if (!raw.includes('\r')) return { text: raw, eol: '\n' };
+  return { text: raw.replace(/\r\n?/g, '\n'), eol: raw.includes('\r\n') ? '\r\n' : '\n' };
+}
+export const joinEol = (text: string, eol: Eol) => (eol === '\r\n' ? text.replace(/\n/g, '\r\n') : text);
+
 export interface OrgDate {
   y: number;
   m: number;
@@ -89,7 +97,8 @@ export function parseHeadings(text: string, wf: Workflow): Heading[] {
 
   for (let i = 0; i < lines.length; i++) {
     if (!real.has(i)) continue;
-    const m = /^(\*+)\s+(.*)$/.exec(lines[i])!;
+    const m = /^(\*+)\s+(.*)$/.exec(lines[i]);
+    if (!m) continue;
     const level = m[1].length;
     let rest = m[2];
     let keyword: string | null = null;
