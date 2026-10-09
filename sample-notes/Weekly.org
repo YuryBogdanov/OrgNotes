@@ -16,6 +16,7 @@ SCHEDULED: <2026-10-13 Tue>
 SCHEDULED: <2026-10-14 Wed>
 ** NEXT Просмотреть заявки на найм
 SCHEDULED: <2026-10-14 Wed>
+Контекст: [[id:budget-2027][бюджет 2027]], [[file:Команда/Данные/Дмитрий Орлов.org::*Цели на квартал][цели Дмитрия]], [[https://www.gnu.org/software/emacs/manual/html_node/org/][справка по Org]].
 * Четверг
 ** TODO Ревью roadmap с продуктом
 <2026-10-15 Thu 14:00>

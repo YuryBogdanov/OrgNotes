@@ -35,6 +35,8 @@ export interface Heading {
   closed?: OrgDate;
   event?: OrgDate; // bare active timestamp right under the heading
   effort?: string;
+  id?: string; // :ID: property
+  customId?: string; // :CUSTOM_ID: property
   parent: number; // index into headings array, -1 for top level
   path: string[]; // titles of ancestors
 }
@@ -134,7 +136,9 @@ export function parseHeadings(text: string, wf: Workflow): Heading[] {
       }
     }
     // planning line (line directly under heading) and property drawer
-    const body = lines.slice(h.line + 1, Math.min(h.end, h.line + 12));
+    // the heading's own text only: stop at the next heading of any level (child headings have their own)
+    const ownEnd = out[k + 1]?.line ?? lines.length;
+    const body = lines.slice(h.line + 1, Math.min(ownEnd, h.line + 12));
     const first = body[0] ?? '';
     if (/^\s*(SCHEDULED|DEADLINE|CLOSED):/.test(first)) {
       const sc = /SCHEDULED:\s*(<[^>]*>)/.exec(first);
@@ -146,8 +150,18 @@ export function parseHeadings(text: string, wf: Workflow): Heading[] {
     } else if (/^\s*<\d{4}-/.test(first)) {
       h.event = toDate(TS.exec(first));
     }
-    const ef = body.find((l) => /^\s*:Effort:/i.test(l));
-    if (ef) h.effort = ef.replace(/^\s*:Effort:\s*/i, '').trim();
+    // property drawer: first :PROPERTIES: ... :END: right below the heading/planning line
+    const start = body.findIndex((l) => /^\s*:PROPERTIES:\s*$/i.test(l));
+    if (start >= 0 && start <= 1) {
+      for (let j = start + 1; j < body.length && !/^\s*:END:\s*$/i.test(body[j]); j++) {
+        const pm = /^\s*:([^\s:]+):\s*(.*)$/.exec(body[j]);
+        if (!pm) continue;
+        const key = pm[1].toUpperCase();
+        if (key === 'EFFORT') h.effort = pm[2].trim();
+        else if (key === 'ID') h.id = pm[2].trim();
+        else if (key === 'CUSTOM_ID') h.customId = pm[2].trim();
+      }
+    }
   }
   return out;
 }
