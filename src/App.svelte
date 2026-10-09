@@ -20,8 +20,10 @@
 
   onMount(() => {
     store.load();
+    store.listen();
     const key = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === '0') { e.preventDefault(); e.altKey ? (store.showInspector = !store.showInspector) : (store.showNav = !store.showNav); }
+      if (e.metaKey && e.key === 'o') { e.preventDefault(); store.chooseFolder(); }
       if (e.metaKey && e.key === '1') { e.preventDefault(); store.mode = 'notes'; }
       if (e.metaKey && e.key === '2') { e.preventDefault(); store.mode = 'agenda'; }
     };
@@ -78,7 +80,17 @@
     {/if}
 
     <main class="center">
-      {#if store.mode === 'agenda'}
+      {#if store.needFolder}
+        <div class="welcome">
+          <svg width="44" height="44" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.2" stroke-linejoin="round"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" /></svg>
+          <h1>Выберите папку с заметками</h1>
+          <p>Приложение читает и пишет обычные <code>.org</code>-файлы. Подпапки тоже учитываются, правки из Emacs подхватываются сразу.</p>
+          <div class="wbtns">
+            <button class="wprimary" onclick={() => store.chooseFolder()}>Выбрать папку…</button>
+            {#if store.hasSample}<button class="wsecondary" onclick={() => store.useSample()}>Открыть примеры</button>{/if}
+          </div>
+        </div>
+      {:else if store.mode === 'agenda'}
         <Agenda />
       {:else if file}
         <div class="tabs"><div class="tab">
@@ -87,11 +99,11 @@
         </div></div>
         <div class="ed">
           <Editor text={file.text} fileKey={file.path} wf={file.wf} reveal={store.reveal}
-            onchange={(t) => store.setText(t)} oncursor={(line, col) => (store.cursor = { line, col })} />
+            onchange={(t) => store.setText(t)} oncursor={(line, col) => { store.cursor = { line, col }; }} />
         </div>
         <div class="status">
           <span>Стр. {store.cursor.line + 1}, кол. {store.cursor.col}</span><span>Org</span><span>UTF-8</span>
-          <span class="grow">{store.saveState === 'saving' ? 'Сохранение…' : store.saveState === 'saved' ? 'Сохранено' : 'Только в памяти (браузер)'}</span>
+          <span class="grow">{store.notice || (store.saveState === 'saving' ? 'Сохранение…' : store.saveState === 'saved' ? 'Сохранено' : 'Только в памяти (браузер)')}</span>
           <span>{file.name}</span>
         </div>
       {/if}
@@ -142,4 +154,12 @@
     border-top: 1px solid var(--line); font-size: 11.5px; color: var(--fg2);
   }
   .grow { margin-left: auto; }
+  .welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px; text-align: center; }
+  .welcome h1 { margin: 6px 0 0; font-size: 20px; font-weight: 700; }
+  .welcome p { margin: 0; max-width: 420px; color: var(--fg2); line-height: 1.5; }
+  .welcome code { font-family: var(--mono); font-size: 12px; background: var(--field); padding: 1px 5px; border-radius: 4px; }
+  .wbtns { display: flex; gap: 10px; margin-top: 8px; }
+  .wprimary, .wsecondary { height: 30px; padding: 0 16px; border: 0; border-radius: 6px; font-size: 13px; }
+  .wprimary { background: var(--acc); color: var(--onacc); font-weight: 600; }
+  .wsecondary { background: var(--field); }
 </style>

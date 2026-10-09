@@ -69,7 +69,12 @@
 </script>
 
 <div class="nav">
-  <div class="title">НАВИГАТОР</div>
+  <div class="head">
+    <span class="title" title={store.dir ?? ''}>{store.dir ? store.dir.split('/').pop() : 'НАВИГАТОР'}</span>
+    <button class="open" aria-label="Выбрать папку заметок (⌘O)" title="Выбрать папку заметок (⌘O)" onclick={() => store.chooseFolder()}>
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" /></svg>
+    </button>
+  </div>
   <div class="list">
     {#each rows as r (r.key)}
       <div class="row" class:sel={r.selected} class:dim={r.done} style="padding-left:{6 + r.depth * 14}px" role="treeitem" aria-selected={r.selected} tabindex="-1"
@@ -94,7 +99,10 @@
 
 <style>
   .nav { height: 100%; display: flex; flex-direction: column; min-width: 0; }
-  .title { padding: 12px 14px 6px; font-size: 11px; font-weight: 600; color: var(--fg2); letter-spacing: 0.02em; }
+  .head { display: flex; align-items: center; gap: 6px; padding: 8px 8px 4px 14px; }
+  .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; color: var(--fg2); letter-spacing: 0.02em; text-transform: uppercase; }
+  .open { width: 26px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); display: flex; align-items: center; justify-content: center; }
+  .open:hover { background: var(--field); }
   .list { flex: 1; overflow: auto; padding: 0 6px 10px; }
   .row { display: flex; align-items: center; gap: 5px; height: 24px; border-radius: 6px; padding-right: 8px; white-space: nowrap; }
   .row.sel { background: var(--sel); }
