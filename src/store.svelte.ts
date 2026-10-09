@@ -71,6 +71,8 @@ class Store {
   history = $state.raw<{ path: string; line: number }[]>([]);
   notice = $state('');
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
+  private saving = 0; // saves in flight
+  private writes = 0; // bumped after every successful write: a snapshot of the disk taken across a bump may be stale
   private noticeTimer: ReturnType<typeof setTimeout> | undefined;
 
   get cur(): number {
@@ -115,45 +117,63 @@ class Store {
         return;
       }
     }
+    // gather everything first and publish it in one go: the UI becomes usable the moment `files` is set,
+    // and anything the user does after that must not be overwritten by the tail of this function
     const list = this.sorted(await this.listFiles());
-    this.files = list.map(fromDisk);
-    await this.loadFolders();
+    const files = list.map(fromDisk);
+    const folders = await this.readFolders(files);
     const last = lsGet('lastFile:' + (this.dir ?? ''));
-    const pick = this.files.find((f) => f.path === last) ?? this.files.find((f) => f.name === 'Weekly.org') ?? this.files[0];
+    const pick = files.find((f) => f.path === last) ?? files.find((f) => f.name === 'Weekly.org') ?? files[0];
+    this.folders = folders;
     this.curPath = pick?.path ?? '';
     this.cursor = { line: 0, col: 0 };
+    this.files = files;
     this.loaded = true;
   }
 
-  private async loadFolders() {
-    if (isTauri) {
-      this.folders = await invoke<string[]>('list_folders');
-    } else {
-      const set = new Set<string>();
-      for (const f of this.files) {
-        const parts = f.name.split('/').slice(0, -1);
-        parts.forEach((_, i) => set.add(parts.slice(0, i + 1).join('/')));
-      }
-      this.folders = [...set];
+  private async readFolders(files: { name: string }[]): Promise<string[]> {
+    if (isTauri) return invoke<string[]>('list_folders');
+    const set = new Set<string>();
+    for (const f of files) {
+      const parts = f.name.split('/').slice(0, -1);
+      parts.forEach((_, i) => set.add(parts.slice(0, i + 1).join('/')));
     }
+    return [...set];
   }
 
-  /** Re-read the folder after something changed on disk, keeping unsaved local edits. */
+  /**
+   * Re-read the folder after something changed on disk, keeping unsaved local edits.
+   * A disk snapshot is only trusted if no save of ours was running or finished while it was being
+   * read; otherwise it can be older than what we already wrote (and than what the user typed on
+   * top of it) and applying it would revert text and throw the cursor around.
+   */
   async reload() {
     if (!this.dir && isTauri) return;
-    const list = this.sorted(await this.listFiles());
-    await this.loadFolders();
+    for (let attempt = 0; attempt < 6; attempt++) {
+      for (let i = 0; this.saving > 0 && i < 100; i++) await new Promise((r) => setTimeout(r, 20));
+      const seq = this.writes;
+      const list = this.sorted(await this.listFiles());
+      const folders = await this.readFolders(list);
+      if (this.saving > 0 || this.writes !== seq) continue; // stale snapshot, take a new one
+      this.applySnapshot(list, folders);
+      return;
+    }
+    // we keep writing: the echo of our last save will trigger another reload
+  }
+
+  private applySnapshot(list: Listed[], folders: string[]) {
     const old = new Map(this.files.map((f) => [f.path, f]));
     let adopted = '';
     this.files = list.map((n) => {
       const o = old.get(n.path);
       if (!o) return fromDisk(n);
-      if (n.text === o.diskRaw) return o; // nothing new on disk (untouched)
+      if (n.text === o.diskRaw) return o; // nothing new on disk (untouched, or the echo of our own save)
       const { text } = splitEol(n.text);
-      if (text === o.text) return { ...o, disk: text, diskRaw: n.text }; // echo of our own save
+      if (text === o.text) return { ...o, disk: text, diskRaw: n.text };
       if (o.text !== o.disk) adopted = n.name; // we had unsaved edits: disk wins, but say so
       return fromDisk(n);
     });
+    this.folders = folders;
     if (adopted) this.say(`«${adopted.split('/').pop()}» изменён снаружи — загружена версия с диска`);
     if (!this.files.some((f) => f.path === this.curPath)) this.curPath = this.files[0]?.path ?? '';
   }
@@ -362,18 +382,27 @@ class Store {
     }
     const text = f.text;
     const out = joinEol(text, f.eol);
+    let failure: unknown = null;
+    this.saving++;
     try {
       await invoke('save_org_file', { path, text: out, base: f.diskRaw });
+      this.writes++;
       this.files = this.files.map((x) => (x.path === path ? { ...x, disk: text, diskRaw: out } : x));
-      // typed more while the write was in flight: keep going
-      const now = this.files.find((x) => x.path === path);
-      if (now && now.text !== now.disk) this.scheduleSave(path);
-      else this.saveState = 'saved';
     } catch (e) {
-      this.saveState = 'saved';
-      if (String(e) === 'conflict') await this.reload();
-      else this.say('Не удалось сохранить: ' + e);
+      failure = e;
+    } finally {
+      this.saving--;
     }
+    if (failure) {
+      this.saveState = 'saved';
+      if (String(failure) === 'conflict') await this.reload();
+      else this.say('Не удалось сохранить: ' + failure);
+      return;
+    }
+    // typed more while the write was in flight: keep going
+    const now = this.files.find((x) => x.path === path);
+    if (now && now.text !== now.disk) this.scheduleSave(path);
+    else this.saveState = 'saved';
   }
 }
 

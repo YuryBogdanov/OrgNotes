@@ -28,8 +28,8 @@ const clickEndOf = async (page: Page, text: string) => {
   await page.locator('.cm-line', { hasText: text }).first().click();
   await page.keyboard.press('End');
 };
-const open = async (page: Page, files: Record<string, string>, eventDelayMs?: number) => {
-  await installTauriMock(page, files, { eventDelayMs });
+const open = async (page: Page, files: Record<string, string>, eventDelayMs?: number, listDelayMs?: number) => {
+  await installTauriMock(page, files, { eventDelayMs, listDelayMs });
   await page.goto('/');
   await expect(page.locator('.cm-content')).toContainText('#+TITLE');
 };
@@ -117,4 +117,43 @@ test('unsaved local edits are not written over an external change', async ({ pag
   expect((await log(page)).some((e) => e[0] === 'conflict')).toBe(true);
   await expect(page.locator('.cm-content')).toContainText('внешняя');
   await expect(page.locator('.status')).toContainText('изменён снаружи');
+});
+
+test('continuous typing survives slow disk reads racing with autosave echoes', async ({ page }) => {
+  // reads take 250 ms and the watcher echo arrives 100 ms after a save: the snapshot a reload gets is
+  // older than what the user has typed by the time it is applied
+  await open(page, { [WEEKLY]: LF }, 100, 250);
+  await clickEndOf(page, 'ещё текст');
+  const line = (await cursor(page)).line;
+
+  const typed = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  for (const ch of typed) {
+    await page.keyboard.type(ch, { delay: 0 });
+    await page.waitForTimeout(110);
+    expect((await cursor(page)).line).toBe(line);
+  }
+  await page.waitForTimeout(1500);
+
+  await expect(page.locator('.cm-activeLine')).toHaveText('ещё текст' + typed);
+  expect(await disk(page)).toContain('ещё текст' + typed);
+  await expect(page.locator('.status')).not.toContainText('изменён снаружи');
+});
+
+test('every keystroke followed by a save and a slow reload: nothing is reverted, cursor stays', async ({ page }) => {
+  // a save fires 500 ms after each pause, its echo arrives after 100 ms and the reload then reads for ~500 ms,
+  // so the next character is typed while the previous save's reload is still in flight
+  await open(page, { [WEEKLY]: LF }, 100, 250);
+  await clickEndOf(page, 'ещё текст');
+  const line = (await cursor(page)).line;
+
+  const typed = 'abcdefghij';
+  for (const ch of typed) {
+    await page.keyboard.type(ch, { delay: 0 });
+    await page.waitForTimeout(560);
+    expect((await cursor(page)).line).toBe(line);
+    await expect(page.locator('.cm-activeLine')).toContainText('ещё текст' + typed.slice(0, typed.indexOf(ch) + 1));
+  }
+  await page.waitForTimeout(1500);
+  expect(await disk(page)).toContain('ещё текст' + typed);
+  await expect(page.locator('.status')).not.toContainText('изменён снаружи');
 });

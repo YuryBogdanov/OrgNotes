@@ -5,9 +5,9 @@ import type { Page } from '@playwright/test';
  * debounced `notes-changed` event the Rust side produces, so the real save → watch → reload
  * cycle of the front end runs in a plain browser.
  */
-export async function installTauriMock(page: Page, files: Record<string, string>, opts: { eventDelayMs?: number } = {}) {
+export async function installTauriMock(page: Page, files: Record<string, string>, opts: { eventDelayMs?: number; listDelayMs?: number } = {}) {
   await page.addInitScript(
-    ({ files, eventDelay }) => {
+    ({ files, eventDelay, listDelay }) => {
       const w = window as any;
       const disk: Record<string, string> = { ...files };
       const cbs: Record<number, (e: unknown) => void> = {};
@@ -43,6 +43,12 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           if (cmd === 'get_notes_dir') return '/mock';
           if (cmd === 'sample_notes_dir') return null;
           if (cmd === 'list_org_files') {
+            // snapshot first, answer later: like a slow disk read racing with the user's typing
+            const snapshot = Object.entries(disk).map(([path, text]) => ({ name: path.replace('/mock/', ''), path, text }));
+            if (listDelay) await new Promise((r) => setTimeout(r, listDelay));
+            return snapshot;
+          }
+          if (cmd === 'list_org_files__old') {
             return Object.entries(disk).map(([path, text]) => ({ name: path.replace('/mock/', ''), path, text }));
           }
           if (cmd === 'save_org_file') {
@@ -57,6 +63,7 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             return;
           }
           if (cmd === 'list_folders') {
+            if (listDelay) await new Promise((r) => setTimeout(r, listDelay));
             const out = new Set<string>(folders);
             for (const p of Object.keys(disk)) {
               const parts = p.replace('/mock/', '').split('/').slice(0, -1);
@@ -133,6 +140,6 @@ export async function installTauriMock(page: Page, files: Record<string, string>
         },
       };
     },
-    { files, eventDelay: opts.eventDelayMs ?? 300 },
+    { files, eventDelay: opts.eventDelayMs ?? 300, listDelay: opts.listDelayMs ?? 0 },
   );
 }
