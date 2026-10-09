@@ -41,25 +41,159 @@ export interface Heading {
   path: string[]; // titles of ancestors
 }
 
-export const DEFAULT_WORKFLOW: Workflow = { open: ['TODO', 'NEXT', 'WAIT'], done: ['DONE', 'CANCELLED'] };
+export interface WorkflowState {
+  name: string;
+  done: boolean;
+  key?: string; // quick-select letter, like TODO(t)
+  color?: string; // gray | red | blue | orange | green | purple
+}
+
+/** One status sequence, e.g. "Задачи": NEW TODO IN-PROGRESS | DONE. The first state is where new items start. */
+export interface WorkflowDef {
+  name: string;
+  states: WorkflowState[];
+}
+
+export interface Workflow {
+  open: string[]; // all not-done keywords of all sequences (flat; used for recognition)
+  done: string[]; // all done keywords
+  sequences?: WorkflowDef[];
+  primary?: number; // sequence used for headings that have no keyword yet
+  source?: 'file' | 'project' | 'default';
+}
+
+export interface ProjectConfig {
+  workflows: WorkflowDef[];
+}
+
+export const EMPTY_CONFIG: ProjectConfig = { workflows: [] };
+
+const stateOf = (name: string, done: boolean): WorkflowState => ({ name, done });
+
+export const DEFAULT_SEQUENCE: WorkflowDef = {
+  name: 'Задачи',
+  states: [stateOf('TODO', false), stateOf('NEXT', false), stateOf('WAIT', false), stateOf('DONE', true), stateOf('CANCELLED', true)],
+};
+
+export function fromSequences(sequences: WorkflowDef[], primary: number, source: Workflow['source']): Workflow {
+  const all = sequences.flatMap((s) => s.states);
+  return {
+    open: [...new Set(all.filter((s) => !s.done).map((s) => s.name))],
+    done: [...new Set(all.filter((s) => s.done).map((s) => s.name))],
+    sequences,
+    primary,
+    source,
+  };
+}
+
+export const DEFAULT_WORKFLOW: Workflow = fromSequences([DEFAULT_SEQUENCE], 0, 'default');
+
+/** The sequence a keyword belongs to; without a keyword (or an unknown one) the file's primary sequence. */
+export function sequenceFor(wf: Workflow, keyword: string | null): WorkflowDef {
+  const seqs = wf.sequences;
+  if (!seqs?.length) {
+    // plain {open, done} object (older callers, tests)
+    return { name: '', states: [...wf.open.map((n) => stateOf(n, false)), ...wf.done.map((n) => stateOf(n, true))] };
+  }
+  const own = keyword ? seqs.find((s) => s.states.some((x) => x.name === keyword)) : undefined;
+  return own ?? seqs[Math.min(wf.primary ?? 0, seqs.length - 1)];
+}
+export const firstOpen = (s: WorkflowDef) => s.states.find((x) => !x.done)?.name ?? s.states[0]?.name ?? 'TODO';
+export const firstDone = (s: WorkflowDef) => s.states.find((x) => x.done)?.name ?? null;
 
 const stripKey = (w: string) => w.replace(/\(.*\)$/, '');
 
-export function parseWorkflow(text: string): Workflow {
-  const open: string[] = [];
-  const done: string[] = [];
+/** `#+TODO:` lines of a file, one sequence per line. */
+export function parseFileSequences(text: string): WorkflowDef[] {
+  const out: WorkflowDef[] = [];
   for (const m of text.matchAll(/^#\+(?:SEQ_|TYP_)?TODO:\s*(.+)$/gm)) {
     const [a, b] = m[1].split('|');
-    const left = a.trim().split(/\s+/).filter(Boolean).map(stripKey);
+    const left = a.trim().split(/\s+/).filter(Boolean);
+    const right = b === undefined ? [] : b.trim().split(/\s+/).filter(Boolean);
+    const states: WorkflowState[] = [];
     if (b === undefined) {
-      done.push(left.pop()!);
-      open.push(...left);
+      // no bar: the last word is the done state
+      const last = left.pop();
+      left.forEach((w) => states.push(stateOf(stripKey(w), false)));
+      if (last) states.push(stateOf(stripKey(last), true));
     } else {
-      open.push(...left);
-      done.push(...b.trim().split(/\s+/).filter(Boolean).map(stripKey));
+      left.forEach((w) => states.push(stateOf(stripKey(w), false)));
+      right.forEach((w) => states.push(stateOf(stripKey(w), true)));
     }
+    if (states.length) out.push({ name: `#+TODO ${out.length + 1}`, states });
   }
-  return open.length || done.length ? { open, done } : DEFAULT_WORKFLOW;
+  return out;
+}
+
+/** Statuses declared in the file itself only; DEFAULT_WORKFLOW when there are none. */
+export function parseWorkflow(text: string): Workflow {
+  const seqs = parseFileSequences(text);
+  return seqs.length ? fromSequences(seqs, 0, 'file') : DEFAULT_WORKFLOW;
+}
+
+/**
+ * Statuses that apply to one file. Precedence: `#+TODO:` in the file, then the project's workflows
+ * (the first one is where a heading without a status starts), then the built-in default.
+ */
+export function resolveWorkflow(text: string, _relPath: string, cfg: ProjectConfig): Workflow {
+  const own = parseFileSequences(text);
+  if (own.length) return fromSequences(own, 0, 'file');
+  if (!cfg.workflows.length) return DEFAULT_WORKFLOW;
+  return fromSequences(cfg.workflows, 0, 'project');
+}
+
+const KEYWORD = /^[^\s()|:]+$/;
+const COLORS = new Set(['gray', 'red', 'blue', 'orange', 'green', 'purple']);
+
+/** Reads `.orgnotes/config.json`. Never throws: problems become warnings and the offending part is skipped. */
+export function parseProjectConfig(json: string): { config: ProjectConfig; warnings: string[] } {
+  const warnings: string[] = [];
+  let raw: any;
+  try {
+    raw = JSON.parse(json);
+  } catch (e) {
+    return { config: EMPTY_CONFIG, warnings: ['config.json: ' + String(e)] };
+  }
+  const workflows: WorkflowDef[] = [];
+  for (const w of Array.isArray(raw?.workflows) ? raw.workflows : []) {
+    const name = typeof w?.name === 'string' ? w.name.trim() : '';
+    if (!name) {
+      warnings.push('workflow без имени пропущен');
+      continue;
+    }
+    const states: WorkflowState[] = [];
+    for (const st of Array.isArray(w.states) ? w.states : []) {
+      // status names are Org keywords: no spaces, so "IN PROGRESS" becomes "IN-PROGRESS"
+      const n = typeof st?.name === 'string' ? st.name.trim().replace(/\s+/g, '-') : '';
+      if (!KEYWORD.test(n)) {
+        warnings.push(`${name}: недопустимое имя статуса «${st?.name}»`);
+        continue;
+      }
+      if (states.some((x) => x.name === n)) continue;
+      // Org cannot tell which sequence to cycle a repeated keyword in, so a status belongs to one workflow only
+      const owner = workflows.find((x) => x.states.some((y) => y.name === n));
+      if (owner) {
+        warnings.push(`статус ${n} уже есть в workflow «${owner.name}», в «${name}» он пропущен`);
+        continue;
+      }
+      states.push({
+        name: n,
+        done: st.done === true,
+        key: typeof st.key === 'string' && st.key.length === 1 ? st.key : undefined,
+        color: COLORS.has(st.color) ? st.color : undefined,
+      });
+    }
+    if (!states.length) {
+      warnings.push(`workflow «${name}» без статусов пропущен`);
+      continue;
+    }
+    if (workflows.some((x) => x.name === name)) {
+      warnings.push(`workflow «${name}» объявлен дважды, второй пропущен`);
+      continue;
+    }
+    workflows.push({ name, states });
+  }
+  return { config: { workflows }, warnings };
 }
 
 const TS = /<(\d{4})-(\d{2})-(\d{2})(?:\s+[^\s\d>]+)?(?:\s+(\d{2}:\d{2}))?(?:\s+([.+]{1,2}\d+[hdwmy]))?[^>]*>/;
@@ -279,7 +413,7 @@ export function setKeyword(text: string, h: Heading, keyword: string | null, wf:
       return `${k}:${sp}${next}`;
     });
     if (shifted) {
-      write(wf.open[0] ?? 'TODO');
+      write(firstOpen(sequenceFor(wf, h.keyword)));
       setProperty(lines, h, 'LAST_REPEAT', inactiveStamp(now));
       return lines.join('\n');
     }
@@ -336,8 +470,14 @@ export const fmtLong = (d: Date) => `${WD_FULL[d.getDay()]}, ${d.getDate()} ${MO
 export const fmtDay = (d: Date) => `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
 export const weekdayName = (d: Date) => WD_FULL[d.getDay()][0].toUpperCase() + WD_FULL[d.getDay()].slice(1);
 
-/** CSS custom property that colours a keyword. */
+const COLOR_VAR: Record<string, string> = {
+  gray: '--fg3', red: '--todo', blue: '--next', orange: '--wait', green: '--done', purple: '--purple',
+};
+
+/** CSS custom property that colours a keyword: the state's own colour, else by name, else by done/open. */
 export function kwTone(kw: string, wf: Workflow): string {
+  const st = wf.sequences?.flatMap((s) => s.states).find((x) => x.name === kw);
+  if (st?.color && COLOR_VAR[st.color]) return COLOR_VAR[st.color];
   const known: Record<string, string> = { TODO: '--todo', NEXT: '--next', WAIT: '--wait', DONE: '--done', CANCELLED: '--fg3' };
   if (known[kw]) return known[kw];
   return wf.done.includes(kw) ? '--done' : '--todo';
