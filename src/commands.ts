@@ -154,6 +154,10 @@ register({
   when: () => store.files.length > 0, run: () => gotoStep(),
 });
 register({
+  id: 'outline', title: 'Показать структуру файла', icon: 'head', group: 'general', synonyms: ['структура', 'заголовки', 'outline', 'оглавление'],
+  when: (c) => !!c.file, run: () => store.showOutline(),
+});
+register({
   id: 'chooseFolder', title: 'Выбрать рабочую папку…', icon: 'folder', group: 'general', synonyms: ['открыть папку'],
   when: (c) => c.noFolder, run: () => void store.chooseFolder(),
 });
@@ -234,7 +238,7 @@ export function mainStep(c: Ctx): Step {
 
 /** «#»: the headings of the current file, indented by level (ТЗ про навигатор, раздел 3, will say more). */
 function headingRows(c: Ctx, q: string): Row[] {
-  if (!c.file) return [NOTHING];
+  if (!c.file) return [{ id: 'none', group: '', title: 'Откройте файл, чтобы перейти к заголовку' }];
   const f = c.file;
   const rows = f.headings.flatMap((h, i): Row[] => {
     const title = bare(h.title);

@@ -276,6 +276,8 @@
   }
 
   const TABS = ['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Файлы'];
+  const READY = ['Основные', 'Статусы'];
+  let tab = $state('Статусы');
   const bannerCount = $derived(problems.length + Object.keys(errors).length);
 </script>
 
@@ -286,13 +288,26 @@
     <header>
       <div class="tabs" role="tablist" aria-label="Разделы настроек">
         {#each TABS as t}
-          <button role="tab" aria-selected={t === 'Статусы'} class:on={t === 'Статусы'} disabled={t !== 'Статусы'} title={t === 'Статусы' ? '' : 'Пока не реализовано'}>{t}</button>
+          <button role="tab" aria-selected={t === tab} class:on={t === tab} disabled={!READY.includes(t)} title={READY.includes(t) ? '' : 'Пока не реализовано'} onclick={() => (tab = t)}>{t}</button>
         {/each}
       </div>
       <span class="flash" class:show={savedFlash}>Сохранено в .orgnotes/config.json</span>
       {#if !standalone}<button class="close" aria-label="Закрыть настройки" onclick={() => (store.settingsOpen = false)}>×</button>{/if}
     </header>
 
+    {#if tab === 'Основные'}
+      <div class="body">
+        <section class="general" aria-label="Основные">
+          <div class="cap">НАВИГАТОР</div>
+          <div class="opt">
+            <label for="nav-headings">Показывать заголовки в навигаторе</label>
+            <button id="nav-headings" class="switch" role="switch" aria-checked={store.navHeadings} aria-label="Показывать заголовки в навигаторе"
+              onclick={() => store.setNavHeadings(!store.navHeadings)}><span></span></button>
+          </div>
+          <p class="help">Структура файла всегда есть в инспекторе, на вкладке «Структура», и в командной палитре по «#». Настройка хранится на этом Mac.</p>
+        </section>
+      </div>
+    {:else}
     <div class="body">
       <aside>
         <div class="cap">НАБОРЫ СТАТУСОВ</div>
@@ -446,6 +461,7 @@
         </section>
       {/if}
     </div>
+    {/if}
 
     {#if picker && pickerState}
       <ColorPicker value={pickerState.color} keyword={pickerState.keyword} fallback={toneFor(pickerState.keyword || 'X', asWorkflow)}
@@ -522,6 +538,16 @@
   .chip { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
   .add { width: 100%; margin-top: 4px; height: 30px; border: 1px dashed var(--line); background: transparent; border-radius: 7px; color: var(--acc); }
   .help { font-size: 12px; line-height: 1.5; color: var(--fg2); padding: 10px 6px; }
+  .general { max-width: 560px; }
+  .opt { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; background: var(--side); border: 1px solid var(--line); border-radius: 8px; }
+  .opt label { font-size: 13px; }
+  /* a macOS switch */
+  .switch { flex: 0 0 auto; position: relative; width: 32px; height: 18px; padding: 0; border: 0; border-radius: 9px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); transition: background 0.15s; }
+  .switch span { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: var(--onpacc); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s; }
+  .switch[aria-checked='true'] { background: var(--acc); box-shadow: none; }
+  .switch[aria-checked='true'] span { transform: translateX(14px); }
+  .switch:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .switch, .switch span { transition: none; } }
 
   section { flex: 1; min-width: 0; overflow: auto; padding: 18px 22px 24px; display: flex; flex-direction: column; gap: 14px; }
   .head { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }

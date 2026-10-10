@@ -43,15 +43,19 @@
       for (const c of kids) {
         const key = c.rel + '/';
         const open = isOpen(key, true);
-        out.push({ key, kind: 'folder', depth, label: c.name, open, hasKids: true, rel: c.rel });
+        // an empty folder has no chevron (its column stays, so the names line up)
+        const full = c.children.size + c.files.length > 0 || store.creating?.dir === c.rel;
+        out.push({ key, kind: 'folder', depth, label: c.name, open: open && full, hasKids: full, rel: c.rel });
         if (open) walk(c, depth + 1);
       }
       for (const i of n.files) {
         const f = store.files[i];
-        const fopen = isOpen(f.path, i === store.cur);
+        // headings show only with "Показывать заголовки в навигаторе"; the outline lives in the inspector
+        const kids = store.navHeadings && f.headings.length > 0;
+        const fopen = kids && isOpen(f.path, i === store.cur);
         out.push({
-          key: f.path, kind: 'file', depth, label: noExt(base(f.name)), open: fopen, hasKids: f.headings.length > 0,
-          rel: f.name, file: i, selected: i === store.cur && store.selected < 0,
+          key: f.path, kind: 'file', depth, label: noExt(base(f.name)), open: fopen, hasKids: kids,
+          rel: f.name, file: i, selected: i === store.cur && (!fopen || store.selected < 0),
         });
         if (!fopen) continue;
         let hiddenUntil = -1;
@@ -76,14 +80,49 @@
     return out;
   });
 
+  const toggle = (r: Row) => (toggled.has(r.key) ? toggled.delete(r.key) : toggled.add(r.key));
   function click(r: Row) {
     if (r.kind === 'new') return;
-    if (r.kind === 'folder') toggled.has(r.key) ? toggled.delete(r.key) : toggled.add(r.key);
-    else store.open(r.file!, r.line ?? 0);
+    focusKey = r.key;
+    if (r.kind === 'folder') {
+      if (r.hasKids) toggle(r);
+    } else store.open(r.file!, r.line ?? 0);
   }
   function chev(e: MouseEvent, r: Row) {
     e.stopPropagation();
-    toggled.has(r.key) ? toggled.delete(r.key) : toggled.add(r.key);
+    focusKey = r.key;
+    toggle(r);
+  }
+
+  // ---- keyboard, as in Finder: ↑↓ move, → opens (then goes in), ← closes (then goes to the parent), ↩ opens a file
+  let focusKey = $state<string | null>(null);
+  function setFocus(k: string) {
+    focusKey = k;
+    queueMicrotask(() => listEl?.querySelector<HTMLElement>(`[data-key="${CSS.escape(k)}"]`)?.focus());
+  }
+  function key(e: KeyboardEvent) {
+    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    const list = rows.filter((r) => r.kind !== 'new');
+    const i = list.findIndex((r) => r.key === focusKey);
+    const r = list[i];
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const next = list[Math.max(0, Math.min(list.length - 1, i < 0 ? 0 : i + (e.key === 'ArrowDown' ? 1 : -1)))];
+      if (next) setFocus(next.key);
+    } else if (e.key === 'ArrowRight' && r) {
+      e.preventDefault();
+      if (r.hasKids && !r.open) toggle(r);
+      else if (r.open && list[i + 1]) setFocus(list[i + 1].key);
+    } else if (e.key === 'ArrowLeft' && r) {
+      e.preventDefault();
+      if (r.hasKids && r.open) toggle(r);
+      else {
+        for (let j = i - 1; j >= 0; j--) if (list[j].depth < r.depth) return setFocus(list[j].key);
+      }
+    } else if (e.key === 'Enter' && r && r.kind !== 'folder') {
+      e.preventDefault();
+      store.open(r.file!, r.line ?? 0);
+    }
   }
 
   // ---- "Показать в навигаторе" -------------------------------------------------------
@@ -197,11 +236,11 @@
     </button>
   </div>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="list" bind:this={listEl} class:rootdrop={dropOn === ''} oncontextmenu={emptyMenu}
+  <div class="list" bind:this={listEl} class:rootdrop={dropOn === ''} oncontextmenu={emptyMenu} onkeydown={key}
     ondragover={(e) => over(e, '')} ondrop={(e) => drop(e, '')} ondragleave={() => (dropOn = null)}>
     {#each rows as r (r.key)}
       {#if r.kind === 'new'}
-        <div class="row" style="padding-left:{6 + r.depth * 14 + 19}px">
+        <div class="row" style="padding-left:{6 + r.depth * 14 + 16}px">
           <svg class="ic" width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.5" stroke-linejoin="round">
             {#if store.creating?.kind === 'folder'}<path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" />{:else}<path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" />{/if}
           </svg>
@@ -212,14 +251,16 @@
       {:else}
         <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
         <div class="row" class:sel={r.selected} class:flash={r.kind === 'file' && flash === r.key} class:dim={r.done} data-key={r.key} class:drop={r.kind === 'folder' && dropOn === r.rel}
-          style="padding-left:{6 + r.depth * 14}px" role="treeitem" aria-selected={r.selected} tabindex="-1"
+          style="padding-left:{6 + r.depth * 14}px" role="treeitem" aria-selected={r.selected} aria-expanded={r.hasKids ? r.open : undefined}
+          tabindex={r.key === focusKey ? 0 : -1}
           draggable={store.canManageFiles && (r.kind === 'file' || r.kind === 'folder') && store.renaming !== r.rel}
           ondragstart={(e) => dragStart(e, r)} ondragend={() => (dragRel = dropOn = null)}
           ondragover={(e) => r.kind === 'folder' && over(e, r.rel)}
           ondrop={(e) => r.kind === 'folder' && drop(e, r.rel)}
           oncontextmenu={(e) => rowMenu(e, r)}
-          onclick={() => click(r)} ondblclick={() => store.canManageFiles && r.kind !== 'heading' && (store.renaming = r.rel)} onkeydown={() => {}}>
-          <button class="chev" class:hide={!r.hasKids} aria-label="Свернуть или развернуть" onclick={(e) => chev(e, r)}>
+          onclick={() => click(r)} ondblclick={() => store.canManageFiles && r.kind !== 'heading' && (store.renaming = r.rel)}>
+          <!-- the chevron column is there on every row; a file shows its chevron only when open or under the pointer -->
+          <button class="chev" class:hide={!r.hasKids} class:fh={r.kind === 'file' && !r.open} tabindex="-1" aria-label="Свернуть или развернуть" onclick={(e) => chev(e, r)}>
             <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate({r.open ? 90 : 0}deg)"><path d="M4 2l4 4-4 4" /></svg>
           </button>
           {#if r.kind === 'folder'}
@@ -255,13 +296,17 @@
   .open:hover { background: var(--field); }
   .list { flex: 1; overflow: auto; padding: 0 6px 10px; border-radius: 6px; }
   .list.rootdrop { box-shadow: inset 0 0 0 2px var(--acc); }
-  .row { display: flex; align-items: center; gap: 5px; height: 24px; border-radius: 6px; padding-right: 8px; white-space: nowrap; }
+  .row { display: flex; align-items: center; gap: 6px; height: 24px; border-radius: 6px; padding-right: 8px; white-space: nowrap; }
   .row.sel { background: var(--sel); }
   .row.flash { background: var(--sel); box-shadow: inset 0 0 0 1.5px var(--acc); }
   .row.drop { background: var(--sel); box-shadow: inset 0 0 0 1.5px var(--acc); }
   .row.dim .label { color: var(--fg3); }
-  .chev { flex: 0 0 14px; width: 14px; height: 14px; padding: 0; border: 0; background: transparent; color: var(--fg3); display: flex; align-items: center; justify-content: center; }
+  .row:focus { outline: none; }
+  .row:focus-visible { box-shadow: inset 0 0 0 1.5px var(--acc); }
+  .chev { flex: 0 0 10px; width: 10px; height: 14px; padding: 0; border: 0; background: transparent; color: var(--fg3); display: flex; align-items: center; justify-content: center; }
   .chev.hide { visibility: hidden; }
+  .chev.fh { opacity: 0; }
+  .row:hover .chev.fh { opacity: 1; }
   .ic { flex: 0 0 auto; }
   .kw { flex: 0 0 auto; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; letter-spacing: 0.02em; }
   .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

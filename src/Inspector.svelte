@@ -4,6 +4,7 @@
   import { dayDiff, firstDone, fmtShort, sequenceFor, startOf, subtreeProgress, toJs, toneFor } from './org';
   import { toneStyle } from './colors';
   import { displayName } from './names';
+  import Outline from './Outline.svelte';
 
   const f = $derived(store.file);
   const h = $derived(f && store.selected >= 0 ? f.headings[store.selected] : undefined);
@@ -39,7 +40,17 @@
 </script>
 
 <div class="insp">
-  {#if h && f}
+  <div class="tabs" role="tablist" aria-label="Инспектор">
+    <button role="tab" aria-label="Задача" title="Задача" aria-selected={store.inspectorTab === 'task'} class:on={store.inspectorTab === 'task'} onclick={() => store.setInspectorTab('task')}>
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5l1.5 1.5 3-3M3.5 12.5l1.5 1.5 3-3M11 5.5h6M11 12.5h6" /></svg>
+    </button>
+    <button role="tab" aria-label="Структура" title="Структура" aria-selected={store.inspectorTab === 'outline'} class:on={store.inspectorTab === 'outline'} onclick={() => store.setInspectorTab('outline')}>
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h8M6 9h8M9 13.5h8M3 4.5v.01M6 9v.01M9 13.5v.01" /></svg>
+    </button>
+  </div>
+  {#if store.inspectorTab === 'outline'}
+    <Outline />
+  {:else if h && f}
     <section>
       <div class="cap">ЗАДАЧА</div>
       <div class="name">{h.title}</div>
@@ -146,7 +157,11 @@
 </div>
 
 <style>
-  .insp { height: 100%; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 16px; }
+  .insp { height: 100%; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+  .tabs { flex: 0 0 auto; display: flex; align-self: flex-start; padding: 2px; background: var(--field); border-radius: 8px; gap: 2px; }
+  .tabs button { width: 34px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); display: flex; align-items: center; justify-content: center; padding: 0; }
+  .tabs button.on { background: var(--segon); color: var(--acc); box-shadow: var(--shadow); }
+  .tabs button:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
   section { display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
   section:last-child { border-bottom: 0; }
   .cap { font-size: 11px; font-weight: 600; color: var(--fg2); letter-spacing: 0.02em; }

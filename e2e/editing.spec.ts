@@ -78,7 +78,7 @@ test('typing a link character by character keeps the cursor and renders only the
 test('a CRLF file loads, keeps its cursor while typing and is saved back as CRLF', async ({ page }) => {
   const crlf = LF.replace(/\n/g, '\r\n');
   await open(page, { [WEEKLY]: crlf });
-  await expect(page.locator('.nav')).toContainText('Первая');
+  await expect(page.locator('.cm-content')).toContainText('Первая');
   await clickEndOf(page, 'строка один');
   const line = (await cursor(page)).line;
 

@@ -78,7 +78,7 @@ test.describe('modes', () => {
     await expect(plate).toContainText('[#A] Подготовить бюджет 2027');
     await expect(plate.locator('.right')).toHaveText('work · строка 4');
     expect(await groups(page)).toEqual(['К ЗАГОЛОВКУ', 'ОБЩИЕ']);
-    expect(await titles(page)).toEqual(['Сменить статус…', 'Запланировать…', 'Поставить дедлайн…', 'Изменить теги…', 'Перенести в другой файл…', 'Создать файл…', 'Создать папку…', 'Новая задача', 'Перейти к файлу…']);
+    expect(await titles(page)).toEqual(['Сменить статус…', 'Запланировать…', 'Поставить дедлайн…', 'Изменить теги…', 'Перенести в другой файл…', 'Создать файл…', 'Создать папку…', 'Новая задача', 'Перейти к файлу…', 'Показать структуру файла']);
     await expect(selected(page)).toHaveText('Сменить статус…');
   });
 
@@ -207,7 +207,7 @@ test.describe('keyboard and mouse', () => {
     await at(page, 'Подготовить бюджет');
     await palette(page);
     await page.keyboard.press('ArrowUp'); // round to the last
-    await expect(selected(page)).toHaveText('Перейти к файлу…');
+    await expect(selected(page)).toHaveText('Показать структуру файла');
     await page.keyboard.press('ArrowDown');
     await expect(selected(page)).toHaveText('Сменить статус…');
     for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowDown');
