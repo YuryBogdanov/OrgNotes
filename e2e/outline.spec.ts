@@ -183,3 +183,96 @@ test('Option+Left/Right still move by word in body text', async ({ page }) => {
   await page.keyboard.type('X');
   await expect(page.locator('.cm-activeLine')).toHaveText('alpha Xbody');
 });
+
+const CONFIG = JSON.stringify({
+  version: 1,
+  workflows: [
+    { name: 'Задачи', states: [{ name: 'NEW' }, { name: 'TODO' }, { name: 'DONE', done: true }] },
+    { name: 'Встречи', states: [{ name: 'MEETING' }, { name: 'FINISHED', done: true }] },
+    { name: 'Цели', states: [{ name: 'BACKLOG' }, { name: 'ACTIVE' }, { name: 'COMPLETED', done: true }] },
+  ],
+});
+
+test.describe('status rotation', () => {
+  const openStatuses = async (page: Page, line = '* Заметка') => {
+    await installTauriMock(page, { '/mock/Keys.org': `${line}\nтекст\n`, '/mock/.orgnotes/config.json': CONFIG });
+    await page.goto('/');
+    await expect(page.locator('.cm-content')).toContainText('текст');
+    await page.locator('.cm-line').first().click();
+    await page.keyboard.press('End');
+  };
+  const firstLine = (page: Page) => page.locator('.cm-line').first().innerText();
+
+  test('Shift+Right walks the statuses of the heading\'s workflow and removes the status after the last', async ({ page }) => {
+    await openStatuses(page);
+    await page.keyboard.press('Shift+ArrowRight');
+    expect(await firstLine(page)).toBe('* NEW Заметка'); // none -> first status of the first workflow
+    await page.keyboard.press('Shift+ArrowRight');
+    expect(await firstLine(page)).toBe('* TODO Заметка');
+    await page.keyboard.press('Shift+ArrowRight');
+    expect(await firstLine(page)).toBe('* DONE Заметка');
+    await page.keyboard.press('Shift+ArrowRight');
+    expect(await firstLine(page)).toBe('* Заметка'); // after the last: plain heading
+  });
+
+  test('Shift+Left goes back and clears the status on the first status of any workflow', async ({ page }) => {
+    await openStatuses(page, '* TODO Заметка');
+    await page.keyboard.press('Shift+ArrowLeft');
+    expect(await firstLine(page)).toBe('* NEW Заметка');
+    await page.keyboard.press('Shift+ArrowLeft');
+    expect(await firstLine(page)).toBe('* Заметка');
+    await page.keyboard.press('Shift+ArrowLeft'); // no status: first status of the first workflow again
+    expect(await firstLine(page)).toBe('* NEW Заметка');
+  });
+
+  test('a status that is the first of a later workflow is cleared by Shift+Left too', async ({ page }) => {
+    await openStatuses(page, '* ACTIVE Цель');
+    await page.keyboard.press('Shift+ArrowLeft');
+    expect(await firstLine(page)).toBe('* BACKLOG Цель');
+    await page.keyboard.press('Shift+ArrowLeft');
+    expect(await firstLine(page)).toBe('* Цель');
+  });
+
+  test('Ctrl+Shift+Right jumps to the first status of the next workflow, and off the last', async ({ page }) => {
+    await openStatuses(page);
+    await page.keyboard.press('Control+Shift+ArrowRight');
+    expect(await firstLine(page)).toBe('* NEW Заметка');
+    await page.keyboard.press('Control+Shift+ArrowRight');
+    expect(await firstLine(page)).toBe('* MEETING Заметка');
+    await page.keyboard.press('Control+Shift+ArrowRight');
+    expect(await firstLine(page)).toBe('* BACKLOG Заметка');
+    await page.keyboard.press('Control+Shift+ArrowRight');
+    expect(await firstLine(page)).toBe('* Заметка');
+  });
+
+  test('Ctrl+Shift+Left goes to the previous workflow and clears the status from the first one', async ({ page }) => {
+    await openStatuses(page, '* COMPLETED Цель');
+    await page.keyboard.press('Control+Shift+ArrowLeft');
+    expect(await firstLine(page)).toBe('* MEETING Цель');
+    await page.keyboard.press('Control+Shift+ArrowLeft');
+    expect(await firstLine(page)).toBe('* NEW Цель');
+    await page.keyboard.press('Control+Shift+ArrowLeft');
+    expect(await firstLine(page)).toBe('* Цель');
+  });
+
+  test('finishing sets CLOSED, leaving removes it, the caret stays on the heading', async ({ page }) => {
+    await openStatuses(page, '* TODO Заметка');
+    await page.keyboard.press('Shift+ArrowRight');
+    await expect(page.locator('.cm-line').nth(1)).toContainText('CLOSED:');
+    await page.keyboard.type('!');
+    expect(await firstLine(page)).toBe('* DONE Заметка!');
+    await page.keyboard.press('Shift+ArrowLeft');
+    await expect(page.locator('.cm-content')).not.toContainText('CLOSED:');
+    expect(await firstLine(page)).toBe('* TODO Заметка!');
+  });
+
+  test('in body text Shift+arrows still select', async ({ page }) => {
+    await openStatuses(page);
+    await page.locator('.cm-line', { hasText: 'текст' }).click();
+    await page.keyboard.press('End');
+    await page.keyboard.press('Shift+ArrowLeft');
+    await page.keyboard.type('X');
+    await expect(page.locator('.cm-line', { hasText: 'текс' })).toHaveText('тексX'); // the selected last letter was replaced
+    expect(await firstLine(page)).toBe('* Заметка');
+  });
+});

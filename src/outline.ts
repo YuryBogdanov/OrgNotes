@@ -1,7 +1,7 @@
 // Structure editing in the spirit of Org's M-RET, M-left/right, M-up/down, S-up/down.
 // Pure functions: text + caret offset in, text edits + new caret out. The editor applies them as one
 // transaction, so one ⌘Z undoes one command.
-import { firstOpen, headingLines, parseHeadings, sequenceFor, setPriority, type Workflow } from './org';
+import { firstOpen, headingLines, parseHeadings, sequenceFor, setKeyword, setPriority, type Workflow, type WorkflowDef } from './org';
 
 export interface Edit {
   from: number;
@@ -216,3 +216,68 @@ export const nextCycleState = (current: number | undefined, max: number) => ((cu
 
 /** First open state of the file's first workflow, for M-S-RET. */
 export const newTaskState = (wf: Workflow) => firstOpen(sequenceFor(wf, null));
+
+// ---- Shift+←/→ and Ctrl+Shift+←/→ : status and workflow rotation --------------------
+
+const sequencesOf = (wf: Workflow): WorkflowDef[] => (wf.sequences?.length ? wf.sequences : [sequenceFor(wf, null)]);
+
+/**
+ * Shift+→ / Shift+←: the next / previous status inside the heading's own workflow.
+ *  - no status: the first status of the first workflow (either direction)
+ *  - → after the last status: the status is removed
+ *  - ← on the first status of any workflow: the status is removed
+ */
+export function rotateStatus(wf: Workflow, keyword: string | null, dir: 'next' | 'prev'): string | null {
+  const seqs = sequencesOf(wf);
+  const seq = keyword ? seqs.find((s) => s.states.some((x) => x.name === keyword)) : undefined;
+  if (!seq || !keyword) return seqs[0].states[0].name;
+  const i = seq.states.findIndex((x) => x.name === keyword);
+  if (dir === 'next') return i + 1 < seq.states.length ? seq.states[i + 1].name : null;
+  return i === 0 ? null : seq.states[i - 1].name;
+}
+
+/**
+ * Ctrl+Shift+→ / Ctrl+Shift+←: jump to the first status of the next / previous workflow.
+ *  - no status: the first status of the first workflow (either direction)
+ *  - → from the last workflow, and ← from the first one: the status is removed
+ */
+export function rotateWorkflow(wf: Workflow, keyword: string | null, dir: 'next' | 'prev'): string | null {
+  const seqs = sequencesOf(wf);
+  const k = keyword ? seqs.findIndex((s) => s.states.some((x) => x.name === keyword)) : -1;
+  if (k < 0) return seqs[0].states[0].name;
+  const to = dir === 'next' ? k + 1 : k - 1;
+  return to >= 0 && to < seqs.length ? seqs[to].states[0].name : null;
+}
+
+/** Apply a status change to the heading on the caret's line (CLOSED, repeaters etc. as in setKeyword). */
+export function changeStatusAt(
+  text: string,
+  caret: number,
+  how: (wf: Workflow, keyword: string | null) => string | null,
+  wf: Workflow,
+  now = new Date(),
+): Result | null {
+  const c = ctx(text);
+  const ln = lineAt(c, caret);
+  if (!c.real.has(ln)) return null;
+  const h = parseHeadings(text, wf).find((x) => x.line === ln);
+  if (!h) return null;
+  const updated = setKeyword(text, h, how(wf, h.keyword), wf, now);
+  if (updated === text) return null;
+  // one minimal edit (keyword on the heading line, and CLOSED / LAST_REPEAT lines below it)
+  let a = 0;
+  const max = Math.min(text.length, updated.length);
+  while (a < max && text[a] === updated[a]) a++;
+  let b = 0;
+  while (b < max - a && text[text.length - 1 - b] === updated[updated.length - 1 - b]) b++;
+  const from = a;
+  const to = text.length - b;
+  const insert = updated.slice(a, updated.length - b);
+  // the caret stays on its heading line, after the keyword it was after before
+  const oldLine = c.lines[ln];
+  const newLine = updated.split('\n')[ln];
+  const keywordAt = /^\*+\s+/.exec(oldLine)![0].length;
+  const col = caret - c.starts[ln];
+  const next = c.starts[ln] + (col >= keywordAt ? col + (newLine.length - oldLine.length) : col);
+  return { changes: [{ from, to, insert }], caret: next };
+}

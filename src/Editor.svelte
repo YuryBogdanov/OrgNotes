@@ -6,7 +6,7 @@
   import { foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
   import { headingLines, kwTone, type Workflow } from './org';
   import { extractLinks, type OrgLink } from './links';
-  import { cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, shiftSubtree, type Result } from './outline';
+  import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftSubtree, type Result } from './outline';
   import type { Text } from '@codemirror/state';
 
   let { text, fileKey, wf, reveal, onchange, oncursor, onfollow }: {
@@ -252,6 +252,11 @@
             { key: 'Alt-ArrowDown', run: (v) => onHeading(v) && run(v, moveSubtree(v.state.doc.toString(), sel(v).head, 1)) },
             { key: 'Shift-ArrowUp', run: (v) => onHeading(v) && run(v, cyclePriority(v.state.doc.toString(), sel(v).head, 'up', words)) },
             { key: 'Shift-ArrowDown', run: (v) => onHeading(v) && run(v, cyclePriority(v.state.doc.toString(), sel(v).head, 'down', words)) },
+            // statuses: Shift+←/→ inside the workflow, Ctrl+Shift+←/→ between workflows (heading lines only)
+            { key: 'Shift-ArrowRight', run: (v) => onHeading(v) && run(v, changeStatusAt(v.state.doc.toString(), sel(v).head, (w, k) => rotateStatus(w, k, 'next'), words)) },
+            { key: 'Shift-ArrowLeft', run: (v) => onHeading(v) && run(v, changeStatusAt(v.state.doc.toString(), sel(v).head, (w, k) => rotateStatus(w, k, 'prev'), words)) },
+            { key: 'Ctrl-Shift-ArrowRight', run: (v) => onHeading(v) && run(v, changeStatusAt(v.state.doc.toString(), sel(v).head, (w, k) => rotateWorkflow(w, k, 'next'), words)) },
+            { key: 'Ctrl-Shift-ArrowLeft', run: (v) => onHeading(v) && run(v, changeStatusAt(v.state.doc.toString(), sel(v).head, (w, k) => rotateWorkflow(w, k, 'prev'), words)) },
             { key: 'Shift-Tab', run: cycleVisibility },
           ]),
         ),

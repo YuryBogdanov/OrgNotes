@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { cyclePriority, foldTargets, insertHeading, moveSubtree, nextCycleState, shiftSubtree, type Result } from './outline';
-import { DEFAULT_WORKFLOW } from './org';
+import { changeStatusAt, cyclePriority, foldTargets, insertHeading, moveSubtree, nextCycleState, rotateStatus, rotateWorkflow, shiftSubtree, type Result } from './outline';
+import { DEFAULT_WORKFLOW, resolveWorkflow } from './org';
 
 const apply = (text: string, r: Result | null) => {
   if (!r) return null;
@@ -164,5 +164,85 @@ describe('visibility cycle (S-Tab)', () => {
       seq.push(s);
     }
     expect(seq).toEqual([0, 1, 2, 3, 0]);
+  });
+});
+
+describe('status and workflow rotation', () => {
+  const wf = resolveWorkflow('', 'x.org', {
+    workflows: [
+      { name: 'Задачи', states: [{ name: 'NEW', done: false }, { name: 'TODO', done: false }, { name: 'DONE', done: true }] },
+      { name: 'Встречи', states: [{ name: 'MEETING', done: false }, { name: 'FINISHED', done: true }] },
+      { name: 'Цели', states: [{ name: 'BACKLOG', done: false }, { name: 'ACTIVE', done: false }, { name: 'COMPLETED', done: true }] },
+    ],
+  });
+
+  describe('rotateStatus (Shift+←/→)', () => {
+    it('no status: the first status of the first workflow, either direction', () => {
+      expect(rotateStatus(wf, null, 'next')).toBe('NEW');
+      expect(rotateStatus(wf, null, 'prev')).toBe('NEW');
+    });
+    it('→ walks the statuses of its own workflow and removes the status after the last one', () => {
+      expect(rotateStatus(wf, 'NEW', 'next')).toBe('TODO');
+      expect(rotateStatus(wf, 'TODO', 'next')).toBe('DONE');
+      expect(rotateStatus(wf, 'DONE', 'next')).toBeNull();
+      expect(rotateStatus(wf, 'MEETING', 'next')).toBe('FINISHED');
+    });
+    it('← goes back and removes the status on the first status of any workflow', () => {
+      expect(rotateStatus(wf, 'DONE', 'prev')).toBe('TODO');
+      expect(rotateStatus(wf, 'NEW', 'prev')).toBeNull();
+      expect(rotateStatus(wf, 'MEETING', 'prev')).toBeNull();
+      expect(rotateStatus(wf, 'BACKLOG', 'prev')).toBeNull();
+    });
+  });
+
+  describe('rotateWorkflow (Ctrl+Shift+←/→)', () => {
+    it('no status: the first status of the first workflow, either direction', () => {
+      expect(rotateWorkflow(wf, null, 'next')).toBe('NEW');
+      expect(rotateWorkflow(wf, null, 'prev')).toBe('NEW');
+    });
+    it('→ jumps to the first status of the next workflow, from any status', () => {
+      expect(rotateWorkflow(wf, 'NEW', 'next')).toBe('MEETING');
+      expect(rotateWorkflow(wf, 'DONE', 'next')).toBe('MEETING');
+      expect(rotateWorkflow(wf, 'FINISHED', 'next')).toBe('BACKLOG');
+    });
+    it('→ after the last workflow removes the status', () => {
+      expect(rotateWorkflow(wf, 'ACTIVE', 'next')).toBeNull();
+    });
+    it('← goes to the previous workflow and removes the status from the first workflow', () => {
+      expect(rotateWorkflow(wf, 'MEETING', 'prev')).toBe('NEW');
+      expect(rotateWorkflow(wf, 'COMPLETED', 'prev')).toBe('MEETING');
+      expect(rotateWorkflow(wf, 'NEW', 'prev')).toBeNull();
+    });
+    it('with a single workflow it behaves as a toggle', () => {
+      expect(rotateWorkflow(DEFAULT_WORKFLOW, null, 'next')).toBe('TODO');
+      expect(rotateWorkflow(DEFAULT_WORKFLOW, 'NEXT', 'next')).toBeNull();
+    });
+  });
+
+  describe('changeStatusAt', () => {
+    const NOW = new Date(2026, 9, 10, 12, 0);
+    const press = (s: string, how: Parameters<typeof changeStatusAt>[2]) => {
+      const { text, caret } = at(s);
+      return show(apply(text, changeStatusAt(text, caret, how, wf, NOW)));
+    };
+    it('sets, rotates and removes the keyword keeping the rest of the line and the caret', () => {
+      expect(press('* Задача| :a:\n', (w, k) => rotateStatus(w, k, 'next'))).toBe('* NEW Задача| :a:\n');
+      expect(press('* TODO Задача|\n', (w, k) => rotateStatus(w, k, 'next'))).toBe('* DONE Задача|\nCLOSED: [2026-10-10 Sat 12:00]\n');
+      expect(press('* NEW Задача|\n', (w, k) => rotateStatus(w, k, 'prev'))).toBe('* Задача|\n');
+    });
+    it('a caret in the title keeps its place relative to the text', () => {
+      expect(press('* TODO Зада|ча\n', (w, k) => rotateStatus(w, k, 'prev'))).toBe('* NEW Зада|ча\n');
+    });
+    it('leaving a done status removes CLOSED', () => {
+      expect(press('* DONE Задача|\nCLOSED: [2026-10-08 Thu 18:20]\n', (w, k) => rotateStatus(w, k, 'prev'))).toBe('* TODO Задача|\n');
+    });
+    it('a repeating task goes back to the start of its own workflow when finished', () => {
+      const out = press('* MEETING Планёрка|\nSCHEDULED: <2026-10-12 Mon +1w>\n', (w, k) => rotateStatus(w, k, 'next'));
+      expect(out).toBe('* MEETING Планёрка|\nSCHEDULED: <2026-10-19 Mon +1w>\n:PROPERTIES:\n:LAST_REPEAT: [2026-10-10 Sat 12:00]\n:END:\n');
+    });
+    it('does nothing off a heading line', () => {
+      const { text, caret } = at('* TODO A\nbo|dy\n');
+      expect(changeStatusAt(text, caret, (w, k) => rotateStatus(w, k, 'next'), wf)).toBeNull();
+    });
   });
 });
