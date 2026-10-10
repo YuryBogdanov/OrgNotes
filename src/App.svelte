@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { store } from './store.svelte';
   import Navigator from './Navigator.svelte';
   import Inspector from './Inspector.svelte';
@@ -7,6 +7,7 @@
   import SaveAsSheet from './SaveAsSheet.svelte';
   import CloseSheet from './CloseSheet.svelte';
   import Palette from './Palette.svelte';
+  import DiskSheet from './DiskSheet.svelte';
   import { installMenu, type AppMenu } from './menu';
   import { MIN_PANE, secondKind } from './layout';
   import { displayPath } from './names';
@@ -61,6 +62,13 @@
   // ---- the layout survives a restart ----------------------------------------------------------------------
   $effect(() => {
     if (store.loaded && !isSettingsWindow) store.persistLayout();
+  });
+  // a file changed or vanished on disk under edits: ask when the window is in front, no sheet is up and its tab
+  // is shown — one question at a time
+  $effect(() => {
+    void [store.conflicts, store.orphans, store.sheetOpen, store.appActive, store.layout.active];
+    for (const p of store.layout.panes) void p.tabs[p.active]?.path;
+    if (!isSettingsWindow) untrack(() => store.pumpDisk());
   });
 
   // ---- menu bar and shortcuts -------------------------------------------------------------------------------
@@ -200,6 +208,13 @@
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
   {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
   {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
+  {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
+  {#if store.toast}
+    <div class="toast" role="status">
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 10a6.5 6.5 0 1 1-2-4.7M16.5 3.5V6.5h-3" /></svg>
+      <span>{store.toast.text}</span>
+    </div>
+  {/if}
   {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
   {#if store.settingsOpen}<Settings />{/if}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -288,6 +303,9 @@
 {/if}
 
 <style>
+  /* «обновлён с диска»: does not take the focus or block typing, goes after 4 s */
+  .toast { position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 9px 14px; background: var(--bar); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); font-size: 12.5px; color: var(--fg); pointer-events: none; }
+  .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .win { height: 100%; display: flex; flex-direction: column; }
   .toolbar {
     flex: 0 0 52px; display: flex; align-items: center; gap: 12px; padding: 0 14px;
