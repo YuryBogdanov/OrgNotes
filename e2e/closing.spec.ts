@@ -93,7 +93,7 @@ test.describe('one file', () => {
     await page.keyboard.press('Enter'); // still unwritable
     const err = sheet(page);
     await expect(err.locator('#cs-title')).toHaveText('Не удалось сохранить «work»');
-    await expect(err).toContainText('нет прав на запись');
+    await expect(err).toContainText('Нет прав на запись. Текст остался в редакторе.');
     await btn(page, 'ОК').click();
     expect(await labels(page)).toEqual(['work']);
     await expect(page.locator('.cm-line').first()).toHaveText('* Q4 2026 правка');
