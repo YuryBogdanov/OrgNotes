@@ -13,7 +13,7 @@
   let { text, fileKey, wf, reveal, initial, hint = '', onchange, oncursor, onfollow }: {
     hint?: string; // grey placeholder in an empty document
     text: string; fileKey: string; wf: Workflow;
-    reveal: { line: number; n: number; focus?: boolean } | null | undefined;
+    reveal: { line: number; n: number; focus?: boolean; col?: number } | null | undefined;
     initial?: { line: number; col: number }; // where the caret of this tab was (restored when the tab is shown)
     onchange: (t: string) => void;
     oncursor: (line: number, col: number) => void;
@@ -343,7 +343,8 @@
     if (!view || !r || r.n === lastReveal) return;
     lastReveal = r.n;
     const ln = Math.min(r.line + 1, view.state.doc.lines);
-    const pos = view.state.doc.line(ln).from;
+    const line = view.state.doc.line(ln);
+    const pos = line.from + Math.min(r.col ?? 0, line.length); // a new task puts the caret after its keyword
     view.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: 'center' }) });
     if (r.focus !== false) view.focus(); // a task opened from the agenda keeps the focus in the agenda
   });

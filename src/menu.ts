@@ -25,6 +25,8 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
           items: [
             it('newTab', 'Новая вкладка', 'CmdOrCtrl+KeyT'),
             it('newFile', 'Новый файл', 'CmdOrCtrl+N'),
+            it('paletteNewFile', 'Создать файл…', 'Shift+CmdOrCtrl+KeyN'),
+            it('paletteGoto', 'Перейти к файлу…', 'Shift+CmdOrCtrl+KeyO'),
             it('openFolder', 'Открыть папку…', 'CmdOrCtrl+O'),
             sep,
             it('save', 'Сохранить…', 'CmdOrCtrl+S'),
@@ -45,6 +47,8 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
         {
           text: 'Вид',
           items: [
+            it('palette', 'Командная палитра', 'Shift+CmdOrCtrl+KeyP'),
+            sep,
             it('splitRight', 'Разделить вправо', 'CmdOrCtrl+Backslash'),
             it('splitDown', 'Разделить вниз', 'Alt+CmdOrCtrl+Backslash', false),
             sep,
