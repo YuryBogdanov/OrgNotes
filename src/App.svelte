@@ -6,6 +6,7 @@
   import Pane from './Pane.svelte';
   import SaveAsSheet from './SaveAsSheet.svelte';
   import CloseSheet from './CloseSheet.svelte';
+  import Palette from './Palette.svelte';
   import { installMenu, type AppMenu } from './menu';
   import { MIN_PANE, secondKind } from './layout';
   import { displayPath } from './names';
@@ -73,6 +74,9 @@
       store.creating = { dir, kind: 'file' };
     },
     newTab: () => store.newUntitled(store.layout.active),
+    palette: () => store.togglePalette(),
+    paletteNewFile: () => store.openPalette('newFile'),
+    paletteGoto: () => store.openPalette('goto'),
     closePane: () => store.closePane(store.layout.active),
     openFolder: () => store.chooseFolder(),
     closeTab: () => store.closeActiveTab(),
@@ -127,6 +131,9 @@
     if (e.altKey && e.code === 'KeyW') return 'closeOthers';
     if (e.ctrlKey && e.code === 'KeyW') return 'closePane';
     if (e.shiftKey && e.code === 'KeyW') return 'closeWindow';
+    if (e.shiftKey && e.code === 'KeyP') return 'palette';
+    if (e.shiftKey && e.code === 'KeyN') return 'paletteNewFile';
+    if (e.shiftKey && e.code === 'KeyO') return 'paletteGoto';
     if (e.altKey && e.code === 'KeyC') return 'copyPath';
     if (e.shiftKey && e.code === 'KeyJ') return 'revealInNav';
     if (e.code === 'Backslash' || k === '\\') return e.shiftKey ? 'keepOne' : e.altKey ? null : 'splitRight';
@@ -142,7 +149,7 @@
     store.listen();
     if (isSettingsWindow) return;
     // while a sheet is up, menu commands do nothing
-    const guarded = Object.fromEntries(Object.entries(actions).map(([id, run]) => [id, () => { if (!store.sheetOpen) run(); }]));
+    const guarded = Object.fromEntries(Object.entries(actions).map(([id, run]) => [id, () => { if (!store.sheetOpen || (id === 'palette' && store.palette)) run(); }]));
     installMenu(guarded).then((m) => (menu = m));
     // closing the window asks about unsaved tabs first, like quitting
     if ('__TAURI_INTERNALS__' in window && !(window as any).__ORG_SETTINGS_OVERLAY__) {
@@ -159,8 +166,8 @@
     }
     const key = (e: KeyboardEvent) => {
       if (menu) return; // the menu bar owns the shortcuts
-      if (store.sheetOpen) return; // the sheet has the keyboard
       const id = shortcut(e);
+      if (store.sheetOpen && !(id === 'palette' && store.palette)) return; // the sheet has the keyboard; ⇧⌘P closes the palette
       if (!id) return;
       if (id === 'settings' && store.settingsOpen) {
         e.preventDefault();
@@ -192,6 +199,7 @@
   <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
   {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
+  {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
   {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
   {#if store.settingsOpen}<Settings />{/if}
   <!-- svelte-ignore a11y_no_static_element_interactions -->

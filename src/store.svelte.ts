@@ -5,7 +5,8 @@ import {
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { displayName, noteName, withOrg } from './names';
-import { EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, splitEol, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
+import { appendTask, refile, setPlanning, setTags } from './edits';
+import { EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
 export interface NoteFile {
   name: string; // relative path inside the notes folder
@@ -77,7 +78,18 @@ class Store {
   errorReq = $state<{ title: string; text: string; resolve: () => void } | null>(null);
   /** While a sheet is up the rest of the window does not react: no shortcuts, no menu commands. */
   get sheetOpen() {
-    return !!(this.unsavedReq || this.saveAsReq || this.errorReq);
+    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette);
+  }
+  /** The command palette; `start` opens it right at a step ("Создать файл…" ⇧⌘N, "Перейти к файлу…" ⇧⌘O). */
+  palette = $state<{ start?: 'newFile' | 'goto'; n: number } | null>(null);
+  openPalette(start?: 'newFile' | 'goto') {
+    if (this.unsavedReq || this.saveAsReq || this.errorReq) return;
+    this.palette = { start, n: Date.now() };
+  }
+  /** ⇧⌘P: opens, or closes an open palette. */
+  togglePalette() {
+    if (this.palette) this.palette = null;
+    else this.openPalette();
   }
   /** "Показать в навигаторе": expand to this file and mark it for a moment. */
   navReveal = $state<{ path: string; n: number } | null>(null);
@@ -366,6 +378,29 @@ class Store {
   }
   setKeyword(kw: string | null) { this.patch((t, h, wf) => setKeyword(t, h, kw, wf)); }
   setPriority(p: string | null) { this.patch((t, h) => setPriority(t, h, p)); }
+  setPlanning(kind: 'SCHEDULED' | 'DEADLINE', date: Date | null) { this.patch((t, h) => setPlanning(t, h, kind, date)); }
+  setTags(tags: string[]) { this.patch((t, h) => setTags(t, h, tags)); }
+
+  /** "Перенести в другой файл…": the heading under the cursor with its subtree goes to the end of file `to`. */
+  refileTo(to: number) {
+    const f = this.file;
+    const h = f?.headings[this.selected];
+    const dst = this.files[to];
+    if (!f || !h || !dst || dst.path === f.path) return;
+    const r = refile(f.text, h, dst.text);
+    this.setText(r.src, f.path);
+    this.setText(r.dst, dst.path);
+    this.say(`Перенесено в «${displayName(dst.name)}»`);
+  }
+  /** "Новая задача": a top-level task at the end of the current file, the caret after its keyword. */
+  newTask() {
+    const f = this.file;
+    const t = this.tab;
+    if (!f || t?.kind !== 'file') return;
+    const r = appendTask(f.text, startOf(sequenceFor(f.wf, null)));
+    this.setText(r.text, f.path);
+    t.reveal = { line: r.line, n: Date.now(), focus: true, col: 1e9 };
+  }
 
   /**
    * Open a file in the active pane: a tab that already shows it is reused, the active file tab is retargeted
@@ -672,6 +707,10 @@ class Store {
 
   get canManageFiles() {
     return isTauri && !!this.dir;
+  }
+  /** The app runs but no notes folder is chosen yet. */
+  get needsFolder() {
+    return isTauri && !this.dir;
   }
 
   abs(rel: string) {

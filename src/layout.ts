@@ -12,7 +12,7 @@ export interface Tab {
   kind: TabKind;
   path?: string; // file tabs
   cursor: Cursor;
-  reveal?: { line: number; n: number; focus: boolean } | null; // a request to move the caret there and scroll to it
+  reveal?: { line: number; n: number; focus: boolean; col?: number } | null; // a request to move the caret there and scroll to it
   fromAgenda?: { line: number; title: string } | null; // "Открыто из агенды" caption
   title?: string; // untitled tabs: "Без названия", "Без названия 2", …
   text?: string; // untitled tabs: the text, not on disk until "Сохранить как…"
