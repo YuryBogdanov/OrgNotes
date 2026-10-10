@@ -4,6 +4,7 @@ import {
   newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
+import { displayName, withOrg } from './names';
 import { EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, splitEol, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
 export interface NoteFile {
@@ -305,7 +306,7 @@ class Store {
       return fromDisk(n, this.config);
     });
     this.folders = folders;
-    if (adopted) this.say(`«${adopted.split('/').pop()}» изменён снаружи — загружена версия с диска`);
+    if (adopted) this.say(`«${displayName(adopted)}» изменён снаружи — загружена версия с диска`);
     // a file that disappeared closes its tabs, in both panes
     dropMissing(this.layout, (p) => this.files.some((f) => f.path === p));
   }
@@ -545,23 +546,16 @@ class Store {
     try {
       const path = isTauri
         ? await invoke<string>('save_new_file', { parent: this.abs(dirRel), name, text: t.text ?? '', overwrite })
-        : `${dirRel ? dirRel + '/' : ''}${/\.[^.]+$/.test(name) ? name : name + '.org'}`;
+        : `${dirRel ? dirRel + '/' : ''}${withOrg(name)}`;
       lsSet('saveAsDir:' + (this.dir ?? ''), dirRel);
       if (isTauri) await this.reload();
       else this.files = [...this.files, fromDisk({ name: path, path, text: t.text ?? '' }, this.config)].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-      if (this.files.some((f) => f.path === path)) {
-        t.kind = 'file';
-        t.path = path;
-        t.title = undefined;
-        t.text = undefined;
-        t.reveal = null; // the caret stays where it was
-        this.navReveal = { path, n: Date.now() };
-      } else {
-        // saved with a different extension: it is not a note, so its tab goes
-        const [pi, ti] = this.where(t);
-        if (pi >= 0) closeTab(this.layout, pi, ti);
-        this.say('Файл сохранён; приложение показывает только .org');
-      }
+      t.kind = 'file';
+      t.path = path;
+      t.title = undefined;
+      t.text = undefined;
+      t.reveal = null; // the caret stays where it was
+      this.navReveal = { path, n: Date.now() };
       return 'ok';
     } catch (e) {
       const m = String(e);

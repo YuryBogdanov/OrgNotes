@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { store } from './store.svelte';
   import { parseHeadings } from './org';
+  import { noOrg } from './names';
   import type { Tab } from './layout';
 
   // "Сохранить как…" for a tab that has no file yet: a sheet attached under the toolbar.
@@ -20,7 +21,6 @@
   // the name: from the first heading of the text, else "Без названия"
   const firstHeading = parseHeadings(tab.text ?? '', store.untitledWf)[0]?.title.replace(/\s*\[[^\]]*\]\s*/g, ' ').trim();
   let name = $state((firstHeading || 'Без названия').replace(/[/:\\]/g, '-').replace(/^\.+/, ''));
-  const hasExt = $derived(/\.[^.\s]+$/.test(name.trim()));
 
   // the folder: the one of the file in the neighbour pane, else the last one used, else the root
   const folders = $derived(['', ...[...store.folders].sort((a, b) => a.localeCompare(b, 'ru'))]);
@@ -86,7 +86,7 @@
       else done(false);
     }
   }
-  const fileName = $derived(hasExt ? name.trim() : name.trim() + '.org');
+  const fileName = $derived(noOrg(name.trim())); // as the app shows it
 </script>
 
 <svelte:window onkeydown={key} />
@@ -98,7 +98,6 @@
         <label for="sa-name">Сохранить как:</label>
         <div class="namebox">
           <input id="sa-name" bind:this={input} bind:value={name} autocomplete="off" spellcheck="false" />
-          {#if !hasExt}<span class="ext" aria-hidden="true">.org</span>{/if}
         </div>
       </div>
       <div class="row">
@@ -146,7 +145,6 @@
   label { flex: 0 0 96px; text-align: right; color: var(--fg2); }
   .namebox { flex: 1; min-width: 0; height: 28px; display: flex; align-items: center; padding: 0 8px; background: var(--field); border: 2px solid var(--acc); border-radius: 6px; }
   .namebox input { flex: 0 1 auto; min-width: 20px; width: 100%; border: 0; background: transparent; font-size: 13px; padding: 0; outline: none; -webkit-user-select: text; user-select: text; }
-  .ext { color: var(--fg3); font-size: 13px; }
   select, .nf { flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--field); font-size: 13px; }
   .nf { border: 1px solid var(--line); background: var(--bg); -webkit-user-select: text; user-select: text; }
   .path { padding-left: 108px; margin: -4px 0 16px; font-size: 11.5px; color: var(--fg2); }

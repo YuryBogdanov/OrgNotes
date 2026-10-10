@@ -25,7 +25,7 @@ test('creates a file from the + menu, opens it and writes a title', async ({ pag
   await page.getByRole('textbox', { name: 'Имя нового файла' }).fill('Идеи');
   await page.keyboard.press('Enter');
 
-  await expect(page.locator('.tab')).toContainText('Идеи.org');
+  await expect(page.locator('.tab')).toContainText('Идеи');
   expect((await disk(page))['/mock/Идеи.org']).toBe('#+TITLE: Идеи\n\n');
   await expect(row(page, 'Идеи')).toBeVisible();
 });
@@ -114,7 +114,7 @@ test('moves a note by dropping it onto a folder, and refuses a folder dropped in
 test('deleting asks first, sends to the Trash and closes the file\'s tab', async ({ page }) => {
   await open(page);
   await row(page, 'Other').click();
-  await expect(page.locator('.tab')).toContainText('Other.org');
+  await expect(page.locator('.tab')).toContainText('Other');
 
   await row(page, 'Other').click({ button: 'right' });
   await menuItem(page, 'Переместить в Корзину…').click();
@@ -132,7 +132,7 @@ test('deleting asks first, sends to the Trash and closes the file\'s tab', async
   await expect(row(page, 'Other')).toHaveCount(0);
   expect((await log(page)).some((e) => e[0] === 'trash' && e[1] === '/mock/Other.org')).toBe(true);
   // its tab is closed; it was the only one, so the pane shows its empty state
-  await expect(page.locator('.tab', { hasText: 'Other.org' })).toHaveCount(0);
+  await expect(page.locator('.tab', { hasText: 'Other' })).toHaveCount(0);
   await expect(page.getByText('Нет открытых вкладок')).toBeVisible();
 });
 
@@ -149,5 +149,5 @@ test('unsaved typing is not lost when the note is renamed right after', async ({
   await page.keyboard.press('Enter');
 
   await expect.poll(async () => (await disk(page))['/mock/Прочее.org']).toBe('* Другая!!!\n');
-  await expect(page.locator('.tab')).toContainText('Прочее.org');
+  await expect(page.locator('.tab')).toContainText('Прочее');
 });

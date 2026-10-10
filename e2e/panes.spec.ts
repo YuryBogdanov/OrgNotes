@@ -39,7 +39,7 @@ test.describe('toolbar group', () => {
     await open(page);
     await btn(page, 'Агенда').click();
     await expect(panes(page)).toHaveCount(2);
-    expect(await tabsOf(page, 0)).toEqual(['work.org']);
+    expect(await tabsOf(page, 0)).toEqual(['work']);
     expect(await tabsOf(page, 1)).toEqual(['Агенда']);
     await expect(btn(page, 'Агенда')).toHaveAttribute('aria-pressed', 'true');
     await expect(btn(page, 'Второй редактор')).toHaveAttribute('aria-pressed', 'false');
@@ -53,13 +53,13 @@ test.describe('toolbar group', () => {
     await page.locator('.cm-line', { hasText: 'текст бюджета' }).click();
     await btn(page, 'Второй редактор').click();
     await expect(panes(page)).toHaveCount(2);
-    expect(await tabsOf(page, 1)).toEqual(['work.org']);
+    expect(await tabsOf(page, 1)).toEqual(['work']);
     expect(await status(page, 1)).toBe(await status(page, 0));
     await expect(panes(page).nth(1)).toHaveClass(/active/);
     await expect(btn(page, 'Второй редактор')).toHaveAttribute('aria-pressed', 'true');
     // with the editor there, "Агенда" opens as a new tab of the second pane and becomes the pressed one
     await btn(page, 'Агенда').click();
-    expect(await tabsOf(page, 1)).toEqual(['work.org', 'Агенда']);
+    expect(await tabsOf(page, 1)).toEqual(['work', 'Агенда']);
     await expect(btn(page, 'Агенда')).toHaveAttribute('aria-pressed', 'true');
     await expect(btn(page, 'Второй редактор')).toHaveAttribute('aria-pressed', 'false');
   });
@@ -108,11 +108,11 @@ test.describe('agenda and its neighbour', () => {
   test('click opens the task in the neighbour pane at its heading; the focus stays in the agenda', async ({ page }) => {
     await open(page);
     await page.keyboard.press('Meta+2'); // the agenda in the only pane
-    expect(await tabsOf(page, 0)).toEqual(['work.org', 'Агенда']);
+    expect(await tabsOf(page, 0)).toEqual(['work', 'Агенда']);
     await page.locator('.item', { hasText: 'Синк с CTO' }).click();
     // the file opens on the LEFT, the agenda stays on the right
     await expect(panes(page)).toHaveCount(2);
-    expect(await tabsOf(page, 0)).toEqual(['journal.org']);
+    expect(await tabsOf(page, 0)).toEqual(['journal']);
     await expect(panes(page).nth(1).locator('.agenda')).toBeVisible();
     await expect(panes(page).nth(0).locator('.cm-activeLine')).toHaveText('** TODO Синк с CTO');
     expect(await page.evaluate(() => !!document.activeElement?.closest('.agenda'))).toBe(true);
@@ -133,7 +133,7 @@ test.describe('agenda and its neighbour', () => {
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
     await expect(panes(page).nth(0).locator('.cm-activeLine')).toHaveText('** TODO Свести расходы');
-    expect(await tabsOf(page, 0)).toEqual(['work.org']); // no new tab
+    expect(await tabsOf(page, 0)).toEqual(['work']); // no new tab
     expect(await page.evaluate(() => !!document.activeElement?.closest('.agenda'))).toBe(true);
   });
 
@@ -145,9 +145,9 @@ test.describe('agenda and its neighbour', () => {
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('ArrowDown'); // Синк с CTO (journal.org)
     await page.keyboard.press('Alt+Enter');
-    expect(await tabsOf(page, 1)).toEqual(['Агенда', 'journal.org']);
+    expect(await tabsOf(page, 1)).toEqual(['Агенда', 'journal']);
     await expect(panes(page).nth(1).locator('.cm-activeLine')).toHaveText('** TODO Синк с CTO');
-    expect(await tabsOf(page, 0)).toEqual(['work.org']);
+    expect(await tabsOf(page, 0)).toEqual(['work']);
   });
 
   test('a double click moves the focus to the opened file', async ({ page }) => {
@@ -189,11 +189,11 @@ test.describe('layout commands', () => {
     await page.keyboard.press('Meta+Backslash'); // two panes already: nothing more
     await expect(panes(page)).toHaveCount(2);
     await page.locator('.nav .row', { hasText: 'journal' }).first().click(); // opens in the active (right) pane
-    expect(await tabsOf(page, 1)).toEqual(['journal.org']);
+    expect(await tabsOf(page, 1)).toEqual(['journal']);
     await panes(page).nth(0).locator('.cm-content').click(); // make the left one active
     await page.keyboard.press('Shift+Meta+Backslash'); // closes the inactive (right) pane
     await expect(panes(page)).toHaveCount(1);
-    expect(await tabsOf(page, 0)).toEqual(['work.org', 'journal.org']);
+    expect(await tabsOf(page, 0)).toEqual(['work', 'journal']);
   });
 
   test('swap exchanges the panes with their tabs; the same pane stays active', async ({ page }) => {
@@ -202,18 +202,42 @@ test.describe('layout commands', () => {
     await panes(page).nth(0).locator('.cm-content').click();
     await page.keyboard.press('Shift+Control+Meta+ArrowRight');
     expect(await tabsOf(page, 0)).toEqual(['Агенда']);
-    expect(await tabsOf(page, 1)).toEqual(['work.org']);
+    expect(await tabsOf(page, 1)).toEqual(['work']);
     await expect(panes(page).nth(1)).toHaveClass(/active/);
   });
 
-  test('the pane "×" closes that pane and moves its tabs into the other', async ({ page }) => {
+  test('there is no pane "×"; pressing the lit "Второй редактор" closes the second pane and keeps its tabs', async ({ page }) => {
     await open(page);
     await btn(page, 'Второй редактор').click();
-    await page.locator('.nav .row', { hasText: 'journal' }).first().click();
-    await panes(page).nth(1).getByRole('button', { name: 'Закрыть панель' }).click();
-    await expect(panes(page)).toHaveCount(1);
-    expect(await tabsOf(page, 0)).toEqual(['work.org', 'journal.org']);
     await expect(page.getByRole('button', { name: 'Закрыть панель' })).toHaveCount(0);
+    await page.locator('.nav .row', { hasText: 'journal' }).first().click(); // right pane: journal
+    await page.keyboard.press('Meta+t'); // right pane: journal, Без названия
+    await page.keyboard.type('черновик');
+    await expect(btn(page, 'Второй редактор')).toHaveAttribute('aria-pressed', 'true');
+    await btn(page, 'Второй редактор').click();
+    await expect(panes(page)).toHaveCount(1);
+    expect(await tabsOf(page, 0)).toEqual(['work', 'journal', 'Без названия']); // no question: nothing was closed
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  });
+
+  test('⌃⌘W closes the active pane, its tabs go to the end of the other', async ({ page }) => {
+    await open(page);
+    await btn(page, 'Агенда').click();
+    await panes(page).nth(0).locator('.cm-content').click();
+    await page.keyboard.press('Meta+2'); // left: work, Агенда — already in the right pane, so it is not doubled
+    await page.keyboard.press('Control+Meta+w');
+    await expect(panes(page)).toHaveCount(1);
+    expect(await tabsOf(page, 0)).toEqual(['Агенда', 'work']);
+  });
+
+  test('closing the last tab of the left pane leaves the right one as the only, active pane', async ({ page }) => {
+    await open(page);
+    await btn(page, 'Агенда').click();
+    await panes(page).nth(0).locator('.cm-content').click();
+    await page.keyboard.press('Meta+w');
+    await expect(panes(page)).toHaveCount(1);
+    expect(await tabsOf(page, 0)).toEqual(['Агенда']);
+    await expect(panes(page).nth(0)).toHaveClass(/active/);
   });
 });
 
@@ -222,7 +246,7 @@ test.describe('tabs', () => {
     await open(page);
     await page.locator('.nav .row', { hasText: 'journal' }).first().click({ modifiers: [] });
     await page.keyboard.press('Meta+2');
-    expect(await tabsOf(page, 0)).toEqual(['journal.org', 'Агенда']);
+    expect(await tabsOf(page, 0)).toEqual(['journal', 'Агенда']);
     const t = panes(page).nth(0).locator('.tab').first();
     const x = t.getByRole('button', { name: /Закрыть вкладку/ });
     expect(await x.evaluate((el) => getComputedStyle(el).opacity)).toBe('0');
@@ -245,7 +269,7 @@ test.describe('tabs', () => {
     await open(page);
     await page.keyboard.press('Meta+2');
     await page.keyboard.press('Meta+w');
-    expect(await tabsOf(page, 0)).toEqual(['work.org']);
+    expect(await tabsOf(page, 0)).toEqual(['work']);
   });
 });
 
@@ -281,7 +305,7 @@ test.describe('room and restarts', () => {
     for (const i of [0, 1]) expect((await panes(page).nth(i).boundingBox())!.width).toBeGreaterThanOrEqual(319);
     await page.setViewportSize({ width: 600, height: 800 }); // even that is not enough: the panes merge
     await expect(panes(page)).toHaveCount(1);
-    expect(await tabsOf(page, 0)).toEqual(['work.org']); // the copy merged into the original
+    expect(await tabsOf(page, 0)).toEqual(['work']); // the copy merged into the original
     await page.setViewportSize({ width: 1360, height: 800 });
     await expect(page.locator('.insp')).toBeVisible(); // the inspector comes back
   });
@@ -310,7 +334,7 @@ test.describe('room and restarts', () => {
     await page.waitForTimeout(200);
     await page.reload();
     await expect(panes(page)).toHaveCount(2);
-    expect(await tabsOf(page, 0)).toEqual(['work.org']);
+    expect(await tabsOf(page, 0)).toEqual(['work']);
     expect(await tabsOf(page, 1)).toEqual(['Агенда']);
     await expect(panes(page).nth(0)).toHaveClass(/active/);
     expect(await status(page, 0)).toBe(10);
@@ -324,8 +348,8 @@ test.describe('room and restarts', () => {
     await page.getByRole('menuitem', { name: 'Переименовать' }).click();
     await page.getByRole('textbox', { name: 'Новое имя' }).fill('plan');
     await page.keyboard.press('Enter');
-    await expect.poll(() => tabsOf(page, 0)).toEqual(['plan.org']);
-    expect(await tabsOf(page, 1)).toEqual(['plan.org']);
+    await expect.poll(() => tabsOf(page, 0)).toEqual(['plan']);
+    expect(await tabsOf(page, 1)).toEqual(['plan']);
     await navRow('plan').click({ button: 'right' });
     await page.getByRole('menuitem', { name: 'Переместить в Корзину…' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Переместить в Корзину' }).click();

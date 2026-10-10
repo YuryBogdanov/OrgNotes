@@ -55,7 +55,8 @@ export const neighbor = (L: Layout, pane: number) => (L.panes.length === 2 ? 1 -
 export const secondKind = (L: Layout): TabKind | null => {
   if (L.panes.length < 2) return null;
   const p = L.panes[1];
-  return p.tabs[p.active]?.kind ?? null;
+  const k = p.tabs[p.active]?.kind ?? null;
+  return k === 'untitled' ? 'file' : k; // a text tab of any kind lights "Второй редактор"
 };
 
 function insertAfterActive(p: Pane, t: Tab) {
@@ -167,11 +168,13 @@ export function focusPane(L: Layout, dir: -1 | 1) {
  * The three toolbar buttons ("Второй редактор", "Агенда", "Календарь"): exactly one is pressed and it reflects
  * the kind of the second pane's active tab.
  *  - pressing an unpressed one opens that content in the second pane (creating it on the right if needed);
- *  - pressing the pressed one closes the second pane when it has a single tab, else closes that tab.
+ *  - pressing the pressed "Второй редактор" closes the second pane, its tabs move to the first one (nothing is lost);
+ *  - pressing the pressed "Агенда" closes the agenda tab (and the pane with it when that was its only tab).
  * `fileTab` is what a new second editor shows: a copy of the current tab.
  */
 export function toggleSecond(L: Layout, kind: TabKind, fileTab: () => Tab | undefined) {
   const pressed = secondKind(L);
+  if (pressed === kind && kind === 'file') return closePane(L, 1);
   if (pressed === kind) {
     const p = L.panes[1];
     if (p.tabs.length === 1) {

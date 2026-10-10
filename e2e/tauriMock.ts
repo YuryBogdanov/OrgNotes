@@ -133,7 +133,7 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           if (cmd === 'save_new_file') {
             if (badName(args.name)) throw 'bad name';
             if (args.name.trim() === 'fail') throw 'disk full';
-            const n = /\.[^.]+$/.test(args.name.trim()) ? args.name.trim() : args.name.trim() + '.org';
+            const n = /\.org$/i.test(args.name.trim()) ? args.name.trim() : args.name.trim() + '.org';
             const path = args.parent + '/' + n;
             if (path in disk && !args.overwrite) throw 'exists';
             disk[path] = args.text;
