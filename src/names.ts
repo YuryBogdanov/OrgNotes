@@ -12,3 +12,17 @@ export const displayPath = (rel: string) => {
 };
 /** What "Сохранить как…" writes: ".org" is added unless the name already ends with it ("Привет.org" stays). */
 export const withOrg = (name: string) => (/\.org$/i.test(name) ? name : name + '.org');
+
+/**
+ * The name of a note that has no file yet: its first non-empty line without the heading stars, at most 40
+ * characters ("…" when cut). Used in the close dialog and as the suggested name in "Сохранить как".
+ */
+export function noteName(text: string, max = 40) {
+  const line = text.split('\n').map((l) => l.replace(/^\*+\s*/, '').trim()).find((l) => l) ?? '';
+  if (!line) return 'Без названия';
+  const chars = [...line];
+  return chars.length > max ? chars.slice(0, max - 1).join('').trimEnd() + '…' : line;
+}
+
+/** "в 2 вкладках", "в 21 вкладке". */
+export const inTabs = (n: number) => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'вкладке' : 'вкладках'}`;

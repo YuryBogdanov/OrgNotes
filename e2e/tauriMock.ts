@@ -54,6 +54,8 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             return Object.entries(disk).map(([path, text]) => ({ name: path.replace('/mock/', ''), path, text }));
           }
           if (cmd === 'save_org_file') {
+            // a test can make a file unwritable: window.__failWrites = ['/mock/work.org']
+            if ((w.__failWrites ?? []).includes(args.path)) throw 'нет прав на запись';
             if (disk[args.path] !== args.base) {
               w.__log.push(['conflict', args.path]);
               throw 'conflict';

@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { store } from './store.svelte';
-  import { parseHeadings } from './org';
-  import { noOrg } from './names';
+  import { noOrg, noteName } from './names';
   import type { Tab } from './layout';
 
   // "Сохранить как…" for a tab that has no file yet: a sheet attached under the toolbar.
@@ -18,9 +17,8 @@
   const rootName = $derived(store.dir?.split('/').pop() ?? 'Заметки');
   const dirOf = (rel: string) => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
 
-  // the name: from the first heading of the text, else "Без названия"
-  const firstHeading = parseHeadings(tab.text ?? '', store.untitledWf)[0]?.title.replace(/\s*\[[^\]]*\]\s*/g, ' ').trim();
-  let name = $state((firstHeading || 'Без названия').replace(/[/:\\]/g, '-').replace(/^\.+/, ''));
+  // the name: the note's first non-empty line without stars, as the close sheet calls it
+  let name = $state(noteName(tab.text ?? '').replace(/[/:\\]/g, '-').replace(/^\.+/, ''));
 
   // the folder: the one of the file in the neighbour pane, else the last one used, else the root
   const folders = $derived(['', ...[...store.folders].sort((a, b) => a.localeCompare(b, 'ru'))]);
@@ -65,7 +63,7 @@
       return;
     }
     replace = false;
-    if (r !== 'ok') store.say(r); // the sheet closes, the tab stays unsaved
+    if (r !== 'ok') store.sayDraft(r); // the sheet closes, the tab stays unsaved
     done(r === 'ok');
   }
   // the sheet hands the focus back to the editor, the caret where it was
