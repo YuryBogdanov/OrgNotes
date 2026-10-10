@@ -154,6 +154,10 @@ register({
   when: () => store.files.length > 0, run: () => gotoStep(),
 });
 register({
+  id: 'outline', title: 'Показать структуру файла', icon: 'head', group: 'general', synonyms: ['структура', 'заголовки', 'outline', 'оглавление'],
+  when: (c) => !!c.file, run: () => store.showOutline(),
+});
+register({
   id: 'chooseFolder', title: 'Выбрать рабочую папку…', icon: 'folder', group: 'general', synonyms: ['открыть папку'],
   when: (c) => c.noFolder, run: () => void store.chooseFolder(),
 });
@@ -201,14 +205,15 @@ export function contextOf(): Ctx {
 export function mainStep(c: Ctx): Step {
   return {
     placeholder: 'Команда или файл…',
-    ghost: (q) => (q === '#' ? 'заголовок' : ''),
+    // «#» and «№» (the same key on the Russian layout) both go to headings
+    ghost: (q) => (q === '#' || q === '№' ? 'заголовок' : ''),
     plate: (q) => {
       if (!c.file) return null;
-      if (q.startsWith('#')) return { kind: 'headings', file: c.file };
+      if (/^[#№]/.test(q)) return { kind: 'headings', file: c.file };
       return c.heading ? { kind: 'heading', h: c.heading, file: c.file } : { kind: 'general', file: c.file, line: c.line };
     },
     rows: (q) => {
-      if (q.startsWith('#')) return headingRows(c, q.slice(1)); // «@» stays an ordinary character for now
+      if (/^[#№]/.test(q)) return headingRows(c, q.slice(1)); // «@» stays an ordinary character for now
       const u = uses();
       const rows: Row[] = [];
       for (const g of ['heading', 'general'] as const) {
@@ -234,7 +239,7 @@ export function mainStep(c: Ctx): Step {
 
 /** «#»: the headings of the current file, indented by level (ТЗ про навигатор, раздел 3, will say more). */
 function headingRows(c: Ctx, q: string): Row[] {
-  if (!c.file) return [NOTHING];
+  if (!c.file) return [{ id: 'none', group: '', title: 'Откройте файл, чтобы перейти к заголовку' }];
   const f = c.file;
   const rows = f.headings.flatMap((h, i): Row[] => {
     const title = bare(h.title);

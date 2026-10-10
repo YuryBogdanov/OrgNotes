@@ -78,7 +78,7 @@ test.describe('modes', () => {
     await expect(plate).toContainText('[#A] Подготовить бюджет 2027');
     await expect(plate.locator('.right')).toHaveText('work · строка 4');
     expect(await groups(page)).toEqual(['К ЗАГОЛОВКУ', 'ОБЩИЕ']);
-    expect(await titles(page)).toEqual(['Сменить статус…', 'Запланировать…', 'Поставить дедлайн…', 'Изменить теги…', 'Перенести в другой файл…', 'Создать файл…', 'Создать папку…', 'Новая задача', 'Перейти к файлу…']);
+    expect(await titles(page)).toEqual(['Сменить статус…', 'Запланировать…', 'Поставить дедлайн…', 'Изменить теги…', 'Перенести в другой файл…', 'Создать файл…', 'Создать папку…', 'Новая задача', 'Перейти к файлу…', 'Показать структуру файла']);
     await expect(selected(page)).toHaveText('Сменить статус…');
   });
 
@@ -128,6 +128,19 @@ test.describe('modes', () => {
     await page.keyboard.type('@');
     await expect(pal(page).locator('.plate')).toContainText('Действия применятся к заголовку');
     await expect(rows(page)).toHaveText(['Ничего не найдено']);
+  });
+
+  test('«№» (Shift+3 on the Russian layout) works as «#»', async ({ page }) => {
+    await open(page);
+    await at(page, '#+TITLE');
+    await palette(page);
+    await page.keyboard.type('№');
+    await expect(pal(page).locator('.plate')).toContainText('Переход к заголовку в текущем файле');
+    await expect(pal(page).locator('.ghost')).toContainText('заголовок');
+    await page.keyboard.type('найм');
+    expect(await titles(page)).toEqual(['План найма']);
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.status')).toContainText('Стр. 8');
   });
 
   test('«#» starts on the heading the cursor is in; progress cookies are not shown', async ({ page }) => {
@@ -207,7 +220,7 @@ test.describe('keyboard and mouse', () => {
     await at(page, 'Подготовить бюджет');
     await palette(page);
     await page.keyboard.press('ArrowUp'); // round to the last
-    await expect(selected(page)).toHaveText('Перейти к файлу…');
+    await expect(selected(page)).toHaveText('Показать структуру файла');
     await page.keyboard.press('ArrowDown');
     await expect(selected(page)).toHaveText('Сменить статус…');
     for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowDown');

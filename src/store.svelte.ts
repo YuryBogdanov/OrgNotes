@@ -95,6 +95,29 @@ class Store {
   navReveal = $state<{ path: string; n: number } | null>(null);
   showNav = $state(true);
   showInspector = $state(true);
+  /** "Показывать заголовки в навигаторе" (Настройки → Основные): a view preference of this Mac, off by default. */
+  navHeadings = $state(lsGet('nav:headings') === '1');
+  setNavHeadings(on: boolean) {
+    this.navHeadings = on;
+    lsSet('nav:headings', on ? '1' : '0'); // the main window hears it through the storage event
+  }
+  /** The inspector's tab, remembered for the window. */
+  inspectorTab = $state<'task' | 'outline'>(lsGet('inspector:tab') === 'outline' ? 'outline' : 'task');
+  setInspectorTab(t: 'task' | 'outline') {
+    this.inspectorTab = t;
+    lsSet('inspector:tab', t);
+  }
+  /** "Показать структуру файла": the inspector with its outline. */
+  showOutline() {
+    this.showInspector = true;
+    this.setInspectorTab('outline');
+  }
+  /** Put the caret on a line of the active editor and scroll there; with `focus` the editor gets the keyboard. */
+  revealLine(line: number, focus: boolean) {
+    const t = this.tab;
+    if (t?.kind !== 'file') return;
+    t.reveal = { line, n: Date.now() + Math.random(), focus };
+  }
   navW = $state(248);
   inspW = $state(272);
   saveState = $state<'saved' | 'saving' | 'memory'>(isTauri ? 'saved' : 'memory');
@@ -356,6 +379,10 @@ class Store {
   }
 
   async listen() {
+    // the settings window changes view preferences of this Mac
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'nav:headings') this.navHeadings = e.newValue === '1';
+    });
     if (!isTauri) return;
     const { listen } = await import('@tauri-apps/api/event');
     await listen('notes-changed', () => this.reload());
@@ -406,10 +433,10 @@ class Store {
    * Open a file in the active pane: a tab that already shows it is reused, the active file tab is retargeted
    * (like a click in Xcode's navigator), an agenda tab keeps its place and the file opens next to it.
    */
-  open(fileIdx: number, line = 0) {
+  open(fileIdx: number, line = 0, focus = true) {
     const f = this.files[fileIdx];
     if (!f) return;
-    openFile(this.layout, this.layout.active, f.path, line, { replace: true });
+    openFile(this.layout, this.layout.active, f.path, line, { replace: true, focus });
     lsSet('lastFile:' + (this.dir ?? ''), f.path);
   }
 

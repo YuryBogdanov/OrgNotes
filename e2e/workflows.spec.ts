@@ -24,6 +24,7 @@ const open = async (page: Page, files: Record<string, string> = NOTES) => {
 const heading = (page: Page, text: string) => page.locator('.cm-line', { hasText: text }).first();
 
 test('statuses declared in the project config are recognised in files without #+TODO', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('nav:headings', '1')); // headings in the navigator
   await open(page);
   // IN-PROGRESS and MEETING are not built-in statuses: they only exist in the config
   await expect(page.locator('.nav .kw', { hasText: 'IN-PROGRESS' })).toBeVisible();
