@@ -4,7 +4,8 @@
   import { Decoration, EditorView, ViewPlugin, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
   import { foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
-  import { headingLines, kwTone, type Workflow } from './org';
+  import { headingLines, toneFor, type Workflow } from './org';
+  import { toneStyle } from './colors';
   import { extractLinks, type OrgLink } from './links';
   import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftSubtree, type Result } from './outline';
   import type { Text } from '@codemirror/state';
@@ -132,7 +133,7 @@
           const w = /^(\S+)/.exec(t.slice(i));
           if (w && (open.has(w[1]) || done.has(w[1]))) {
             items.push(
-              Decoration.mark({ class: 'cm-kw', attributes: { style: `color:var(${kwTone(w[1], words)})` } }).range(line.from + i, line.from + i + w[1].length),
+              Decoration.mark({ class: 'cm-kw tone', attributes: { style: toneStyle(toneFor(w[1], words)) } }).range(line.from + i, line.from + i + w[1].length),
             );
             i += w[1].length;
             if (done.has(w[1])) items.push(Decoration.line({ class: 'cm-doneline' }).range(line.from));

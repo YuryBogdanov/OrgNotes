@@ -1,7 +1,8 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity';
   import { store } from './store.svelte';
-  import { kwTone, subtreeProgress } from './org';
+  import { subtreeProgress, toneFor } from './org';
+  import { toneStyle } from './colors';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
 
   type Row = {
@@ -63,7 +64,7 @@
           const p = hasKids ? subtreeProgress(f.headings, hi, f.wf) : { done: 0, total: 0 };
           out.push({
             key, kind: 'heading', depth: depth + h.level, label: h.title, open, hasKids, rel: f.name,
-            file: i, line: h.line, kw: h.keyword, tone: h.keyword ? kwTone(h.keyword, f.wf) : undefined,
+            file: i, line: h.line, kw: h.keyword, tone: h.keyword ? toneStyle(toneFor(h.keyword, f.wf)) : undefined,
             cnt: p.total ? `${p.done}/${p.total}` : '',
             selected: i === store.cur && hi === store.selected,
             done: !!h.keyword && f.wf.done.includes(h.keyword),
@@ -211,7 +212,7 @@
             <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="var(--fg2)" stroke-width="1.6" stroke-linejoin="round"><path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" /></svg>
           {/if}
           {#if r.kind === 'heading' && r.kw}
-            <span class="kw" style="color:var({r.tone});background:color-mix(in srgb, var({r.tone}) 16%, transparent)">{r.kw}</span>
+            <span class="kw tone-chip" style={r.tone}>{r.kw}</span>
           {/if}
           {#if store.renaming === r.rel && r.kind !== 'heading'}
             <input class="name" aria-label="Новое имя" value={r.label} use:focusSelect

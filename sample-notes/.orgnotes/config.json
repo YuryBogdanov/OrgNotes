@@ -4,27 +4,64 @@
     {
       "name": "Задачи",
       "states": [
-        { "name": "TODO", "color": "red" },
-        { "name": "NEXT", "color": "blue" },
-        { "name": "WAIT", "color": "orange" },
-        { "name": "DONE", "done": true, "color": "green" },
-        { "name": "CANCELLED", "done": true, "color": "gray" }
+        {
+          "name": "NEW",
+          "color": "gray"
+        },
+        {
+          "name": "TODO",
+          "color": "red"
+        },
+        {
+          "name": "IN-PROGRESS",
+          "color": "blue"
+        },
+        {
+          "name": "BLOCKED",
+          "color": "orange"
+        },
+        {
+          "name": "DONE",
+          "done": true,
+          "color": "green"
+        }
       ]
     },
     {
       "name": "Встречи",
       "states": [
-        { "name": "MEETING", "color": "blue" },
-        { "name": "FINISHED", "done": true, "color": "green" },
-        { "name": "SKIPPED", "done": true, "color": "gray" }
+        {
+          "name": "MEETING",
+          "color": "blue"
+        },
+        {
+          "name": "FINISHED",
+          "done": true,
+          "color": "green"
+        },
+        {
+          "name": "CANCELLED",
+          "done": true,
+          "color": "gray"
+        }
       ]
     },
     {
       "name": "Цели на квартал",
       "states": [
-        { "name": "BACKLOG", "color": "gray" },
-        { "name": "ACTIVE", "color": "blue" },
-        { "name": "COMPLETED", "done": true, "color": "green" }
+        {
+          "name": "BACKLOG",
+          "color": "gray"
+        },
+        {
+          "name": "ACTIVE",
+          "color": "blue"
+        },
+        {
+          "name": "COMPLETED",
+          "done": true,
+          "color": "green"
+        }
       ]
     }
   ]

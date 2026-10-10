@@ -137,6 +137,13 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             emit();
             return;
           }
+          if (cmd === 'plugin:window|get_all_windows') return (w.__windows as string[]) ?? ['main'];
+          if (cmd === 'plugin:webview|create_webview_window') {
+            w.__log.push(['window', args.options]);
+            (w.__windows ??= ['main']).push(args.options.label);
+            return;
+          }
+          if (cmd.startsWith('plugin:event|')) return null; // emit, emit_to, ...
           if (cmd === 'plugin:opener|open_url') {
             w.__log.push(['open_url', args.url]);
             return;

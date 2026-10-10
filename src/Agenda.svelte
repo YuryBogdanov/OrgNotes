@@ -1,6 +1,7 @@
 <script lang="ts">
   import { store } from './store.svelte';
-  import { dayDiff, fmtDay, fmtLong, kwTone, occurrences, repeaterLabel, toJs, weekdayName } from './org';
+  import { dayDiff, fmtDay, fmtLong, occurrences, repeaterLabel, toJs, toneFor, weekdayName } from './org';
+  import { toneStyle } from './colors';
 
   type Item = {
     day: number; // days from today
@@ -19,7 +20,7 @@
         const isEvent = !h.keyword && !!h.event;
         if (!isOpen && !isEvent) continue;
         const base = {
-          kw: h.keyword, tone: h.keyword ? kwTone(h.keyword, f.wf) : '--fg2', ev: isEvent, pr: h.priority === 'A',
+          kw: h.keyword, tone: h.keyword ? toneStyle(toneFor(h.keyword, f.wf)) : '', ev: isEvent, pr: h.priority === 'A',
           title: h.title, src: [f.name.replace(/\.org$/, ''), ...h.path].join(' › '), tags: h.tags.join(' '),
           file: fi, line: h.line,
         };
@@ -86,7 +87,7 @@
         <div class="item" role="button" tabindex="-1" onclick={() => store.open(it.file, it.line)} onkeydown={() => {}}>
           <span class="time">{it.time}</span>
           {#if it.kw}
-            <span class="kw" style="color:var({it.tone});background:color-mix(in srgb, var({it.tone}) 16%, transparent)">{it.kw}</span>
+            <span class="kw tone-chip" style={it.tone}>{it.kw}</span>
           {:else}
             <span class="kw ev">СОБ.</span>
           {/if}

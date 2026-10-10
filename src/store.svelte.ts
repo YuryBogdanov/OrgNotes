@@ -131,6 +131,64 @@ class Store {
     this.files = this.files.map((f) => build(f.name, f.path, f.text, f.disk, f.diskRaw, f.eol, cfg));
   }
 
+  /** How many headings carry this keyword, across all notes. */
+  keywordUsage(keyword: string): number {
+    let n = 0;
+    for (const f of this.files) for (const h of f.headings) if (h.keyword === keyword) n++;
+    return n;
+  }
+
+  /** Replace the status word `from` with `to` on every heading that has it. Returns the number of headings changed. */
+  renameKeywordInFiles(from: string, to: string): number {
+    let total = 0;
+    for (const f of this.files) {
+      const lines = f.text.split('\n');
+      let changed = 0;
+      for (const h of f.headings) {
+        if (h.keyword !== from) continue;
+        const m = /^(\*+\s+)(\S+)(.*)$/.exec(lines[h.line]);
+        if (m && m[2] === from) {
+          lines[h.line] = m[1] + to + m[3];
+          changed++;
+        }
+      }
+      if (changed) {
+        this.setText(lines.join('\n'), f.path);
+        total += changed;
+      }
+    }
+    return total;
+  }
+
+  /** Settings open in their own window inside the app, and as a sheet in a plain browser. */
+  async openSettings() {
+    if (!isTauri || (window as any).__ORG_SETTINGS_OVERLAY__) {
+      this.settingsOpen = true;
+      return;
+    }
+    try {
+      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+      const existing = await WebviewWindow.getByLabel('settings');
+      if (existing) {
+        await existing.setFocus();
+        return;
+      }
+      new WebviewWindow('settings', {
+        url: 'index.html#settings',
+        title: 'Настройки',
+        width: 1040,
+        height: 740,
+        minWidth: 840,
+        minHeight: 560,
+        center: true,
+        dragDropEnabled: false,
+      });
+    } catch (e) {
+      this.settingsOpen = true; // never leave the user without settings
+      this.say('Не удалось открыть окно настроек: ' + e);
+    }
+  }
+
   /** Persist the project config (Settings) and apply it right away. */
   async saveConfig(json: string) {
     try {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_WORKFLOW, firstOpen, headingAt, headingLines, joinEol, kwTone, parseHeadings, parseProjectConfig, parseWorkflow, resolveWorkflow, sequenceFor, setKeyword, setPriority, shiftTimestamp, splitEol, subtreeProgress } from './org';
+import { DEFAULT_WORKFLOW, firstOpen, startOf, headingAt, headingLines, joinEol, toneFor, parseHeadings, parseProjectConfig, parseWorkflow, resolveWorkflow, sequenceFor, setKeyword, setPriority, shiftTimestamp, splitEol, subtreeProgress } from './org';
 
 // Saturday, 10 October 2026, 12:00
 const NOW = new Date(2026, 9, 10, 12, 0);
@@ -250,12 +250,27 @@ describe('project workflows', () => {
     const out = setKeyword(t, parseHeadings(t, wf)[0], 'FINISHED', wf, new Date(2026, 9, 10, 12, 0));
     expect(out.startsWith('* MEETING Планёрка\nSCHEDULED: <2026-10-19 Mon +1w>')).toBe(true);
   });
-  it('colours states by their colour, then by name', () => {
+  it('colours states by their colour, then by well-known name, then by open/done', () => {
     const wf = resolveWorkflow('', 'x.org', config);
-    expect(kwTone('IN-PROGRESS', wf)).toBe('--next');
-    expect(kwTone('FINISHED', wf)).toBe('--done');
-    expect(kwTone('MEETING', wf)).toBe('--todo');
-    expect(kwTone('TODO', DEFAULT_WORKFLOW)).toBe('--todo');
+    expect(toneFor('IN-PROGRESS', wf)).toEqual({ light: '#0a58c2', dark: '#6cb4ff' }); // blue
+    expect(toneFor('FINISHED', wf)).toEqual({ light: '#1d7f3a', dark: '#6fd58a' }); // done: green
+    expect(toneFor('MEETING', wf)).toEqual({ light: '#c4262e', dark: '#ff7b80' }); // open: red
+    expect(toneFor('TODO', DEFAULT_WORKFLOW).light).toBe('#c4262e');
+    expect(toneFor('CANCELLED', DEFAULT_WORKFLOW).light).toBe('#5f5f66');
+  });
+  it('reads colours as palette ids or hex and ignores anything else', () => {
+    const r = parseProjectConfig(JSON.stringify({ workflows: [{ name: 'A', states: [
+      { name: 'ONE', color: 'teal' }, { name: 'TWO', color: '#A1B2C3' }, { name: 'THREE', color: 'chartreuse' } ] }] }));
+    expect(r.config.workflows[0].states.map((s) => s.color)).toEqual(['teal', '#A1B2C3', undefined]);
+  });
+  it('starts a new task in the chosen initial status, else the first open one', () => {
+    const r = parseProjectConfig(JSON.stringify({ workflows: [
+      { name: 'A', initial: 'TODO', states: [{ name: 'NEW' }, { name: 'TODO' }, { name: 'DONE', done: true }] },
+      { name: 'B', initial: 'DONE', states: [{ name: 'X' }, { name: 'DONE2', done: true }] } ] }));
+    const [a, b] = r.config.workflows;
+    expect(startOf(a)).toBe('TODO');
+    expect(startOf(b)).toBe('X'); // a closed status cannot be the initial one
+    expect(r.warnings.join('\n')).toContain('не подходит как состояние новой задачи');
   });
 });
 

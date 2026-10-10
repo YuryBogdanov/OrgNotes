@@ -1,18 +1,18 @@
 // Draft model behind Settings → Статусы: editing workflows without touching the live config until it is valid.
 import { DEFAULT_BEHAVIOR, DEFAULT_SEQUENCE, type ProjectConfig, type WorkflowBehavior } from './org';
 
-export const COLORS = ['gray', 'red', 'blue', 'orange', 'green', 'purple'] as const;
-
 export interface DraftState {
   id: string;
-  label: string; // as typed; spaces turn into "-" in the file
+  keyword: string; // exactly as written in a file: upper case, "-" instead of spaces
   done: boolean;
-  key: string; // quick-select letter or ''
-  color: string; // one of COLORS or '' (automatic)
+  key: string; // an explicit quick-key from a hand-written config, '' = derived from the keyword
+  color: string; // a palette id, a #rrggbb hex, or '' (automatic)
+  pending?: boolean; // a row just added with "+ Состояние" that has not been confirmed yet
 }
 export interface DraftWorkflow {
   id: string;
   name: string;
+  initialId?: string; // the state a new task gets; an open one, default: the first open state
   states: DraftState[]; // invariant: open states first, then done ones
 }
 export interface Draft {
@@ -25,12 +25,77 @@ export interface Problem {
   message: string;
 }
 
+export const MAX_KEYWORD = 24;
+
 let counter = 0;
 const uid = () => `d${++counter}`;
 
-/** The keyword as it is written in a file. */
-export const keywordOf = (label: string) => label.trim().replace(/\s+/g, '-');
-const KEYWORD = /^[^\s()|:]+$/;
+// ---- keywords -----------------------------------------------------------------------
+
+/** What the user typed, as it goes into a file: trimmed, upper case, spaces become dashes. */
+export const normalizeKeyword = (raw: string) => raw.trim().toLocaleUpperCase('ru').replace(/\s+/g, '-');
+
+/** The human name of a status: derived from the keyword, never edited by hand. */
+export const displayName = (keyword: string) => keyword.replace(/-/g, ' ');
+
+/** Rules that depend on the word alone. null = fine. */
+export function keywordProblem(keyword: string): string | null {
+  if (!keyword) return 'Введите ключевое слово';
+  if ([...keyword].length > MAX_KEYWORD) return `Не длиннее ${MAX_KEYWORD} символов`;
+  if (/[()|@!/]/.test(keyword)) return 'Нельзя использовать ( ) | @ ! /: они значимы в синтаксисе #+TODO:';
+  if (!/^[\p{L}\p{N}_-]+$/u.test(keyword)) return 'Допустимы буквы, цифры, дефис и подчёркивание';
+  return null;
+}
+
+/** Name of the workflow that already uses `keyword` (other than the state `except`), else null. */
+export function keywordOwner(d: Draft, keyword: string, except?: string): string | null {
+  for (const w of d.workflows) {
+    for (const s of w.states) {
+      if (s.id !== except && !s.pending && s.keyword === keyword) return w.name.trim() || '…';
+    }
+  }
+  return null;
+}
+
+/** All problems with a word being entered for state `id`, in the order the user should see them. */
+export function checkKeyword(d: Draft, keyword: string, id: string): string | null {
+  const own = keywordProblem(keyword);
+  if (own) return own;
+  const owner = keywordOwner(d, keyword, id);
+  return owner ? `Такое слово уже есть в наборе «${owner}»` : null;
+}
+
+// ---- quick keys ----------------------------------------------------------------------
+
+/**
+ * The key letter of every state: an explicit one if the config has it, else the first letter of the word,
+ * or the next free letter of the word when that one is taken by another state of the set.
+ */
+export function effectiveKeys(w: DraftWorkflow): Map<string, string> {
+  const out = new Map<string, string>();
+  const used = new Set<string>();
+  for (const s of w.states) {
+    if (s.key && !s.pending) {
+      out.set(s.id, s.key);
+      used.add(s.key.toLowerCase());
+    }
+  }
+  for (const s of w.states) {
+    if (out.has(s.id)) continue;
+    let key = '';
+    for (const ch of s.keyword.toLocaleLowerCase('ru')) {
+      if (/\p{L}/u.test(ch) && !used.has(ch)) {
+        key = ch;
+        break;
+      }
+    }
+    if (key) used.add(key);
+    out.set(s.id, key);
+  }
+  return out;
+}
+
+// ---- building a draft -----------------------------------------------------------------
 
 function normalize(w: DraftWorkflow) {
   // stable partition: open first, done after
@@ -40,20 +105,28 @@ function normalize(w: DraftWorkflow) {
 export function fromConfig(cfg: ProjectConfig): Draft {
   const source = cfg.workflows.length ? cfg.workflows : [DEFAULT_SEQUENCE];
   const workflows = source.map((w) => {
-    const d: DraftWorkflow = {
+    const states: DraftState[] = w.states.map((s) => ({
       id: uid(),
-      name: w.name,
-      states: w.states.map((s) => ({ id: uid(), label: s.name, done: s.done, key: s.key ?? '', color: s.color ?? '' })),
-    };
+      keyword: s.name,
+      done: s.done,
+      key: s.key ?? '',
+      color: s.color ?? '',
+    }));
+    const d: DraftWorkflow = { id: uid(), name: w.name, states };
+    const init = w.initial ? states.find((s) => s.keyword === w.initial && !s.done) : undefined;
+    if (init) d.initialId = init.id;
     normalize(d);
     return d;
   });
   return { workflows, behavior: { ...(cfg.behavior ?? DEFAULT_BEHAVIOR) } };
 }
 
-// ---- operations ------------------------------------------------------------------
+export const initialOf = (w: DraftWorkflow): DraftState | undefined =>
+  w.states.find((s) => s.id === w.initialId && !s.done && !s.pending) ?? w.states.find((s) => !s.done && !s.pending);
 
-const allKeywords = (d: Draft) => new Set(d.workflows.flatMap((w) => w.states.map((s) => keywordOf(s.label))));
+// ---- operations ------------------------------------------------------------------------
+
+const allKeywords = (d: Draft) => new Set(d.workflows.flatMap((w) => w.states.filter((s) => !s.pending).map((s) => s.keyword)));
 
 function freshName(d: Draft, base: string): string {
   const taken = allKeywords(d);
@@ -62,39 +135,67 @@ function freshName(d: Draft, base: string): string {
 }
 
 export function addWorkflow(d: Draft): DraftWorkflow {
-  const n = d.workflows.length + 1;
+  let n = d.workflows.length + 1;
+  const names = new Set(d.workflows.map((w) => w.name));
+  while (names.has(`Набор ${n}`)) n++;
   const w: DraftWorkflow = {
     id: uid(),
     name: `Набор ${n}`,
     states: [
-      { id: uid(), label: freshName(d, 'NEW'), done: false, key: '', color: '' },
-      { id: uid(), label: freshName(d, 'DONE'), done: true, key: '', color: '' },
+      { id: uid(), keyword: freshName(d, 'NEW'), done: false, key: '', color: 'gray' },
+      { id: uid(), keyword: freshName(d, 'DONE'), done: true, key: '', color: 'green' },
     ],
   };
   d.workflows.push(w);
   return w;
 }
 
+export const canRemoveWorkflow = (d: Draft) => d.workflows.length > 1;
+
 export function removeWorkflow(d: Draft, id: string) {
+  if (!canRemoveWorkflow(d)) return;
   d.workflows = d.workflows.filter((w) => w.id !== id);
 }
 
-export function moveWorkflow(d: Draft, id: string, dir: -1 | 1) {
-  const i = d.workflows.findIndex((w) => w.id === id);
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= d.workflows.length) return;
-  [d.workflows[i], d.workflows[j]] = [d.workflows[j], d.workflows[i]];
+/** Drop workflow `id` before `beforeId`, or at the end for null. */
+export function dropWorkflow(d: Draft, id: string, beforeId: string | null) {
+  const w = d.workflows.find((x) => x.id === id);
+  if (!w || beforeId === id) return;
+  d.workflows = d.workflows.filter((x) => x.id !== id);
+  const at = beforeId ? d.workflows.findIndex((x) => x.id === beforeId) : -1;
+  d.workflows.splice(at < 0 ? d.workflows.length : at, 0, w);
 }
 
+export const pendingState = (d: Draft) => {
+  for (const w of d.workflows) {
+    const s = w.states.find((x) => x.pending);
+    if (s) return { workflow: w, state: s };
+  }
+  return null;
+};
+
+/** "+ Состояние": an empty grey row at the end of the open block, waiting for its keyword. */
 export function addState(d: Draft, w: DraftWorkflow, done = false): DraftState {
-  const s: DraftState = { id: uid(), label: freshName(d, done ? 'DONE' : 'STATE'), done, key: '', color: '' };
+  const existing = pendingState(d);
+  if (existing && existing.workflow.id === w.id) return existing.state; // never a second empty row
+  if (existing) removeState(existing.workflow, existing.state.id);
+  const s: DraftState = { id: uid(), keyword: '', done, key: '', color: 'gray', pending: true };
   w.states.push(s);
   normalize(w);
   return s;
 }
 
+export const canRemoveState = (w: DraftWorkflow, id: string) => {
+  const s = w.states.find((x) => x.id === id);
+  if (!s) return false;
+  if (s.pending || s.done) return true;
+  return w.states.filter((x) => !x.done && !x.pending).length > 1; // the last open state stays
+};
+
 export function removeState(w: DraftWorkflow, id: string) {
+  if (!canRemoveState(w, id)) return;
   w.states = w.states.filter((s) => s.id !== id);
+  if (w.initialId === id) w.initialId = undefined; // falls back to the first open state
 }
 
 /** Move one step; crossing the open/done separator changes whether the state closes the task. */
@@ -108,7 +209,9 @@ export function moveState(w: DraftWorkflow, id: string, dir: -1 | 1) {
     return;
   }
   if (dir > 0 && !s.done && i === open.length - 1) {
+    if (open.length === 1) return; // the last open state cannot become a closing one
     s.done = true; // last open state moves down over the separator
+    if (w.initialId === s.id) w.initialId = undefined;
     return;
   }
   const j = i + dir;
@@ -120,7 +223,10 @@ export function moveState(w: DraftWorkflow, id: string, dir: -1 | 1) {
 export function dropState(w: DraftWorkflow, id: string, beforeId: string | 'separator' | null) {
   const s = w.states.find((x) => x.id === id);
   if (!s || beforeId === id) return;
-  w.states = w.states.filter((x) => x.id !== id);
+  const wasOpen = !s.done;
+  const others = w.states.filter((x) => x.id !== id);
+  if (wasOpen && beforeId === 'separator' && !others.some((x) => !x.done)) return; // keep one open state
+  w.states = others;
   if (beforeId === 'separator') {
     s.done = true;
     const at = w.states.findIndex((x) => x.done);
@@ -135,46 +241,47 @@ export function dropState(w: DraftWorkflow, id: string, beforeId: string | 'sepa
     w.states.splice(at, 0, s);
   }
   normalize(w);
+  if (s.done && w.initialId === s.id) w.initialId = undefined;
 }
 
-// ---- validation -------------------------------------------------------------------
+// ---- validation ---------------------------------------------------------------------------
 
+/** Problems of the whole draft; rows that are still being added are not part of it. */
 export function validate(d: Draft): Problem[] {
   const out: Problem[] = [];
   const names = new Map<string, string>();
-  const owner = new Map<string, string>(); // keyword -> workflow name
+  const seen = new Map<string, string>(); // keyword -> workflow name
   for (const w of d.workflows) {
     const wn = w.name.trim();
     if (!wn) out.push({ workflow: w.id, message: 'У набора должно быть название' });
     else if (names.has(wn)) out.push({ workflow: w.id, message: `Набор «${wn}» уже есть` });
     names.set(wn, w.id);
 
-    if (!w.states.some((s) => !s.done)) out.push({ workflow: w.id, message: 'Нужно хотя бы одно незавершённое состояние' });
-    const keys = new Map<string, string>();
-    for (const s of w.states) {
-      const kw = keywordOf(s.label);
-      if (!kw) out.push({ workflow: w.id, state: s.id, message: 'Название состояния не может быть пустым' });
-      else if (!KEYWORD.test(kw)) out.push({ workflow: w.id, state: s.id, message: 'Недопустимые символы: ( ) | :' });
-      else if (owner.has(kw))
-        out.push({ workflow: w.id, state: s.id, message: `«${kw}» уже есть в наборе «${owner.get(kw)}»: состояние принадлежит одному набору` });
-      else owner.set(kw, wn || '…');
-      if (s.key) {
-        if ([...s.key].length !== 1) out.push({ workflow: w.id, state: s.id, message: 'Клавиша — одна буква' });
-        else if (keys.has(s.key.toLowerCase())) out.push({ workflow: w.id, state: s.id, message: `Клавиша «${s.key}» уже занята` });
-        keys.set(s.key.toLowerCase(), s.id);
+    const real = w.states.filter((s) => !s.pending);
+    if (!real.some((s) => !s.done)) out.push({ workflow: w.id, message: 'Нужно хотя бы одно незавершённое состояние' });
+    for (const s of real) {
+      const own = keywordProblem(s.keyword);
+      if (own) {
+        out.push({ workflow: w.id, state: s.id, message: own });
+        continue;
       }
+      const owner = seen.get(s.keyword);
+      if (owner !== undefined) out.push({ workflow: w.id, state: s.id, message: `Такое слово уже есть в наборе «${owner}»` });
+      else seen.set(s.keyword, wn || '…');
     }
   }
   return out;
 }
 
-// ---- output -----------------------------------------------------------------------
+// ---- output ----------------------------------------------------------------------------------
 
 /** `#+TODO:` line equivalent of a workflow, for people who also use Emacs. */
 export function orgLine(w: DraftWorkflow): string {
-  const fmt = (s: DraftState) => keywordOf(s.label) + (s.key ? `(${s.key})` : '');
-  const open = w.states.filter((s) => !s.done).map(fmt);
-  const done = w.states.filter((s) => s.done).map(fmt);
+  const keys = effectiveKeys(w);
+  const real = w.states.filter((s) => !s.pending && s.keyword);
+  const fmt = (s: DraftState) => s.keyword + (keys.get(s.id) ? `(${keys.get(s.id)})` : '');
+  const open = real.filter((s) => !s.done).map(fmt);
+  const done = real.filter((s) => s.done).map(fmt);
   return `#+TODO: ${open.join(' ')} |${done.length ? ' ' + done.join(' ') : ''}`;
 }
 
@@ -191,16 +298,21 @@ export function toJson(existingRaw: string | null, d: Draft): string {
   }
   const { version, workflows: _w, behavior: oldBehavior, ...rest } = base as Record<string, unknown>;
   const out: Record<string, unknown> = { version: version ?? 1, ...rest };
-  out.workflows = d.workflows.map((w) => ({
-    name: w.name.trim(),
-    states: w.states.map((s) => {
-      const o: Record<string, unknown> = { name: keywordOf(s.label) };
-      if (s.done) o.done = true;
-      if (s.key) o.key = s.key;
-      if (s.color) o.color = s.color;
-      return o;
-    }),
-  }));
+  out.workflows = d.workflows.map((w) => {
+    const real = w.states.filter((s) => !s.pending);
+    const o: Record<string, unknown> = { name: w.name.trim() };
+    const firstOpen = real.find((s) => !s.done);
+    const init = w.initialId ? real.find((s) => s.id === w.initialId && !s.done) : undefined;
+    if (init && init !== firstOpen) o.initial = init.keyword;
+    o.states = real.map((s) => {
+      const st: Record<string, unknown> = { name: s.keyword };
+      if (s.done) st.done = true;
+      if (s.key) st.key = s.key;
+      if (s.color) st.color = s.color;
+      return st;
+    });
+    return o;
+  });
   const isDefault = d.behavior.closed === DEFAULT_BEHAVIOR.closed && d.behavior.logbook === DEFAULT_BEHAVIOR.logbook;
   if (!isDefault || oldBehavior !== undefined) out.behavior = { closedTimestamp: d.behavior.closed, logbook: d.behavior.logbook };
   return JSON.stringify(out, null, 2) + '\n';

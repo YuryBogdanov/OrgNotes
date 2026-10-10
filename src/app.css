@@ -44,6 +44,14 @@ button { cursor: default; }
 ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg) 22%, transparent); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-track { background: transparent; }
 
+/* status colours: each theme gets its own value through --tl / --td (see colors.ts) */
+.tone { color: var(--tl); }
+.tone-chip { color: var(--tl); background: color-mix(in srgb, var(--tl) 14%, transparent); }
+@media (prefers-color-scheme: dark) {
+  .tone { color: var(--td); }
+  .tone-chip { color: var(--td); background: color-mix(in srgb, var(--td) 15%, transparent); }
+}
+
 /* ---- editor (CodeMirror) ---- */
 .cm-editor { height: 100%; background: var(--bg) !important; color: var(--fg); font-family: var(--mono); font-size: 13px; }
 .cm-editor.cm-focused { outline: none; }
