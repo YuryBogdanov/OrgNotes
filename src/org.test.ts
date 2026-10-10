@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_WORKFLOW, firstOpen, headingAt, headingLines, joinEol, kwTone, parseHeadings, parseProjectConfig, parseWorkflow, resolveWorkflow, sequenceFor, setKeyword, setPriority, shiftTimestamp, splitEol, subtreeProgress } from './org';
+import { DEFAULT_WORKFLOW, firstOpen, startOf, headingAt, headingLines, joinEol, toneFor, parseHeadings, parseProjectConfig, parseWorkflow, resolveWorkflow, sequenceFor, setKeyword, setPriority, shiftTimestamp, splitEol, subtreeProgress } from './org';
 
 // Saturday, 10 October 2026, 12:00
 const NOW = new Date(2026, 9, 10, 12, 0);
@@ -250,11 +250,75 @@ describe('project workflows', () => {
     const out = setKeyword(t, parseHeadings(t, wf)[0], 'FINISHED', wf, new Date(2026, 9, 10, 12, 0));
     expect(out.startsWith('* MEETING Планёрка\nSCHEDULED: <2026-10-19 Mon +1w>')).toBe(true);
   });
-  it('colours states by their colour, then by name', () => {
+  it('colours states by their colour, then by well-known name, then by open/done', () => {
     const wf = resolveWorkflow('', 'x.org', config);
-    expect(kwTone('IN-PROGRESS', wf)).toBe('--next');
-    expect(kwTone('FINISHED', wf)).toBe('--done');
-    expect(kwTone('MEETING', wf)).toBe('--todo');
-    expect(kwTone('TODO', DEFAULT_WORKFLOW)).toBe('--todo');
+    expect(toneFor('IN-PROGRESS', wf)).toEqual({ light: '#0a58c2', dark: '#6cb4ff' }); // blue
+    expect(toneFor('FINISHED', wf)).toEqual({ light: '#1d7f3a', dark: '#6fd58a' }); // done: green
+    expect(toneFor('MEETING', wf)).toEqual({ light: '#c4262e', dark: '#ff7b80' }); // open: red
+    expect(toneFor('TODO', DEFAULT_WORKFLOW).light).toBe('#c4262e');
+    expect(toneFor('CANCELLED', DEFAULT_WORKFLOW).light).toBe('#5f5f66');
+  });
+  it('reads colours as palette ids or hex and ignores anything else', () => {
+    const r = parseProjectConfig(JSON.stringify({ workflows: [{ name: 'A', states: [
+      { name: 'ONE', color: 'teal' }, { name: 'TWO', color: '#A1B2C3' }, { name: 'THREE', color: 'chartreuse' } ] }] }));
+    expect(r.config.workflows[0].states.map((s) => s.color)).toEqual(['teal', '#A1B2C3', undefined]);
+  });
+  it('starts a new task in the chosen initial status, else the first open one', () => {
+    const r = parseProjectConfig(JSON.stringify({ workflows: [
+      { name: 'A', initial: 'TODO', states: [{ name: 'NEW' }, { name: 'TODO' }, { name: 'DONE', done: true }] },
+      { name: 'B', initial: 'DONE', states: [{ name: 'X' }, { name: 'DONE2', done: true }] } ] }));
+    const [a, b] = r.config.workflows;
+    expect(startOf(a)).toBe('TODO');
+    expect(startOf(b)).toBe('X'); // a closed status cannot be the initial one
+    expect(r.warnings.join('\n')).toContain('не подходит как состояние новой задачи');
+  });
+});
+
+describe('status change behaviour', () => {
+  const NOW = new Date(2026, 9, 10, 12, 0);
+  const wf = (behavior: { closed: boolean; logbook: boolean }) => resolveWorkflow('', 'x.org', { workflows: [], behavior });
+  const run = (t: string, to: string | null, b: { closed: boolean; logbook: boolean }) => {
+    const w = wf(b);
+    return setKeyword(t, parseHeadings(t, w)[0], to, w, NOW);
+  };
+
+  it('writes CLOSED by default and can be told not to', () => {
+    expect(run('* TODO a\n', 'DONE', { closed: true, logbook: false })).toBe('* DONE a\nCLOSED: [2026-10-10 Sat 12:00]\n');
+    expect(run('* TODO a\n', 'DONE', { closed: false, logbook: false })).toBe('* DONE a\n');
+  });
+  it('still removes an existing CLOSED when reopened, whatever the setting', () => {
+    expect(run('* DONE a\nCLOSED: [2026-10-08 Thu 18:20]\n', 'TODO', { closed: false, logbook: false })).toBe('* TODO a\n');
+  });
+  it('logs state changes into a new :LOGBOOK: drawer, newest on top', () => {
+    const b = { closed: true, logbook: true };
+    const once = run('* TODO a\n', 'NEXT', b);
+    expect(once).toBe('* NEXT a\n:LOGBOOK:\n- State "NEXT"       from "TODO"       [2026-10-10 Sat 12:00]\n:END:\n');
+    const twice = run(once, 'DONE', b);
+    expect(twice).toBe(
+      '* DONE a\nCLOSED: [2026-10-10 Sat 12:00]\n:LOGBOOK:\n- State "DONE"       from "NEXT"       [2026-10-10 Sat 12:00]\n' +
+        '- State "NEXT"       from "TODO"       [2026-10-10 Sat 12:00]\n:END:\n',
+    );
+  });
+  it('puts the drawer after the property drawer and logs a first status as from ""', () => {
+    const b = { closed: true, logbook: true };
+    expect(run('* a\n:PROPERTIES:\n:ID: x\n:END:\ntext\n', 'TODO', b)).toBe(
+      '* TODO a\n:PROPERTIES:\n:ID: x\n:END:\n:LOGBOOK:\n- State "TODO"       from ""           [2026-10-10 Sat 12:00]\n:END:\ntext\n',
+    );
+  });
+  it('does not log removing the status or setting the same one', () => {
+    const b = { closed: true, logbook: true };
+    expect(run('* TODO a\n', null, b)).toBe('* a\n');
+    expect(run('* TODO a\n', 'TODO', b)).toBe('* TODO a\n');
+  });
+  it('logs the finish of a repeating task', () => {
+    const b = { closed: true, logbook: true };
+    const out = run('* TODO a\nSCHEDULED: <2026-10-12 Mon +1w>\n', 'DONE', b);
+    expect(out).toContain('SCHEDULED: <2026-10-19 Mon +1w>');
+    expect(out).toContain(':LAST_REPEAT: [2026-10-10 Sat 12:00]');
+    expect(out).toContain('- State "DONE"       from "TODO"       [2026-10-10 Sat 12:00]');
+  });
+  it('reads behaviour from the project config, with defaults', () => {
+    expect(parseProjectConfig('{}').config.behavior).toEqual({ closed: true, logbook: false });
+    expect(parseProjectConfig('{"behavior":{"closedTimestamp":false,"logbook":true}}').config.behavior).toEqual({ closed: false, logbook: true });
   });
 });

@@ -1,7 +1,8 @@
 <script lang="ts">
   import { store } from './store.svelte';
   import { backlinks, linkLabel, linksOf, resolveLink } from './links';
-  import { dayDiff, firstDone, firstOpen, fmtShort, kwTone, sequenceFor, subtreeProgress, toJs } from './org';
+  import { dayDiff, firstDone, fmtShort, sequenceFor, startOf, subtreeProgress, toJs, toneFor } from './org';
+  import { toneStyle } from './colors';
 
   const f = $derived(store.file);
   const h = $derived(f && store.selected >= 0 ? f.headings[store.selected] : undefined);
@@ -10,7 +11,7 @@
   const groups = $derived(
     f?.wf.sequences && f.wf.sequences.length > 1 ? f.wf.sequences : f ? [{ name: '', states: seq!.states }] : [],
   );
-  const tone = $derived(h?.keyword && f ? kwTone(h.keyword, f.wf) : '--fg2');
+  const toneVars = $derived(h?.keyword && f ? toneStyle(toneFor(h.keyword, f.wf)) : '');
   const progress = $derived(h && f ? subtreeProgress(f.headings, store.selected, f.wf) : { done: 0, total: 0 });
   const inherited = $derived.by(() => {
     if (!h || !f) return [] as string[];
@@ -43,7 +44,7 @@
       <div class="name">{h.title}</div>
       <label class="row">
         <span class="k">Состояние</span>
-        <select class="pick" style="color:var({tone});font-weight:600" value={h.keyword ?? ''} onchange={(e) => store.setKeyword(e.currentTarget.value || null)}>
+        <select class="pick {h.keyword ? 'tone' : ''}" style="{toneVars};font-weight:600" value={h.keyword ?? ''} onchange={(e) => store.setKeyword(e.currentTarget.value || null)}>
           <option value="">—</option>
           {#each groups as g}
             {#if g.name && groups.length > 1}
@@ -65,7 +66,7 @@
         <div class="hint right">workflow: {seq.name}</div>
       {/if}
       {#if seq && firstDone(seq)}
-        <button class="primary" onclick={() => store.setKeyword(isDone ? firstOpen(seq) : firstDone(seq))}>
+        <button class="primary" onclick={() => store.setKeyword(isDone ? startOf(seq) : firstDone(seq))}>
           {isDone ? 'Вернуть в работу' : 'Выполнено'}
         </button>
       {/if}

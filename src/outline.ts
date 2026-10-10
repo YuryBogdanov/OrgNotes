@@ -1,7 +1,7 @@
 // Structure editing in the spirit of Org's M-RET, M-left/right, M-up/down, S-up/down.
 // Pure functions: text + caret offset in, text edits + new caret out. The editor applies them as one
 // transaction, so one ⌘Z undoes one command.
-import { firstOpen, headingLines, parseHeadings, sequenceFor, setKeyword, setPriority, type Workflow, type WorkflowDef } from './org';
+import { headingLines, parseHeadings, sequenceFor, setKeyword, setPriority, startOf, type Workflow, type WorkflowDef } from './org';
 
 export interface Edit {
   from: number;
@@ -215,7 +215,7 @@ export function foldTargets(text: string, state: number): { lines: number[]; max
 export const nextCycleState = (current: number | undefined, max: number) => ((current ?? max) + 1) % (max + 1);
 
 /** First open state of the file's first workflow, for M-S-RET. */
-export const newTaskState = (wf: Workflow) => firstOpen(sequenceFor(wf, null));
+export const newTaskState = (wf: Workflow) => startOf(sequenceFor(wf, null));
 
 // ---- Shift+←/→ and Ctrl+Shift+←/→ : status and workflow rotation --------------------
 
@@ -230,7 +230,7 @@ const sequencesOf = (wf: Workflow): WorkflowDef[] => (wf.sequences?.length ? wf.
 export function rotateStatus(wf: Workflow, keyword: string | null, dir: 'next' | 'prev'): string | null {
   const seqs = sequencesOf(wf);
   const seq = keyword ? seqs.find((s) => s.states.some((x) => x.name === keyword)) : undefined;
-  if (!seq || !keyword) return seqs[0].states[0].name;
+  if (!seq || !keyword) return startOf(seqs[0]);
   const i = seq.states.findIndex((x) => x.name === keyword);
   if (dir === 'next') return i + 1 < seq.states.length ? seq.states[i + 1].name : null;
   return i === 0 ? null : seq.states[i - 1].name;
@@ -244,9 +244,9 @@ export function rotateStatus(wf: Workflow, keyword: string | null, dir: 'next' |
 export function rotateWorkflow(wf: Workflow, keyword: string | null, dir: 'next' | 'prev'): string | null {
   const seqs = sequencesOf(wf);
   const k = keyword ? seqs.findIndex((s) => s.states.some((x) => x.name === keyword)) : -1;
-  if (k < 0) return seqs[0].states[0].name;
+  if (k < 0) return startOf(seqs[0]);
   const to = dir === 'next' ? k + 1 : k - 1;
-  return to >= 0 && to < seqs.length ? seqs[to].states[0].name : null;
+  return to >= 0 && to < seqs.length ? startOf(seqs[to]) : null;
 }
 
 /** Apply a status change to the heading on the caret's line (CLOSED, repeaters etc. as in setKeyword). */

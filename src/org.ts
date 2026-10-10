@@ -1,3 +1,4 @@
+import { isColor, toneOf, type Tone } from './colors';
 // Minimal Org parsing + text patching. The file text stays the source of truth:
 // every edit is a targeted string patch, nothing is re-serialised from a tree.
 
@@ -17,7 +18,15 @@ export interface OrgDate {
   repeater?: string;
 }
 
+/** Project-wide behaviour of status changes. */
+export interface WorkflowBehavior {
+  closed: boolean; // write CLOSED: [..] when a task is finished
+  logbook: boolean; // log every status change into the heading's :LOGBOOK: drawer
+}
+export const DEFAULT_BEHAVIOR: WorkflowBehavior = { closed: true, logbook: false };
+
 export interface Workflow {
+  behavior?: WorkflowBehavior;
   open: string[];
   done: string[];
 }
@@ -44,14 +53,15 @@ export interface Heading {
 export interface WorkflowState {
   name: string;
   done: boolean;
-  key?: string; // quick-select letter, like TODO(t)
-  color?: string; // gray | red | blue | orange | green | purple
+  key?: string; // quick-select letter, like TODO(t) (kept if a hand-written config has it)
+  color?: string; // a palette id (gray red orange green teal blue purple pink) or a #rrggbb hex
 }
 
 /** One status sequence, e.g. "Задачи": NEW TODO IN-PROGRESS | DONE. The first state is where new items start. */
 export interface WorkflowDef {
   name: string;
   states: WorkflowState[];
+  initial?: string; // the status a new task gets; an open state of this workflow (default: the first open one)
 }
 
 export interface Workflow {
@@ -64,9 +74,10 @@ export interface Workflow {
 
 export interface ProjectConfig {
   workflows: WorkflowDef[];
+  behavior: WorkflowBehavior;
 }
 
-export const EMPTY_CONFIG: ProjectConfig = { workflows: [] };
+export const EMPTY_CONFIG: ProjectConfig = { workflows: [], behavior: DEFAULT_BEHAVIOR };
 
 const stateOf = (name: string, done: boolean): WorkflowState => ({ name, done });
 
@@ -99,6 +110,11 @@ export function sequenceFor(wf: Workflow, keyword: string | null): WorkflowDef {
   return own ?? seqs[Math.min(wf.primary ?? 0, seqs.length - 1)];
 }
 export const firstOpen = (s: WorkflowDef) => s.states.find((x) => !x.done)?.name ?? s.states[0]?.name ?? 'TODO';
+/** Where a new task of this workflow starts: the chosen initial status, else the first open one. */
+export const startOf = (s: WorkflowDef) => {
+  const i = s.initial ? s.states.find((x) => x.name === s.initial && !x.done) : undefined;
+  return i ? i.name : firstOpen(s);
+};
 export const firstDone = (s: WorkflowDef) => s.states.find((x) => x.done)?.name ?? null;
 
 const stripKey = (w: string) => w.replace(/\(.*\)$/, '');
@@ -137,13 +153,16 @@ export function parseWorkflow(text: string): Workflow {
  */
 export function resolveWorkflow(text: string, _relPath: string, cfg: ProjectConfig): Workflow {
   const own = parseFileSequences(text);
-  if (own.length) return fromSequences(own, 0, 'file');
-  if (!cfg.workflows.length) return DEFAULT_WORKFLOW;
-  return fromSequences(cfg.workflows, 0, 'project');
+  let wf: Workflow;
+  if (own.length) wf = fromSequences(own, 0, 'file');
+  else if (!cfg.workflows.length) wf = DEFAULT_WORKFLOW;
+  else wf = fromSequences(cfg.workflows, 0, 'project');
+  // behaviour is a project setting and applies whichever statuses are in effect
+  const b = cfg.behavior ?? DEFAULT_BEHAVIOR;
+  return b === DEFAULT_BEHAVIOR || (b.closed === DEFAULT_BEHAVIOR.closed && b.logbook === DEFAULT_BEHAVIOR.logbook) ? wf : { ...wf, behavior: b };
 }
 
 const KEYWORD = /^[^\s()|:]+$/;
-const COLORS = new Set(['gray', 'red', 'blue', 'orange', 'green', 'purple']);
 
 /** Reads `.orgnotes/config.json`. Never throws: problems become warnings and the offending part is skipped. */
 export function parseProjectConfig(json: string): { config: ProjectConfig; warnings: string[] } {
@@ -180,7 +199,7 @@ export function parseProjectConfig(json: string): { config: ProjectConfig; warni
         name: n,
         done: st.done === true,
         key: typeof st.key === 'string' && st.key.length === 1 ? st.key : undefined,
-        color: COLORS.has(st.color) ? st.color : undefined,
+        color: isColor(st.color) ? st.color : undefined,
       });
     }
     if (!states.length) {
@@ -191,9 +210,20 @@ export function parseProjectConfig(json: string): { config: ProjectConfig; warni
       warnings.push(`workflow «${name}» объявлен дважды, второй пропущен`);
       continue;
     }
-    workflows.push({ name, states });
+    const def: WorkflowDef = { name, states };
+    const initial = typeof w.initial === 'string' ? w.initial.trim().replace(/\s+/g, '-') : '';
+    if (initial) {
+      if (states.some((x) => x.name === initial && !x.done)) def.initial = initial;
+      else warnings.push(`${name}: «${w.initial}» не подходит как состояние новой задачи`);
+    }
+    workflows.push(def);
   }
-  return { config: { workflows }, warnings };
+  const bh = raw?.behavior ?? {};
+  const behavior: WorkflowBehavior = {
+    closed: typeof bh.closedTimestamp === 'boolean' ? bh.closedTimestamp : DEFAULT_BEHAVIOR.closed,
+    logbook: typeof bh.logbook === 'boolean' ? bh.logbook : DEFAULT_BEHAVIOR.logbook,
+  };
+  return { config: { workflows, behavior }, warnings };
 }
 
 const TS = /<(\d{4})-(\d{2})-(\d{2})(?:\s+[^\s\d>]+)?(?:\s+(\d{2}:\d{2}))?(?:\s+([.+]{1,2}\d+[hdwmy]))?[^>]*>/;
@@ -394,6 +424,20 @@ function setProperty(lines: string[], h: Heading, key: string, value: string) {
   }
 }
 
+/** Add a `- State "NEW" from "OLD" [stamp]` entry on top of the heading's :LOGBOOK: drawer, creating it if needed. */
+function logState(lines: string[], h: Heading, to: string, from: string | null, now: Date) {
+  const q = (w: string) => `"${w}"`.padEnd(12);
+  const entry = `- State ${q(to)} from ${q(from ?? '')} ${inactiveStamp(now)}`;
+  let i = h.line + 1;
+  if (/^\s*(SCHEDULED|DEADLINE|CLOSED):/.test(lines[i] ?? '')) i++;
+  if (/^\s*:PROPERTIES:\s*$/i.test(lines[i] ?? '')) {
+    while (i < lines.length && !/^\s*:END:\s*$/i.test(lines[i])) i++;
+    i++;
+  }
+  if (/^\s*:LOGBOOK:\s*$/i.test(lines[i] ?? '')) lines.splice(i + 1, 0, entry);
+  else lines.splice(i, 0, ':LOGBOOK:', entry, ':END:');
+}
+
 /** Change (or remove) the TODO keyword of one heading. Maintains CLOSED: and repeaters like Org does. */
 export function setKeyword(text: string, h: Heading, keyword: string | null, wf: Workflow, now = new Date()): string {
   const lines = text.split('\n');
@@ -413,8 +457,9 @@ export function setKeyword(text: string, h: Heading, keyword: string | null, wf:
       return `${k}:${sp}${next}`;
     });
     if (shifted) {
-      write(firstOpen(sequenceFor(wf, h.keyword)));
+      write(startOf(sequenceFor(wf, h.keyword)));
       setProperty(lines, h, 'LAST_REPEAT', inactiveStamp(now));
+      if (wf.behavior?.logbook) logState(lines, h, keyword, h.keyword, now);
       return lines.join('\n');
     }
   }
@@ -426,7 +471,8 @@ export function setKeyword(text: string, h: Heading, keyword: string | null, wf:
   const isDone = keyword !== null && wf.done.includes(keyword);
   const stripClosed = (s: string) => s.replace(/CLOSED:\s*\[[^\]]*\]\s*/, '').replace(/\s+$/, '');
 
-  if (isDone && !(hasPlanning && /CLOSED:/.test(next))) {
+  const writeClosed = wf.behavior?.closed ?? DEFAULT_BEHAVIOR.closed;
+  if (isDone && writeClosed && !(hasPlanning && /CLOSED:/.test(next))) {
     const stamp = `CLOSED: ${inactiveStamp(now)}`;
     if (hasPlanning) lines[h.line + 1] = next.replace(/^(\s*)/, `$1${stamp} `);
     else lines.splice(h.line + 1, 0, stamp);
@@ -435,6 +481,7 @@ export function setKeyword(text: string, h: Heading, keyword: string | null, wf:
     if (/^\s*$/.test(cleaned)) lines.splice(h.line + 1, 1);
     else lines[h.line + 1] = cleaned;
   }
+  if (wf.behavior?.logbook && keyword !== null && keyword !== h.keyword) logState(lines, h, keyword, h.keyword, now);
   return lines.join('\n');
 }
 
@@ -470,17 +517,13 @@ export const fmtLong = (d: Date) => `${WD_FULL[d.getDay()]}, ${d.getDate()} ${MO
 export const fmtDay = (d: Date) => `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
 export const weekdayName = (d: Date) => WD_FULL[d.getDay()][0].toUpperCase() + WD_FULL[d.getDay()].slice(1);
 
-const COLOR_VAR: Record<string, string> = {
-  gray: '--fg3', red: '--todo', blue: '--next', orange: '--wait', green: '--done', purple: '--purple',
-};
+const DEFAULT_COLOR: Record<string, string> = { TODO: 'red', NEXT: 'blue', WAIT: 'orange', DONE: 'green', CANCELLED: 'gray' };
 
-/** CSS custom property that colours a keyword: the state's own colour, else by name, else by done/open. */
-export function kwTone(kw: string, wf: Workflow): string {
+/** Colour of a status in both themes: its own colour, else by well-known name, else by open/done. */
+export function toneFor(kw: string, wf: Workflow): Tone {
   const st = wf.sequences?.flatMap((s) => s.states).find((x) => x.name === kw);
-  if (st?.color && COLOR_VAR[st.color]) return COLOR_VAR[st.color];
-  const known: Record<string, string> = { TODO: '--todo', NEXT: '--next', WAIT: '--wait', DONE: '--done', CANCELLED: '--fg3' };
-  if (known[kw]) return known[kw];
-  return wf.done.includes(kw) ? '--done' : '--todo';
+  const t = toneOf(st?.color) ?? toneOf(DEFAULT_COLOR[kw]) ?? toneOf(wf.done.includes(kw) ? 'green' : 'red')!;
+  return t;
 }
 
 export function repeaterLabel(r?: string): string {
