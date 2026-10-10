@@ -30,6 +30,7 @@ fn every_menu_accelerator_parses() {
         "Control+CmdOrCtrl+KeyW",
         "Shift+CmdOrCtrl+Backslash",
         "Shift+CmdOrCtrl+KeyJ",
+        "Shift+CmdOrCtrl+KeyW",
         "Shift+Control+CmdOrCtrl+ArrowRight",
     ];
     for a in used {

@@ -5,7 +5,7 @@
   import Inspector from './Inspector.svelte';
   import Pane from './Pane.svelte';
   import SaveAsSheet from './SaveAsSheet.svelte';
-  import UnsavedDialog from './UnsavedDialog.svelte';
+  import CloseSheet from './CloseSheet.svelte';
   import { installMenu, type AppMenu } from './menu';
   import { MIN_PANE, secondKind } from './layout';
   import { displayPath } from './names';
@@ -88,6 +88,7 @@
     revealInNav: () => store.revealInNavigator(store.tab),
     copyPath: () => store.copyPath(store.tab),
     quit: () => store.quit(),
+    closeWindow: () => store.quit(), // the only window: closing it is quitting, with the same question
     splitRight: () => store.splitRight(),
     swap: () => store.swapPanes(),
     keepOne: () => store.keepOnePane(),
@@ -125,6 +126,7 @@
     if (e.altKey && k === 'ArrowRight') return 'paneRight';
     if (e.altKey && e.code === 'KeyW') return 'closeOthers';
     if (e.ctrlKey && e.code === 'KeyW') return 'closePane';
+    if (e.shiftKey && e.code === 'KeyW') return 'closeWindow';
     if (e.altKey && e.code === 'KeyC') return 'copyPath';
     if (e.shiftKey && e.code === 'KeyJ') return 'revealInNav';
     if (e.code === 'Backslash' || k === '\\') return e.shiftKey ? 'keepOne' : e.altKey ? null : 'splitRight';
@@ -139,12 +141,15 @@
     store.load();
     store.listen();
     if (isSettingsWindow) return;
-    installMenu(actions).then((m) => (menu = m));
+    // while a sheet is up, menu commands do nothing
+    const guarded = Object.fromEntries(Object.entries(actions).map(([id, run]) => [id, () => { if (!store.sheetOpen) run(); }]));
+    installMenu(guarded).then((m) => (menu = m));
     // closing the window asks about unsaved tabs first, like quitting
     if ('__TAURI_INTERNALS__' in window && !(window as any).__ORG_SETTINGS_OVERLAY__) {
       import('@tauri-apps/api/window')
         .then(({ getCurrentWindow }) =>
           getCurrentWindow().onCloseRequested((e) => {
+            if (store.sheetOpen) return e.preventDefault(); // already asking
             if (!store.hasUnsaved()) return;
             e.preventDefault();
             store.quit();
@@ -154,6 +159,7 @@
     }
     const key = (e: KeyboardEvent) => {
       if (menu) return; // the menu bar owns the shortcuts
+      if (store.sheetOpen) return; // the sheet has the keyboard
       const id = shortcut(e);
       if (!id) return;
       if (id === 'settings' && store.settingsOpen) {
@@ -183,8 +189,10 @@
 {:else}
 <div class="win">
   <Dialogs />
-  {#if store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/if}
-  {#if store.unsavedReq}<UnsavedDialog tab={store.unsavedReq.tab} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
+  <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
+  {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
+  {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
+  {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
   {#if store.settingsOpen}<Settings />{/if}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="toolbar" data-tauri-drag-region onmousedown={drag}>

@@ -4,7 +4,7 @@ import {
   newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
-import { displayName, withOrg } from './names';
+import { displayName, noteName, withOrg } from './names';
 import { EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, splitEol, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
 export interface NoteFile {
@@ -71,7 +71,14 @@ class Store {
   layout = $state<Layout>(emptyLayout());
   /** Sheets the page shows on request: "Сохранить как…" and the question about unsaved text. */
   saveAsReq = $state<{ tab: Tab; resolve: (saved: boolean) => void } | null>(null);
-  unsavedReq = $state<{ tab: Tab; resolve: (answer: 'save' | 'discard' | 'cancel') => void } | null>(null);
+  /** The close sheet: what closing would lose (one file, one new note, or several tabs). */
+  unsavedReq = $state<{ items: Unsaved[]; resolve: (answer: 'save' | 'discard' | 'cancel') => void } | null>(null);
+  /** A write failed while closing: the reason, with a single "ОК". */
+  errorReq = $state<{ title: string; text: string; resolve: () => void } | null>(null);
+  /** While a sheet is up the rest of the window does not react: no shortcuts, no menu commands. */
+  get sheetOpen() {
+    return !!(this.unsavedReq || this.saveAsReq || this.errorReq);
+  }
   /** "Показать в навигаторе": expand to this file and mark it for a moment. */
   navReveal = $state<{ path: string; n: number } | null>(null);
   showNav = $state(true);
@@ -119,6 +126,14 @@ class Store {
     return t?.kind === 'file' ? this.files.find((f) => f.path === t.path) : undefined;
   }
 
+  /** A failed "Сохранить как…", shown in the bar of the new notes (other messages are about files). */
+  draftNotice = $state('');
+  private draftTimer: ReturnType<typeof setTimeout> | undefined;
+  sayDraft(msg: string) {
+    this.draftNotice = msg;
+    clearTimeout(this.draftTimer);
+    this.draftTimer = setTimeout(() => (this.draftNotice = ''), 6000);
+  }
   say(msg: string) {
     this.notice = msg;
     clearTimeout(this.noticeTimer);
@@ -437,8 +452,12 @@ class Store {
   get untitledWf() {
     return resolveWorkflow('', UNTITLED + '.org', this.config);
   }
+  /** A new note with text in it (spaces and blank lines do not count), or a file whose text is not on disk yet. */
   isUnsaved(t: Tab | undefined) {
-    return !!t && t.kind === 'untitled' && !!t.text;
+    if (!t) return false;
+    if (t.kind === 'untitled') return !!t.text?.trim();
+    const f = t.kind === 'file' ? this.files.find((x) => x.path === t.path) : undefined;
+    return !!f && f.text !== f.disk;
   }
   hasUnsaved() {
     return this.layout.panes.some((p) => p.tabs.some((t) => this.isUnsaved(t)));
@@ -461,20 +480,81 @@ class Store {
     }
     return [-1, -1];
   }
-  /** Ask about unsaved text before a tab goes away. True when it may be closed. */
-  private async mayClose(t: Tab): Promise<boolean> {
-    if (!this.isUnsaved(t)) return true;
-    const [pi, ti] = this.where(t);
-    if (pi >= 0) this.activateTab(pi, ti); // show what the question is about
-    const answer = await new Promise<'save' | 'discard' | 'cancel'>((resolve) => (this.unsavedReq = { tab: t, resolve }));
+  /**
+   * What closing the tabs `ts` would lose, in the order of the window (left pane first, left to right).
+   * Files save themselves half a second after an edit, so a write that is only waiting goes out now; a file is
+   * listed only when that write fails, and only when its last tab is among the closing ones (the same file in
+   * the other pane keeps the text). New notes with text are always listed.
+   */
+  private async unsavedOf(ts: Tab[]): Promise<Unsaved[]> {
+    const closing = new Set(ts.map((t) => t.id));
+    const order = this.layout.panes.flatMap((p) => p.tabs).filter((t) => closing.has(t.id));
+    const openElsewhere = (path: string) => this.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'file' && t.path === path && !closing.has(t.id)));
+    const paths = [...new Set(order.flatMap((t) => (t.kind === 'file' && t.path && !openElsewhere(t.path) ? [t.path] : [])))];
+    for (const path of paths) {
+      const f = this.files.find((x) => x.path === path);
+      if (!f || f.text === f.disk) continue;
+      clearTimeout(this.timers.get(path));
+      this.timers.delete(path);
+      await this.save(path);
+    }
+    const out: Unsaved[] = [];
+    const seen = new Set<string>();
+    for (const t of order) {
+      if (t.kind === 'untitled' && t.text?.trim()) out.push({ tab: t, kind: 'note', name: noteName(t.text) });
+      if (t.kind !== 'file' || !t.path || !paths.includes(t.path) || seen.has(t.path)) continue;
+      seen.add(t.path); // listed and counted once, whichever pane
+      const f = this.files.find((x) => x.path === t.path);
+      if (f && f.text !== f.disk) out.push({ tab: t, kind: 'file', name: displayName(f.name) });
+    }
+    return out;
+  }
+  /**
+   * Ask before tabs go away. True when they may close: nothing would be lost, "Не сохранять", or everything was
+   * saved. "Сохранить всё" writes the files, then opens "Сохранить как" for each new note in turn; a cancel or a
+   * failed write stops there and nothing closes (what was saved stays open, without its dot).
+   */
+  async confirmClose(ts: Tab[]): Promise<boolean> {
+    if (this.sheetOpen) return false; // a second ⌘W while the sheet is up does nothing
+    const items = await this.unsavedOf(ts);
+    if (!items.length) return true;
+    if (items.length === 1) {
+      const [pi, ti] = this.where(items[0].tab);
+      items[0].tab.reveal = null;
+      if (pi >= 0) this.activateTab(pi, ti); // show what the question is about
+    }
+    const answer = await new Promise<'save' | 'discard' | 'cancel'>((resolve) => (this.unsavedReq = { items, resolve }));
     this.unsavedReq = null;
     if (answer === 'cancel') return false;
-    if (answer === 'discard') return true;
-    return this.saveAs(t); // closes only after a successful write
+    if (answer === 'discard') {
+      for (const it of items) if (it.kind === 'file') this.revert(it.tab.path!);
+      return true;
+    }
+    for (const it of items.filter((x) => x.kind === 'file')) {
+      const err = await this.save(it.tab.path!);
+      if (err) {
+        await new Promise<void>((resolve) => (this.errorReq = { title: `Не удалось сохранить «${it.name}»`, text: err[0].toUpperCase() + err.slice(1) + '. Текст остался в редакторе.', resolve }));
+        this.errorReq = null;
+        return false;
+      }
+    }
+    for (const it of items.filter((x) => x.kind === 'note')) {
+      const [pi, ti] = this.where(it.tab);
+      it.tab.reveal = null; // shown, not focused: the keyboard stays with the sheet
+      if (pi >= 0) this.activateTab(pi, ti);
+      if (!(await this.saveAs(it.tab))) return false;
+    }
+    return true;
+  }
+  /** "Не сохранять" on a file: the text goes back to what is on disk. */
+  private revert(path: string) {
+    clearTimeout(this.timers.get(path));
+    this.timers.delete(path);
+    this.files = this.files.map((f) => (f.path === path ? build(f.name, f.path, f.disk, f.disk, f.diskRaw, f.eol, this.config) : f));
   }
   async closeTab(pi: number, ti: number) {
     const t = this.layout.panes[pi]?.tabs[ti];
-    if (!t || !(await this.mayClose(t))) return;
+    if (!t || !(await this.confirmClose([t]))) return;
     const [p2, t2] = this.where(t);
     if (p2 >= 0) closeTab(this.layout, p2, t2);
   }
@@ -482,12 +562,13 @@ class Store {
     const p = this.layout.panes[this.layout.active];
     if (p?.tabs.length) await this.closeTab(this.layout.active, p.active);
   }
-  /** "Закрыть остальные": asks about each unsaved tab in turn; "Отмена" stops there. */
+  /** "Закрыть остальные": one question about the others (the kept tab is not in it, whatever its state). */
   async closeOthers(pi: number, ti: number) {
     const keep = this.layout.panes[pi]?.tabs[ti];
     if (!keep) return;
-    for (const t of othersOf(this.layout, pi, ti)) {
-      if (!(await this.mayClose(t))) break;
+    const others = othersOf(this.layout, pi, ti);
+    if (!(await this.confirmClose(others))) return;
+    for (const t of others) {
       const [p2, t2] = this.where(t);
       if (p2 >= 0) closeTab(this.layout, p2, t2);
     }
@@ -570,17 +651,13 @@ class Store {
       await this.reload();
       return path.slice((this.dir ?? '').length + 1);
     } catch (e) {
-      this.say(this.errorText(e));
+      this.sayDraft(this.errorText(e)); // it comes from the save sheet
       return null;
     }
   }
-  /** Quit, asking about every unsaved tab first. */
+  /** ⌘Q, ⌘⇧W, the red button: one question about the unsaved tabs of both panes. */
   async quit() {
-    for (const p of [...this.layout.panes])
-      for (const t of [...p.tabs]) {
-        if (!this.isUnsaved(t)) continue;
-        if (!(await this.mayClose(t))) return;
-      }
+    if (!(await this.confirmClose(this.layout.panes.flatMap((p) => p.tabs)))) return;
     await this.flush();
     if (isTauri) await invoke('quit_app');
   }
@@ -735,11 +812,12 @@ class Store {
     this.timers.set(path, setTimeout(() => this.save(path), 500));
   }
 
-  private async save(path: string) {
+  /** Write a file; resolves to the reason it failed, or null. */
+  private async save(path: string): Promise<string | null> {
     const f = this.files.find((x) => x.path === path);
     if (!f || f.text === f.disk) {
       this.saveState = 'saved';
-      return;
+      return null;
     }
     const text = f.text;
     const out = joinEol(text, f.eol);
@@ -756,15 +834,21 @@ class Store {
     }
     if (failure) {
       this.saveState = 'saved';
-      if (String(failure) === 'conflict') await this.reload();
-      else this.say('Не удалось сохранить: ' + failure);
-      return;
+      if (String(failure) === 'conflict') {
+        await this.reload();
+        return 'файл изменился на диске, загружена версия с диска';
+      }
+      this.say('Не удалось сохранить: ' + failure);
+      return String(failure);
     }
     // typed more while the write was in flight: keep going
     const now = this.files.find((x) => x.path === path);
     if (now && now.text !== now.disk) this.scheduleSave(path);
     else this.saveState = 'saved';
+    return null;
   }
 }
+
+export type Unsaved = { tab: Tab; kind: 'file' | 'note'; name: string };
 
 export const store = new Store();
