@@ -49,7 +49,7 @@ async function openExternal(url: string) {
   }
 }
 
-type Listed = { name: string; path: string; text: string };
+type Listed = { name: string; path: string; text: string; mtime?: number };
 
 function fromDisk(l: Listed, cfg: ProjectConfig): NoteFile {
   const { text, eol } = splitEol(l.text);
@@ -74,11 +74,31 @@ class Store {
   saveAsReq = $state<{ tab: Tab; resolve: (saved: boolean) => void } | null>(null);
   /** The close sheet: what closing would lose (one file, one new note, or several tabs). */
   unsavedReq = $state<{ items: Unsaved[]; resolve: (answer: 'save' | 'discard' | 'cancel') => void } | null>(null);
+  // ---- the file changed on disk (ТЗ «Файл изменился на диске») ----
+  /** Files whose disk version changed under unsaved edits: the tab keeps its text until the user picks a version. */
+  conflicts = $state.raw<Record<string, Conflict>>({});
+  /** Files gone from disk while open: they stay in their tabs (not in the navigator) until closed or saved again. */
+  orphans = $state.raw<Record<string, NoteFile>>({});
+  /** Orphans with edits the user was already asked about ("Оставить открытой", Esc). */
+  private orphanAsked = new Set<string>();
+  /** When each file was last edited here (shown as «Моя версия»). */
+  private edited: Record<string, number> = {};
+  /** Bumped when a file is silently reloaded from disk: its editor drops the undo history. */
+  diskGen = $state.raw<Record<string, number>>({});
+  /** The sheet about a changed or deleted file. */
+  diskReq = $state<{ kind: 'changed' | 'deleted'; path: string; resolve: (a: DiskAnswer) => void } | null>(null);
+  /** «work» обновлён с диска — a status line at the bottom of the editor for 4 s. */
+  toast = $state<{ text: string; n: number } | null>(null);
+  private toastNames: string[] = [];
+  private toastTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The window is in front: disk questions wait for it. */
+  appActive = $state(typeof document === 'undefined' || document.hasFocus());
+
   /** A write failed while closing: the reason, with a single "ОК". */
   errorReq = $state<{ title: string; text: string; resolve: () => void } | null>(null);
   /** While a sheet is up the rest of the window does not react: no shortcuts, no menu commands. */
   get sheetOpen() {
-    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette);
+    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq);
   }
   /** The command palette; `start` opens it right at a step ("Создать файл…" ⇧⌘N, "Перейти к файлу…" ⇧⌘O). */
   palette = $state<{ start?: 'newFile' | 'goto'; n: number } | null>(null);
@@ -145,7 +165,7 @@ class Store {
     return this.files.findIndex((f) => f.path === this.curPath);
   }
   get file(): NoteFile | undefined {
-    return this.files[this.cur];
+    return this.files[this.cur] ?? this.orphans[this.curPath];
   }
   get mode(): 'notes' | 'agenda' {
     return this.tab?.kind === 'agenda' ? 'agenda' : 'notes';
@@ -158,7 +178,7 @@ class Store {
     return f ? headingAt(f.headings, this.cursor.line) : -1;
   }
   fileOf(t: Tab | undefined): NoteFile | undefined {
-    return t?.kind === 'file' ? this.files.find((f) => f.path === t.path) : undefined;
+    return t?.kind === 'file' ? (this.files.find((f) => f.path === t.path) ?? this.orphans[t.path ?? '']) : undefined;
   }
 
   /** A failed "Сохранить как…", shown in the bar of the new notes (other messages are about files). */
@@ -344,21 +364,165 @@ class Store {
   }
 
   private applySnapshot(list: Listed[], folders: string[]) {
-    const old = new Map(this.files.map((f) => [f.path, f]));
-    let adopted = '';
-    this.files = list.map((n) => {
+    // open orphans count as known files: one that comes back is compared like any other
+    const old = new Map([...Object.values(this.orphans), ...this.files].map((f) => [f.path, f]));
+    const reloaded: string[] = [];
+    const conflicts = { ...this.conflicts };
+    const gen = { ...this.diskGen };
+    const files = list.map((n) => {
       const o = old.get(n.path);
       if (!o) return fromDisk(n, this.config);
-      if (n.text === o.diskRaw) return o; // nothing new on disk (untouched, or the echo of our own save)
-      const { text } = splitEol(n.text);
-      if (text === o.text) return { ...o, disk: text, diskRaw: n.text };
-      if (o.text !== o.disk) adopted = n.name; // we had unsaved edits: disk wins, but say so
+      if (n.text === o.diskRaw) return o; // nothing new on disk: untouched, «touched», or the echo of our own save
+      const { text, eol } = splitEol(n.text);
+      if (text === o.text) {
+        delete conflicts[n.path]; // the disk caught up with what the tab shows
+        return { ...o, disk: text, diskRaw: n.text };
+      }
+      if (o.text !== o.disk) {
+        // unsaved edits here and a new version there: nothing is lost, the user picks one (the newest disk version)
+        clearTimeout(this.timers.get(n.path));
+        this.timers.delete(n.path);
+        conflicts[n.path] = { path: n.path, name: o.name, disk: text, diskRaw: n.text, eol, mtime: n.mtime ?? Date.now(), postponed: false };
+        return o;
+      }
+      // no edits: take the disk version silently
+      if (this.isVisible(n.path)) reloaded.push(o.name);
+      gen[n.path] = (gen[n.path] ?? 0) + 1;
       return fromDisk(n, this.config);
     });
+    // gone from disk: moved within the folder (the same text appeared elsewhere), or deleted
+    const known = new Set(list.map((n) => n.path));
+    const added = list.filter((n) => !old.has(n.path));
+    const orphans: Record<string, NoteFile> = {};
+    const moves: Record<string, string> = {};
+    for (const o of old.values()) {
+      if (known.has(o.path) || !this.isOpen(o.path)) continue;
+      const twins = added.filter((n) => n.text === o.diskRaw);
+      if (twins.length === 1) {
+        moves[o.path] = twins[0].path;
+        if (o.text !== o.disk) {
+          // the edits move along with the tab
+          const i = files.findIndex((f) => f.path === twins[0].path);
+          files[i] = build(files[i].name, files[i].path, o.text, files[i].disk, files[i].diskRaw, files[i].eol, this.config);
+          this.scheduleSave(files[i].path);
+        }
+      } else orphans[o.path] = o;
+      delete conflicts[o.path];
+    }
+    this.files = files;
     this.folders = folders;
-    if (adopted) this.say(`«${displayName(adopted)}» изменён снаружи — загружена версия с диска`);
-    // a file that disappeared closes its tabs, in both panes
-    dropMissing(this.layout, (p) => this.files.some((f) => f.path === p));
+    this.orphans = orphans;
+    this.conflicts = conflicts;
+    this.diskGen = gen;
+    if (Object.keys(moves).length) mapPaths(this.layout, (p) => moves[p] ?? p);
+    for (const p of this.orphanAsked) if (!orphans[p]) this.orphanAsked.delete(p);
+    if (reloaded.length) this.showReloaded(reloaded);
+  }
+
+  /** Shown in one of the panes (the active tab of a pane). */
+  private isVisible(path: string) {
+    return this.layout.panes.some((p) => { const t = p.tabs[p.active]; return t?.kind === 'file' && t.path === path; });
+  }
+  private isOpen(path: string) {
+    return this.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'file' && t.path === path));
+  }
+  private showReloaded(names: string[]) {
+    this.toastNames = [...new Set([...(this.toast ? this.toastNames : []), ...names])];
+    const n = this.toastNames.length;
+    const files = n % 10 === 1 && n % 100 !== 11 ? 'файл' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'файла' : 'файлов';
+    const text = n === 1 ? `«${displayName(this.toastNames[0])}» обновлён с диска: файл изменила другая программа` : `Обновлено с диска: ${n} ${files}`;
+    this.toast = { text, n: Date.now() };
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => (this.toast = null), 4000);
+  }
+
+  /**
+   * The next disk question, if one is due: the window is in front, no sheet is up, and the tab is shown —
+   * the active pane first. Called whenever any of that may have changed.
+   */
+  async pumpDisk() {
+    if (this.sheetOpen || !this.appActive) return;
+    const panes = [this.layout.active, ...this.layout.panes.map((_, i) => i).filter((i) => i !== this.layout.active)];
+    for (const pi of panes) {
+      const p = this.layout.panes[pi];
+      const t = p?.tabs[p.active];
+      if (t?.kind !== 'file' || !t.path) continue;
+      const c = this.conflicts[t.path];
+      if (c && !c.postponed) return void this.askChanged(t.path);
+      const o = this.orphans[t.path];
+      if (o && o.text !== o.disk && !this.orphanAsked.has(t.path)) return void this.askDeleted(t.path);
+    }
+  }
+  /** «Файл изменён другой программой»: resolves to what was decided ('later' leaves the conflict for later). One
+   * question per file at a time: whoever asks while it is up (the queue, closing, ⌘S) gets the same answer. */
+  askChanged(path: string): Promise<DiskAnswer> {
+    return (this.asking[path] ??= this.askChangedOnce(path).finally(() => delete this.asking[path]));
+  }
+  private asking: Record<string, Promise<DiskAnswer>> = {};
+  private async askChangedOnce(path: string): Promise<DiskAnswer> {
+    const a = await new Promise<DiskAnswer>((resolve) => (this.diskReq = { kind: 'changed', path, resolve }));
+    this.diskReq = null;
+    const c = this.conflicts[path];
+    const f = this.files.find((x) => x.path === path);
+    if (c && f) {
+      const rest = { ...this.conflicts };
+      delete rest[path];
+      if (a === 'disk') {
+        // the disk text comes in as an ordinary edit, so ⌘Z brings mine back
+        this.files = this.files.map((x) => (x.path === path ? build(x.name, x.path, c.disk, c.disk, c.diskRaw, c.eol, this.config) : x));
+        this.conflicts = rest;
+      } else if (a === 'mine') {
+        // the disk version is the accepted base now: the next write replaces it without asking again
+        this.files = this.files.map((x) => (x.path === path ? { ...x, disk: c.disk, diskRaw: c.diskRaw } : x));
+        this.conflicts = rest;
+        this.scheduleSave(path);
+      } else this.conflicts = { ...this.conflicts, [path]: { ...c, postponed: true } };
+    }
+    queueMicrotask(() => this.pumpDisk());
+    return a;
+  }
+  /** «Файл удалён или перемещён» for a tab with edits. */
+  async askDeleted(path: string): Promise<DiskAnswer> {
+    const a = await new Promise<DiskAnswer>((resolve) => (this.diskReq = { kind: 'deleted', path, resolve }));
+    this.diskReq = null;
+    this.orphanAsked.add(path);
+    if (a === 'close') this.dropOrphan(path);
+    else if (a === 'saveas') {
+      const [pi, ti] = this.whereFile(path);
+      const t = this.layout.panes[pi]?.tabs[ti];
+      if (t) await this.saveAs(t);
+    }
+    queueMicrotask(() => this.pumpDisk());
+    return a;
+  }
+  /** "Закрыть без сохранения": the orphan's tabs go, in both panes. */
+  private dropOrphan(path: string) {
+    const rest = { ...this.orphans };
+    delete rest[path];
+    this.orphans = rest;
+    dropMissing(this.layout, (p) => p !== path);
+  }
+  private whereFile(path: string): [number, number] {
+    const pi = this.layout.active;
+    const own = this.layout.panes[pi]?.tabs.findIndex((t) => t.kind === 'file' && t.path === path) ?? -1;
+    if (own >= 0) return [pi, own];
+    for (let i = 0; i < this.layout.panes.length; i++) {
+      const ti = this.layout.panes[i].tabs.findIndex((t) => t.kind === 'file' && t.path === path);
+      if (ti >= 0) return [i, ti];
+    }
+    return [-1, -1];
+  }
+  /** The window came to the front: questions put off with Esc come back, and the open files are read again. */
+  activated() {
+    this.appActive = true;
+    const c: Record<string, Conflict> = {};
+    for (const [k, v] of Object.entries(this.conflicts)) c[k] = { ...v, postponed: false };
+    this.conflicts = c;
+    void this.reload();
+  }
+  /** «Моя версия»: when the tab's text was last changed here. */
+  editedAt(path: string) {
+    return this.edited[path];
   }
 
   async chooseFolder() {
@@ -383,14 +547,24 @@ class Store {
     window.addEventListener('storage', (e) => {
       if (e.key === 'nav:headings') this.navHeadings = e.newValue === '1';
     });
+    // back in front: check the open files again in case an event was missed
+    window.addEventListener('focus', () => this.activated());
+    window.addEventListener('blur', () => (this.appActive = false));
     if (!isTauri) return;
     const { listen } = await import('@tauri-apps/api/event');
     await listen('notes-changed', () => this.reload());
   }
 
   setText(text: string, path: string = this.curPath) {
+    const orphan = this.orphans[path];
+    if (orphan) {
+      // a file gone from disk lives in its tab only; ⌘S writes it again
+      if (orphan.text !== text) this.orphans = { ...this.orphans, [path]: build(orphan.name, orphan.path, text, orphan.disk, orphan.diskRaw, orphan.eol, this.config) };
+      return;
+    }
     const f = this.files.find((x) => x.path === path);
     if (!f || f.text === text) return;
+    this.edited[path] = Date.now();
     const next = build(f.name, f.path, text, f.disk, f.diskRaw, f.eol, this.config);
     this.files = this.files.map((x) => (x.path === path ? next : x));
     this.scheduleSave(path);
@@ -555,7 +729,7 @@ class Store {
     const paths = [...new Set(order.flatMap((t) => (t.kind === 'file' && t.path && !openElsewhere(t.path) ? [t.path] : [])))];
     for (const path of paths) {
       const f = this.files.find((x) => x.path === path);
-      if (!f || f.text === f.disk) continue;
+      if (!f || f.text === f.disk || this.conflicts[path]) continue;
       clearTimeout(this.timers.get(path));
       this.timers.delete(path);
       await this.save(path);
@@ -566,7 +740,7 @@ class Store {
       if (t.kind === 'untitled' && t.text?.trim()) out.push({ tab: t, kind: 'note', name: noteName(t.text) });
       if (t.kind !== 'file' || !t.path || !paths.includes(t.path) || seen.has(t.path)) continue;
       seen.add(t.path); // listed and counted once, whichever pane
-      const f = this.files.find((x) => x.path === t.path);
+      const f = this.files.find((x) => x.path === t.path) ?? this.orphans[t.path];
       if (f && f.text !== f.disk) out.push({ tab: t, kind: 'file', name: displayName(f.name) });
     }
     return out;
@@ -593,7 +767,18 @@ class Store {
       return true;
     }
     for (const it of items.filter((x) => x.kind === 'file')) {
-      const err = await this.save(it.tab.path!);
+      const path = it.tab.path!;
+      if (this.orphans[path]) {
+        if (!(await this.recreate(path))) return false;
+        continue;
+      }
+      // an unresolved conflict asks which version first; Esc stops the closing
+      if (this.conflicts[path]) {
+        const a = await this.askChanged(path);
+        if (a === 'later') return false;
+        if (a === 'disk') continue;
+      }
+      const err = await this.save(path);
       if (err) {
         await new Promise<void>((resolve) => (this.errorReq = { title: `Не удалось сохранить «${it.name}»`, text: err[0].toUpperCase() + err.slice(1) + '. Текст остался в редакторе.', resolve }));
         this.errorReq = null;
@@ -669,8 +854,39 @@ class Store {
   /** ⌘S: a tab without a file opens "Сохранить как…"; files are saved on their own anyway. */
   async saveActive() {
     const t = this.tab;
-    if (t?.kind === 'untitled') await this.saveAs(t);
-    else await this.flush();
+    if (t?.kind === 'untitled') return void (await this.saveAs(t));
+    const path = t?.kind === 'file' ? t.path ?? '' : '';
+    const c = this.conflicts[path];
+    if (c) {
+      // ⌘S on an unresolved conflict asks first and writes nothing
+      this.conflicts = { ...this.conflicts, [path]: { ...c, postponed: false } };
+      return void this.pumpDisk();
+    }
+    if (this.orphans[path]) return void (await this.recreate(path));
+    await this.flush();
+  }
+  /** ⌘S on a file gone from disk: write it again at its old path (no folder there any more: «Сохранить как…»). */
+  private async recreate(path: string): Promise<boolean> {
+    const o = this.orphans[path];
+    if (!o) return true;
+    const dir = o.name.includes('/') ? o.name.slice(0, o.name.lastIndexOf('/')) : '';
+    try {
+      await invoke<string>('save_new_file', { parent: this.abs(dir), name: o.name.split('/').pop()!, text: joinEol(o.text, o.eol), overwrite: false });
+      const rest = { ...this.orphans };
+      delete rest[path];
+      this.orphans = rest; // the reload below finds the file again
+      this.files = [...this.files, { ...o, disk: o.text, diskRaw: joinEol(o.text, o.eol) }];
+      await this.reload();
+      return true;
+    } catch {
+      const [pi, ti] = this.whereFile(path);
+      const t = this.layout.panes[pi]?.tabs[ti];
+      return t ? this.saveAs(t) : false;
+    }
+  }
+  /** What "Сохранить как…" writes: a new note's text, or the text of a file gone from disk. */
+  textOf(t: Tab) {
+    return t.kind === 'untitled' ? (t.text ?? '') : (this.orphans[t.path ?? '']?.text ?? '');
   }
   /** Opens the "Сохранить как…" sheet; resolves true once the text is on disk. */
   saveAs(t: Tab): Promise<boolean> {
@@ -688,11 +904,19 @@ class Store {
   async commitSaveAs(t: Tab, dirRel: string, name: string, overwrite: boolean): Promise<'ok' | 'exists' | string> {
     try {
       const path = isTauri
-        ? await invoke<string>('save_new_file', { parent: this.abs(dirRel), name, text: t.text ?? '', overwrite })
+        ? await invoke<string>('save_new_file', { parent: this.abs(dirRel), name, text: this.textOf(t), overwrite })
         : `${dirRel ? dirRel + '/' : ''}${withOrg(name)}`;
       lsSet('saveAsDir:' + (this.dir ?? ''), dirRel);
       if (isTauri) await this.reload();
-      else this.files = [...this.files, fromDisk({ name: path, path, text: t.text ?? '' }, this.config)].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+      else this.files = [...this.files, fromDisk({ name: path, path, text: this.textOf(t) }, this.config)].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+      if (t.kind === 'file' && t.path && this.orphans[t.path]) {
+        // a file gone from disk, saved under a new name: every tab of it follows
+        const from = t.path;
+        const rest = { ...this.orphans };
+        delete rest[from];
+        this.orphans = rest;
+        mapPaths(this.layout, (p) => (p === from ? path : p));
+      }
       t.kind = 'file';
       t.path = path;
       t.title = undefined;
@@ -756,7 +980,7 @@ class Store {
   private async flush() {
     for (const t of this.timers.values()) clearTimeout(t);
     this.timers.clear();
-    for (const f of this.files.filter((x) => x.text !== x.disk)) await this.save(f.path);
+    for (const f of this.files.filter((x) => x.text !== x.disk && !this.conflicts[x.path])) await this.save(f.path);
   }
 
   async createEntry(parentRel: string, name: string, kind: 'file' | 'folder') {
@@ -792,7 +1016,9 @@ class Store {
     this.dialog = null;
     try {
       await this.flush();
-      await invoke('trash_entry', { path: this.abs(rel) });
+      const abs = this.abs(rel);
+      await invoke('trash_entry', { path: abs });
+      dropMissing(this.layout, (p) => p !== abs && !p.startsWith(abs + '/')); // deleted here: its tabs go too
       await this.reload();
       this.say('Перемещено в Корзину');
     } catch (e) {
@@ -872,7 +1098,7 @@ class Store {
   }
 
   private scheduleSave(path: string) {
-    if (!isTauri) return;
+    if (!isTauri || this.conflicts[path]) return; // a conflict waits for the user's choice
     this.saveState = 'saving';
     clearTimeout(this.timers.get(path));
     this.timers.set(path, setTimeout(() => this.save(path), 500));
@@ -880,6 +1106,7 @@ class Store {
 
   /** Write a file; resolves to the reason it failed, or null. */
   private async save(path: string): Promise<string | null> {
+    if (this.conflicts[path]) return CONFLICT; // never over a version the user has not seen
     const f = this.files.find((x) => x.path === path);
     if (!f || f.text === f.disk) {
       this.saveState = 'saved';
@@ -901,8 +1128,15 @@ class Store {
     if (failure) {
       this.saveState = 'saved';
       if (String(failure) === 'conflict') {
+        // the file changed since we read it (and no event told us yet): read it, the user decides
         await this.reload();
-        return 'файл изменился на диске, загружена версия с диска';
+        if (!this.conflicts[path]) {
+          const now = this.files.find((x) => x.path === path);
+          if (now && now.text !== now.disk) this.scheduleSave(path);
+          return null;
+        }
+        queueMicrotask(() => this.pumpDisk());
+        return CONFLICT;
       }
       this.say('Не удалось сохранить: ' + failure);
       return String(failure);
@@ -916,5 +1150,8 @@ class Store {
 }
 
 export type Unsaved = { tab: Tab; kind: 'file' | 'note'; name: string };
+export type Conflict = { path: string; name: string; disk: string; diskRaw: string; eol: Eol; mtime: number; postponed: boolean };
+export type DiskAnswer = 'disk' | 'mine' | 'later' | 'saveas' | 'keep' | 'close';
+const CONFLICT = 'файл на диске изменён другой программой';
 
 export const store = new Store();

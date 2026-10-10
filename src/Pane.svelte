@@ -22,6 +22,8 @@
     return h ? [...h.path, h.title] : [];
   });
   const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : displayName(t.path ?? ''));
+  // a file deleted on disk stays open: an italic name, and the tooltip says why
+  const gone = (t: Tab) => t.kind === 'file' && !!store.orphans[t.path ?? ''];
   const dirty = (t: Tab) => {
     if (t.kind === 'untitled') return !!t.text?.trim(); // spaces and blank lines are not worth a dot
     const f = store.fileOf(t);
@@ -135,7 +137,7 @@
     const el = e.currentTarget as HTMLElement;
     tipTimer = setTimeout(() => {
       const r = el.getBoundingClientRect();
-      tip = { text: t.path!, x: r.left, y: r.bottom + 4 };
+      tip = { text: gone(t) ? `Файла нет на диске: ${t.path} · ⌘S создаст его снова` : t.path!, x: r.left, y: r.bottom + 4 };
     }, 1000);
   }
   function tipEnd() {
@@ -155,7 +157,7 @@
   const GAP = 16; // .status gap
   let sw = $state(0); // the status bar's width
   const cursorText = $derived(tab ? `Стр. ${tab.cursor.line + 1}, кол. ${tab.cursor.col}` : '');
-  const savedText = $derived(store.notice || (store.saveState === 'saving' ? 'Сохранение…' : store.saveState === 'saved' ? 'Сохранено' : 'Только в памяти (браузер)'));
+  const savedText = $derived(store.notice || (tab && gone(tab) ? 'Файла нет на диске' : store.saveState === 'saving' ? 'Сохранение…' : store.saveState === 'saved' ? 'Сохранено' : 'Только в памяти (браузер)'));
   const status = $derived.by(() => {
     const parts = file ? displayPath(file.name) : [];
     const name = parts[parts.length - 1] ?? '';
@@ -200,7 +202,7 @@
   <div class="strip" class:fl={fadeL} class:fr={fadeR} role="tablist" aria-label="Вкладки" bind:this={strip} ondblclick={stripDblClick} onscroll={() => { edges(); tipEnd(); }}>
     {#each pane.tabs as t, ti (t.id)}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <div class="tab" class:on={ti === pane.active} class:dirty={dirty(t)} class:untitled={t.kind === 'untitled'} class:menu={menuTab === t.id}
+      <div class="tab" class:on={ti === pane.active} class:dirty={dirty(t)} class:untitled={t.kind === 'untitled'} class:gone={gone(t)} class:menu={menuTab === t.id}
         role="tab" aria-selected={ti === pane.active} tabindex={ti === pane.active ? 0 : -1} data-tab={t.id}
         onmouseenter={(e) => tipStart(e, t)} onmouseleave={tipEnd} onmousedown={tipEnd}
         onclick={(e) => { if (e.ctrlKey) return tabMenu(e, t, ti); store.activateTab(pi, ti); }}
@@ -242,7 +244,7 @@
       {/each}
     </div>
     <div class="ed">
-      <Editor text={file.text} fileKey={tab.id + '|' + file.path} wf={file.wf} reveal={tab.reveal} initial={tab.cursor}
+      <Editor text={file.text} fileKey={tab.id + '|' + file.path} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} resetOn={store.diskGen[file.path] ?? 0}
         onchange={(t) => store.setText(t, file.path)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>
     {#if tab.fromAgenda}
@@ -315,7 +317,7 @@
     font-size: 12.5px; color: var(--fg2); cursor: default;
   }
   .tab:hover:not(.on), .tab.menu:not(.on) { background: var(--field); color: var(--fg); }
-  .tab.untitled .lbl { font-style: italic; }
+  .tab.untitled .lbl, .tab.gone .lbl { font-style: italic; }
   .tab.menu .x { opacity: 1; }
   .tab.menu .dot { opacity: 0; }
   .tab.on { background: var(--bg); border-color: var(--line); color: var(--fg2); }

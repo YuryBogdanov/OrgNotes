@@ -115,8 +115,9 @@ test('unsaved local edits are not written over an external change', async ({ pag
 
   expect(await disk(page)).toBe(external);
   expect((await log(page)).some((e) => e[0] === 'conflict')).toBe(true);
-  await expect(page.locator('.cm-content')).toContainText('внешняя');
-  await expect(page.locator('.status')).toContainText('изменён снаружи');
+  // neither version is lost: the tab keeps mine and the user is asked
+  await expect(page.locator('.cm-content')).toContainText('LOCAL');
+  await expect(page.getByRole('alertdialog')).toContainText('изменён другой программой');
 });
 
 test('continuous typing survives slow disk reads racing with autosave echoes', async ({ page }) => {

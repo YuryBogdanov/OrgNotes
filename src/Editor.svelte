@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { EditorState, Prec, RangeSetBuilder, type Range } from '@codemirror/state';
+  import { Compartment, EditorState, Prec, RangeSetBuilder, type Range } from '@codemirror/state';
   import { Decoration, EditorView, ViewPlugin, placeholder as cmPlaceholder, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
   import { foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
@@ -10,8 +10,9 @@
   import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftSubtree, type Result } from './outline';
   import type { Text } from '@codemirror/state';
 
-  let { text, fileKey, wf, reveal, initial, hint = '', onchange, oncursor, onfollow }: {
+  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, onchange, oncursor, onfollow }: {
     hint?: string; // grey placeholder in an empty document
+    resetOn?: number; // bumped when the text was silently reloaded from disk: the undo history starts over
     text: string; fileKey: string; wf: Workflow;
     reveal: { line: number; n: number; focus?: boolean; col?: number } | null | undefined;
     initial?: { line: number; col: number }; // where the caret of this tab was (restored when the tab is shown)
@@ -24,6 +25,8 @@
   let view: EditorView | undefined;
   let lastKey = '';
   let lastReveal = 0;
+  let lastReset = 0;
+  const undo = new Compartment();
 
   const HEAD = /^(\*+)\s/;
   // heading lines per document version; ignores `* x` inside #+BEGIN_…/#+END_… blocks
@@ -228,7 +231,7 @@
       doc,
       extensions: [
         lineNumbers(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(),
-        history(), orgFold, foldGutter(), plugin,
+        undo.of(history()), orgFold, foldGutter(), plugin,
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         EditorView.domEventHandlers({
@@ -302,17 +305,33 @@
   onMount(() => {
     view = new EditorView({ state: makeState(text, wf), parent: host });
     lastKey = fileKey;
+    lastReset = resetOn;
     restoreCaret(); // a pending reveal, if any, is applied right after by its own effect
     return () => view?.destroy();
   });
 
   $effect(() => {
-    const t = text, k = fileKey, w = wf;
+    const t = text, k = fileKey, w = wf, r = resetOn;
     if (!view) return;
     if (k !== lastKey) {
       lastKey = k;
+      lastReset = r;
       view.setState(makeState(t, w));
       restoreCaret();
+    } else if (r !== lastReset) {
+      // reloaded from disk (no edits here): the caret keeps its line and column, the scroll stays, and ⌘Z
+      // must not bring the old text back over the new file
+      lastReset = r;
+      const sel = view.state.selection.main;
+      const line = view.state.doc.lineAt(sel.head);
+      const col = sel.head - line.from;
+      const top = view.scrollDOM.scrollTop;
+      if (view.state.doc.toString() !== t) view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: t } });
+      const doc = view.state.doc;
+      const ln = doc.line(Math.min(line.number, doc.lines));
+      view.dispatch({ selection: { anchor: Math.min(ln.from + col, ln.to) }, effects: undo.reconfigure([]) });
+      view.dispatch({ effects: undo.reconfigure(history()) });
+      view.scrollDOM.scrollTop = top;
     } else {
       const cur = view.state.doc.toString();
       if (cur !== t) {

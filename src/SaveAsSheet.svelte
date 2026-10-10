@@ -17,12 +17,18 @@
   const rootName = $derived(store.dir?.split('/').pop() ?? 'Заметки');
   const dirOf = (rel: string) => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
 
+  // a file gone from disk keeps its name and, if it is still there, its folder
+  const orphan = tab.kind === 'file' ? store.orphans[tab.path ?? ''] : undefined;
   // the name: the note's first non-empty line without stars, as the close sheet calls it
-  let name = $state(noteName(tab.text ?? '').replace(/[/:\\]/g, '-').replace(/^\.+/, ''));
+  let name = $state(orphan ? noOrg(orphan.name.split('/').pop()!) : noteName(tab.text ?? '').replace(/[/:\\]/g, '-').replace(/^\.+/, ''));
 
   // the folder: the one of the file in the neighbour pane, else the last one used, else the root
   const folders = $derived(['', ...[...store.folders].sort((a, b) => a.localeCompare(b, 'ru'))]);
   function initialDir() {
+    if (orphan) {
+      const d = dirOf(orphan.name);
+      return d === '' || store.folders.includes(d) ? d : '';
+    }
     const L = store.layout;
     for (let i = 0; i < L.panes.length; i++) {
       if (L.panes[i].tabs.includes(tab) || L.panes[i].tabs.some((t) => t.id === tab.id)) continue;

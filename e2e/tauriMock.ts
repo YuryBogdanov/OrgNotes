@@ -22,8 +22,24 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           const id = listeners['notes-changed'];
           if (id) cbs[id]({ event: 'notes-changed', id: 1, payload: null });
         }, eventDelay);
+      const mtime: Record<string, number> = {};
+      // another program: writes, deletes and moves files, and the watcher tells the app
       w.__setDisk = (path: string, text: string) => {
         disk[path] = text;
+        mtime[path] = Date.now();
+        emit();
+      };
+      w.__touchDisk = (path: string) => {
+        mtime[path] = Date.now();
+        emit();
+      };
+      w.__rmDisk = (path: string) => {
+        delete disk[path];
+        emit();
+      };
+      w.__mvDisk = (from: string, to: string) => {
+        disk[to] = disk[from];
+        delete disk[from];
         emit();
       };
       w.__TAURI_INTERNALS__ = {
@@ -46,7 +62,7 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             // snapshot first, answer later: like a slow disk read racing with the user's typing
             const snapshot = Object.entries(disk)
               .filter(([path]) => path.endsWith('.org') && !path.replace('/mock/', '').split('/').some((p) => p.startsWith('.')))
-              .map(([path, text]) => ({ name: path.replace('/mock/', ''), path, text }));
+              .map(([path, text]) => ({ name: path.replace('/mock/', ''), path, text, mtime: mtime[path] ?? 0 }));
             if (listDelay) await new Promise((r) => setTimeout(r, listDelay));
             return snapshot;
           }

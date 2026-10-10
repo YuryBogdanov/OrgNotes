@@ -22,6 +22,8 @@ struct OrgFile {
     name: String,
     path: String,
     text: String,
+    /// last modification, ms since the epoch (shown when the file changed under an edit)
+    mtime: u64,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -78,10 +80,16 @@ fn collect(dir: &Path, root: &Path, out: &mut Vec<OrgFile>) {
                     .unwrap_or(&p)
                     .to_string_lossy()
                     .to_string();
+                let mtime = fs::metadata(&p)
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map_or(0, |d| d.as_millis() as u64);
                 out.push(OrgFile {
                     name: rel,
                     path: p.to_string_lossy().to_string(),
                     text,
+                    mtime,
                 });
             }
         }
