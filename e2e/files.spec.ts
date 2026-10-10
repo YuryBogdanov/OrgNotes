@@ -111,7 +111,7 @@ test('moves a note by dropping it onto a folder, and refuses a folder dropped in
   expect(Object.keys(await disk(page))).toContain('/mock/Team/lead.org');
 });
 
-test('deleting asks first, sends to the Trash and leaves the app on another note', async ({ page }) => {
+test('deleting asks first, sends to the Trash and closes the file\'s tab', async ({ page }) => {
   await open(page);
   await row(page, 'Other').click();
   await expect(page.locator('.tab')).toContainText('Other.org');
@@ -131,7 +131,9 @@ test('deleting asks first, sends to the Trash and leaves the app on another note
 
   await expect(row(page, 'Other')).toHaveCount(0);
   expect((await log(page)).some((e) => e[0] === 'trash' && e[1] === '/mock/Other.org')).toBe(true);
-  await expect(page.locator('.tab')).not.toContainText('Other.org');
+  // its tab is closed; it was the only one, so the pane shows its empty state
+  await expect(page.locator('.tab', { hasText: 'Other.org' })).toHaveCount(0);
+  await expect(page.getByText('Нет открытых вкладок')).toBeVisible();
 });
 
 test('unsaved typing is not lost when the note is renamed right after', async ({ page }) => {
