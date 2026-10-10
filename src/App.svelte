@@ -8,6 +8,8 @@
   import CloseSheet from './CloseSheet.svelte';
   import Palette from './Palette.svelte';
   import DiskSheet from './DiskSheet.svelte';
+  import StartScreen from './StartScreen.svelte';
+  import EmptyFolder from './EmptyFolder.svelte';
   import { installMenu, type AppMenu } from './menu';
   import { MIN_PANE, secondKind } from './layout';
   import { displayPath } from './names';
@@ -86,7 +88,7 @@
     paletteNewFile: () => store.openPalette('newFile'),
     paletteGoto: () => store.openPalette('goto'),
     closePane: () => store.closePane(store.layout.active),
-    openFolder: () => store.chooseFolder(),
+    openFolder: () => store.changeFolder(),
     closeTab: () => store.closeActiveTab(),
     closeOthers: () => {
       const p = store.layout.panes[store.layout.active];
@@ -100,7 +102,7 @@
     revealInNav: () => store.revealInNavigator(store.tab),
     copyPath: () => store.copyPath(store.tab),
     quit: () => store.quit(),
-    closeWindow: () => store.quit(), // the only window: closing it is quitting, with the same question
+    closeWindow: () => store.hideWindow(), // as on macOS: the app stays in the Dock, nothing is lost
     splitRight: () => store.splitRight(),
     swap: () => store.swapPanes(),
     keepOne: () => store.keepOnePane(),
@@ -148,7 +150,7 @@
     if (e.ctrlKey || e.shiftKey) return null;
     if (k === '0') return e.altKey ? 'insp' : 'nav';
     if (e.altKey) return null;
-    return ({ '[': 'back', n: 'newFile', ',': 'settings', o: 'openFolder', t: 'newTab', w: 'closeTab', s: 'save', q: 'quit', '1': 'notes', '2': 'agenda' } as Record<string, string>)[k] ?? null;
+    return ({ '[': 'back', n: 'newFile', ',': 'settings', t: 'newTab', w: 'closeTab', s: 'save', q: 'quit', '1': 'notes', '2': 'agenda' } as Record<string, string>)[k] ?? null;
   }
   const today = new Date().toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -159,19 +161,7 @@
     // while a sheet is up, menu commands do nothing
     const guarded = Object.fromEntries(Object.entries(actions).map(([id, run]) => [id, () => { if (!store.sheetOpen || (id === 'palette' && store.palette)) run(); }]));
     installMenu(guarded).then((m) => (menu = m));
-    // closing the window asks about unsaved tabs first, like quitting
-    if ('__TAURI_INTERNALS__' in window && !(window as any).__ORG_SETTINGS_OVERLAY__) {
-      import('@tauri-apps/api/window')
-        .then(({ getCurrentWindow }) =>
-          getCurrentWindow().onCloseRequested((e) => {
-            if (store.sheetOpen) return e.preventDefault(); // already asking
-            if (!store.hasUnsaved()) return;
-            e.preventDefault();
-            store.quit();
-          }),
-        )
-        .catch(() => {});
-    }
+    // closing the window only hides it (Rust side): the text stays in memory, so nothing to ask; quitting asks
     const key = (e: KeyboardEvent) => {
       if (menu) return; // the menu bar owns the shortcuts
       const id = shortcut(e);
@@ -207,6 +197,7 @@
   <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
   {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
+  {#if store.start && !isSettingsWindow}<StartScreen />{/if}
   {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
   {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
   {#if store.toast}
@@ -217,6 +208,8 @@
   {/if}
   {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
   {#if store.settingsOpen}<Settings />{/if}
+  <!-- a start screen comes instead of the window (no toolbar, no navigator) -->
+  {#if !store.start}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="toolbar" data-tauri-drag-region onmousedown={drag}>
     <div class="lights-gap"></div>
@@ -242,7 +235,7 @@
     </div>
     <div class="right">
       <div class="seg3" role="group" aria-label="Открыть в панели">
-        <button aria-label="Второй редактор" title="Второй редактор" aria-pressed={pressed === 'file'} class:on={pressed === 'file'} onclick={() => store.toggleSecond('file')}>
+        <button aria-label="Второй редактор" title="Второй редактор" aria-pressed={pressed === 'file'} class:on={pressed === 'file'} disabled={!store.tab && store.layout.panes.length < 2} onclick={() => store.toggleSecond('file')}>
           <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5" /><path d="M10 3.5v13" /></svg>
         </button>
         <button aria-label="Агенда" title="Агенда" aria-pressed={pressed === 'agenda'} class:on={pressed === 'agenda'} onclick={() => store.toggleSecond('agenda')}>
@@ -268,16 +261,8 @@
     {/if}
 
     <main class="center">
-      {#if store.needFolder}
-        <div class="welcome">
-          <svg width="44" height="44" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.2" stroke-linejoin="round"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" /></svg>
-          <h1>Выберите папку с заметками</h1>
-          <p>Приложение читает и пишет обычные <code>.org</code>-файлы. Подпапки тоже учитываются, правки из Emacs подхватываются сразу.</p>
-          <div class="wbtns">
-            <button class="wprimary" onclick={() => store.chooseFolder()}>Выбрать папку…</button>
-            {#if store.hasSample}<button class="wsecondary" onclick={() => store.useSample()}>Открыть примеры</button>{/if}
-          </div>
-        </div>
+      {#if store.loaded && !store.files.length && !store.folderGone && !store.layout.panes.some((p) => p.tabs.length)}
+        <EmptyFolder />
       {:else}
         <div class="panes" bind:this={panesEl}>
           {#each store.layout.panes as p, i (p.id)}
@@ -299,6 +284,7 @@
       <aside class="side" style="width:{store.inspW}px"><Inspector /></aside>
     {/if}
   </div>
+  {/if}
 </div>
 {/if}
 
@@ -338,12 +324,4 @@
   .pwrap { min-width: 0; display: flex; }
   .divider { flex: 0 0 1px; background: var(--line); position: relative; z-index: 5; }
   .divider::after { content: ''; position: absolute; inset: 0 -4px; cursor: col-resize; }
-  .welcome { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px; text-align: center; }
-  .welcome h1 { margin: 6px 0 0; font-size: 20px; font-weight: 700; }
-  .welcome p { margin: 0; max-width: 420px; color: var(--fg2); line-height: 1.5; }
-  .welcome code { font-family: var(--mono); font-size: 12px; background: var(--field); padding: 1px 5px; border-radius: 4px; }
-  .wbtns { display: flex; gap: 10px; margin-top: 8px; }
-  .wprimary, .wsecondary { height: 30px; padding: 0 16px; border: 0; border-radius: 6px; font-size: 13px; }
-  .wprimary { background: var(--acc); color: var(--onacc); font-weight: 600; }
-  .wsecondary { background: var(--field); }
 </style>

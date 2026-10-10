@@ -18,10 +18,9 @@ const open = async (page: Page, files: Record<string, string> = FILES()) => {
 const row = (page: Page, label: string) => page.locator('.nav .row').filter({ has: page.locator('.label', { hasText: new RegExp(`^${label}$`) }) });
 const menuItem = (page: Page, name: string) => page.getByRole('menuitem', { name });
 
-test('creates a file from the + menu, opens it and writes a title', async ({ page }) => {
+test('creates a file from the navigator\'s + button, opens it and writes a title', async ({ page }) => {
   await open(page);
-  await page.getByRole('button', { name: 'Создать…' }).click();
-  await menuItem(page, 'Новый файл').click();
+  await page.locator('.nav').getByRole('button', { name: 'Создать файл' }).click();
   await page.getByRole('textbox', { name: 'Имя нового файла' }).fill('Идеи');
   await page.keyboard.press('Enter');
 
@@ -42,8 +41,7 @@ test('creates a folder, including an empty one, from the empty-area menu', async
 
 test('rejects a clashing name with a message and changes nothing', async ({ page }) => {
   await open(page);
-  await page.getByRole('button', { name: 'Создать…' }).click();
-  await menuItem(page, 'Новый файл').click();
+  await page.locator('.nav').getByRole('button', { name: 'Создать файл' }).click();
   await page.getByRole('textbox', { name: 'Имя нового файла' }).fill('Other');
   await page.keyboard.press('Enter');
 

@@ -21,7 +21,6 @@ fn every_menu_accelerator_parses() {
         "CmdOrCtrl+Digit0",
         "CmdOrCtrl+KeyT",
         "CmdOrCtrl+N",
-        "CmdOrCtrl+O",
         "CmdOrCtrl+Q",
         "CmdOrCtrl+S",
         "CmdOrCtrl+W",

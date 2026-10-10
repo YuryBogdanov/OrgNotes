@@ -253,8 +253,11 @@ test.describe('quitting', () => {
     await expect(sheet(page).locator('li .nm')).toHaveText(['слева', 'справа']); // left pane first
     await btn(page, 'Отмена').click();
     expect((await log(page)).some((e) => e[0] === 'quit')).toBe(false);
-    await page.keyboard.press('Meta+Shift+w'); // closing the window asks the same
-    await expect(sheet(page).locator('li')).toHaveCount(2);
+    // closing the window only hides it (the app stays in the Dock with the text in memory): no question
+    await page.keyboard.press('Meta+Shift+w');
+    await expect.poll(async () => (await log(page)).some((e) => e[0] === 'hide')).toBe(true);
+    await expect(sheet(page)).toHaveCount(0);
+    await page.keyboard.press('Meta+q');
     await page.keyboard.press('Meta+d');
     await expect.poll(async () => (await log(page)).some((e) => e[0] === 'quit')).toBe(true);
   });

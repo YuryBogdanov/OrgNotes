@@ -174,11 +174,6 @@
     e.preventDefault();
     menu = { x: e.clientX, y: e.clientY, items: createItems('') };
   }
-  function plusMenu(e: MouseEvent) {
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const here = store.file ? parentOf(store.file.name) : '';
-    menu = { x: r.left, y: r.bottom + 4, items: createItems(here) };
-  }
 
   // ---- inline name input --------------------------------------------------------
   function focusSelect(el: HTMLInputElement) {
@@ -227,14 +222,27 @@
   <div class="head">
     <span class="title" title={store.dir ?? ''}>{store.dir ? store.dir.split('/').pop() : 'НАВИГАТОР'}</span>
     {#if store.canManageFiles}
-      <button class="open" aria-label="Создать…" title="Создать файл или папку (⌘N — файл)" onclick={plusMenu}>
+      <button class="open" aria-label="Создать файл" title="Создать файл (⌘N)" onclick={() => startCreate(store.file ? parentOf(store.file.name) : '', 'file')}>
         <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 4v12M4 10h12" /></svg>
       </button>
+      <button class="open" aria-label="Создать папку" title="Создать папку" onclick={() => startCreate(store.file ? parentOf(store.file.name) : '', 'folder')}>
+        <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" /></svg>
+      </button>
     {/if}
-    <button class="open" aria-label="Выбрать папку заметок (⌘O)" title="Выбрать папку заметок (⌘O)" onclick={() => store.chooseFolder()}>
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" /></svg>
-    </button>
   </div>
+  {#if store.folderGone}
+    <!-- the notes folder went away while working: the tabs keep their text -->
+    <div class="gone" role="alert">
+      <b>Папка недоступна</b>
+      <span>Открытые вкладки и их текст сохранены.</span>
+      <div class="gbtns">
+        <button onclick={() => store.retryFolder()}>Повторить</button>
+        <button onclick={() => store.changeFolder()}>Выбрать другую…</button>
+      </div>
+    </div>
+  {:else if store.loaded && !store.files.length && !store.folders.length && !store.creating}
+    <p class="none">В папке пока нет org-файлов.</p>
+  {/if}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="list" bind:this={listEl} class:rootdrop={dropOn === ''} oncontextmenu={emptyMenu} onkeydown={key}
     ondragover={(e) => over(e, '')} ondrop={(e) => drop(e, '')} ondragleave={() => (dropOn = null)}>
@@ -294,6 +302,11 @@
   .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; color: var(--fg2); letter-spacing: 0.02em; text-transform: uppercase; }
   .open { width: 26px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); display: flex; align-items: center; justify-content: center; }
   .open:hover { background: var(--field); }
+  .gone { margin: 4px 10px 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; border-radius: 8px; background: color-mix(in srgb, var(--wait) 14%, transparent); font-size: 12px; color: var(--fg2); }
+  .gone b { color: var(--wait); font-size: 12.5px; }
+  .gbtns { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+  .gbtns button { height: 22px; padding: 0 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--fg); font-size: 12px; }
+  .none { margin: 0; padding: 4px 18px 12px; color: var(--fg2); font-size: 12.5px; line-height: 1.5; }
   .list { flex: 1; overflow: auto; padding: 0 6px 10px; border-radius: 6px; }
   .list.rootdrop { box-shadow: inset 0 0 0 2px var(--acc); }
   .row { display: flex; align-items: center; gap: 6px; height: 24px; border-radius: 6px; padding-right: 8px; white-space: nowrap; }

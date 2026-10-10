@@ -16,9 +16,9 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
     const menu = await Menu.new({
       items: [
         {
-          text: 'Org',
+          text: 'Panopticon',
           // a custom "Выйти" so unsaved tabs are asked about first
-          items: [{ item: { About: null } }, sep, it('settings', 'Настройки…', 'CmdOrCtrl+Comma'), sep, { item: 'Services' }, sep, { item: 'Hide' }, { item: 'HideOthers' }, { item: 'ShowAll' }, sep, it('quit', 'Выйти из Org', 'CmdOrCtrl+Q')],
+          items: [{ item: { About: null } }, sep, it('settings', 'Настройки…', 'CmdOrCtrl+Comma'), sep, { item: 'Services' }, sep, { item: 'Hide' }, { item: 'HideOthers' }, { item: 'ShowAll' }, sep, it('quit', 'Выйти из Panopticon', 'CmdOrCtrl+Q')],
         },
         {
           text: 'Файл',
@@ -27,7 +27,7 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
             it('newFile', 'Новый файл', 'CmdOrCtrl+N'),
             it('paletteNewFile', 'Создать файл…', 'Shift+CmdOrCtrl+KeyN'),
             it('paletteGoto', 'Перейти к файлу…', 'Shift+CmdOrCtrl+KeyO'),
-            it('openFolder', 'Открыть папку…', 'CmdOrCtrl+O'),
+            it('openFolder', 'Открыть другую папку…'), // no shortcut in the first version
             sep,
             it('save', 'Сохранить…', 'CmdOrCtrl+S'),
             sep,
