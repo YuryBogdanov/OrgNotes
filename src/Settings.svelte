@@ -4,7 +4,7 @@
   import { toneOf, toneStyle, colorName } from './colors';
   import ColorPicker from './ColorPicker.svelte';
   import {
-    MAX_KEYWORD, addState, addWorkflow, canRemoveState, canRemoveWorkflow, checkKeyword, displayName, dropState, dropWorkflow,
+    MAX_KEYWORD, addState, checkKey, normalizeKey, addWorkflow, canRemoveState, canRemoveWorkflow, checkKeyword, displayName, dropState, dropWorkflow,
     effectiveKeys, fromConfig, initialOf, moveState, normalizeKeyword, orgLine, pendingState, removeState, removeWorkflow,
     toJson, validate, type DraftState,
   } from './workflowEditor';
@@ -78,6 +78,46 @@
   function clearEdit(id: string) {
     delete edits[id];
     delete errors[id];
+  }
+
+  // quick keys: the field shows the automatic letter until one is typed; empty = automatic again
+  let keyEdits = $state<Record<string, string>>({});
+  const keyShown = (s: DraftState) => keyEdits[s.id] ?? (s.key || keys.get(s.id) || '');
+  function typingKey(s: DraftState, raw: string) {
+    const v = normalizeKey(raw);
+    keyEdits[s.id] = v;
+    const e = wf ? checkKey(wf, v, s.id) : null;
+    if (e) errors['k' + s.id] = e;
+    else delete errors['k' + s.id];
+  }
+  function clearKeyEdit(id: string) {
+    delete keyEdits[id];
+    delete errors['k' + id];
+  }
+  function commitKey(s: DraftState) {
+    const v = keyEdits[s.id];
+    if (v === undefined) return true;
+    if (errors['k' + s.id]) return false;
+    const current = s.key || keys.get(s.id) || '';
+    if (v === '') s.key = ''; // back to automatic
+    else if (v !== current) s.key = v; // typing the letter that is already shown changes nothing
+    clearKeyEdit(s.id);
+    return true;
+  }
+  function keyKeydown(e: KeyboardEvent, s: DraftState) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (commitKey(s)) (e.currentTarget as HTMLInputElement).blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      clearKeyEdit(s.id);
+      (e.currentTarget as HTMLInputElement).blur();
+    }
+  }
+  function keyBlur(s: DraftState) {
+    if (errors['k' + s.id]) clearKeyEdit(s.id);
+    else commitKey(s);
   }
   function cancel(s: DraftState) {
     clearEdit(s.id);
@@ -309,7 +349,9 @@
               <span role="columnheader" class="edith">В ФАЙЛЕ
                 <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Редактируется"><path d="M3 17l1-4 9.5-9.5a1.4 1.4 0 0 1 2 0l1 1a1.4 1.4 0 0 1 0 2L7 16z" /></svg>
               </span>
-              <span role="columnheader">КЛАВИША</span><span></span>
+              <span role="columnheader" class="edith">КЛАВИША
+                <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Редактируется (клавиша)"><path d="M3 17l1-4 9.5-9.5a1.4 1.4 0 0 1 2 0l1 1a1.4 1.4 0 0 1 0 2L7 16z" /></svg>
+              </span><span></span>
             </div>
 
             {#each [...open, 'sep', ...done] as item (typeof item === 'string' ? 'sep' : item.id)}
@@ -343,13 +385,20 @@
                       oninput={(e) => typing(s, e.currentTarget.value)} onkeydown={(e) => keydown(e, s)} onblur={() => blur(s)}
                       onfocus={() => (focusId = s.id)} />
                   </span>
-                  <span class="keycell">{#if keys.get(s.id) && !s.pending}<span class="keychip">{keys.get(s.id)}</span>{/if}</span>
+                  <span class="keycell">
+                    <input class="qk" class:auto={!s.key && keyEdits[s.id] === undefined} class:red={!!errors['k' + s.id]} aria-label="Клавиша" aria-invalid={!!errors['k' + s.id]}
+                      spellcheck="false" autocomplete="off" disabled={s.pending}
+                      value={keyShown(s)} onfocus={(e) => e.currentTarget.select()} onmouseup={(e) => { e.preventDefault(); e.currentTarget.select(); }}
+                      oninput={(e) => { typingKey(s, (e as InputEvent).data || e.currentTarget.value); e.currentTarget.value = keyEdits[s.id] ?? ''; }} onkeydown={(e) => keyKeydown(e, s)} onblur={() => keyBlur(s)} />
+                  </span>
                   <span class="acts">
                     <button class="x" aria-label="Удалить состояние {displayName(s.keyword)}" disabled={!canRemoveWorkflow(draft) && false || !canRemoveState(wf, s.id)}
                       title={canRemoveState(wf, s.id) ? '' : 'Последнее открытое состояние удалить нельзя'} onclick={() => askDelete(s)}>×</button>
                   </span>
                 </div>
-                {#if errors[s.id]}
+                {#if errors['k' + s.id]}
+                  <div class="hint err">{errors['k' + s.id]}</div>
+                {:else if errors[s.id]}
                   <div class="hint err">{errors[s.id]}</div>
                 {:else if s.pending}
                   <div class="hint">Введите ключевое слово и нажмите ↩ · ⎋ — отмена</div>
@@ -364,7 +413,7 @@
               <button onclick={() => plus(true)}>+ Завершающее</button>
             </div>
           </div>
-          <div class="note">Название строится из ключевого слова. Редактируется только колонка «В файле».</div>
+          <div class="note">Название строится из ключевого слова. Редактируются колонки «В файле» и «Клавиша».</div>
 
           <div class="block">
             <div class="cap">ПОВЕДЕНИЕ</div>
@@ -485,7 +534,8 @@
   .danger { color: var(--todo); }
 
   /* one grid for the header and every row, so columns line up at any width */
-  .table { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .table { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; flex: 0 0 auto; }
+  section > * { flex-shrink: 0; }
   .grid { display: grid; grid-template-columns: 24px 56px minmax(120px, 1.1fr) minmax(150px, 1.2fr) 76px 40px; column-gap: 12px; align-items: center; padding: 0 10px; }
   .th { height: 30px; background: var(--side); font-size: 11px; font-weight: 600; color: var(--fg2); letter-spacing: 0.02em; }
   .th span { text-align: left; }
@@ -507,7 +557,11 @@
   .kw { width: 100%; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-family: var(--mono); font-size: 12.5px; -webkit-user-select: text; user-select: text; }
   .kw:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 25%, transparent); }
   .kw.red { border-color: var(--todo); box-shadow: 0 0 0 3px color-mix(in srgb, var(--todo) 20%, transparent); }
-  .keychip { display: inline-block; min-width: 22px; text-align: center; padding: 1px 6px; border-radius: 5px; background: var(--field); font-family: var(--mono); font-size: 12px; color: var(--fg2); }
+  .qk { width: 44px; height: 28px; padding: 0; text-align: center; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-family: var(--mono); font-size: 12.5px; -webkit-user-select: text; user-select: text; }
+  .qk.auto { color: var(--fg2); }
+  .qk:disabled { background: transparent; border-color: transparent; }
+  .qk:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 25%, transparent); }
+  .qk.red { border-color: var(--todo); }
   .acts { display: flex; justify-content: flex-end; }
   .x { width: 26px; height: 26px; border: 0; border-radius: 6px; background: transparent; color: var(--fg3); font-size: 16px; }
   .x:hover:not(:disabled) { background: var(--field); color: var(--todo); }

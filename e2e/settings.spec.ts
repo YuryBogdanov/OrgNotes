@@ -41,7 +41,7 @@ test.describe('table', () => {
     await openSettings(page);
     const header = page.locator('.th');
     await expect(header.getByLabel('Только чтение')).toBeVisible();
-    await expect(header.getByLabel('Редактируется')).toBeVisible();
+    await expect(header.getByLabel('Редактируется', { exact: true })).toBeVisible();
 
     for (const width of [900, 1100, 1400]) {
       await page.setViewportSize({ width, height: 760 });
@@ -52,7 +52,7 @@ test.describe('table', () => {
       expect(await left(heads.nth(0))).toBe(await left(first.locator('.swatch .dot')));
       expect(await left(heads.nth(1))).toBe(await left(first.locator('.name')));
       expect(await left(heads.nth(2))).toBe(await left(first.locator('input.kw')));
-      expect(await left(heads.nth(3))).toBe(await left(first.locator('.keychip')));
+      expect(await left(heads.nth(3))).toBe(await left(first.locator('input.qk')));
     }
   });
 
@@ -87,11 +87,75 @@ test.describe('table', () => {
     }
   });
 
-  test('the key is a read-only chip: first letter, the next free one on a clash', async ({ page }) => {
+  test('the key is an editable field: automatic letter by default, explicit when typed, automatic again when cleared', async ({ page }) => {
     await openSettings(page);
-    const keys = await page.locator('.srow .keychip').allInnerTexts();
-    expect(keys).toEqual(['n', 't', 'i', 'e', 'd']); // NEW, TODO, IN-PROGRESS, NEXT (n is taken -> e), DONE
-    expect(await page.locator('.srow .keychip').first().evaluate((el) => el.tagName)).toBe('SPAN');
+    const keyOf = (n: number) => rows(page).nth(n).locator('input.qk');
+    expect(await page.locator('.srow input.qk').evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual(['n', 't', 'i', 'e', 'd']);
+    expect(await keyOf(0).evaluate((el) => el.classList.contains('auto'))).toBe(true); // shown as automatic
+    await expect(page.locator('.th').getByLabel('Редактируется (клавиша)')).toBeVisible();
+
+    // type over the letter: it becomes explicit and is saved
+    await keyOf(1).click();
+    await page.keyboard.type('x');
+    await page.keyboard.press('Enter');
+    await expect.poll(async () => (await config(page)).workflows[0].states[1].key).toBe('x');
+    expect(await keyOf(1).evaluate((el) => el.classList.contains('auto'))).toBe(false);
+    await expect(page.getByLabel('Строка #+TODO')).toContainText('TODO(x)');
+
+    // Esc cancels
+    await keyOf(1).click();
+    await page.keyboard.type('q');
+    await page.keyboard.press('Escape');
+    await expect(keyOf(1)).toHaveValue('x');
+
+    // clearing returns to automatic
+    await keyOf(1).click();
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Enter');
+    await expect.poll(async () => (await config(page)).workflows[0].states[1].key).toBeUndefined();
+    await expect(keyOf(1)).toHaveValue('t');
+  });
+
+  test('a key already set by hand on another status is refused with its name', async ({ page }) => {
+    await openSettings(page);
+    const keyOf = (n: number) => rows(page).nth(n).locator('input.qk');
+    await keyOf(1).click();
+    await page.keyboard.type('x');
+    await page.keyboard.press('Enter');
+    await keyOf(2).click();
+    await page.keyboard.type('x');
+    await expect(page.getByText('Клавиша «x» уже занята статусом TODO')).toBeVisible();
+    expect(await keyOf(2).getAttribute('aria-invalid')).toBe('true');
+    await page.keyboard.press('Enter');
+    await expect(keyOf(2)).toBeFocused(); // not confirmed
+    await page.keyboard.press('Escape');
+    await expect(keyOf(2)).toHaveValue('i');
+  });
+
+  test('an automatic key steps aside for a key set by hand', async ({ page }) => {
+    await openSettings(page);
+    // TODO takes "n", which is NEW's automatic letter: NEW moves on to its next free letter "e"... but NEXT has it,
+    // so the rule is: explicit first, automatic ones fill in the rest in order
+    await rows(page).nth(1).locator('input.qk').click();
+    await page.keyboard.type('n');
+    await page.keyboard.press('Enter');
+    const keys = await page.locator('.srow input.qk').evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value));
+    expect(keys[1]).toBe('n');
+    expect(new Set(keys).size).toBe(keys.length); // no two statuses share a letter
+  });
+
+  test('the "+" buttons stay reachable in a short window', async ({ page }) => {
+    await page.setViewportSize({ width: 1000, height: 480 });
+    await openSettings(page);
+    const t = page.locator('.table');
+    // the table is never squashed: all its content is inside it
+    const clipped = await t.evaluate((el) => el.scrollHeight - el.clientHeight);
+    expect(clipped).toBeLessThanOrEqual(1);
+    const add = page.getByRole('button', { name: '+ Состояние' });
+    await add.scrollIntoViewIfNeeded();
+    await expect(add).toBeVisible();
+    await add.click();
+    await expect(page.locator('input.kw:focus')).toHaveCount(1);
   });
 
   test('no ↑↓ buttons in rows; ⌥↑ / ⌥↓ on a focused row reorder it', async ({ page }) => {
@@ -112,7 +176,7 @@ test.describe('table', () => {
 
   test('explanation under the table, and a "+ Завершающее" button', async ({ page }) => {
     await openSettings(page);
-    await expect(page.getByText('Название строится из ключевого слова. Редактируется только колонка «В файле».')).toBeVisible();
+    await expect(page.getByText('Название строится из ключевого слова. Редактируются колонки «В файле» и «Клавиша».')).toBeVisible();
     await page.getByRole('button', { name: '+ Завершающее' }).click();
     // goes to the end of the closed block
     expect((await keywords(page)).at(-1)).toBe('');
@@ -134,7 +198,7 @@ test.describe('new state', () => {
     await expect(created).toHaveCount(1);
     await expect(created.locator('input.kw')).toHaveAttribute('placeholder', 'например, REVIEW');
     await expect(created.locator('.name')).toHaveText('—');
-    await expect(created.locator('.keychip')).toHaveCount(0);
+    await expect(created.locator('input.qk')).toBeDisabled(); // no letter until there is a word
     expect(await created.locator('.swatch .dot').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(95, 95, 102)'); // gray
     await expect(page.getByText('Введите ключевое слово и нажмите ↩ · ⎋ — отмена')).toBeVisible();
     // it sits in the open block, before the separator
@@ -155,7 +219,7 @@ test.describe('new state', () => {
     await expect.poll(async () => (await config(page)).workflows[0].states.map((s: any) => s.name)).toContain('IN-REVIEW');
     // the chain and the #+TODO line follow
     await expect(page.getByLabel('Строка #+TODO')).toContainText('IN-REVIEW');
-    await expect(page.locator('.keychip').nth(4)).toHaveText('r'); // I of IN-PROGRESS is taken -> next free letter
+    await expect(page.locator('input.qk').nth(4)).toHaveValue('r'); // I of IN-PROGRESS is taken -> next free letter
   });
 
   test('Esc removes the row; losing focus with an empty field removes it too; a valid word is confirmed on blur', async ({ page }) => {

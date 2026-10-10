@@ -95,6 +95,20 @@ export function effectiveKeys(w: DraftWorkflow): Map<string, string> {
   return out;
 }
 
+/** What may be typed into the quick-key field: one letter or digit. */
+export const normalizeKey = (raw: string) => [...raw.trim().toLocaleLowerCase('ru')].slice(-1).join('');
+
+/**
+ * Problems with a quick-key being entered for state `id` (null = fine). Only another state's *explicit* key
+ * clashes: automatic keys step aside to the next free letter.
+ */
+export function checkKey(w: DraftWorkflow, key: string, id: string): string | null {
+  if (!key) return null; // empty = automatic
+  if (!/^[\p{L}\p{N}]$/u.test(key)) return 'Клавиша — одна буква или цифра';
+  const other = w.states.find((s) => s.id !== id && !s.pending && s.key.toLowerCase() === key);
+  return other ? `Клавиша «${key}» уже занята статусом ${other.keyword}` : null;
+}
+
 // ---- building a draft -----------------------------------------------------------------
 
 function normalize(w: DraftWorkflow) {
@@ -259,6 +273,14 @@ export function validate(d: Draft): Problem[] {
 
     const real = w.states.filter((s) => !s.pending);
     if (!real.some((s) => !s.done)) out.push({ workflow: w.id, message: 'Нужно хотя бы одно незавершённое состояние' });
+    // explicit quick keys (from a hand-written config or the editor) must be unique within the set
+    const explicit = new Map<string, string>();
+    for (const s of real) {
+      if (!s.key) continue;
+      const k = s.key.toLowerCase();
+      if (explicit.has(k)) out.push({ workflow: w.id, state: s.id, message: `Клавиша «${s.key}» уже занята статусом ${explicit.get(k)}` });
+      else explicit.set(k, s.keyword);
+    }
     for (const s of real) {
       const own = keywordProblem(s.keyword);
       if (own) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addState, addWorkflow, canRemoveState, checkKeyword, displayName, dropState, dropWorkflow, effectiveKeys, fromConfig,
+  addState, addWorkflow, canRemoveState, checkKey, checkKeyword, normalizeKey, displayName, dropState, dropWorkflow, effectiveKeys, fromConfig,
   initialOf, keywordProblem, moveState, normalizeKeyword, orgLine, pendingState, removeState, removeWorkflow, toJson, validate,
 } from './workflowEditor';
 import { parseProjectConfig } from './org';
@@ -59,6 +59,44 @@ describe('quick keys', () => {
     const k = effectiveKeys(d.workflows[0]);
     expect(k.get(d.workflows[0].states[1].id)).toBe('o');
     expect(k.get(d.workflows[0].states[0].id)).toBe('n'); // o is reserved by the explicit key
+  });
+});
+
+describe('editing a quick key', () => {
+  it('takes one letter or digit, lower case', () => {
+    expect(normalizeKey(' X ')).toBe('x');
+    expect(normalizeKey('ab')).toBe('b'); // typing over a selected letter keeps the new one
+    expect(normalizeKey('')).toBe('');
+  });
+  it('accepts letters and digits and refuses anything else', () => {
+    const d = base();
+    const w = d.workflows[0];
+    for (const ok of ['x', '7', 'я']) expect(checkKey(w, ok, w.states[0].id), ok).toBeNull();
+    for (const bad of ['-', '(', ' ']) expect(checkKey(w, bad, w.states[0].id), bad).toContain('одна буква или цифра');
+    expect(checkKey(w, '', w.states[0].id)).toBeNull(); // empty = automatic
+  });
+  it('refuses a key that another state has set by hand, but lets it take an automatic one', () => {
+    const d = base();
+    const w = d.workflows[0];
+    const [nw, todo, next] = w.states;
+    todo.key = 'x';
+    expect(checkKey(w, 'x', next.id)).toContain('уже занята статусом TODO');
+    expect(checkKey(w, 'n', todo.id)).toBeNull(); // n is only NEW's automatic key
+    todo.key = 'n';
+    const keys = effectiveKeys(w);
+    expect(keys.get(todo.id)).toBe('n');
+    expect(keys.get(nw.id)).toBe('e'); // NEW steps aside: n is taken, e is its next free letter
+    expect(validate(d)).toEqual([]);
+  });
+  it('reports two explicit equal keys in a hand-written config', () => {
+    const d = fromConfig(cfg({ workflows: [{ name: 'A', states: [{ name: 'ONE', key: 'x' }, { name: 'TWO', key: 'X' }, { name: 'END', done: true }] }] }));
+    expect(validate(d).map((p) => p.message).join('\n')).toContain('Клавиша «X» уже занята статусом ONE');
+  });
+  it('writes only explicit keys', () => {
+    const d = base();
+    d.workflows[0].states[1].key = 'z';
+    const out = JSON.parse(toJson(null, d)).workflows[0].states;
+    expect(out.map((s: any) => s.key)).toEqual([undefined, 'z', undefined, undefined]);
   });
 });
 
