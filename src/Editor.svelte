@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { EditorState, Prec, RangeSetBuilder, type Range } from '@codemirror/state';
-  import { Decoration, EditorView, ViewPlugin, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+  import { Decoration, EditorView, ViewPlugin, placeholder as cmPlaceholder, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
   import { foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
   import { headingLines, toneFor, type Workflow } from './org';
@@ -10,7 +10,8 @@
   import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftSubtree, type Result } from './outline';
   import type { Text } from '@codemirror/state';
 
-  let { text, fileKey, wf, reveal, initial, onchange, oncursor, onfollow }: {
+  let { text, fileKey, wf, reveal, initial, hint = '', onchange, oncursor, onfollow }: {
+    hint?: string; // grey placeholder in an empty document
     text: string; fileKey: string; wf: Workflow;
     reveal: { line: number; n: number; focus?: boolean } | null | undefined;
     initial?: { line: number; col: number }; // where the caret of this tab was (restored when the tab is shown)
@@ -228,6 +229,7 @@
       extensions: [
         lineNumbers(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(),
         history(), orgFold, foldGutter(), plugin,
+        ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         EditorView.domEventHandlers({
           mousedown(e, v) {

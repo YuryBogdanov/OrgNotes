@@ -130,6 +130,21 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             emit();
             return to;
           }
+          if (cmd === 'save_new_file') {
+            if (badName(args.name)) throw 'bad name';
+            if (args.name.trim() === 'fail') throw 'disk full';
+            const n = /\.[^.]+$/.test(args.name.trim()) ? args.name.trim() : args.name.trim() + '.org';
+            const path = args.parent + '/' + n;
+            if (path in disk && !args.overwrite) throw 'exists';
+            disk[path] = args.text;
+            w.__log.push(['save_new', path]);
+            emit();
+            return path;
+          }
+          if (cmd === 'quit_app') {
+            w.__log.push(['quit']);
+            return;
+          }
           if (cmd === 'trash_entry') {
             for (const k of Object.keys(disk)) if (k === args.path || k.startsWith(args.path + '/')) delete disk[k];
             folders.delete(args.path.replace('/mock/', ''));

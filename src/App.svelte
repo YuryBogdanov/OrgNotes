@@ -4,6 +4,8 @@
   import Navigator from './Navigator.svelte';
   import Inspector from './Inspector.svelte';
   import Pane from './Pane.svelte';
+  import SaveAsSheet from './SaveAsSheet.svelte';
+  import UnsavedDialog from './UnsavedDialog.svelte';
   import { installMenu, type AppMenu } from './menu';
   import { MIN_PANE, secondKind } from './layout';
   import Splitter from './Splitter.svelte';
@@ -71,6 +73,18 @@
     },
     openFolder: () => store.chooseFolder(),
     closeTab: () => store.closeActiveTab(),
+    closeOthers: () => {
+      const p = store.layout.panes[store.layout.active];
+      if (p) store.closeOthers(store.layout.active, p.active);
+    },
+    save: () => store.saveActive(),
+    moveLeft: () => store.tabToSide(-1, false),
+    moveRight: () => store.tabToSide(1, false),
+    dupLeft: () => store.tabToSide(-1, true),
+    dupRight: () => store.tabToSide(1, true),
+    revealInNav: () => store.revealInNavigator(store.tab),
+    copyPath: () => store.copyPath(store.tab),
+    quit: () => store.quit(),
     splitRight: () => store.splitRight(),
     swap: () => store.swapPanes(),
     keepOne: () => store.keepOnePane(),
@@ -87,19 +101,33 @@
     if (!menu) return;
     menu.setEnabled('splitRight', !two);
     for (const id of ['swap', 'keepOne', 'paneLeft', 'paneRight']) menu.setEnabled(id, two);
+    const pi = store.layout.active;
+    const t = store.tab;
+    menu.setEnabled('moveRight', two && pi === 0);
+    menu.setEnabled('moveLeft', two && pi === 1);
+    menu.setEnabled('dupRight', two && pi === 0 && t?.kind !== 'untitled');
+    menu.setEnabled('dupLeft', two && pi === 1 && t?.kind !== 'untitled');
+    menu.setEnabled('revealInNav', t?.kind === 'file');
+    menu.setEnabled('copyPath', t?.kind === 'file');
   });
   /** The same shortcuts when there is no native menu (plain browser, tests). */
   function shortcut(e: KeyboardEvent): string | null {
     if (!e.metaKey) return null;
     const k = e.key;
     if (e.ctrlKey && e.shiftKey && (k === 'ArrowRight' || k === 'ArrowLeft')) return 'swap';
-    if (e.ctrlKey && k === 'ArrowLeft') return 'paneLeft';
-    if (e.ctrlKey && k === 'ArrowRight') return 'paneRight';
+    // tabs to the neighbour pane (⌃⌘ / ⌥⌃⌘ + arrow), focus between panes (⌥⌘ + arrow)
+    if (e.ctrlKey && k === 'ArrowLeft') return e.altKey ? 'dupLeft' : 'moveLeft';
+    if (e.ctrlKey && k === 'ArrowRight') return e.altKey ? 'dupRight' : 'moveRight';
+    if (e.altKey && k === 'ArrowLeft') return 'paneLeft';
+    if (e.altKey && k === 'ArrowRight') return 'paneRight';
+    if (e.altKey && e.code === 'KeyW') return 'closeOthers';
+    if (e.altKey && e.code === 'KeyC') return 'copyPath';
+    if (e.shiftKey && e.code === 'KeyJ') return 'revealInNav';
     if (e.code === 'Backslash' || k === '\\') return e.shiftKey ? 'keepOne' : e.altKey ? null : 'splitRight';
     if (e.ctrlKey || e.shiftKey) return null;
     if (k === '0') return e.altKey ? 'insp' : 'nav';
     if (e.altKey) return null;
-    return ({ '[': 'back', n: 'newFile', ',': 'settings', o: 'openFolder', w: 'closeTab', '1': 'notes', '2': 'agenda' } as Record<string, string>)[k] ?? null;
+    return ({ '[': 'back', n: 'newFile', ',': 'settings', o: 'openFolder', w: 'closeTab', s: 'save', q: 'quit', '1': 'notes', '2': 'agenda' } as Record<string, string>)[k] ?? null;
   }
   const today = new Date().toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -108,6 +136,18 @@
     store.listen();
     if (isSettingsWindow) return;
     installMenu(actions).then((m) => (menu = m));
+    // closing the window asks about unsaved tabs first, like quitting
+    if ('__TAURI_INTERNALS__' in window && !(window as any).__ORG_SETTINGS_OVERLAY__) {
+      import('@tauri-apps/api/window')
+        .then(({ getCurrentWindow }) =>
+          getCurrentWindow().onCloseRequested((e) => {
+            if (!store.hasUnsaved()) return;
+            e.preventDefault();
+            store.quit();
+          }),
+        )
+        .catch(() => {});
+    }
     const key = (e: KeyboardEvent) => {
       if (menu) return; // the menu bar owns the shortcuts
       const id = shortcut(e);
@@ -139,6 +179,8 @@
 {:else}
 <div class="win">
   <Dialogs />
+  {#if store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/if}
+  {#if store.unsavedReq}<UnsavedDialog tab={store.unsavedReq.tab} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
   {#if store.settingsOpen}<Settings />{/if}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="toolbar" data-tauri-drag-region onmousedown={drag}>
@@ -152,6 +194,8 @@
     <div class="path">
       {#if store.mode === 'agenda'}
         <span class="last">Агенда</span>
+      {:else if store.tab?.kind === 'untitled'}
+        <span class="last">{store.tab.title}</span><span class="sep">·</span><span>не сохранено</span>
       {:else if crumbs.length}
         {#each crumbs as c, i}
           {#if i}<span class="sep">›</span>{/if}<span class:last={i === crumbs.length - 1}>{c}</span>

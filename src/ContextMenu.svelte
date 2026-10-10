@@ -1,5 +1,5 @@
 <script module lang="ts">
-  export type MenuItem = { label: string; action: () => void; danger?: boolean; disabled?: boolean } | 'sep';
+  export type MenuItem = { label: string; action: () => void; danger?: boolean; disabled?: boolean; shortcut?: string } | 'sep';
 </script>
 
 <script lang="ts">
@@ -26,7 +26,9 @@
     {#if it === 'sep'}
       <div class="sep"></div>
     {:else}
-      <button role="menuitem" class:danger={it.danger} disabled={it.disabled} onclick={() => { onclose(); it.action(); }}>{it.label}</button>
+      <button role="menuitem" class:danger={it.danger} disabled={it.disabled} aria-keyshortcuts={it.shortcut} onclick={() => { onclose(); it.action(); }}>
+        <span>{it.label}</span>{#if it.shortcut}<span class="kb">{it.shortcut}</span>{/if}
+      </button>
     {/if}
   {/each}
 </div>
@@ -38,10 +40,12 @@
     background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(20px);
     border: 1px solid var(--line); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
   }
-  .menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 4px 10px; border-radius: 5px; font-size: 13px; }
+  .menu button { display: flex; justify-content: space-between; gap: 24px; width: 100%; text-align: left; border: 0; background: transparent; padding: 4px 10px; border-radius: 5px; font-size: 13px; }
   .menu button:hover:not(:disabled) { background: var(--acc); color: var(--onacc); }
   .menu button:disabled { opacity: 0.4; }
   .menu button.danger { color: var(--todo); }
   .menu button.danger:hover:not(:disabled) { background: var(--todo); color: var(--onacc); }
+  .kb { color: var(--fg2); }
+  .menu button:hover:not(:disabled) .kb { color: inherit; }
   .sep { height: 1px; background: var(--line); margin: 5px 6px; }
 </style>

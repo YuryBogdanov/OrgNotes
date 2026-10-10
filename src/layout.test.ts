@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   activeTab, addPane, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
   openFile, openFromAgenda, restore, secondKind, serialize, splitRight, swap, toggleSecond, type Layout,
+  newUntitled, moveTab, duplicateTab, othersOf, targetOf,
 } from './layout';
 
-const kinds = (L: Layout) => L.panes.map((p) => p.tabs.map((t) => (t.kind === 'agenda' ? 'A' : t.path)));
+const kinds = (L: Layout) => L.panes.map((p) => p.tabs.map((t) => (t.kind === 'agenda' ? 'A' : t.kind === 'untitled' ? t.title : t.path)));
 const one = (path = 'a.org') => emptyLayout(newTab('file', path));
 
 describe('opening files', () => {
@@ -184,5 +185,73 @@ describe('moves, deletions and restarts', () => {
     expect(restore(null, () => true)).toBeNull();
     expect(restore('{bad', () => true)).toBeNull();
     expect(restore(serialize(one('x.org')), () => false)).toBeNull();
+  });
+});
+
+describe('tab commands', () => {
+  it('new untitled tabs go to the end, become active and are numbered per pane', () => {
+    const L = one();
+    openFile(L, 0, 'b.org', 0);
+    L.panes[0].active = 0;
+    newUntitled(L, 0);
+    newUntitled(L, 0);
+    expect(kinds(L)).toEqual([['a.org', 'b.org', 'Без названия', 'Без названия 2']]);
+    expect(activeTab(L)!.title).toBe('Без названия 2');
+    expect(activeTab(L)!.text).toBe('');
+    splitRight(L);
+    newUntitled(L, 1);
+    expect(L.panes[1].tabs.at(-1)!.title).toBe('Без названия'); // the numbering is per pane
+  });
+  it('moves a tab after the target\'s active tab and activates it there; an emptied source pane closes', () => {
+    const L = one();
+    splitRight(L);
+    openFile(L, 1, 'b.org', 0);
+    L.panes[1].active = 0;
+    openFile(L, 0, 'c.org', 0);
+    moveTab(L, 0, 1); // c.org -> right pane, after its active tab (a.org)
+    expect(kinds(L)).toEqual([['a.org'], ['a.org', 'c.org', 'b.org']]);
+    expect(L.active).toBe(1);
+    expect(activeTab(L)!.path).toBe('c.org');
+    moveTab(L, 0, 0); // a.org already open on the right: no second tab, and the left pane is gone
+    expect(kinds(L)).toEqual([['a.org', 'c.org', 'b.org']]);
+    expect(activeTab(L)!.path).toBe('a.org');
+  });
+  it('duplicates into the neighbour, reusing a tab that already shows the file', () => {
+    const L = one();
+    splitRight(L);
+    openFile(L, 0, 'b.org', 0);
+    duplicateTab(L, 0, 1);
+    expect(kinds(L)).toEqual([['a.org', 'b.org'], ['a.org', 'b.org']]);
+    expect(L.active).toBe(1);
+    duplicateTab(L, 0, 0); // a.org is already on the right
+    expect(kinds(L)[1]).toEqual(['a.org', 'b.org']);
+    expect(activeTab(L)!.path).toBe('a.org');
+  });
+  it('nothing to move to or duplicate into with one pane; untitled tabs are not duplicated', () => {
+    const L = one();
+    expect(targetOf(L, 0)).toBe(-1);
+    expect(moveTab(L, 0, 0)).toBe(false);
+    expect(duplicateTab(L, 0, 0)).toBe(false);
+    splitRight(L);
+    newUntitled(L, 0);
+    expect(duplicateTab(L, 0, L.panes[0].tabs.length - 1)).toBe(false);
+    expect(moveTab(L, 0, L.panes[0].tabs.length - 1)).toBe(true);
+  });
+  it('the right pane sends tabs to the left one', () => {
+    const L = one();
+    splitRight(L);
+    expect(targetOf(L, 1)).toBe(0);
+  });
+  it('lists the other tabs of a pane', () => {
+    const L = one();
+    openFile(L, 0, 'b.org', 0);
+    openFile(L, 0, 'c.org', 0);
+    expect(othersOf(L, 0, 1).map((t) => t.path)).toEqual(['a.org', 'c.org']);
+  });
+  it('untitled tabs are not restored after a restart', () => {
+    const L = one();
+    newUntitled(L, 0);
+    const back = restore(serialize(L), () => true)!;
+    expect(kinds(back)).toEqual([['a.org']]);
   });
 });

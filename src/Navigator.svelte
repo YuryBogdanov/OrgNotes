@@ -86,6 +86,22 @@
     toggled.has(r.key) ? toggled.delete(r.key) : toggled.add(r.key);
   }
 
+  // ---- "Показать в навигаторе" -------------------------------------------------------
+  let flash = $state<string | null>(null);
+  let listEl: HTMLDivElement | undefined = $state();
+  $effect(() => {
+    const r = store.navReveal;
+    if (!r) return;
+    const f = store.files.find((x) => x.path === r.path);
+    if (!f) return;
+    const parts = f.name.split('/').slice(0, -1);
+    parts.forEach((_, i) => toggled.delete(parts.slice(0, i + 1).join('/') + '/')); // expand every folder above it
+    flash = r.path;
+    const t = setTimeout(() => (flash = null), 1600);
+    queueMicrotask(() => listEl?.querySelector<HTMLElement>(`[data-key="${CSS.escape(r.path)}"]`)?.scrollIntoView({ block: 'nearest' }));
+    return () => clearTimeout(t);
+  });
+
   // ---- context menu -----------------------------------------------------------
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
 
@@ -181,7 +197,7 @@
     </button>
   </div>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="list" class:rootdrop={dropOn === ''} oncontextmenu={emptyMenu}
+  <div class="list" bind:this={listEl} class:rootdrop={dropOn === ''} oncontextmenu={emptyMenu}
     ondragover={(e) => over(e, '')} ondrop={(e) => drop(e, '')} ondragleave={() => (dropOn = null)}>
     {#each rows as r (r.key)}
       {#if r.kind === 'new'}
@@ -195,7 +211,7 @@
         </div>
       {:else}
         <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
-        <div class="row" class:sel={r.selected} class:dim={r.done} class:drop={r.kind === 'folder' && dropOn === r.rel}
+        <div class="row" class:sel={r.selected} class:flash={r.kind === 'file' && flash === r.key} class:dim={r.done} data-key={r.key} class:drop={r.kind === 'folder' && dropOn === r.rel}
           style="padding-left:{6 + r.depth * 14}px" role="treeitem" aria-selected={r.selected} tabindex="-1"
           draggable={store.canManageFiles && (r.kind === 'file' || r.kind === 'folder') && store.renaming !== r.rel}
           ondragstart={(e) => dragStart(e, r)} ondragend={() => (dragRel = dropOn = null)}
@@ -241,6 +257,7 @@
   .list.rootdrop { box-shadow: inset 0 0 0 2px var(--acc); }
   .row { display: flex; align-items: center; gap: 5px; height: 24px; border-radius: 6px; padding-right: 8px; white-space: nowrap; }
   .row.sel { background: var(--sel); }
+  .row.flash { background: var(--sel); box-shadow: inset 0 0 0 1.5px var(--acc); }
   .row.drop { background: var(--sel); box-shadow: inset 0 0 0 1.5px var(--acc); }
   .row.dim .label { color: var(--fg3); }
   .chev { flex: 0 0 14px; width: 14px; height: 14px; padding: 0; border: 0; background: transparent; color: var(--fg3); display: flex; align-items: center; justify-content: center; }
