@@ -54,6 +54,10 @@ class Store {
   folders = $state.raw<string[]>([]); // relative paths of all sub-folders, including empty ones
   config = $state.raw<ProjectConfig>(EMPTY_CONFIG); // <notes>/.orgnotes/config.json
   private configRaw: string | null = null;
+  settingsOpen = $state(false);
+  get configText() {
+    return this.configRaw;
+  }
   creating = $state<{ dir: string; kind: 'file' | 'folder' } | null>(null); // inline "new" row in the navigator
   renaming = $state<string | null>(null); // relative path of the entry being renamed inline
   dialog = $state<{ type: 'delete' | 'move'; rel: string; isDir: boolean } | null>(null);
@@ -121,6 +125,22 @@ class Store {
     return true;
   }
 
+  /** Re-parse every note with the current project config (unsaved edits stay). */
+  private rebuildAll() {
+    const cfg = this.config;
+    this.files = this.files.map((f) => build(f.name, f.path, f.text, f.disk, f.diskRaw, f.eol, cfg));
+  }
+
+  /** Persist the project config (Settings) and apply it right away. */
+  async saveConfig(json: string) {
+    try {
+      if (isTauri) await invoke('write_project_config', { text: json });
+      if (this.takeConfig(json)) this.rebuildAll();
+    } catch (e) {
+      this.say('Не удалось сохранить настройки: ' + e);
+    }
+  }
+
   private sorted(list: Listed[]) {
     const order = (n: string) => (n.includes('/') ? 1 : 0);
     return list.sort((a, b) => order(a.name) - order(b.name) || a.name.localeCompare(b.name, 'ru'));
@@ -180,11 +200,7 @@ class Store {
       const folders = await this.readFolders(list);
       const cfgRaw = await this.readConfig();
       if (this.saving > 0 || this.writes !== seq) continue; // stale snapshot, take a new one
-      if (this.takeConfig(cfgRaw)) {
-        // statuses changed: every note is re-read with them (unsaved edits stay)
-        const cfg = this.config;
-        this.files = this.files.map((f) => build(f.name, f.path, f.text, f.disk, f.diskRaw, f.eol, cfg));
-      }
+      if (this.takeConfig(cfgRaw)) this.rebuildAll(); // statuses changed: every note is re-read with them
       this.applySnapshot(list, folders);
       return;
     }

@@ -17,7 +17,15 @@ export interface OrgDate {
   repeater?: string;
 }
 
+/** Project-wide behaviour of status changes. */
+export interface WorkflowBehavior {
+  closed: boolean; // write CLOSED: [..] when a task is finished
+  logbook: boolean; // log every status change into the heading's :LOGBOOK: drawer
+}
+export const DEFAULT_BEHAVIOR: WorkflowBehavior = { closed: true, logbook: false };
+
 export interface Workflow {
+  behavior?: WorkflowBehavior;
   open: string[];
   done: string[];
 }
@@ -64,9 +72,10 @@ export interface Workflow {
 
 export interface ProjectConfig {
   workflows: WorkflowDef[];
+  behavior: WorkflowBehavior;
 }
 
-export const EMPTY_CONFIG: ProjectConfig = { workflows: [] };
+export const EMPTY_CONFIG: ProjectConfig = { workflows: [], behavior: DEFAULT_BEHAVIOR };
 
 const stateOf = (name: string, done: boolean): WorkflowState => ({ name, done });
 
@@ -137,9 +146,13 @@ export function parseWorkflow(text: string): Workflow {
  */
 export function resolveWorkflow(text: string, _relPath: string, cfg: ProjectConfig): Workflow {
   const own = parseFileSequences(text);
-  if (own.length) return fromSequences(own, 0, 'file');
-  if (!cfg.workflows.length) return DEFAULT_WORKFLOW;
-  return fromSequences(cfg.workflows, 0, 'project');
+  let wf: Workflow;
+  if (own.length) wf = fromSequences(own, 0, 'file');
+  else if (!cfg.workflows.length) wf = DEFAULT_WORKFLOW;
+  else wf = fromSequences(cfg.workflows, 0, 'project');
+  // behaviour is a project setting and applies whichever statuses are in effect
+  const b = cfg.behavior ?? DEFAULT_BEHAVIOR;
+  return b === DEFAULT_BEHAVIOR || (b.closed === DEFAULT_BEHAVIOR.closed && b.logbook === DEFAULT_BEHAVIOR.logbook) ? wf : { ...wf, behavior: b };
 }
 
 const KEYWORD = /^[^\s()|:]+$/;
@@ -193,7 +206,12 @@ export function parseProjectConfig(json: string): { config: ProjectConfig; warni
     }
     workflows.push({ name, states });
   }
-  return { config: { workflows }, warnings };
+  const bh = raw?.behavior ?? {};
+  const behavior: WorkflowBehavior = {
+    closed: typeof bh.closedTimestamp === 'boolean' ? bh.closedTimestamp : DEFAULT_BEHAVIOR.closed,
+    logbook: typeof bh.logbook === 'boolean' ? bh.logbook : DEFAULT_BEHAVIOR.logbook,
+  };
+  return { config: { workflows, behavior }, warnings };
 }
 
 const TS = /<(\d{4})-(\d{2})-(\d{2})(?:\s+[^\s\d>]+)?(?:\s+(\d{2}:\d{2}))?(?:\s+([.+]{1,2}\d+[hdwmy]))?[^>]*>/;
@@ -394,6 +412,20 @@ function setProperty(lines: string[], h: Heading, key: string, value: string) {
   }
 }
 
+/** Add a `- State "NEW" from "OLD" [stamp]` entry on top of the heading's :LOGBOOK: drawer, creating it if needed. */
+function logState(lines: string[], h: Heading, to: string, from: string | null, now: Date) {
+  const q = (w: string) => `"${w}"`.padEnd(12);
+  const entry = `- State ${q(to)} from ${q(from ?? '')} ${inactiveStamp(now)}`;
+  let i = h.line + 1;
+  if (/^\s*(SCHEDULED|DEADLINE|CLOSED):/.test(lines[i] ?? '')) i++;
+  if (/^\s*:PROPERTIES:\s*$/i.test(lines[i] ?? '')) {
+    while (i < lines.length && !/^\s*:END:\s*$/i.test(lines[i])) i++;
+    i++;
+  }
+  if (/^\s*:LOGBOOK:\s*$/i.test(lines[i] ?? '')) lines.splice(i + 1, 0, entry);
+  else lines.splice(i, 0, ':LOGBOOK:', entry, ':END:');
+}
+
 /** Change (or remove) the TODO keyword of one heading. Maintains CLOSED: and repeaters like Org does. */
 export function setKeyword(text: string, h: Heading, keyword: string | null, wf: Workflow, now = new Date()): string {
   const lines = text.split('\n');
@@ -415,6 +447,7 @@ export function setKeyword(text: string, h: Heading, keyword: string | null, wf:
     if (shifted) {
       write(firstOpen(sequenceFor(wf, h.keyword)));
       setProperty(lines, h, 'LAST_REPEAT', inactiveStamp(now));
+      if (wf.behavior?.logbook) logState(lines, h, keyword, h.keyword, now);
       return lines.join('\n');
     }
   }
@@ -426,7 +459,8 @@ export function setKeyword(text: string, h: Heading, keyword: string | null, wf:
   const isDone = keyword !== null && wf.done.includes(keyword);
   const stripClosed = (s: string) => s.replace(/CLOSED:\s*\[[^\]]*\]\s*/, '').replace(/\s+$/, '');
 
-  if (isDone && !(hasPlanning && /CLOSED:/.test(next))) {
+  const writeClosed = wf.behavior?.closed ?? DEFAULT_BEHAVIOR.closed;
+  if (isDone && writeClosed && !(hasPlanning && /CLOSED:/.test(next))) {
     const stamp = `CLOSED: ${inactiveStamp(now)}`;
     if (hasPlanning) lines[h.line + 1] = next.replace(/^(\s*)/, `$1${stamp} `);
     else lines.splice(h.line + 1, 0, stamp);
@@ -435,6 +469,7 @@ export function setKeyword(text: string, h: Heading, keyword: string | null, wf:
     if (/^\s*$/.test(cleaned)) lines.splice(h.line + 1, 1);
     else lines[h.line + 1] = cleaned;
   }
+  if (wf.behavior?.logbook && keyword !== null && keyword !== h.keyword) logState(lines, h, keyword, h.keyword, now);
   return lines.join('\n');
 }
 

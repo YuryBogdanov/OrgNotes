@@ -7,6 +7,7 @@
   import Agenda from './Agenda.svelte';
   import Splitter from './Splitter.svelte';
   import Dialogs from './Dialogs.svelte';
+  import Settings from './Settings.svelte';
 
   const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
   const file = $derived(store.file);
@@ -31,6 +32,7 @@
         store.showNav = true;
         store.creating = { dir, kind: 'file' };
       }
+      if (e.metaKey && e.key === ',') { e.preventDefault(); store.settingsOpen = !store.settingsOpen; }
       if (e.metaKey && e.key === 'o') { e.preventDefault(); store.chooseFolder(); }
       if (e.metaKey && e.key === '1') { e.preventDefault(); store.mode = 'notes'; }
       if (e.metaKey && e.key === '2') { e.preventDefault(); store.mode = 'agenda'; }
@@ -51,6 +53,7 @@
 
 <div class="win">
   <Dialogs />
+  {#if store.settingsOpen}<Settings />{/if}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="toolbar" data-tauri-drag-region onmousedown={drag}>
     <div class="lights-gap"></div>
@@ -79,6 +82,9 @@
         <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="9" r="5.5" /><path d="M13.5 13.5L17 17" /></svg>
         <span>Поиск</span>
       </div>
+      <button class="ibtn" aria-label="Настройки (⌘,)" title="Настройки (⌘,)" onclick={() => (store.settingsOpen = true)}>
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5" /><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" /></svg>
+      </button>
       <button class="ibtn" aria-label="Показать или скрыть инспектор" onclick={() => (store.showInspector = !store.showInspector)}>
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5" /><path d="M12 3.5v13" /></svg>
       </button>

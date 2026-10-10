@@ -258,3 +258,52 @@ describe('project workflows', () => {
     expect(kwTone('TODO', DEFAULT_WORKFLOW)).toBe('--todo');
   });
 });
+
+describe('status change behaviour', () => {
+  const NOW = new Date(2026, 9, 10, 12, 0);
+  const wf = (behavior: { closed: boolean; logbook: boolean }) => resolveWorkflow('', 'x.org', { workflows: [], behavior });
+  const run = (t: string, to: string | null, b: { closed: boolean; logbook: boolean }) => {
+    const w = wf(b);
+    return setKeyword(t, parseHeadings(t, w)[0], to, w, NOW);
+  };
+
+  it('writes CLOSED by default and can be told not to', () => {
+    expect(run('* TODO a\n', 'DONE', { closed: true, logbook: false })).toBe('* DONE a\nCLOSED: [2026-10-10 Sat 12:00]\n');
+    expect(run('* TODO a\n', 'DONE', { closed: false, logbook: false })).toBe('* DONE a\n');
+  });
+  it('still removes an existing CLOSED when reopened, whatever the setting', () => {
+    expect(run('* DONE a\nCLOSED: [2026-10-08 Thu 18:20]\n', 'TODO', { closed: false, logbook: false })).toBe('* TODO a\n');
+  });
+  it('logs state changes into a new :LOGBOOK: drawer, newest on top', () => {
+    const b = { closed: true, logbook: true };
+    const once = run('* TODO a\n', 'NEXT', b);
+    expect(once).toBe('* NEXT a\n:LOGBOOK:\n- State "NEXT"       from "TODO"       [2026-10-10 Sat 12:00]\n:END:\n');
+    const twice = run(once, 'DONE', b);
+    expect(twice).toBe(
+      '* DONE a\nCLOSED: [2026-10-10 Sat 12:00]\n:LOGBOOK:\n- State "DONE"       from "NEXT"       [2026-10-10 Sat 12:00]\n' +
+        '- State "NEXT"       from "TODO"       [2026-10-10 Sat 12:00]\n:END:\n',
+    );
+  });
+  it('puts the drawer after the property drawer and logs a first status as from ""', () => {
+    const b = { closed: true, logbook: true };
+    expect(run('* a\n:PROPERTIES:\n:ID: x\n:END:\ntext\n', 'TODO', b)).toBe(
+      '* TODO a\n:PROPERTIES:\n:ID: x\n:END:\n:LOGBOOK:\n- State "TODO"       from ""           [2026-10-10 Sat 12:00]\n:END:\ntext\n',
+    );
+  });
+  it('does not log removing the status or setting the same one', () => {
+    const b = { closed: true, logbook: true };
+    expect(run('* TODO a\n', null, b)).toBe('* a\n');
+    expect(run('* TODO a\n', 'TODO', b)).toBe('* TODO a\n');
+  });
+  it('logs the finish of a repeating task', () => {
+    const b = { closed: true, logbook: true };
+    const out = run('* TODO a\nSCHEDULED: <2026-10-12 Mon +1w>\n', 'DONE', b);
+    expect(out).toContain('SCHEDULED: <2026-10-19 Mon +1w>');
+    expect(out).toContain(':LAST_REPEAT: [2026-10-10 Sat 12:00]');
+    expect(out).toContain('- State "DONE"       from "TODO"       [2026-10-10 Sat 12:00]');
+  });
+  it('reads behaviour from the project config, with defaults', () => {
+    expect(parseProjectConfig('{}').config.behavior).toEqual({ closed: true, logbook: false });
+    expect(parseProjectConfig('{"behavior":{"closedTimestamp":false,"logbook":true}}').config.behavior).toEqual({ closed: false, logbook: true });
+  });
+});
