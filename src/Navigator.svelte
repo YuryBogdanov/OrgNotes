@@ -86,7 +86,7 @@
     focusKey = r.key;
     if (r.kind === 'folder') {
       if (r.hasKids) toggle(r);
-    } else store.open(r.file!, r.line ?? 0);
+    } else store.open(r.file!, r.line ?? 0, false); // the keyboard stays here: ↑↓ go on, ↩ goes into the editor
   }
   function chev(e: MouseEvent, r: Row) {
     e.stopPropagation();
@@ -121,7 +121,7 @@
       }
     } else if (e.key === 'Enter' && r && r.kind !== 'folder') {
       e.preventDefault();
-      store.open(r.file!, r.line ?? 0);
+      store.open(r.file!, r.line ?? 0, true);
     }
   }
 

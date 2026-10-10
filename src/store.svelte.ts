@@ -433,10 +433,10 @@ class Store {
    * Open a file in the active pane: a tab that already shows it is reused, the active file tab is retargeted
    * (like a click in Xcode's navigator), an agenda tab keeps its place and the file opens next to it.
    */
-  open(fileIdx: number, line = 0) {
+  open(fileIdx: number, line = 0, focus = true) {
     const f = this.files[fileIdx];
     if (!f) return;
-    openFile(this.layout, this.layout.active, f.path, line, { replace: true });
+    openFile(this.layout, this.layout.active, f.path, line, { replace: true, focus });
     lsSet('lastFile:' + (this.dir ?? ''), f.path);
   }
 

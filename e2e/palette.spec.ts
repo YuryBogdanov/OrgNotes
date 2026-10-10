@@ -130,6 +130,19 @@ test.describe('modes', () => {
     await expect(rows(page)).toHaveText(['Ничего не найдено']);
   });
 
+  test('«№» (Shift+3 on the Russian layout) works as «#»', async ({ page }) => {
+    await open(page);
+    await at(page, '#+TITLE');
+    await palette(page);
+    await page.keyboard.type('№');
+    await expect(pal(page).locator('.plate')).toContainText('Переход к заголовку в текущем файле');
+    await expect(pal(page).locator('.ghost')).toContainText('заголовок');
+    await page.keyboard.type('найм');
+    expect(await titles(page)).toEqual(['План найма']);
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.status')).toContainText('Стр. 8');
+  });
+
   test('«#» starts on the heading the cursor is in; progress cookies are not shown', async ({ page }) => {
     await open(page, { ...FILES(), '/mock/work.org': WORK.replace('Подготовить бюджет 2027', 'Подготовить бюджет 2027 [1/3]') });
     await at(page, 'Свести заявки');

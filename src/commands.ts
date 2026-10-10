@@ -205,14 +205,15 @@ export function contextOf(): Ctx {
 export function mainStep(c: Ctx): Step {
   return {
     placeholder: 'Команда или файл…',
-    ghost: (q) => (q === '#' ? 'заголовок' : ''),
+    // «#» and «№» (the same key on the Russian layout) both go to headings
+    ghost: (q) => (q === '#' || q === '№' ? 'заголовок' : ''),
     plate: (q) => {
       if (!c.file) return null;
-      if (q.startsWith('#')) return { kind: 'headings', file: c.file };
+      if (/^[#№]/.test(q)) return { kind: 'headings', file: c.file };
       return c.heading ? { kind: 'heading', h: c.heading, file: c.file } : { kind: 'general', file: c.file, line: c.line };
     },
     rows: (q) => {
-      if (q.startsWith('#')) return headingRows(c, q.slice(1)); // «@» stays an ordinary character for now
+      if (/^[#№]/.test(q)) return headingRows(c, q.slice(1)); // «@» stays an ordinary character for now
       const u = uses();
       const rows: Row[] = [];
       for (const g of ['heading', 'general'] as const) {

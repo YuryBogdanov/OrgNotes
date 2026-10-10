@@ -96,6 +96,21 @@ test.describe('navigator', () => {
     await expect(page.locator('.nav')).not.toContainText('Q4 2026');
   });
 
+  test('a click on a file opens it and keeps the keyboard in the navigator; ↩ goes into the editor', async ({ page }) => {
+    await open(page);
+    await navRow(page, '/mock/journal.org').click();
+    await expect(page.locator('.tab.on .lbl')).toHaveText('journal');
+    await expect(navRow(page, '/mock/journal.org')).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(navRow(page, '/mock/work.org')).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    await expect(navRow(page, '/mock/empty.org')).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.tab.on .lbl')).toHaveText('empty');
+    await expect(page.locator('section.pane.active .cm-content')).toBeFocused();
+  });
+
   test('←/→ fold and open folders as in Finder; ↑↓ move', async ({ page }) => {
     await open(page);
     await navRow(page, 'Работа/').locator('.label').click(); // also folds it
