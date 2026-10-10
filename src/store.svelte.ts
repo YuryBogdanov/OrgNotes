@@ -97,16 +97,18 @@ class Store {
 
   private async listFiles(): Promise<Listed[]> {
     if (isTauri) return invoke<Listed[]>('list_org_files');
-    // browser fallback: bundled sample notes, edits stay in memory
-    const raw = import.meta.glob('../sample-notes/**/*.org', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-    return Object.entries(raw).map(([k, text]) => ({ name: k.replace('../sample-notes/', ''), path: k, text }));
+    // browser fallback (dev only): bundled sample notes, edits stay in memory
+    if (!import.meta.env.DEV) return [];
+    const { bundledNotes } = await import('./fallbackNotes');
+    return Object.entries(bundledNotes).map(([k, text]) => ({ name: k.replace('../sample-notes/', ''), path: k, text }));
   }
 
   private async readConfig(): Promise<string | null> {
     if (isTauri) return invoke<string | null>('read_project_config');
-    // browser fallback: the bundled sample project's config
-    const raw = import.meta.glob('../sample-notes/.orgnotes/config.json', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-    return Object.values(raw)[0] ?? null;
+    // browser fallback (dev only): the bundled sample project's config
+    if (!import.meta.env.DEV) return null;
+    const { bundledConfig } = await import('./fallbackNotes');
+    return Object.values(bundledConfig)[0] ?? null;
   }
 
   /** Parse the project config text; reports problems. Returns true when the effective config changed. */
