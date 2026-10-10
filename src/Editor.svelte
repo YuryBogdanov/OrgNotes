@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { EditorState, RangeSetBuilder, type Range } from '@codemirror/state';
+  import { EditorState, Prec, RangeSetBuilder, type Range } from '@codemirror/state';
   import { Decoration, EditorView, ViewPlugin, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-  import { foldGutter, foldKeymap, foldService, toggleFold } from '@codemirror/language';
+  import { foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
   import { headingLines, kwTone, type Workflow } from './org';
   import { extractLinks, type OrgLink } from './links';
+  import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftSubtree, type Result } from './outline';
   import type { Text } from '@codemirror/state';
 
   let { text, fileKey, wf, reveal, onchange, oncursor, onfollow }: {
@@ -38,19 +39,77 @@
   };
   const linkAt = (doc: Text, pos: number) => linksIn(doc).find((l) => pos >= l.from && pos <= l.to);
 
+  // ---- Org structure commands -------------------------------------------------------
+  const cycleState = new WeakMap<EditorView, number>(); // S-Tab position per editor, absent = everything open
+
+  const apply = (v: EditorView, r: Result) => {
+    v.dispatch({ changes: r.changes, selection: { anchor: r.caret }, scrollIntoView: true, userEvent: 'input' });
+    cycleState.delete(v);
+    return true;
+  };
+  const sel = (v: EditorView) => v.state.selection.main;
+  /** Apply a command result; a heading-line command that cannot move still consumes the key. */
+  const run = (v: EditorView, r: Result | null) => (r ? apply(v, r) : true);
+  const onHeading = (v: EditorView) => sel(v).empty && isHeadingLine(v.state.doc.toString(), sel(v).head);
+
+  const isFolded = (v: EditorView, lineTo: number) => {
+    let folded = false;
+    foldedRanges(v.state).between(lineTo, lineTo, (from) => {
+      if (from === lineTo) folded = true;
+    });
+    return folded;
+  };
+
+  /** M-RET / M-S-RET: new heading at the current level. */
+  const newHeading = (v: EditorView, todo: boolean, words: Workflow) => {
+    const head = sel(v).head;
+    const line = v.state.doc.lineAt(head);
+    return apply(v, insertHeading(v.state.doc.toString(), head, { todo: todo ? newTaskState(words) : undefined, folded: isFolded(v, line.to) }));
+  };
+
+  /** S-Tab: everything folded, then level 1 open, level 2 open, ... all open, then folded again. */
+  const cycleVisibility = (v: EditorView) => {
+    const text = v.state.doc.toString();
+    const { max } = foldTargets(text, 0);
+    if (max === 0) return false; // no headings
+    const state = nextCycleState(cycleState.get(v), max);
+    cycleState.set(v, state);
+    const targets = foldTargets(text, state).lines;
+    const effects = [] as ReturnType<typeof foldEffect.of>[];
+    foldedRanges(v.state).between(0, v.state.doc.length, (from, to) => {
+      effects.push(unfoldEffect.of({ from, to }));
+    });
+    const fold: { from: number; to: number }[] = [];
+    for (const ln of targets) {
+      const l = v.state.doc.line(ln + 1);
+      const r = foldable(v.state, l.from, l.to);
+      if (r) {
+        effects.push(foldEffect.of(r));
+        fold.push(r);
+      }
+    }
+    // the caret must not end up inside hidden text: put it on the outermost folded heading
+    const head = sel(v).head;
+    const hiding = fold.filter((r) => head > r.from && head <= r.to).sort((a, b) => a.from - b.from)[0];
+    v.dispatch({ effects, selection: hiding ? { anchor: hiding.from } : undefined, scrollIntoView: true });
+    return true;
+  };
+
   const orgFold = foldService.of((state, lineStart) => {
     const line = state.doc.lineAt(lineStart);
     const heads = headingSet(state.doc);
     if (!heads.has(line.number - 1)) return null;
     const m = HEAD.exec(line.text)!;
     let end = line.to;
+    let content = false; // a heading followed only by blank lines has nothing to fold
     for (let n = line.number + 1; n <= state.doc.lines; n++) {
       const l = state.doc.line(n);
       const mm = heads.has(n - 1) ? HEAD.exec(l.text) : null;
       if (mm && mm[1].length <= m[1].length) break;
+      if (l.text.trim() !== '') content = true;
       end = l.to;
     }
-    return end > line.to ? { from: line.to, to: end } : null;
+    return content && end > line.to ? { from: line.to, to: end } : null;
   });
 
   function decorate(v: EditorView, words: Workflow): { all: DecorationSet; atomic: DecorationSet } {
@@ -180,6 +239,27 @@
           },
         }),
         EditorView.lineWrapping,
+        Prec.high(
+          keymap.of([
+            { key: 'Alt-Enter', run: (v) => newHeading(v, false, words) },
+            { key: 'Alt-Shift-Enter', run: (v) => newHeading(v, true, words) },
+            // heading lines only, so Option+arrows keep moving by word inside text (as in Org on a Mac)
+            { key: 'Alt-ArrowLeft', run: (v) => onHeading(v) && run(v, shiftSubtree(v.state.doc.toString(), sel(v).head, -1)) },
+            { key: 'Alt-ArrowRight', run: (v) => onHeading(v) && run(v, shiftSubtree(v.state.doc.toString(), sel(v).head, 1)) },
+            { key: 'Alt-Shift-ArrowLeft', run: (v) => onHeading(v) && run(v, shiftSubtree(v.state.doc.toString(), sel(v).head, -1)) },
+            { key: 'Alt-Shift-ArrowRight', run: (v) => onHeading(v) && run(v, shiftSubtree(v.state.doc.toString(), sel(v).head, 1)) },
+            { key: 'Alt-ArrowUp', run: (v) => onHeading(v) && run(v, moveSubtree(v.state.doc.toString(), sel(v).head, -1)) },
+            { key: 'Alt-ArrowDown', run: (v) => onHeading(v) && run(v, moveSubtree(v.state.doc.toString(), sel(v).head, 1)) },
+            { key: 'Shift-ArrowUp', run: (v) => onHeading(v) && run(v, cyclePriority(v.state.doc.toString(), sel(v).head, 'up', words)) },
+            { key: 'Shift-ArrowDown', run: (v) => onHeading(v) && run(v, cyclePriority(v.state.doc.toString(), sel(v).head, 'down', words)) },
+            // statuses: Shift+←/→ inside the workflow, Ctrl+Shift+←/→ between workflows (heading lines only)
+            { key: 'Shift-ArrowRight', run: (v) => onHeading(v) && run(v, changeStatusAt(v.state.doc.toString(), sel(v).head, (w, k) => rotateStatus(w, k, 'next'), words)) },
+            { key: 'Shift-ArrowLeft', run: (v) => onHeading(v) && run(v, changeStatusAt(v.state.doc.toString(), sel(v).head, (w, k) => rotateStatus(w, k, 'prev'), words)) },
+            { key: 'Ctrl-Shift-ArrowRight', run: (v) => onHeading(v) && run(v, changeStatusAt(v.state.doc.toString(), sel(v).head, (w, k) => rotateWorkflow(w, k, 'next'), words)) },
+            { key: 'Ctrl-Shift-ArrowLeft', run: (v) => onHeading(v) && run(v, changeStatusAt(v.state.doc.toString(), sel(v).head, (w, k) => rotateWorkflow(w, k, 'prev'), words)) },
+            { key: 'Shift-Tab', run: cycleVisibility },
+          ]),
+        ),
         keymap.of([
           { key: 'Mod-Enter', run: (v) => {
               const l = linkAt(v.state.doc, v.state.selection.main.head);
@@ -189,6 +269,7 @@
             } },
           { key: 'Tab', run: (v) => {
               const l = v.state.doc.lineAt(v.state.selection.main.head);
+              cycleState.delete(v);
               return headingSet(v.state.doc).has(l.number - 1) ? toggleFold(v) : false;
             } },
           ...foldKeymap, ...historyKeymap, ...defaultKeymap,
