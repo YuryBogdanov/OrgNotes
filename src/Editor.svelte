@@ -10,9 +10,10 @@
   import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftSubtree, type Result } from './outline';
   import type { Text } from '@codemirror/state';
 
-  let { text, fileKey, wf, reveal, onchange, oncursor, onfollow }: {
+  let { text, fileKey, wf, reveal, initial, onchange, oncursor, onfollow }: {
     text: string; fileKey: string; wf: Workflow;
-    reveal: { line: number; n: number } | null;
+    reveal: { line: number; n: number; focus?: boolean } | null | undefined;
+    initial?: { line: number; col: number }; // where the caret of this tab was (restored when the tab is shown)
     onchange: (t: string) => void;
     oncursor: (line: number, col: number) => void;
     onfollow: (link: OrgLink) => void;
@@ -287,9 +288,19 @@
     });
   }
 
+  /** Put the caret where the tab had it and bring it into view, without taking the focus. */
+  function restoreCaret() {
+    if (!view || !initial) return;
+    const doc = view.state.doc;
+    const ln = doc.line(Math.min(initial.line + 1, doc.lines));
+    const pos = Math.min(ln.from + Math.max(0, initial.col - 1), ln.to);
+    view.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: 'center' }) });
+  }
+
   onMount(() => {
     view = new EditorView({ state: makeState(text, wf), parent: host });
     lastKey = fileKey;
+    restoreCaret(); // a pending reveal, if any, is applied right after by its own effect
     return () => view?.destroy();
   });
 
@@ -299,6 +310,7 @@
     if (k !== lastKey) {
       lastKey = k;
       view.setState(makeState(t, w));
+      restoreCaret();
     } else {
       const cur = view.state.doc.toString();
       if (cur !== t) {
@@ -331,7 +343,7 @@
     const ln = Math.min(r.line + 1, view.state.doc.lines);
     const pos = view.state.doc.line(ln).from;
     view.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: 'center' }) });
-    view.focus();
+    if (r.focus !== false) view.focus(); // a task opened from the agenda keeps the focus in the agenda
   });
 </script>
 

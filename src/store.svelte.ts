@@ -1,3 +1,7 @@
+import {
+  activeTab, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
+  openFile, openFromAgenda, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
+} from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, splitEol, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
@@ -61,14 +65,12 @@ class Store {
   creating = $state<{ dir: string; kind: 'file' | 'folder' } | null>(null); // inline "new" row in the navigator
   renaming = $state<string | null>(null); // relative path of the entry being renamed inline
   dialog = $state<{ type: 'delete' | 'move'; rel: string; isDir: boolean } | null>(null);
-  curPath = $state('');
-  mode = $state<'notes' | 'agenda'>('notes');
-  cursor = $state({ line: 0, col: 0 });
+  /** Editor panes and their tabs; see layout.ts. */
+  layout = $state<Layout>(emptyLayout());
   showNav = $state(true);
   showInspector = $state(true);
-  navW = $state(264);
+  navW = $state(248);
   inspW = $state(272);
-  reveal = $state<{ line: number; n: number } | null>(null);
   saveState = $state<'saved' | 'saving' | 'memory'>(isTauri ? 'saved' : 'memory');
   dir = $state<string | null>(null);
   needFolder = $state(false);
@@ -81,16 +83,33 @@ class Store {
   private writes = 0; // bumped after every successful write: a snapshot of the disk taken across a bump may be stale
   private noticeTimer: ReturnType<typeof setTimeout> | undefined;
 
+  /** The tab with the keyboard: the active tab of the active pane. */
+  get tab(): Tab | undefined {
+    return activeTab(this.layout);
+  }
+  /** Path of the file in the active tab ('' when the active tab is not a file). */
+  get curPath(): string {
+    const t = this.tab;
+    return t?.kind === 'file' ? (t.path ?? '') : '';
+  }
   get cur(): number {
-    const i = this.files.findIndex((f) => f.path === this.curPath);
-    return i >= 0 ? i : 0;
+    return this.files.findIndex((f) => f.path === this.curPath);
   }
   get file(): NoteFile | undefined {
     return this.files[this.cur];
   }
+  get mode(): 'notes' | 'agenda' {
+    return this.tab?.kind === 'agenda' ? 'agenda' : 'notes';
+  }
+  get cursor() {
+    return this.tab?.cursor ?? { line: 0, col: 0 };
+  }
   get selected(): number {
     const f = this.file;
     return f ? headingAt(f.headings, this.cursor.line) : -1;
+  }
+  fileOf(t: Tab | undefined): NoteFile | undefined {
+    return t?.kind === 'file' ? this.files.find((f) => f.path === t.path) : undefined;
   }
 
   say(msg: string) {
@@ -224,11 +243,13 @@ class Store {
     const cfg = this.config;
     const files = list.map((l) => fromDisk(l, cfg));
     const folders = await this.readFolders(files);
+    // the panes and tabs of the last session; files that cannot be opened any more are skipped
+    const exists = (p: string) => files.some((f) => f.path === p);
+    const saved = restore(lsGet(this.layoutKey()), exists);
     const last = lsGet('lastFile:' + (this.dir ?? ''));
     const pick = files.find((f) => f.path === last) ?? files.find((f) => f.name === 'Weekly.org') ?? files[0];
     this.folders = folders;
-    this.curPath = pick?.path ?? '';
-    this.cursor = { line: 0, col: 0 };
+    this.layout = saved ?? emptyLayout(pick ? newTab('file', pick.path) : undefined);
     this.files = files;
     this.loaded = true;
   }
@@ -279,7 +300,8 @@ class Store {
     });
     this.folders = folders;
     if (adopted) this.say(`«${adopted.split('/').pop()}» изменён снаружи — загружена версия с диска`);
-    if (!this.files.some((f) => f.path === this.curPath)) this.curPath = this.files[0]?.path ?? '';
+    // a file that disappeared closes its tabs, in both panes
+    dropMissing(this.layout, (p) => this.files.some((f) => f.path === p));
   }
 
   async chooseFolder() {
@@ -305,7 +327,7 @@ class Store {
     await listen('notes-changed', () => this.reload());
   }
 
-  setText(text: string, path = this.curPath) {
+  setText(text: string, path: string = this.curPath) {
     const f = this.files.find((x) => x.path === path);
     if (!f || f.text === text) return;
     const next = build(f.name, f.path, text, f.disk, f.diskRaw, f.eol, this.config);
@@ -323,14 +345,95 @@ class Store {
   setKeyword(kw: string | null) { this.patch((t, h, wf) => setKeyword(t, h, kw, wf)); }
   setPriority(p: string | null) { this.patch((t, h) => setPriority(t, h, p)); }
 
+  /**
+   * Open a file in the active pane: a tab that already shows it is reused, the active file tab is retargeted
+   * (like a click in Xcode's navigator), an agenda tab keeps its place and the file opens next to it.
+   */
   open(fileIdx: number, line = 0) {
     const f = this.files[fileIdx];
     if (!f) return;
-    this.curPath = f.path;
+    openFile(this.layout, this.layout.active, f.path, line, { replace: true });
     lsSet('lastFile:' + (this.dir ?? ''), f.path);
-    this.mode = 'notes';
-    this.cursor = { line, col: 0 };
-    this.reveal = { line, n: Date.now() };
+  }
+
+  // ---- panes and tabs ---------------------------------------------------------------
+
+  private layoutKey() {
+    return 'layout:' + (this.dir ?? '');
+  }
+  persistLayout() {
+    lsSet(this.layoutKey(), serialize(this.layout));
+  }
+  setActivePane(i: number) {
+    if (i >= 0 && i < this.layout.panes.length && this.layout.active !== i) this.layout.active = i;
+  }
+  activateTab(pi: number, ti: number) {
+    const p = this.layout.panes[pi];
+    if (!p || !p.tabs[ti]) return;
+    p.active = ti;
+    this.layout.active = pi;
+  }
+  closeTab(pi: number, ti: number) {
+    closeTab(this.layout, pi, ti);
+  }
+  closeActiveTab() {
+    const p = this.layout.panes[this.layout.active];
+    if (p?.tabs.length) closeTab(this.layout, this.layout.active, p.active);
+  }
+  /** The editor of a tab reports its caret; leaving the heading opened from the agenda drops the caption. */
+  setTabCursor(tab: Tab, line: number, col: number) {
+    tab.cursor = { line, col };
+    if (tab.fromAgenda) {
+      const f = this.fileOf(tab);
+      const at = f ? headingAt(f.headings, line) : -1;
+      const from = f ? headingAt(f.headings, tab.fromAgenda.line) : -1;
+      if (at !== from) tab.fromAgenda = null;
+    }
+  }
+  /** Toolbar: "Второй редактор" / "Агенда" in the second pane. */
+  toggleSecond(kind: 'file' | 'agenda') {
+    toggleSecond(this.layout, kind, () => {
+      const t = this.tab;
+      if (t?.kind === 'file') return copyTab(t);
+      const anyFile = this.layout.panes.flatMap((p) => p.tabs).find((x) => x.kind === 'file');
+      if (anyFile) return copyTab(anyFile);
+      return this.files[0] ? newTab('file', this.files[0].path) : undefined;
+    });
+  }
+  splitRight() {
+    return splitRight(this.layout);
+  }
+  swapPanes() {
+    swap(this.layout);
+  }
+  keepOnePane() {
+    keepOne(this.layout);
+  }
+  closePane(pi: number) {
+    closePane(this.layout, pi);
+  }
+  focusPane(dir: -1 | 1) {
+    focusPane(this.layout, dir);
+  }
+  /** The agenda in pane `pi` opens a task: in the neighbour pane (file on the left) or in its own pane. */
+  openFromAgenda(pi: number, fileIdx: number, line: number, mode: 'neighbor' | 'neighbor-focus' | 'here') {
+    const f = this.files[fileIdx];
+    if (!f) return;
+    const h = f.headings.find((x) => x.line === line);
+    openFromAgenda(this.layout, pi, f.path, line, h?.title ?? '', mode);
+  }
+  /** ⌘2: the agenda in the active pane; ⌘1: back to the last file tab of that pane. */
+  showAgendaHere() {
+    openAgenda(this.layout, this.layout.active);
+  }
+  showNotesHere() {
+    const p = this.layout.panes[this.layout.active];
+    const i = p ? p.tabs.findLastIndex((t) => t.kind === 'file') : -1;
+    if (i >= 0) p.active = i;
+  }
+  /** Not enough room for two panes: the second one becomes tabs of the first. */
+  mergePanes() {
+    closePane(this.layout, 1);
   }
 
 
@@ -415,7 +518,7 @@ class Store {
       const map = mapperFor(oldAbs, newAbs);
 
       // current file / history follow the move (before reload, which would otherwise fall back to the first file)
-      this.curPath = map(this.curPath);
+      mapPaths(this.layout, map); // tabs in both panes follow the move
       this.history = this.history.map((h) => ({ ...h, path: map(h.path) }));
       lsSet('lastFile:' + (this.dir ?? ''), this.curPath);
       await this.reload();

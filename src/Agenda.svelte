@@ -3,6 +3,9 @@
   import { dayDiff, fmtDay, fmtLong, occurrences, repeaterLabel, toJs, toneFor, weekdayName } from './org';
   import { toneStyle } from './colors';
 
+  // the pane the agenda lives in: a task opens in the neighbour pane (↩, click) or here (⌥↩)
+  let { pane = 0 }: { pane?: number } = $props();
+
   type Item = {
     day: number; // days from today
     time: string; kw: string | null; tone: string; ev: boolean; pr: boolean;
@@ -66,6 +69,42 @@
   });
 
   const count = $derived(items.length);
+
+  // ---- choosing a task -----------------------------------------------------------------------
+  // `items` is already in display order (by day, then kind, then time), so an index into it is the row order
+  let sel = $state(-1);
+  let list: HTMLDivElement | undefined = $state();
+  const key = (it: Item) => `${it.file}:${it.line}:${it.day}:${it.order}`;
+  let selKey = $state('');
+  // the selection follows its task when the list is recomputed (a status change, a save)
+  $effect(() => {
+    const i = items.findIndex((it) => key(it) === selKey);
+    if (selKey && i >= 0 && i !== sel) sel = i;
+  });
+  function choose(i: number) {
+    sel = Math.max(0, Math.min(items.length - 1, i));
+    selKey = items[sel] ? key(items[sel]) : '';
+    queueMicrotask(() => list?.querySelector<HTMLElement>(`[data-i="${sel}"]`)?.scrollIntoView({ block: 'nearest' }));
+  }
+  function openItem(i: number, mode: 'neighbor' | 'neighbor-focus' | 'here') {
+    const it = items[i];
+    if (!it) return;
+    choose(i);
+    store.openFromAgenda(pane, it.file, it.line, mode);
+    if (mode === 'neighbor') queueMicrotask(() => list?.focus()); // the focus stays in the agenda
+  }
+  function keydown(e: KeyboardEvent) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      choose(sel + 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      choose(sel < 0 ? 0 : sel - 1);
+    } else if (e.key === 'Enter' && sel >= 0) {
+      e.preventDefault();
+      openItem(sel, e.altKey ? 'here' : 'neighbor');
+    }
+  }
 </script>
 
 <div class="agenda">
@@ -75,7 +114,9 @@
       <div class="sub">{count} записей · ближайшие 30 дней</div>
     </div>
   </header>
-  <div class="scroll">
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <div class="scroll" bind:this={list} role="listbox" tabindex="0" aria-label="Задачи агенды" aria-activedescendant={sel >= 0 ? `ag-${pane}-${sel}` : undefined}
+    onkeydown={keydown}>
     {#each groups as g (g.key)}
       <div class="gh">
         <span class="gt" style="color:var({g.tone})">{g.title}</span>
@@ -84,7 +125,10 @@
         <span class="gs">{g.items.length}</span>
       </div>
       {#each g.items as it}
-        <div class="item" role="button" tabindex="-1" onclick={() => store.open(it.file, it.line)} onkeydown={() => {}}>
+        {@const i = items.indexOf(it)}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="item" class:sel={i === sel} id="ag-{pane}-{i}" data-i={i} role="option" aria-selected={i === sel}
+          onclick={() => openItem(i, 'neighbor')} ondblclick={() => openItem(i, 'neighbor-focus')}>
           <span class="time">{it.time}</span>
           {#if it.kw}
             <span class="kw tone-chip" style={it.tone}>{it.kw}</span>
@@ -97,14 +141,16 @@
           </div>
           {#if it.tags}<span class="tag">{it.tags}</span>{/if}
           <span class="mark" class:late={it.day < 0}>{it.mark}</span>
+          <svg class="go" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5l4.5 4.5-4.5 4.5" /></svg>
         </div>
       {/each}
     {/each}
   </div>
+  <div class="foot"><span>↩ открыть в соседней панели</span><span>⌥↩ открыть здесь</span></div>
 </div>
 
 <style>
-  .agenda { height: 100%; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+  .agenda { height: 100%; display: flex; flex-direction: column; min-width: 0; background: var(--bg); container-type: inline-size; }
   header { padding: 18px 24px 14px; border-bottom: 1px solid var(--line); }
   .h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
   .sub { color: var(--fg2); margin-top: 2px; }
@@ -114,7 +160,13 @@
   .gs { font-size: 12px; color: var(--fg2); }
   .rule { flex: 1; height: 1px; background: var(--line); align-self: center; }
   .item { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 6px 10px; border-radius: 7px; }
-  .item:hover { background: var(--sel); }
+  .item:hover { background: color-mix(in srgb, var(--sel) 55%, transparent); }
+  .item.sel { background: var(--sel); }
+  .scroll:focus { outline: none; }
+  .scroll:focus-visible .item.sel { box-shadow: inset 0 0 0 1.5px var(--acc); }
+  .go { flex: 0 0 13px; color: var(--acc); opacity: 0; }
+  .item.sel .go { opacity: 1; }
+  .foot { flex: 0 0 26px; display: flex; align-items: center; gap: 14px; padding: 0 12px; background: var(--side); border-top: 1px solid var(--line); font-size: 11.5px; color: var(--fg2); }
   .time { flex: 0 0 42px; font-size: 12px; color: var(--fg2); font-family: var(--mono); }
   .kw { flex: 0 0 52px; text-align: center; padding: 1px 4px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
   .kw.ev { color: var(--fg2); background: var(--field); }
@@ -125,4 +177,19 @@
   .tag { font-size: 11.5px; color: var(--tagfg); background: var(--tagbg); padding: 1px 8px; border-radius: 9px; }
   .mark { flex: 0 0 170px; text-align: right; font-size: 12px; color: var(--fg2); }
   .mark.late { color: var(--todo); }
+  /* in a pane next to a file: the compact rows of the design, one line each, no big header */
+  @container (max-width: 760px) {
+    header { display: none; }
+    .scroll { padding: 4px 10px 12px; }
+    .gh { padding: 12px 8px 5px; gap: 8px; }
+    .gt { font-size: 12.5px; }
+    .gs { font-size: 11.5px; }
+    .item { min-height: 36px; padding: 4px 8px; gap: 10px; }
+    .time { flex-basis: 38px; font-size: 11.5px; }
+    .kw { flex-basis: 40px; }
+    .main { flex-direction: row; align-items: baseline; gap: 10px; }
+    .ttl { flex: 1 1 auto; min-width: 0; font-size: 13px; }
+    .src { flex: 0 1 auto; max-width: 45%; }
+    .mark, .tag { display: none; }
+  }
 </style>
