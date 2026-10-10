@@ -65,7 +65,7 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
             { item: 'Fullscreen' },
           ],
         },
-        { text: 'Окно', items: [{ item: 'Minimize' }, { item: 'Maximize' }, sep, { item: 'BringAllToFront' }] },
+        { text: 'Окно', items: [it('closeWindow', 'Закрыть окно', 'Shift+CmdOrCtrl+KeyW'), sep, { item: 'Minimize' }, { item: 'Maximize' }, sep, { item: 'BringAllToFront' }] },
       ],
     });
     await menu.setAsAppMenu();

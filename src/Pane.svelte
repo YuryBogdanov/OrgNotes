@@ -23,7 +23,7 @@
   });
   const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : displayName(t.path ?? ''));
   const dirty = (t: Tab) => {
-    if (t.kind === 'untitled') return !!t.text;
+    if (t.kind === 'untitled') return !!t.text?.trim(); // spaces and blank lines are not worth a dot
     const f = store.fileOf(t);
     return !!f && f.text !== f.disk;
   };
@@ -271,7 +271,7 @@
     <div class="unsaved" bind:clientWidth={uw} bind:this={bottom}>
       <span class="odot" aria-hidden="true"></span>
       <span class="us">Не сохранено</span>
-      {#if store.notice}<span class="hint err">{store.notice}</span>{:else if bar.hint}<span class="hint">{HINT}</span>{/if}
+      {#if store.draftNotice}<span class="hint err">{store.draftNotice}</span>{:else if bar.hint}<span class="hint">{HINT}</span>{/if}
       <span class="usr">{#if bar.keys}<span>⌘S</span>{/if}<button bind:offsetWidth={btnW} onclick={() => store.saveAs(tab)}>Сохранить как…</button></span>
     </div>
   {:else}

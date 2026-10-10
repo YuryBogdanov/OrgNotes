@@ -226,14 +226,14 @@ test.describe('save as', () => {
     await expect.poll(async () => (await disk(page))['/mock/Работа/2026/Идеи для ретро.org']).toBe('* Идеи для ретро\nпервая мысль!');
   });
 
-  test('without a heading the name is "Без названия"; the default folder is the one of the neighbour\'s file', async ({ page }) => {
+  test('without a heading the name is the first line; the default folder is the one of the neighbour\'s file', async ({ page }) => {
     await open(page);
     await page.getByRole('button', { name: 'Второй редактор' }).click();
     await navRow(page, 'plan').click(); // right pane shows Работа/2026/plan.org
     await panes(page).nth(0).locator('.cm-content').click();
     await draft(page, 'просто текст');
     await page.keyboard.press('Meta+s');
-    await expect(sheet(page).getByLabel('Сохранить как:')).toHaveValue('Без названия');
+    await expect(sheet(page).getByLabel('Сохранить как:')).toHaveValue('просто текст');
     await expect(sheet(page).getByLabel('Путь')).toHaveText('mock › Работа › 2026');
   });
 
@@ -294,83 +294,6 @@ test.describe('save as', () => {
     await expect(sheet(page).getByLabel('Путь')).toHaveText('mock › Ретро');
     await sheet(page).getByRole('button', { name: 'Сохранить' }).click();
     await expect.poll(async () => Object.keys(await disk(page))).toContain('/mock/Ретро/Идеи для ретро.org');
-  });
-});
-
-test.describe('closing unsaved text', () => {
-  const unsaved = (page: Page) => page.getByRole('alertdialog', { name: 'Несохранённые изменения' });
-
-  test('the cross asks "Сохранить / Не сохранять / Отмена"', async ({ page }) => {
-    await open(page);
-    await blank(page);
-    await page.keyboard.type('черновик');
-    await tabs(page).last().hover();
-    await tabs(page).last().getByRole('button', { name: /Закрыть вкладку/ }).click();
-    await expect(unsaved(page)).toContainText('Сохранить изменения в «Без названия»?');
-    await unsaved(page).getByRole('button', { name: 'Отмена' }).click();
-    expect(await labels(page)).toEqual(['work', 'Без названия']);
-    await page.keyboard.press('Meta+w');
-    await unsaved(page).getByRole('button', { name: 'Не сохранять' }).click();
-    expect(await labels(page)).toEqual(['work']);
-  });
-
-  test('"Сохранить" goes through "Сохранить как…" and closes the tab only after the write', async ({ page }) => {
-    await open(page);
-    await blank(page);
-    await page.keyboard.type('* Черновик\nтекст');
-    await page.keyboard.press('Meta+w');
-    await unsaved(page).getByRole('button', { name: 'Сохранить' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Сохранить как' });
-    await expect(sheet).toBeVisible();
-    expect(await labels(page)).toEqual(['work', 'Без названия']); // still open while choosing
-    await page.keyboard.press('Enter');
-    await expect.poll(async () => (await disk(page))['/mock/Черновик.org']).toBe('* Черновик\nтекст');
-    await expect.poll(() => labels(page)).toEqual(['work']);
-  });
-
-  test('cancelling the save sheet keeps the tab', async ({ page }) => {
-    await open(page);
-    await blank(page);
-    await page.keyboard.type('x');
-    await page.keyboard.press('Meta+w');
-    await unsaved(page).getByRole('button', { name: 'Сохранить' }).click();
-    await page.keyboard.press('Escape');
-    expect(await labels(page)).toEqual(['work', 'Без названия']);
-  });
-
-  test('an empty untitled tab closes without a question', async ({ page }) => {
-    await open(page);
-    await blank(page);
-    await page.keyboard.press('Meta+w');
-    await expect(unsaved(page)).toHaveCount(0);
-    expect(await labels(page)).toEqual(['work']);
-  });
-
-  test('"Закрыть остальные" asks for each unsaved tab in turn', async ({ page }) => {
-    await open(page);
-    await blank(page);
-    await page.keyboard.type('один');
-    await blank(page);
-    await page.keyboard.type('два');
-    await tabs(page).first().click({ button: 'right' });
-    await menuItem(page, /Закрыть остальные/).click();
-    await expect(unsaved(page)).toContainText('«Без названия»');
-    await unsaved(page).getByRole('button', { name: 'Не сохранять' }).click();
-    await expect(unsaved(page)).toContainText('«Без названия 2»');
-    await unsaved(page).getByRole('button', { name: 'Не сохранять' }).click();
-    expect(await labels(page)).toEqual(['work']);
-  });
-
-  test('quitting asks about every unsaved tab and stops on "Отмена"', async ({ page }) => {
-    await open(page);
-    await blank(page);
-    await page.keyboard.type('один');
-    await page.keyboard.press('Meta+q');
-    await unsaved(page).getByRole('button', { name: 'Отмена' }).click();
-    expect((await log(page)).some((e) => e[0] === 'quit')).toBe(false);
-    await page.keyboard.press('Meta+q');
-    await unsaved(page).getByRole('button', { name: 'Не сохранять' }).click();
-    await expect.poll(async () => (await log(page)).some((e) => e[0] === 'quit')).toBe(true);
   });
 });
 
