@@ -46,9 +46,11 @@ button { cursor: default; }
 
 /* status colours: each theme gets its own value through --tl / --td (see colors.ts) */
 .tone { color: var(--tl); }
+.tone-bg { background: var(--tl); }
 .tone-chip { color: var(--tl); background: color-mix(in srgb, var(--tl) 14%, transparent); }
 @media (prefers-color-scheme: dark) {
   .tone { color: var(--td); }
+  .tone-bg { background: var(--td); }
   .tone-chip { color: var(--td); background: color-mix(in srgb, var(--td) 15%, transparent); }
 }
 

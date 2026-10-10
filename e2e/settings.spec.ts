@@ -49,24 +49,42 @@ test.describe('table', () => {
       const first = rows(page).first();
       const heads = header.locator('[role=columnheader]');
       // header cell and the first row's cell share the same left edge: ЦВЕТ, НАЗВАНИЕ, В ФАЙЛЕ, КЛАВИША
-      expect(await left(heads.nth(0))).toBe(await left(first.locator('.swatch')));
+      expect(await left(heads.nth(0))).toBe(await left(first.locator('.swatch .dot')));
       expect(await left(heads.nth(1))).toBe(await left(first.locator('.name')));
       expect(await left(heads.nth(2))).toBe(await left(first.locator('input.kw')));
       expect(await left(heads.nth(3))).toBe(await left(first.locator('.keychip')));
     }
   });
 
-  test('the name is derived from the keyword, read-only, upper case, and Tab skips it', async ({ page }) => {
+  test('the name is a read-only capsule in the status colour, upper case, and Tab skips it', async ({ page }) => {
     await openSettings(page);
     const r = rows(page).nth(2); // IN-PROGRESS
     await expect(r.locator('.name')).toHaveText('IN PROGRESS');
     expect(await r.locator('.name').evaluate((el) => getComputedStyle(el).textTransform)).toBe('uppercase');
+    // a capsule: tinted background, rounded, coloured text; the same look as the chip in the list of workflows
+    const cap = await r.locator('.name').evaluate((el) => {
+      const c = getComputedStyle(el);
+      return { bg: c.backgroundColor, radius: parseFloat(c.borderTopLeftRadius), color: c.color };
+    });
+    expect(cap.bg).not.toBe('rgba(0, 0, 0, 0)');
+    expect(cap.radius).toBeGreaterThanOrEqual(4);
+    expect(cap.color).toBe('rgb(10, 88, 194)'); // blue, light theme
+    const listChip = page.locator('aside .chip', { hasText: 'IN PROGRESS' }).first();
+    expect(await listChip.evaluate((el) => getComputedStyle(el).color)).toBe(cap.color);
     expect(await r.locator('.name').evaluate((el) => el.tagName)).toBe('SPAN');
     // focus the keyword field of the row above, Tab goes to its delete button / next focusable, never to a name
     await rows(page).nth(1).locator('input.kw').focus();
     await page.keyboard.press('Tab');
     const active = await page.evaluate(() => (document.activeElement as HTMLElement).className + '|' + document.activeElement!.tagName);
     expect(active).not.toContain('name');
+  });
+
+  test('the colour column shows a chevron next to the swatch, so it is clear that it can be changed', async ({ page }) => {
+    await openSettings(page);
+    for (const r of await rows(page).all()) {
+      await expect(r.locator('.swatch .dot')).toBeVisible();
+      await expect(r.locator('.swatch .chev')).toBeVisible();
+    }
   });
 
   test('the key is a read-only chip: first letter, the next free one on a clash', async ({ page }) => {
@@ -117,7 +135,7 @@ test.describe('new state', () => {
     await expect(created.locator('input.kw')).toHaveAttribute('placeholder', 'например, REVIEW');
     await expect(created.locator('.name')).toHaveText('—');
     await expect(created.locator('.keychip')).toHaveCount(0);
-    expect(await created.locator('.swatch').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(95, 95, 102)'); // gray
+    expect(await created.locator('.swatch .dot').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(95, 95, 102)'); // gray
     await expect(page.getByText('Введите ключевое слово и нажмите ↩ · ⎋ — отмена')).toBeVisible();
     // it sits in the open block, before the separator
     const order = await page.locator('.srow, .sep').evaluateAll((els) => els.map((e) => (e.classList.contains('sep') ? '|' : (e.querySelector('input.kw') as HTMLInputElement).value || '·')));
@@ -366,6 +384,19 @@ test.describe('colour picker', () => {
     await expect.poll(async () => (await config(page)).workflows[0].states[2].color).toBe('red');
     await page.keyboard.press('Escape');
     await expect(pop(page)).toHaveCount(0);
+  });
+
+  test('the system colour picker is anchored to the "Другой цвет…" button, not to the popover title', async ({ page }) => {
+    await openSettings(page);
+    await rows(page).nth(2).locator('.swatch').click();
+    const btn = (await pop(page).getByRole('button', { name: 'Другой цвет…' }).boundingBox())!;
+    const input = (await pop(page).locator('input[type=color]').boundingBox())!;
+    expect(Math.abs(input.x - btn.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(input.y - btn.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(input.width - btn.width)).toBeLessThanOrEqual(1);
+    expect(Math.abs(input.height - btn.height)).toBeLessThanOrEqual(1);
+    const title = (await pop(page).locator('.hd').boundingBox())!;
+    expect(input.y).toBeGreaterThan(title.y + title.height); // well below the title
   });
 
   test('"Другой цвет…" stores a hex; the dark variant keeps the contrast; it appears as a ninth swatch', async ({ page }) => {

@@ -330,9 +330,12 @@
                   <span class="grip" draggable="true" role="img" aria-label="Перетащить строку" ondragstart={(e) => startRowDrag(e, s)} ondragend={() => (dragId = overId = null)}>⋮⋮</span>
                   <span class="colorcell">
                     <button class="swatch" aria-label="Цвет: {s.color ? colorName(s.color) : 'авто'}. Изменить" aria-haspopup="dialog" aria-expanded={picker?.id === s.id}
-                      style="background:{toneOfState(s).light}" onclick={(e) => togglePicker(e, s)}></button>
+                      onclick={(e) => togglePicker(e, s)}>
+                      <span class="dot tone-bg" style={chipStyle(s)}></span>
+                      <svg class="chev" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5l4 4 4-4" /></svg>
+                    </button>
                   </span>
-                  <span class="name" role="cell" class:empty={!kw}>{kw ? displayName(kw) : '—'}</span>
+                  <span class="name" role="cell" class:chip={!!kw} class:tone-chip={!!kw} class:empty={!kw} style={kw ? chipStyle(s) : ''}>{kw ? displayName(kw) : '—'}</span>
                   <span class="filecell">
                     <input class="kw" class:red={!!errors[s.id]} role="cell" aria-label="Ключевое слово в файле" aria-invalid={!!errors[s.id]}
                       placeholder="например, REVIEW" maxlength={MAX_KEYWORD + 8} spellcheck="false" autocomplete="off"
@@ -493,10 +496,14 @@
   .srow.over, .sep.over, .addrow.over { box-shadow: inset 0 2px 0 var(--acc); }
   .grip { color: var(--fg3); cursor: grab; letter-spacing: -2px; -webkit-user-select: none; user-select: none; }
   .colorcell { display: flex; align-items: center; }
-  .swatch { width: 18px; height: 18px; border-radius: 9px; border: 0; padding: 0; box-shadow: 0 0 0 1px color-mix(in srgb, var(--fg) 18%, transparent); }
-  .swatch:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
-  .name { font-family: var(--mono); font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .name.empty { color: var(--fg3); }
+  .swatch { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 5px 0 0; border: 0; border-radius: 7px; background: transparent; color: var(--fg3); }
+  .swatch:hover { background: var(--field); }
+  .swatch:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+  .dot { width: 16px; height: 16px; border-radius: 8px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--fg) 18%, transparent); }
+  /* the name as a capsule, like the chips in the list of workflows */
+  .name { justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+  .name.chip { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; padding: 3px 9px; border-radius: 6px; }
+  .name.empty { color: var(--fg3); font-family: var(--mono); font-size: 12.5px; }
   .kw { width: 100%; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-family: var(--mono); font-size: 12.5px; -webkit-user-select: text; user-select: text; }
   .kw:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 25%, transparent); }
   .kw.red { border-color: var(--todo); box-shadow: 0 0 0 3px color-mix(in srgb, var(--todo) 20%, transparent); }

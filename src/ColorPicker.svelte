@@ -16,7 +16,8 @@
   const isCustom = $derived(/^#/.test(value));
   const tone = $derived(toneOf(value) ?? fallback);
   const label = $derived(value ? colorName(value) : 'Авто');
-  const swatches = $derived(isCustom ? [...PALETTE.map((p) => ({ id: p.id, name: p.name, light: p.light })), { id: value, name: 'Другой цвет', light: value }] : PALETTE.map((p) => ({ id: p.id, name: p.name, light: p.light })));
+  const named = PALETTE.map((p) => ({ id: p.id, name: p.name, style: toneStyle({ light: p.light, dark: p.dark }) }));
+  const swatches = $derived(isCustom ? [...named, { id: value, name: 'Другой цвет', style: toneStyle(toneOf(value)!) }] : named);
 
   let el: HTMLDivElement | undefined = $state();
   let colorInput: HTMLInputElement | undefined = $state();
@@ -71,7 +72,7 @@
   <div class="grid" role="radiogroup" aria-label="Цвета">
     {#each swatches as s, i (s.id)}
       <button class="cell" data-sw role="radio" aria-checked={s.id === value} aria-label={s.name} tabindex={i === focused ? 0 : -1} onclick={() => onpick(s.id)}>
-        <span class="dot" class:sel={s.id === value} style="background:{s.light}">
+        <span class="dot tone-bg" class:sel={s.id === value} style={s.style}>
           {#if s.id === value}<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg>{/if}
         </span>
         <span class="nm">{s.name}</span>
@@ -87,9 +88,12 @@
     </div>
   </div>
 
-  <button class="other" onclick={() => colorInput?.click()}>Другой цвет…</button>
-  <input bind:this={colorInput} class="hidden" type="color" value={isCustom ? value : tone.light} aria-label="Другой цвет"
-    oninput={(e) => onpick(e.currentTarget.value.toLowerCase())} />
+  <!-- the colour input lies exactly over the button, so the system picker points at the button, not at the popover's corner -->
+  <div class="otherwrap">
+    <button class="other" onclick={() => (colorInput?.showPicker ? colorInput.showPicker() : colorInput?.click())}>Другой цвет…</button>
+    <input bind:this={colorInput} class="hidden" type="color" value={isCustom ? value : tone.light} aria-label="Другой цвет" tabindex="-1"
+      oninput={(e) => onpick(e.currentTarget.value.toLowerCase())} />
+  </div>
   <div class="note">Цвета подбираются отдельно для светлой и тёмной темы</div>
 </div>
 
@@ -116,7 +120,8 @@
   .plate.light { background: #ffffff; }
   .plate.dark { background: #1e1e22; }
   .chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 5px; letter-spacing: 0.02em; }
-  .other { height: 28px; border: 0; border-radius: 6px; background: var(--field); }
-  .hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .otherwrap { position: relative; }
+  .other { width: 100%; height: 28px; border: 0; border-radius: 6px; background: var(--field); }
+  .hidden { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; border: 0; padding: 0; }
   .note { font-size: 11.5px; color: var(--fg2); line-height: 1.4; }
 </style>
