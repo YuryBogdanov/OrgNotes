@@ -23,6 +23,7 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
         {
           text: 'Файл',
           items: [
+            it('newTab', 'Новая вкладка', 'CmdOrCtrl+KeyT'),
             it('newFile', 'Новый файл', 'CmdOrCtrl+N'),
             it('openFolder', 'Открыть папку…', 'CmdOrCtrl+O'),
             sep,
@@ -49,6 +50,7 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
             sep,
             it('swap', 'Поменять панели местами', 'Shift+Control+CmdOrCtrl+ArrowRight', false),
             it('keepOne', 'Оставить одну панель', 'Shift+CmdOrCtrl+Backslash', false),
+            it('closePane', 'Закрыть панель', 'Control+CmdOrCtrl+KeyW', false),
             sep,
             it('paneLeft', 'Перейти в левую панель', 'Alt+CmdOrCtrl+ArrowLeft', false),
             it('paneRight', 'Перейти в правую панель', 'Alt+CmdOrCtrl+ArrowRight', false),

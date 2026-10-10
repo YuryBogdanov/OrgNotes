@@ -3,6 +3,7 @@
   import { backlinks, linkLabel, linksOf, resolveLink } from './links';
   import { dayDiff, firstDone, fmtShort, sequenceFor, startOf, subtreeProgress, toJs, toneFor } from './org';
   import { toneStyle } from './colors';
+  import { displayName } from './names';
 
   const f = $derived(store.file);
   const h = $derived(f && store.selected >= 0 ? f.headings[store.selected] : undefined);
@@ -44,7 +45,8 @@
       <div class="name">{h.title}</div>
       <label class="row">
         <span class="k">Состояние</span>
-        <select class="pick {h.keyword ? 'tone' : ''}" style="{toneVars};font-weight:600" value={h.keyword ?? ''} onchange={(e) => store.setKeyword(e.currentTarget.value || null)}>
+        <span class="plate">
+          <select class="pick {h.keyword ? 'tone' : ''}" style="{toneVars};font-weight:600" value={h.keyword ?? ''} onchange={(e) => store.setKeyword(e.currentTarget.value || null)}>
           <option value="">—</option>
           {#each groups as g}
             {#if g.name && groups.length > 1}
@@ -54,18 +56,26 @@
             {/if}
           {/each}
         </select>
+          <svg class="chev" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" /></svg>
+        </span>
       </label>
       <label class="row">
         <span class="k">Приоритет</span>
-        <select class="pick" style="color:{h.priority ? 'var(--wait)' : 'inherit'};font-weight:600" value={h.priority ?? ''} onchange={(e) => store.setPriority(e.currentTarget.value || null)}>
+        <span class="plate">
+          <select class="pick" style="color:{h.priority ? 'var(--wait)' : 'inherit'};font-weight:600" value={h.priority ?? ''} onchange={(e) => store.setPriority(e.currentTarget.value || null)}>
           <option value="">—</option>
           {#each ['A', 'B', 'C'] as p}<option value={p}>{p}</option>{/each}
         </select>
+          <svg class="chev" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" /></svg>
+        </span>
       </label>
       {#if f.wf.source === 'project' && seq && groups.length > 1}
         <div class="hint right">workflow: {seq.name}</div>
       {/if}
-      {#if seq && firstDone(seq)}
+      <!-- no status: nothing to mark done, the heading can become a task; final: back to work; else: done -->
+      {#if seq && !h.keyword}
+        <button class="secondary" onclick={() => store.setKeyword(startOf(seq))}>Сделать задачей</button>
+      {:else if seq && firstDone(seq)}
         <button class="primary" onclick={() => store.setKeyword(isDone ? startOf(seq) : firstDone(seq))}>
           {isDone ? 'Вернуть в работу' : 'Выполнено'}
         </button>
@@ -110,7 +120,7 @@
         {#each back as b}
           <button class="link" onclick={() => store.jump(b.file, b.line)}>
             <span class="lic">←</span>
-            <span class="ltx">{b.heading || store.files[b.file].name}<span class="src"> · {store.files[b.file].name.split('/').pop()}</span></span>
+            <span class="ltx">{b.heading || displayName(store.files[b.file].name)}<span class="src"> · {displayName(store.files[b.file].name)}</span></span>
           </button>
         {/each}
       </section>
@@ -145,7 +155,13 @@
   .k { color: var(--fg2); font-size: 12px; }
   .val { height: 24px; display: flex; align-items: center; padding: 0 10px; background: var(--field); border-radius: 6px; font-size: 12px; }
   .mono { font-family: var(--mono); }
-  .pick { height: 24px; padding: 0 6px; border: 0; border-radius: 6px; background: var(--field); font-size: 12px; }
+  /* a select drawn as the design's plate: grey, 6 pt corners, 24 pt high, a chevron down at the right */
+  .plate { position: relative; display: inline-flex; align-items: center; }
+  .pick { -webkit-appearance: none; appearance: none; height: 24px; min-width: 56px; padding: 0 24px 0 10px; border: 0; border-radius: 6px; background: var(--field); font-size: 12px; outline: none; }
+  .pick:focus-visible { box-shadow: 0 0 0 2px var(--acc); }
+  .chev { position: absolute; right: 8px; color: var(--fg2); pointer-events: none; }
+  .secondary { height: 28px; border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--fg); font-size: 12.5px; font-weight: 600; }
+  .secondary:active { filter: brightness(0.95); }
   .primary { height: 28px; border: 0; border-radius: 6px; background: var(--acc); color: var(--onacc); font-size: 12.5px; font-weight: 600; }
   .primary:active { filter: brightness(0.9); }
   .hint { font-size: 11.5px; color: var(--fg2); }

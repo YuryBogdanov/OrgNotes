@@ -8,6 +8,7 @@
   import UnsavedDialog from './UnsavedDialog.svelte';
   import { installMenu, type AppMenu } from './menu';
   import { MIN_PANE, secondKind } from './layout';
+  import { displayPath } from './names';
   import Splitter from './Splitter.svelte';
   import Dialogs from './Dialogs.svelte';
   import Settings from './Settings.svelte';
@@ -17,7 +18,7 @@
   const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
   const file = $derived(store.file);
   // toolbar path: the folders and the file of the active tab (the heading crumbs live in the pane)
-  const crumbs = $derived(file ? file.name.split('/') : []);
+  const crumbs = $derived(file ? displayPath(file.name) : []);
   const pressed = $derived(secondKind(store.layout));
 
   // ---- room for two panes: hide the inspector first, then the navigator, then merge the panes ----------
@@ -71,6 +72,8 @@
       store.showNav = true;
       store.creating = { dir, kind: 'file' };
     },
+    newTab: () => store.newUntitled(store.layout.active),
+    closePane: () => store.closePane(store.layout.active),
     openFolder: () => store.chooseFolder(),
     closeTab: () => store.closeActiveTab(),
     closeOthers: () => {
@@ -100,7 +103,7 @@
     const two = store.layout.panes.length > 1;
     if (!menu) return;
     menu.setEnabled('splitRight', !two);
-    for (const id of ['swap', 'keepOne', 'paneLeft', 'paneRight']) menu.setEnabled(id, two);
+    for (const id of ['swap', 'keepOne', 'closePane', 'paneLeft', 'paneRight']) menu.setEnabled(id, two);
     const pi = store.layout.active;
     const t = store.tab;
     menu.setEnabled('moveRight', two && pi === 0);
@@ -121,13 +124,14 @@
     if (e.altKey && k === 'ArrowLeft') return 'paneLeft';
     if (e.altKey && k === 'ArrowRight') return 'paneRight';
     if (e.altKey && e.code === 'KeyW') return 'closeOthers';
+    if (e.ctrlKey && e.code === 'KeyW') return 'closePane';
     if (e.altKey && e.code === 'KeyC') return 'copyPath';
     if (e.shiftKey && e.code === 'KeyJ') return 'revealInNav';
     if (e.code === 'Backslash' || k === '\\') return e.shiftKey ? 'keepOne' : e.altKey ? null : 'splitRight';
     if (e.ctrlKey || e.shiftKey) return null;
     if (k === '0') return e.altKey ? 'insp' : 'nav';
     if (e.altKey) return null;
-    return ({ '[': 'back', n: 'newFile', ',': 'settings', o: 'openFolder', w: 'closeTab', s: 'save', q: 'quit', '1': 'notes', '2': 'agenda' } as Record<string, string>)[k] ?? null;
+    return ({ '[': 'back', n: 'newFile', ',': 'settings', o: 'openFolder', t: 'newTab', w: 'closeTab', s: 'save', q: 'quit', '1': 'notes', '2': 'agenda' } as Record<string, string>)[k] ?? null;
   }
   const today = new Date().toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 

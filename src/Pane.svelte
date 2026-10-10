@@ -6,6 +6,7 @@
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import { parseHeadings } from './org';
   import { targetOf, type Tab } from './layout';
+  import { displayName, displayPath } from './names';
 
   // One editor pane: an accent bar when active, its own tabs, and the content of the active tab.
   let { pi }: { pi: number } = $props();
@@ -20,7 +21,7 @@
     const h = file.headings[headingAt(file.headings, tab.cursor.line)];
     return h ? [...h.path, h.title] : [];
   });
-  const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : (t.path ?? '').split('/').pop()!);
+  const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : displayName(t.path ?? ''));
   const dirty = (t: Tab) => {
     if (t.kind === 'untitled') return !!t.text;
     const f = store.fileOf(t);
@@ -62,12 +63,52 @@
   }
   const idx = (t: Tab) => pane.tabs.findIndex((x) => x.id === t.id);
 
-  // the active tab is always visible when the row scrolls
+  // ---- the tab row: scrolls when the tabs do not fit at their minimum width ---------------------------------
   let strip: HTMLDivElement | undefined = $state();
+  let over = $state(false); // more tabs than room: the row scrolls and "⌵" lists them all
+  let fadeL = $state(false);
+  let fadeR = $state(false);
+  function edges() {
+    if (!strip) return;
+    const max = strip.scrollWidth - strip.clientWidth;
+    over = max > 1;
+    fadeL = strip.scrollLeft > 1;
+    fadeR = strip.scrollLeft < max - 1;
+  }
+  $effect(() => {
+    if (!strip) return;
+    const el = strip;
+    const ro = new ResizeObserver(edges);
+    ro.observe(el);
+    // a mouse wheel scrolls the row sideways too (a trackpad already does)
+    const wheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || el.scrollWidth <= el.clientWidth) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener('wheel', wheel, { passive: false });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener('wheel', wheel);
+    };
+  });
+  // the active tab is always scrolled into view: a new one, one picked from the list or with the keyboard
   $effect(() => {
     const id = tab?.id;
+    void pane.tabs.length;
     if (!id || !strip) return;
-    queueMicrotask(() => strip?.querySelector<HTMLElement>(`[data-tab="${id}"]`)?.scrollIntoView({ inline: 'nearest', block: 'nearest' }));
+    queueMicrotask(() => {
+      const el = strip?.querySelector<HTMLElement>(`[data-tab="${id}"]`);
+      if (strip && el) {
+        // clear of the faded edges, not just inside the row
+        const FADE = 24;
+        const left = el.offsetLeft; // the row is the tabs' offset parent
+        const right = left + el.offsetWidth;
+        if (left < strip.scrollLeft + FADE) strip.scrollLeft = left - FADE;
+        else if (right > strip.scrollLeft + strip.clientWidth - FADE) strip.scrollLeft = right - strip.clientWidth + FADE;
+      }
+      edges();
+    });
   });
   // a double click on the free part of the row (not on a tab) opens an untitled tab
   function stripDblClick(e: MouseEvent) {
@@ -75,19 +116,94 @@
     if (el.closest('.tab') || el.closest('button')) return;
     store.newUntitled(pi);
   }
+  function listMenu(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const items: MenuItem[] = pane.tabs.map((t, ti) => ({
+      label: t.kind === 'file' ? displayName(t.path ?? '') : label(t),
+      icon: t.kind, italic: t.kind === 'untitled', dot: dirty(t), checked: ti === pane.active,
+      action: () => store.activateTab(pi, ti),
+    }));
+    menu = { x: r.right - 240, y: r.bottom + 2, items };
+  }
+
+  // ---- the full path on disk after a second over a file tab ------------------------------------------------------
+  let tip = $state<{ text: string; x: number; y: number } | null>(null);
+  let tipTimer: ReturnType<typeof setTimeout> | undefined;
+  function tipStart(e: MouseEvent, t: Tab) {
+    tipEnd();
+    if (t.kind !== 'file' || !t.path) return;
+    const el = e.currentTarget as HTMLElement;
+    tipTimer = setTimeout(() => {
+      const r = el.getBoundingClientRect();
+      tip = { text: t.path!, x: r.left, y: r.bottom + 4 };
+    }, 1000);
+  }
+  function tipEnd() {
+    clearTimeout(tipTimer);
+    tip = null;
+  }
+
+  // ---- bottom bars: what goes when the pane is narrow -----------------------------------------------------------
+  // Measured, not ellipsised: a hint or a label leaves whole, the cursor position and the save state never do.
+  let font = $state('');
+  const cv = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+  const tw = (str: string) => {
+    if (!cv || !font) return 0;
+    cv.font = font;
+    return Math.ceil(cv.measureText(str).width);
+  };
+  const GAP = 16; // .status gap
+  let sw = $state(0); // the status bar's width
+  const cursorText = $derived(tab ? `Стр. ${tab.cursor.line + 1}, кол. ${tab.cursor.col}` : '');
+  const savedText = $derived(store.notice || (store.saveState === 'saving' ? 'Сохранение…' : store.saveState === 'saved' ? 'Сохранено' : 'Только в памяти (браузер)'));
+  const status = $derived.by(() => {
+    const parts = file ? displayPath(file.name) : [];
+    const name = parts[parts.length - 1] ?? '';
+    const fixed = 28 + tw(cursorText) + tw(savedText) + 2 * GAP; // padding, cursor, saved, the gaps around the path
+    const room = (org: boolean, utf: boolean) => sw - fixed - (org ? tw('Org') + GAP : 0) - (utf ? tw('UTF-8') + GAP : 0);
+    // first the folders of the path go, from the start; then UTF-8, then Org
+    const org = !font || tw(name) <= room(true, false);
+    const utf = !font || tw(name) <= room(true, true);
+    const r = room(org, utf);
+    let path = name;
+    for (let k = 0; k < parts.length - 1; k++) {
+      const tail = parts.slice(k).join('/');
+      const t = k ? '…/' + tail : tail;
+      if (!font || tw(t) <= r) {
+        path = t;
+        break;
+      }
+    }
+    return { org, utf, path };
+  });
+  let uw = $state(0); // the untitled bar's width
+  let btnW = $state(0);
+  const HINT = 'Файл появится на диске после «Сохранить как…»';
+  const bar = $derived.by(() => {
+    // dot 7 + gap + "Не сохранено" + gap + the button, inside 12 px padding; the hint goes first, then ⌘S
+    const fixed = 24 + 7 + 10 + tw('Не сохранено') + 10 + btnW;
+    const keys = tw('⌘S') + 8;
+    return { keys: !font || fixed + keys <= uw, hint: !font || fixed + keys + 10 + tw(HINT) + 10 <= uw };
+  });
+  let bottom: HTMLElement | undefined = $state();
+  $effect(() => {
+    if (bottom && !font) font = getComputedStyle(bottom).font;
+  });
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <section class="pane" class:active aria-label={active ? 'Активная панель' : 'Панель'} data-pane={pi}
   onmousedowncapture={() => store.setActivePane(pi)} onfocusin={() => store.setActivePane(pi)}>
   <div class="accent" aria-hidden="true"></div>
+  <div class="bar">
   <!-- svelte-ignore a11y_interactive_supports_focus -->
-  <div class="strip" role="tablist" aria-label="Вкладки" bind:this={strip} ondblclick={stripDblClick}>
+  <div class="strip" class:fl={fadeL} class:fr={fadeR} role="tablist" aria-label="Вкладки" bind:this={strip} ondblclick={stripDblClick} onscroll={() => { edges(); tipEnd(); }}>
     {#each pane.tabs as t, ti (t.id)}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="tab" class:on={ti === pane.active} class:dirty={dirty(t)} class:untitled={t.kind === 'untitled'} class:menu={menuTab === t.id}
         role="tab" aria-selected={ti === pane.active} tabindex={ti === pane.active ? 0 : -1} data-tab={t.id}
-        title={t.path ?? label(t)} onclick={(e) => { if (e.ctrlKey) return tabMenu(e, t, ti); store.activateTab(pi, ti); }}
+        onmouseenter={(e) => tipStart(e, t)} onmouseleave={tipEnd} onmousedown={tipEnd}
+        onclick={(e) => { if (e.ctrlKey) return tabMenu(e, t, ti); store.activateTab(pi, ti); }}
         oncontextmenu={(e) => tabMenu(e, t, ti)}
         onauxclick={(e) => { if (e.button === 1) { e.preventDefault(); store.closeTab(pi, ti); } }}
         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); store.activateTab(pi, ti); } }}>
@@ -109,7 +225,12 @@
       </div>
     {/each}
     <div class="fill"></div>
-    {#if two}<button class="closepane" aria-label="Закрыть панель" title="Закрыть панель" onclick={() => store.closePane(pi)}>×</button>{/if}
+  </div>
+  {#if over}
+    <button class="more" aria-label="Все вкладки" aria-haspopup="menu" title="Все вкладки" onclick={listMenu}>
+      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" /></svg>
+    </button>
+  {/if}
   </div>
 
   {#if tab?.kind === 'agenda'}
@@ -130,10 +251,10 @@
         Открыто из агенды: <span class="ct">{tab.fromAgenda.title}</span>
       </div>
     {/if}
-    <div class="status">
-      <span>Стр. {tab.cursor.line + 1}, кол. {tab.cursor.col}</span><span>Org</span><span>UTF-8</span>
-      <span class="grow">{store.notice || (store.saveState === 'saving' ? 'Сохранение…' : store.saveState === 'saved' ? 'Сохранено' : 'Только в памяти (браузер)')}</span>
-      <span>{file.name}</span>
+    <div class="status" bind:clientWidth={sw} bind:this={bottom}>
+      <span class="keep">{cursorText}</span>{#if status.org}<span class="keep">Org</span>{/if}{#if status.utf}<span class="keep">UTF-8</span>{/if}
+      <span class="grow keep">{savedText}</span>
+      <span class="where" title={file.path}>{status.path}</span>
     </div>
   {:else if tab?.kind === 'untitled'}
     {#if draftCrumbs.length}
@@ -147,11 +268,11 @@
       <Editor text={tab.text ?? ''} fileKey={tab.id} wf={store.untitledWf} reveal={tab.reveal} initial={tab.cursor} hint="Начните писать…"
         onchange={(t) => (tab.text = t)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>
-    <div class="unsaved">
+    <div class="unsaved" bind:clientWidth={uw} bind:this={bottom}>
       <span class="odot" aria-hidden="true"></span>
       <span class="us">Не сохранено</span>
-      <span class="hint" class:err={!!store.notice}>{store.notice || 'Файл появится на диске после «Сохранить как…»'}</span>
-      <span class="usr"><span>⌘S</span><button onclick={() => store.saveAs(tab)}>Сохранить как…</button></span>
+      {#if store.notice}<span class="hint err">{store.notice}</span>{:else if bar.hint}<span class="hint">{HINT}</span>{/if}
+      <span class="usr">{#if bar.keys}<span>⌘S</span>{/if}<button bind:offsetWidth={btnW} onclick={() => store.saveAs(tab)}>Сохранить как…</button></span>
     </div>
   {:else}
     <div class="empty">
@@ -161,6 +282,9 @@
   {/if}
 </section>
 
+{#if tip}
+  <div class="tip" role="tooltip" style="left:{tip.x}px;top:{tip.y}px">{tip.text}</div>
+{/if}
 {#if menu}
   <ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => { menu = null; menuTab = null; }} />
 {/if}
@@ -169,11 +293,25 @@
   .pane { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; background: var(--bg); }
   .accent { flex: 0 0 2px; background: transparent; }
   .pane.active .accent { background: var(--acc); }
-  .strip { flex: 0 0 34px; display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; background: var(--side); border-bottom: 1px solid var(--line); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  /* the line under the row is a shadow, so the active tab (drawn above it) joins the editor */
+  .bar { flex: 0 0 34px; display: flex; align-items: stretch; background: var(--side); box-shadow: inset 0 -1px 0 var(--line); }
+  .strip {
+    position: relative;
+    flex: 1 1 auto; min-width: 0; display: flex; align-items: flex-end; gap: 2px; padding: 0 8px;
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+    --fl: 0px; --fr: 0px;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fl), #000 calc(100% - var(--fr)), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 var(--fl), #000 calc(100% - var(--fr)), transparent 100%);
+  }
+  .strip.fl { --fl: 24px; }
+  .strip.fr { --fr: 24px; }
+  .more { align-self: center; flex: 0 0 22px; height: 22px; margin: 0 6px 0 2px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); display: flex; align-items: center; justify-content: center; }
+  .more:hover { background: var(--field); color: var(--fg); }
+  .tip { position: fixed; z-index: 95; max-width: 520px; padding: 3px 7px; border-radius: 5px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font-size: 11.5px; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .strip::-webkit-scrollbar { display: none; }
   .tab {
-    position: relative; flex: 0 1 auto; min-width: 100px; max-width: 240px; height: 30px; display: flex; align-items: center; gap: 7px;
-    padding: 0 6px 0 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 7px 7px 0 0; margin-bottom: -1px;
+    position: relative; flex: 0 1 auto; min-width: 110px; max-width: 240px; height: 30px; display: flex; align-items: center; gap: 7px;
+    padding: 0 6px 0 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 7px 7px 0 0;
     font-size: 12.5px; color: var(--fg2); cursor: default;
   }
   .tab:hover:not(.on), .tab.menu:not(.on) { background: var(--field); color: var(--fg); }
@@ -195,8 +333,6 @@
   .tab:hover .dot { opacity: 0; }
   .x:hover { background: rgba(128, 128, 128, 0.28); }
   .fill { flex: 1 1 auto; align-self: stretch; min-width: 12px; }
-  .closepane { align-self: center; flex: 0 0 24px; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: var(--fg3); font-size: 16px; line-height: 1; padding: 0; margin-bottom: 3px; }
-  .closepane:hover { background: var(--field); color: var(--fg); }
   .crumbs { flex: 0 0 24px; display: flex; align-items: center; gap: 6px; padding: 0 12px; font-size: 11.5px; color: var(--fg2); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
   .crumbs .sep { color: var(--fg3); }
   .crumbs .last { color: var(--fg); }
@@ -205,7 +341,9 @@
   .caption { flex: 0 0 28px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--side); border-top: 1px solid var(--line); font-size: 11.5px; color: var(--fg2); }
   .caption .ct { color: var(--fg); }
   .status { flex: 0 0 24px; display: flex; align-items: center; gap: 16px; padding: 0 14px; background: var(--side); border-top: 1px solid var(--line); font-size: 11.5px; color: var(--fg2); white-space: nowrap; overflow: hidden; }
+  .keep { flex: 0 0 auto; }
   .grow { margin-left: auto; }
+  .where { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .unsaved .hint { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .unsaved .err { color: var(--todo); }
   .unsaved { flex: 0 0 30px; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--side); border-top: 1px solid var(--line); font-size: 11.5px; color: var(--fg2); white-space: nowrap; overflow: hidden; }

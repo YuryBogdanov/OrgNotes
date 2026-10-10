@@ -111,14 +111,34 @@ describe('toolbar buttons', () => {
     expect(kinds(L)[1]).toEqual(['A', 'a.org']);
     expect(secondKind(L)).toBe('file');
   });
-  it('pressing the pressed button closes its tab, and the pane when it is the only tab', () => {
+  it('pressing the pressed "Второй редактор" closes the second pane and keeps its tabs at the end of the first', () => {
     const L = one();
     toggleSecond(L, 'agenda', copy(L));
+    openFile(L, 1, 'b.org');
+    newUntitled(L, 1);
+    expect(secondKind(L)).toBe('file'); // an untitled tab lights it too
     toggleSecond(L, 'file', copy(L));
-    toggleSecond(L, 'file', copy(L)); // closes the file tab, the agenda stays
-    expect(kinds(L)).toEqual([['a.org'], ['A']]);
-    toggleSecond(L, 'agenda', copy(L)); // single tab: the pane closes
+    expect(kinds(L)).toEqual([['a.org', 'A', 'b.org', 'Без названия']]);
+    expect(L.active).toBe(0);
+  });
+  it('pressing the pressed "Агенда" closes the agenda tab, and the pane when it is the only tab', () => {
+    const L = one();
+    toggleSecond(L, 'file', copy(L));
+    toggleSecond(L, 'agenda', copy(L));
+    toggleSecond(L, 'agenda', copy(L)); // closes the agenda tab, the file stays
+    expect(kinds(L)).toEqual([['a.org'], ['a.org']]);
+    closeTab(L, 1, 0); // the last tab of the right pane: the pane goes, the left one is active
+    toggleSecond(L, 'agenda', copy(L));
+    toggleSecond(L, 'agenda', copy(L));
     expect(kinds(L)).toEqual([['a.org']]);
+    expect(L.active).toBe(0);
+  });
+  it('closing the last tab of either pane closes that pane; the other one becomes the only and active one', () => {
+    const L = one();
+    toggleSecond(L, 'agenda', copy(L));
+    L.active = 1;
+    closeTab(L, 0, 0);
+    expect(kinds(L)).toEqual([['A']]);
     expect(L.active).toBe(0);
   });
 });

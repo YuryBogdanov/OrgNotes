@@ -335,9 +335,11 @@ mod tests {
         assert_eq!(fs::read_to_string(&p).unwrap(), "* Идеи\n");
         save_new_in(&d, root, "Идеи для ретро", "* другое\n", true).unwrap();
         assert_eq!(fs::read_to_string(&p).unwrap(), "* другое\n");
-        // an extension the user typed is kept
-        let txt = save_new_in(&d, root, "notes.txt", "x", false).unwrap();
-        assert!(txt.ends_with("notes.txt"));
+        // .org is added once, whatever else the name ends with
+        let typed = save_new_in(&d, root, "Привет.org", "x", false).unwrap();
+        assert!(typed.ends_with("/Привет.org"));
+        let dotted = save_new_in(&d, root, "report.v2", "x", false).unwrap();
+        assert!(dotted.ends_with("/report.v2.org"));
         // never outside the notes folder, never over a folder
         let other = tmp("save-new-other");
         assert!(save_new_in(&d, other.to_str().unwrap(), "x", "x", false).is_err());
@@ -576,8 +578,7 @@ fn save_new_in(root: &Path, parent: &str, name: &str, text: &str, overwrite: boo
         return Err("parent is not a folder".into());
     }
     let name = check_name(name)?;
-    let has_ext = Path::new(&name).extension().is_some();
-    let name = if has_ext { name } else { with_org(name) };
+    let name = with_org(name); // "Привет" and "Привет.org" both become "Привет.org"
     let target = parent.join(&name);
     if target.exists() && !overwrite {
         return Err("exists".into());

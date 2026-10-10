@@ -2,6 +2,7 @@
   import { store } from './store.svelte';
   import { dayDiff, fmtDay, fmtLong, occurrences, repeaterLabel, toJs, toneFor, weekdayName } from './org';
   import { toneStyle } from './colors';
+  import { displayName } from './names';
 
   // the pane the agenda lives in: a task opens in the neighbour pane (↩, click) or here (⌥↩)
   let { pane = 0 }: { pane?: number } = $props();
@@ -24,7 +25,7 @@
         if (!isOpen && !isEvent) continue;
         const base = {
           kw: h.keyword, tone: h.keyword ? toneStyle(toneFor(h.keyword, f.wf)) : '', ev: isEvent, pr: h.priority === 'A',
-          title: h.title, src: [f.name.replace(/\.org$/, ''), ...h.path].join(' › '), tags: h.tags.join(' '),
+          title: h.title, src: [displayName(f.name), ...h.path].join(' › '), tags: h.tags.join(' '),
           file: fi, line: h.line,
         };
         const push = (d: Date, time: string, mark: string, order: number) =>
