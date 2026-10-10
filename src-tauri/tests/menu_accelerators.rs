@@ -5,8 +5,14 @@ use muda::accelerator::Accelerator;
 #[test]
 fn every_menu_accelerator_parses() {
     let used = [
+        "Alt+CmdOrCtrl+ArrowLeft",
+        "Alt+CmdOrCtrl+ArrowRight",
         "Alt+CmdOrCtrl+Backslash",
         "Alt+CmdOrCtrl+Digit0",
+        "Alt+CmdOrCtrl+KeyC",
+        "Alt+CmdOrCtrl+W",
+        "Alt+Control+CmdOrCtrl+ArrowLeft",
+        "Alt+Control+CmdOrCtrl+ArrowRight",
         "CmdOrCtrl+1",
         "CmdOrCtrl+2",
         "CmdOrCtrl+Backslash",
@@ -15,10 +21,13 @@ fn every_menu_accelerator_parses() {
         "CmdOrCtrl+Digit0",
         "CmdOrCtrl+N",
         "CmdOrCtrl+O",
+        "CmdOrCtrl+Q",
+        "CmdOrCtrl+S",
         "CmdOrCtrl+W",
         "Control+CmdOrCtrl+ArrowLeft",
         "Control+CmdOrCtrl+ArrowRight",
         "Shift+CmdOrCtrl+Backslash",
+        "Shift+CmdOrCtrl+KeyJ",
         "Shift+Control+CmdOrCtrl+ArrowRight",
     ];
     for a in used {

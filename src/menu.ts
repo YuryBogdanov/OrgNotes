@@ -17,11 +17,28 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
       items: [
         {
           text: 'Org',
-          items: [{ item: { About: null } }, sep, it('settings', 'Настройки…', 'CmdOrCtrl+Comma'), sep, { item: 'Services' }, sep, { item: 'Hide' }, { item: 'HideOthers' }, { item: 'ShowAll' }, sep, { item: 'Quit' }],
+          // a custom "Выйти" so unsaved tabs are asked about first
+          items: [{ item: { About: null } }, sep, it('settings', 'Настройки…', 'CmdOrCtrl+Comma'), sep, { item: 'Services' }, sep, { item: 'Hide' }, { item: 'HideOthers' }, { item: 'ShowAll' }, sep, it('quit', 'Выйти из Org', 'CmdOrCtrl+Q')],
         },
         {
           text: 'Файл',
-          items: [it('newFile', 'Новый файл', 'CmdOrCtrl+N'), it('openFolder', 'Открыть папку…', 'CmdOrCtrl+O'), sep, it('closeTab', 'Закрыть вкладку', 'CmdOrCtrl+W')],
+          items: [
+            it('newFile', 'Новый файл', 'CmdOrCtrl+N'),
+            it('openFolder', 'Открыть папку…', 'CmdOrCtrl+O'),
+            sep,
+            it('save', 'Сохранить…', 'CmdOrCtrl+S'),
+            sep,
+            it('closeTab', 'Закрыть вкладку', 'CmdOrCtrl+W'),
+            it('closeOthers', 'Закрыть остальные вкладки', 'Alt+CmdOrCtrl+W'),
+            sep,
+            it('moveRight', 'Переместить вкладку в правый редактор', 'Control+CmdOrCtrl+ArrowRight', false),
+            it('moveLeft', 'Переместить вкладку в левый редактор', 'Control+CmdOrCtrl+ArrowLeft', false),
+            it('dupRight', 'Продублировать в правом редакторе', 'Alt+Control+CmdOrCtrl+ArrowRight', false),
+            it('dupLeft', 'Продублировать в левом редакторе', 'Alt+Control+CmdOrCtrl+ArrowLeft', false),
+            sep,
+            it('revealInNav', 'Показать в навигаторе', 'Shift+CmdOrCtrl+KeyJ', false),
+            it('copyPath', 'Скопировать путь', 'Alt+CmdOrCtrl+KeyC', false),
+          ],
         },
         { text: 'Правка', items: [{ item: 'Undo' }, { item: 'Redo' }, sep, { item: 'Cut' }, { item: 'Copy' }, { item: 'Paste' }, { item: 'SelectAll' }] },
         {
@@ -33,8 +50,8 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
             it('swap', 'Поменять панели местами', 'Shift+Control+CmdOrCtrl+ArrowRight', false),
             it('keepOne', 'Оставить одну панель', 'Shift+CmdOrCtrl+Backslash', false),
             sep,
-            it('paneLeft', 'Перейти в левую панель', 'Control+CmdOrCtrl+ArrowLeft', false),
-            it('paneRight', 'Перейти в правую панель', 'Control+CmdOrCtrl+ArrowRight', false),
+            it('paneLeft', 'Перейти в левую панель', 'Alt+CmdOrCtrl+ArrowLeft', false),
+            it('paneRight', 'Перейти в правую панель', 'Alt+CmdOrCtrl+ArrowRight', false),
             sep,
             it('notes', 'Заметки', 'CmdOrCtrl+1'),
             it('agenda', 'Агенда', 'CmdOrCtrl+2'),

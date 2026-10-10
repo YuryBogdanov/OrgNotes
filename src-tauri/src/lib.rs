@@ -325,6 +325,28 @@ mod tests {
     }
 
     #[test]
+    fn saves_a_new_file_and_asks_before_replacing() {
+        let d = tmp("save-new");
+        let root = d.to_str().unwrap();
+        let p = save_new_in(&d, root, "Идеи для ретро", "* Идеи\n", false).unwrap();
+        assert!(p.ends_with("Идеи для ретро.org"));
+        assert_eq!(fs::read_to_string(&p).unwrap(), "* Идеи\n");
+        assert_eq!(save_new_in(&d, root, "Идеи для ретро", "* другое\n", false), Err("exists".to_string()));
+        assert_eq!(fs::read_to_string(&p).unwrap(), "* Идеи\n");
+        save_new_in(&d, root, "Идеи для ретро", "* другое\n", true).unwrap();
+        assert_eq!(fs::read_to_string(&p).unwrap(), "* другое\n");
+        // an extension the user typed is kept
+        let txt = save_new_in(&d, root, "notes.txt", "x", false).unwrap();
+        assert!(txt.ends_with("notes.txt"));
+        // never outside the notes folder, never over a folder
+        let other = tmp("save-new-other");
+        assert!(save_new_in(&d, other.to_str().unwrap(), "x", "x", false).is_err());
+        fs::create_dir(d.join("dir.org")).unwrap();
+        assert!(save_new_in(&d, root, "dir", "x", true).is_err());
+        assert!(!d.join(".Идеи для ретро.org.tmp").exists());
+    }
+
+    #[test]
     fn lists_folders_including_empty_ones() {
         let d = tmp("dirs");
         let root = d.to_str().unwrap();
@@ -545,6 +567,41 @@ fn write_project_config(state: State<AppState>, text: String) -> Result<(), Stri
     write_config_in(&root_of(&state)?, &text)
 }
 
+
+/// "Сохранить как…" for a tab that has no file yet. `.org` is added unless the name already has an
+/// extension; an existing file is only replaced when `overwrite` is set (the user confirmed "Заменить").
+fn save_new_in(root: &Path, parent: &str, name: &str, text: &str, overwrite: bool) -> Result<String, String> {
+    let parent = inside(root, Path::new(parent))?;
+    if !parent.is_dir() {
+        return Err("parent is not a folder".into());
+    }
+    let name = check_name(name)?;
+    let has_ext = Path::new(&name).extension().is_some();
+    let name = if has_ext { name } else { with_org(name) };
+    let target = parent.join(&name);
+    if target.exists() && !overwrite {
+        return Err("exists".into());
+    }
+    if target.is_dir() {
+        return Err("a folder has that name".into());
+    }
+    let tmp = parent.join(format!(".{name}.tmp"));
+    fs::write(&tmp, text).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, &target).map_err(|e| e.to_string())?;
+    Ok(as_known(root, &target))
+}
+
+#[tauri::command]
+fn save_new_file(state: State<AppState>, parent: String, name: String, text: String, overwrite: bool) -> Result<String, String> {
+    save_new_in(&root_of(&state)?, &parent, &name, &text, overwrite)
+}
+
+/// Quit after the page has asked about unsaved tabs.
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -560,6 +617,8 @@ pub fn run() {
             read_project_config,
             write_project_config,
             create_entry,
+            save_new_file,
+            quit_app,
             rename_entry,
             move_entry,
             trash_entry

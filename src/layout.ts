@@ -2,7 +2,7 @@
 // active and receives keyboard input and commands. Plain data + functions that mutate it in place, so the
 // store can keep it in $state and tests can use plain objects.
 
-export type TabKind = 'file' | 'agenda';
+export type TabKind = 'file' | 'agenda' | 'untitled';
 export interface Cursor {
   line: number;
   col: number;
@@ -14,6 +14,8 @@ export interface Tab {
   cursor: Cursor;
   reveal?: { line: number; n: number; focus: boolean } | null; // a request to move the caret there and scroll to it
   fromAgenda?: { line: number; title: string } | null; // "Открыто из агенды" caption
+  title?: string; // untitled tabs: "Без названия", "Без названия 2", …
+  text?: string; // untitled tabs: the text, not on disk until "Сохранить как…"
 }
 export interface Pane {
   id: string;
@@ -135,7 +137,7 @@ export function closePane(L: Layout, pi: number) {
   L.panes = [keep];
   L.active = 0;
 }
-const sameContent = (a: Tab, b: Tab) => a.kind === b.kind && (a.kind === 'agenda' || a.path === b.path);
+const sameContent = (a: Tab, b: Tab) => a.kind === b.kind && (a.kind === 'agenda' || (a.kind === 'file' && a.path === b.path) || a.id === b.id);
 
 /** "Оставить одну панель": close the inactive pane. */
 export const keepOne = (L: Layout) => closePane(L, 1 - L.active);
@@ -220,6 +222,57 @@ export function openFromAgenda(L: Layout, ai: number, path: string, line: number
   return t;
 }
 
+// ---- tabs: new, move, duplicate, close others ------------------------------------------
+
+export const UNTITLED = 'Без названия';
+
+/** A new empty tab at the end of pane `pi`'s row: "Без названия", then "Без названия 2", … */
+export function newUntitled(L: Layout, pi: number): Tab {
+  const p = L.panes[pi];
+  const taken = new Set(p.tabs.filter((t) => t.kind === 'untitled').map((t) => t.title));
+  let title = UNTITLED;
+  for (let k = 2; taken.has(title); k++) title = `${UNTITLED} ${k}`;
+  const t: Tab = { ...newTab('untitled'), title, text: '' };
+  p.tabs.push(t);
+  p.active = p.tabs.length - 1;
+  L.active = pi;
+  return t;
+}
+
+/** The neighbour pane to send a tab to: the nearest one to the right, else to the left; -1 with one pane. */
+export const targetOf = (L: Layout, pi: number) => (pi + 1 < L.panes.length ? pi + 1 : pi - 1 >= 0 ? pi - 1 : -1);
+
+/** "Переместить в соседний редактор": goes after the target's active tab and becomes active there. */
+export function moveTab(L: Layout, pi: number, ti: number): boolean {
+  const to = targetOf(L, pi);
+  const t = L.panes[pi]?.tabs[ti];
+  if (to < 0 || !t) return false;
+  const target = L.panes[to];
+  const same = target.tabs.findIndex((x) => sameContent(x, t) && x.kind !== 'untitled');
+  closeTab(L, pi, ti); // may remove the source pane
+  const ti2 = L.panes.indexOf(target);
+  if (same >= 0) target.active = same; // already open there: no second tab
+  else insertAfterActive(target, t);
+  L.active = ti2;
+  return true;
+}
+
+/** "Продублировать в соседнем редакторе": the same tab in the neighbour pane; the original stays. */
+export function duplicateTab(L: Layout, pi: number, ti: number): boolean {
+  const to = targetOf(L, pi);
+  const t = L.panes[pi]?.tabs[ti];
+  if (to < 0 || !t || t.kind === 'untitled') return false;
+  const target = L.panes[to];
+  const same = target.tabs.findIndex((x) => sameContent(x, t));
+  if (same >= 0) target.active = same;
+  else insertAfterActive(target, copyTab(t));
+  L.active = to;
+  return true;
+}
+
+/** Tabs of pane `pi` other than `ti`, in order (what "Закрыть остальные" has to close). */
+export const othersOf = (L: Layout, pi: number, ti: number) => (L.panes[pi]?.tabs ?? []).filter((_, i) => i !== ti);
+
 // ---- paths of files that moved or disappeared ------------------------------------------
 
 export function mapPaths(L: Layout, map: (p: string) => string) {
@@ -245,7 +298,12 @@ export function serialize(L: Layout): string {
     v: 1,
     active: L.active,
     ratio: L.ratio,
-    panes: L.panes.map((p) => ({ active: p.active, tabs: p.tabs.map((t) => ({ kind: t.kind, path: t.path, cursor: t.cursor })) })),
+    // untitled tabs are not restored after a restart (their text is not on disk)
+    panes: L.panes.map((p) => {
+      const tabs = p.tabs.filter((t) => t.kind !== 'untitled');
+      const act = p.tabs[p.active];
+      return { active: Math.max(0, tabs.indexOf(act)), tabs: tabs.map((t) => ({ kind: t.kind, path: t.path, cursor: t.cursor })) };
+    }),
   });
 }
 

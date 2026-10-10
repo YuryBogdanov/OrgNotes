@@ -1,6 +1,7 @@
 import {
   activeTab, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
   openFile, openFromAgenda, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
+  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, splitEol, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
@@ -67,6 +68,11 @@ class Store {
   dialog = $state<{ type: 'delete' | 'move'; rel: string; isDir: boolean } | null>(null);
   /** Editor panes and their tabs; see layout.ts. */
   layout = $state<Layout>(emptyLayout());
+  /** Sheets the page shows on request: "Сохранить как…" and the question about unsaved text. */
+  saveAsReq = $state<{ tab: Tab; resolve: (saved: boolean) => void } | null>(null);
+  unsavedReq = $state<{ tab: Tab; resolve: (answer: 'save' | 'discard' | 'cancel') => void } | null>(null);
+  /** "Показать в навигаторе": expand to this file and mark it for a moment. */
+  navReveal = $state<{ path: string; n: number } | null>(null);
   showNav = $state(true);
   showInspector = $state(true);
   navW = $state(248);
@@ -373,13 +379,6 @@ class Store {
     p.active = ti;
     this.layout.active = pi;
   }
-  closeTab(pi: number, ti: number) {
-    closeTab(this.layout, pi, ti);
-  }
-  closeActiveTab() {
-    const p = this.layout.panes[this.layout.active];
-    if (p?.tabs.length) closeTab(this.layout, this.layout.active, p.active);
-  }
   /** The editor of a tab reports its caret; leaving the heading opened from the agenda drops the caption. */
   setTabCursor(tab: Tab, line: number, col: number) {
     tab.cursor = { line, col };
@@ -431,6 +430,167 @@ class Store {
     const i = p ? p.tabs.findLastIndex((t) => t.kind === 'file') : -1;
     if (i >= 0) p.active = i;
   }
+  // ---- untitled tabs, closing, moving ------------------------------------------------
+
+  /** Statuses for text that has no file yet: the project's, as a file without #+TODO would get. */
+  get untitledWf() {
+    return resolveWorkflow('', UNTITLED + '.org', this.config);
+  }
+  isUnsaved(t: Tab | undefined) {
+    return !!t && t.kind === 'untitled' && !!t.text;
+  }
+  hasUnsaved() {
+    return this.layout.panes.some((p) => p.tabs.some((t) => this.isUnsaved(t)));
+  }
+  /** Double click on the free part of a tab row. */
+  newUntitled(pi: number) {
+    const t = newUntitled(this.layout, pi);
+    t.reveal = { line: 0, n: Date.now(), focus: true };
+    return t;
+  }
+  private where(t: Tab): [number, number] {
+    for (let pi = 0; pi < this.layout.panes.length; pi++) {
+      const ti = this.layout.panes[pi].tabs.indexOf(t);
+      if (ti >= 0) return [pi, ti];
+    }
+    // $state proxies: compare by id
+    for (let pi = 0; pi < this.layout.panes.length; pi++) {
+      const ti = this.layout.panes[pi].tabs.findIndex((x) => x.id === t.id);
+      if (ti >= 0) return [pi, ti];
+    }
+    return [-1, -1];
+  }
+  /** Ask about unsaved text before a tab goes away. True when it may be closed. */
+  private async mayClose(t: Tab): Promise<boolean> {
+    if (!this.isUnsaved(t)) return true;
+    const [pi, ti] = this.where(t);
+    if (pi >= 0) this.activateTab(pi, ti); // show what the question is about
+    const answer = await new Promise<'save' | 'discard' | 'cancel'>((resolve) => (this.unsavedReq = { tab: t, resolve }));
+    this.unsavedReq = null;
+    if (answer === 'cancel') return false;
+    if (answer === 'discard') return true;
+    return this.saveAs(t); // closes only after a successful write
+  }
+  async closeTab(pi: number, ti: number) {
+    const t = this.layout.panes[pi]?.tabs[ti];
+    if (!t || !(await this.mayClose(t))) return;
+    const [p2, t2] = this.where(t);
+    if (p2 >= 0) closeTab(this.layout, p2, t2);
+  }
+  async closeActiveTab() {
+    const p = this.layout.panes[this.layout.active];
+    if (p?.tabs.length) await this.closeTab(this.layout.active, p.active);
+  }
+  /** "Закрыть остальные": asks about each unsaved tab in turn; "Отмена" stops there. */
+  async closeOthers(pi: number, ti: number) {
+    const keep = this.layout.panes[pi]?.tabs[ti];
+    if (!keep) return;
+    for (const t of othersOf(this.layout, pi, ti)) {
+      if (!(await this.mayClose(t))) break;
+      const [p2, t2] = this.where(t);
+      if (p2 >= 0) closeTab(this.layout, p2, t2);
+    }
+    const [p3, t3] = this.where(keep);
+    if (p3 >= 0) this.activateTab(p3, t3);
+  }
+  moveTab(pi: number, ti: number) {
+    moveTab(this.layout, pi, ti);
+  }
+  duplicateTab(pi: number, ti: number) {
+    duplicateTab(this.layout, pi, ti);
+  }
+  /** Shortcut variant: only when the neighbour is on that side. */
+  tabToSide(dir: -1 | 1, duplicate: boolean) {
+    const pi = this.layout.active;
+    const to = targetOf(this.layout, pi);
+    if (to < 0 || Math.sign(to - pi) !== dir) return;
+    const ti = this.layout.panes[pi].active;
+    if (duplicate) this.duplicateTab(pi, ti);
+    else this.moveTab(pi, ti);
+  }
+  revealInNavigator(t: Tab | undefined) {
+    if (t?.kind !== 'file' || !t.path) return;
+    this.showNav = true;
+    this.navReveal = { path: t.path, n: Date.now() };
+  }
+  async copyPath(t: Tab | undefined) {
+    if (t?.kind !== 'file' || !t.path) return;
+    try {
+      await navigator.clipboard.writeText(t.path);
+      this.say('Путь скопирован');
+    } catch (e) {
+      this.say('Не удалось скопировать путь: ' + e);
+    }
+  }
+  /** ⌘S: a tab without a file opens "Сохранить как…"; files are saved on their own anyway. */
+  async saveActive() {
+    const t = this.tab;
+    if (t?.kind === 'untitled') await this.saveAs(t);
+    else await this.flush();
+  }
+  /** Opens the "Сохранить как…" sheet; resolves true once the text is on disk. */
+  saveAs(t: Tab): Promise<boolean> {
+    return new Promise<boolean>((resolve) => (this.saveAsReq = { tab: t, resolve }));
+  }
+  finishSaveAs(saved: boolean) {
+    const r = this.saveAsReq;
+    this.saveAsReq = null;
+    r?.resolve(saved);
+  }
+  /**
+   * Write an untitled tab's text as a new file. 'exists' asks the sheet to confirm a replacement.
+   * On success the tab becomes an ordinary file tab, the file shows up (and is marked) in the navigator.
+   */
+  async commitSaveAs(t: Tab, dirRel: string, name: string, overwrite: boolean): Promise<'ok' | 'exists' | string> {
+    try {
+      const path = isTauri
+        ? await invoke<string>('save_new_file', { parent: this.abs(dirRel), name, text: t.text ?? '', overwrite })
+        : `${dirRel ? dirRel + '/' : ''}${/\.[^.]+$/.test(name) ? name : name + '.org'}`;
+      lsSet('saveAsDir:' + (this.dir ?? ''), dirRel);
+      if (isTauri) await this.reload();
+      else this.files = [...this.files, fromDisk({ name: path, path, text: t.text ?? '' }, this.config)].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+      if (this.files.some((f) => f.path === path)) {
+        t.kind = 'file';
+        t.path = path;
+        t.title = undefined;
+        t.text = undefined;
+        t.reveal = null; // the caret stays where it was
+        this.navReveal = { path, n: Date.now() };
+      } else {
+        // saved with a different extension: it is not a note, so its tab goes
+        const [pi, ti] = this.where(t);
+        if (pi >= 0) closeTab(this.layout, pi, ti);
+        this.say('Файл сохранён; приложение показывает только .org');
+      }
+      return 'ok';
+    } catch (e) {
+      const m = String(e);
+      if (m.includes('exists')) return 'exists';
+      return m.includes('bad name') ? 'Недопустимое имя: без «/», «:» и точки в начале' : 'Не удалось сохранить: ' + m;
+    }
+  }
+  /** "Новая папка" in the save sheet; returns its relative path. */
+  async createFolder(parentRel: string, name: string): Promise<string | null> {
+    try {
+      const path = await invoke<string>('create_entry', { parent: this.abs(parentRel), name, isDir: true });
+      await this.reload();
+      return path.slice((this.dir ?? '').length + 1);
+    } catch (e) {
+      this.say(this.errorText(e));
+      return null;
+    }
+  }
+  /** Quit, asking about every unsaved tab first. */
+  async quit() {
+    for (const p of [...this.layout.panes])
+      for (const t of [...p.tabs]) {
+        if (!this.isUnsaved(t)) continue;
+        if (!(await this.mayClose(t))) return;
+      }
+    await this.flush();
+    if (isTauri) await invoke('quit_app');
+  }
+
   /** Not enough room for two panes: the second one becomes tabs of the first. */
   mergePanes() {
     closePane(this.layout, 1);
@@ -443,7 +603,7 @@ class Store {
     return isTauri && !!this.dir;
   }
 
-  private abs(rel: string) {
+  abs(rel: string) {
     return rel ? `${this.dir}/${rel}` : this.dir!;
   }
 

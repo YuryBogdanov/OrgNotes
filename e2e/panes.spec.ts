@@ -83,14 +83,14 @@ test.describe('active pane', () => {
     await expect(panes(page).nth(1)).toHaveClass(/active/);
   });
 
-  test('⌃⌘← / ⌃⌘→ move between panes, nothing happens past the edge', async ({ page }) => {
+  test('⌥⌘← / ⌥⌘→ move between panes, nothing happens past the edge', async ({ page }) => {
     await open(page);
     await btn(page, 'Второй редактор').click();
-    await page.keyboard.press('Control+Meta+ArrowLeft');
+    await page.keyboard.press('Alt+Meta+ArrowLeft');
     await expect(panes(page).nth(0)).toHaveClass(/active/);
-    await page.keyboard.press('Control+Meta+ArrowLeft');
+    await page.keyboard.press('Alt+Meta+ArrowLeft');
     await expect(panes(page).nth(0)).toHaveClass(/active/);
-    await page.keyboard.press('Control+Meta+ArrowRight');
+    await page.keyboard.press('Alt+Meta+ArrowRight');
     await expect(panes(page).nth(1)).toHaveClass(/active/);
   });
 
