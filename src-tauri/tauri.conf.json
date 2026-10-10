@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Org",
+  "productName": "Panopticon",
   "version": "0.1.0",
-  "identifier": "dev.local.org-prototype",
+  "identifier": "dev.local.panopticon",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Org",
+        "title": "Panopticon",
         "width": 1360,
         "height": 860,
         "minWidth": 900,
@@ -41,5 +41,6 @@
       "icons/128x128.png",
       "icons/icon.icns"
     ]
-  }
+  },
+  "mainBinaryName": "Panopticon"
 }

@@ -298,6 +298,16 @@
     {#if tab === 'Основные'}
       <div class="body">
         <section class="general" aria-label="Основные">
+          <div class="cap">РАБОЧАЯ ПАПКА</div>
+          <div class="opt">
+            <div class="folder">
+              <span class="fname">{store.dir ? store.dir.split('/').pop() : 'Не выбрана'}</span>
+              {#if store.dir}<span class="fpath" title={store.dir}>{store.dir.replace(/^\/Users\/[^/]+/, '~')}</span>{/if}
+            </div>
+            <!-- the change happens in the main window, where the tabs are -->
+            <button class="change" onclick={() => { try { localStorage.setItem('cmd:changeFolder', String(Date.now())); } catch { /* no storage */ } }}>Изменить…</button>
+          </div>
+          <p class="help">Приложение работает с одной папкой: все org-файлы в ней и её подпапках. Сменить её можно и в меню «Файл → Открыть другую папку…».</p>
           <div class="cap">НАВИГАТОР</div>
           <div class="opt">
             <label for="nav-headings">Показывать заголовки в навигаторе</label>
@@ -539,6 +549,10 @@
   .add { width: 100%; margin-top: 4px; height: 30px; border: 1px dashed var(--line); background: transparent; border-radius: 7px; color: var(--acc); }
   .help { font-size: 12px; line-height: 1.5; color: var(--fg2); padding: 10px 6px; }
   .general { max-width: 560px; }
+  .folder { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+  .fname { font-size: 13px; font-weight: 600; }
+  .fpath { font-size: 12px; color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .change { flex: 0 0 auto; height: 24px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
   .opt { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; background: var(--side); border: 1px solid var(--line); border-radius: 8px; }
   .opt label { font-size: 13px; }
   /* a macOS switch */

@@ -29,11 +29,52 @@ struct OrgFile {
 #[derive(Serialize, Deserialize, Default)]
 struct Config {
     notes_dir: Option<String>,
+    /// macOS bookmark of the folder: survives a rename or a move of it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bookmark: Option<Vec<u8>>,
+}
+
+#[cfg(target_os = "macos")]
+mod bookmark {
+    use objc2_foundation::{NSData, NSString, NSURLBookmarkCreationOptions, NSURLBookmarkResolutionOptions, NSURL};
+
+    /// The app is not sandboxed, so a plain bookmark is enough (no security scope needed to read the folder).
+    pub fn make(path: &str) -> Option<Vec<u8>> {
+        let url = NSURL::fileURLWithPath(&NSString::from_str(path));
+        url.bookmarkDataWithOptions_includingResourceValuesForKeys_relativeToURL_error(NSURLBookmarkCreationOptions(0), None, None)
+            .ok()
+            .map(|d| d.to_vec())
+    }
+    pub fn resolve(data: &[u8]) -> Option<String> {
+        let d = NSData::with_bytes(data);
+        let mut stale = objc2::runtime::Bool::NO;
+        let url = unsafe {
+            NSURL::URLByResolvingBookmarkData_options_relativeToURL_bookmarkDataIsStale_error(
+                &d,
+                NSURLBookmarkResolutionOptions::WithoutUI | NSURLBookmarkResolutionOptions::WithoutMounting,
+                None,
+                &mut stale,
+            )
+        }
+        .ok()?;
+        url.path().map(|p| p.to_string())
+    }
+}
+#[cfg(not(target_os = "macos"))]
+mod bookmark {
+    pub fn make(_: &str) -> Option<Vec<u8>> {
+        None
+    }
+    pub fn resolve(_: &[u8]) -> Option<String> {
+        None
+    }
 }
 
 #[derive(Default)]
 struct AppState {
     dir: Mutex<Option<PathBuf>>,
+    /// the remembered folder when it cannot be opened (deleted, renamed beyond the bookmark, unmounted)
+    missing: Mutex<Option<String>>,
     watcher: Mutex<Option<Debouncer<RecommendedWatcher>>>,
 }
 
@@ -136,6 +177,47 @@ fn get_notes_dir(state: State<AppState>) -> Option<String> {
         .map(|p| p.to_string_lossy().to_string())
 }
 
+#[derive(Serialize)]
+struct DirStatus {
+    /// the open notes folder
+    dir: Option<String>,
+    /// the remembered folder that cannot be opened now
+    missing: Option<String>,
+}
+
+/// At start: is there a notes folder, and can it be opened?
+#[tauri::command]
+fn notes_dir_status(state: State<AppState>) -> DirStatus {
+    DirStatus {
+        dir: state.dir.lock().unwrap().as_ref().map(|p| p.to_string_lossy().to_string()),
+        missing: state.missing.lock().unwrap().clone(),
+    }
+}
+
+/// The remembered folder, by its path or, if it was renamed or moved, by its bookmark.
+fn remembered_dir(app: &AppHandle) -> Option<PathBuf> {
+    let cfg = read_config(app);
+    let by_path = cfg.notes_dir.as_ref().map(PathBuf::from).filter(|p| p.is_dir());
+    let found = by_path.or_else(|| cfg.bookmark.as_deref().and_then(bookmark::resolve).map(PathBuf::from).filter(|p| p.is_dir()))?;
+    if cfg.notes_dir.as_deref() != Some(&*found.to_string_lossy()) {
+        remember(app, &found.to_string_lossy()); // moved: keep the new path
+    }
+    Some(found)
+}
+
+fn remember(app: &AppHandle, path: &str) {
+    write_config(app, &Config { notes_dir: Some(path.to_string()), bookmark: bookmark::make(path) });
+}
+
+/// «Повторить»: open the remembered folder if it is back.
+#[tauri::command]
+fn retry_notes_dir(app: AppHandle, state: State<AppState>) -> Option<String> {
+    let dir = remembered_dir(&app)?;
+    *state.missing.lock().unwrap() = None;
+    activate(&app, &state, dir.clone());
+    Some(dir.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 fn set_notes_dir(app: AppHandle, state: State<AppState>, path: String) -> Result<(), String> {
     let dir = PathBuf::from(&path);
@@ -143,13 +225,85 @@ fn set_notes_dir(app: AppHandle, state: State<AppState>, path: String) -> Result
         return Err("not a directory".into());
     }
     activate(&app, &state, dir);
-    write_config(
-        &app,
-        &Config {
-            notes_dir: Some(path),
-        },
-    );
+    *state.missing.lock().unwrap() = None;
+    remember(&app, &path);
     Ok(())
+}
+
+#[derive(Serialize, Debug, PartialEq)]
+struct Scan {
+    name: String,
+    path: String,
+    /// the path as shown: ~ for the home folder
+    shown: String,
+    org: usize,
+    folders: usize,
+    other: usize,
+    /// the scan stopped at the limit: a home folder or a whole disk
+    capped: bool,
+    big: bool,
+}
+
+const SCAN_LIMIT: usize = 10_000;
+
+/// Emacs keeps lock (.#name), auto-save (#name#) and backup (name~) files next to the notes.
+fn emacs_service(name: &str) -> bool {
+    name.starts_with(".#") || (name.starts_with('#') && name.ends_with('#')) || name.ends_with('~')
+}
+
+/// «Папка найдена»: what the app would see in a folder. Hidden entries (.git too) and Emacs service files are not
+/// counted; symbolic links are not followed (they count as other files).
+#[tauri::command]
+fn scan_folder(path: String) -> Result<Scan, String> {
+    scan_in(Path::new(&path), std::env::var("HOME").ok().as_deref())
+}
+
+fn scan_in(root: &Path, home: Option<&str>) -> Result<Scan, String> {
+    if !root.is_dir() {
+        return Err("not a directory".into());
+    }
+    let (mut org, mut folders, mut other, mut seen) = (0, 0, 0, 0usize);
+    let mut stack = vec![root.to_path_buf()];
+    'walk: while let Some(dir) = stack.pop() {
+        let Ok(entries) = fs::read_dir(&dir) else { continue };
+        for e in entries.flatten() {
+            let name = e.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') || emacs_service(&name) {
+                continue;
+            }
+            seen += 1;
+            if seen > SCAN_LIMIT {
+                break 'walk;
+            }
+            let Ok(t) = e.file_type() else { continue };
+            if t.is_dir() {
+                folders += 1;
+                stack.push(e.path());
+            } else if t.is_file() && name.ends_with(".org") {
+                org += 1;
+            } else {
+                other += 1;
+            }
+        }
+    }
+    let path = root.to_string_lossy().to_string();
+    let shown = match home {
+        Some(h) if path == h => "~".to_string(),
+        Some(h) if path.starts_with(&format!("{h}/")) => format!("~{}", &path[h.len()..]),
+        _ => path.clone(),
+    };
+    let capped = seen > SCAN_LIMIT;
+    let big = capped || shown == "~" || root.parent().is_none();
+    Ok(Scan {
+        name: root.file_name().map_or(path.clone(), |n| n.to_string_lossy().to_string()),
+        path,
+        shown,
+        org,
+        folders,
+        other,
+        capped,
+        big,
+    })
 }
 
 /// Bundled sample notes (development convenience); None when the folder is not there.
@@ -160,13 +314,17 @@ fn sample_notes_dir() -> Option<String> {
 }
 
 #[tauri::command]
-fn list_org_files(state: State<AppState>) -> Vec<OrgFile> {
+fn list_org_files(state: State<AppState>) -> Result<Vec<OrgFile>, String> {
     let Some(root) = state.dir.lock().unwrap().clone() else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
+    // the folder went away while the app runs (deleted, unmounted): say so, the open tabs keep their text
+    if !root.is_dir() {
+        return Err("unavailable".into());
+    }
     let mut out = Vec::new();
     collect(&root, &root, &mut out);
-    out
+    Ok(out)
 }
 
 /// Atomic write (temp file + rename) restricted to .org files inside the notes folder.
@@ -330,6 +488,26 @@ mod tests {
         dirs_in(&d, &d, &mut dirs);
         assert!(dirs.is_empty());
         assert!(!d.join(".orgnotes/config.json.tmp").exists());
+    }
+
+    #[test]
+    fn scans_a_folder_like_the_navigator_sees_it() {
+        let d = std::env::temp_dir().join(format!("scan-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&d);
+        fs::create_dir_all(d.join("Команда/Рост")).unwrap();
+        fs::create_dir_all(d.join(".git/objects")).unwrap();
+        for f in ["a.org", "Команда/b.org", "Команда/Рост/c.org", "readme.md", ".git/HEAD", ".#a.org", "#a.org#", "a.org~", ".DS_Store"] {
+            fs::write(d.join(f), "x").unwrap();
+        }
+        let s = scan_in(&d, None).unwrap();
+        assert_eq!((s.org, s.folders, s.other, s.capped, s.big), (3, 2, 1, false, false));
+        let home = scan_in(&d, Some(&d.to_string_lossy())).unwrap();
+        assert_eq!(home.shown, "~");
+        assert!(home.big); // the home folder itself is too big a workspace
+        let inside = scan_in(&d.join("Команда"), Some(&d.to_string_lossy())).unwrap();
+        assert_eq!(inside.shown, "~/Команда");
+        assert!(emacs_service(".#x.org") && emacs_service("#x.org#") && emacs_service("x.org~") && !emacs_service("x.org"));
+        let _ = fs::remove_dir_all(&d);
     }
 
     #[test]
@@ -611,6 +789,25 @@ fn quit_app(app: AppHandle) {
     app.exit(0);
 }
 
+/// Before it was called Panopticon the app had another identifier: its saved settings (the notes folder) move over once.
+fn migrate_config(app: &AppHandle) {
+    let Ok(dir) = app.path().app_config_dir() else { return };
+    let new = dir.join("config.json");
+    let old = dir.with_file_name("dev.local.org-prototype").join("config.json");
+    if !new.exists() && old.exists() {
+        let _ = fs::create_dir_all(&dir);
+        let _ = fs::copy(old, new);
+    }
+}
+
+fn show_main(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -618,7 +815,10 @@ pub fn run() {
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             get_notes_dir,
+            notes_dir_status,
+            retry_notes_dir,
             set_notes_dir,
+            scan_folder,
             sample_notes_dir,
             list_org_files,
             save_org_file,
@@ -640,17 +840,40 @@ pub fn run() {
                     let _ = apply_vibrancy(&window, NSVisualEffectMaterial::Sidebar, None, None);
                 }
             }
-            // ORG_DIR overrides the remembered folder (handy for development).
             let handle = app.handle().clone();
-            let remembered = std::env::var("ORG_DIR")
-                .ok()
-                .or_else(|| read_config(&handle).notes_dir);
-            if let Some(dir) = remembered.map(PathBuf::from).filter(|p| p.is_dir()) {
-                let state = app.state::<AppState>();
+            migrate_config(&handle);
+            let state = app.state::<AppState>();
+            // ORG_DIR overrides the remembered folder (handy for development)
+            if let Some(dir) = std::env::var("ORG_DIR").ok().map(PathBuf::from).filter(|p| p.is_dir()) {
                 activate(&handle, &state, dir);
+            } else if let Some(dir) = remembered_dir(&handle) {
+                activate(&handle, &state, dir);
+            } else if let Some(p) = read_config(&handle).notes_dir {
+                // remembered but not there: the page shows «Папка недоступна»; the setting is never dropped by itself
+                *state.missing.lock().unwrap() = Some(p);
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        // as on macOS: closing the window keeps the app (in the Dock); its text stays in memory, nothing is lost
+        .on_window_event(|w, e| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = e {
+                if w.label() == "main" {
+                    api.prevent_close();
+                    let _ = w.hide();
+                }
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| match event {
+            // a click on the Dock icon brings the window back
+            tauri::RunEvent::Reopen { .. } => show_main(app),
+            // «Завершить» from the Dock or a logout: the page asks about unsaved tabs first, then calls quit_app
+            tauri::RunEvent::ExitRequested { code: None, api, .. } => {
+                api.prevent_exit();
+                show_main(app);
+                let _ = app.emit("quit-requested", ());
+            }
+            _ => {}
+        });
 }

@@ -143,6 +143,14 @@ class Store {
   saveState = $state<'saved' | 'saving' | 'memory'>(isTauri ? 'saved' : 'memory');
   dir = $state<string | null>(null);
   needFolder = $state(false);
+  /**
+   * A start screen over the whole window (ТЗ «Первый запуск и рабочая папка»): «welcome» (no folder yet), «found»
+   * (a folder picked, before «Открыть»; `scan` null while counting), «missing» (the remembered folder cannot be
+   * opened). Null: the ordinary window.
+   */
+  start = $state<StartScreen>(null);
+  /** The open folder went away while working: the tabs keep their text, the navigator says so. */
+  folderGone = $state(false);
   hasSample = $state(false);
   loaded = $state(false);
   history = $state.raw<{ path: string; line: number }[]>([]);
@@ -303,14 +311,17 @@ class Store {
   /** First load, and after the notes folder changes. */
   async load() {
     if (isTauri) {
-      this.dir = await invoke<string | null>('get_notes_dir');
+      const st = await invoke<{ dir: string | null; missing: string | null }>('notes_dir_status');
+      this.dir = st.dir;
       this.hasSample = !!(await invoke<string | null>('sample_notes_dir'));
       this.needFolder = !this.dir;
       if (!this.dir) {
+        this.start = st.missing ? { kind: 'missing', path: st.missing } : { kind: 'welcome' };
         this.files = [];
         this.loaded = true;
         return;
       }
+      if (this.start?.kind !== 'found') this.start = null;
     }
     // gather everything first and publish it in one go: the UI becomes usable the moment `files` is set,
     // and anything the user does after that must not be overwritten by the tail of this function
@@ -352,7 +363,17 @@ class Store {
     for (let attempt = 0; attempt < 6; attempt++) {
       for (let i = 0; this.saving > 0 && i < 100; i++) await new Promise((r) => setTimeout(r, 20));
       const seq = this.writes;
-      const list = this.sorted(await this.listFiles());
+      let raw: Listed[];
+      try {
+        raw = await this.listFiles();
+      } catch {
+        // the folder is gone (deleted, unmounted): every open file goes the «deleted» way, nothing is lost
+        this.folderGone = true;
+        this.applySnapshot([], []);
+        return;
+      }
+      this.folderGone = false;
+      const list = this.sorted(raw);
       const folders = await this.readFolders(list);
       const cfgRaw = await this.readConfig();
       if (this.saving > 0 || this.writes !== seq) continue; // stale snapshot, take a new one
@@ -515,6 +536,8 @@ class Store {
   /** The window came to the front: questions put off with Esc come back, and the open files are read again. */
   activated() {
     this.appActive = true;
+    // the folder may be back (a disk plugged in, a folder restored)
+    if (this.start?.kind === 'missing' || this.folderGone) return void this.retryFolder();
     const c: Record<string, Conflict> = {};
     for (const [k, v] of Object.entries(this.conflicts)) c[k] = { ...v, postponed: false };
     this.conflicts = c;
@@ -525,16 +548,90 @@ class Store {
     return this.edited[path];
   }
 
-  async chooseFolder() {
-    if (!isTauri) return;
+  /** The system «Выбрать папку» panel; null when cancelled. */
+  private async pickFolder(title: string): Promise<string | null> {
+    if (!isTauri) return null;
     const { open } = await import('@tauri-apps/plugin-dialog');
-    const sel = await open({ directory: true, multiple: false, title: 'Папка с заметками' });
-    if (typeof sel === 'string') await this.useFolder(sel);
+    const sel = await open({ directory: true, multiple: false, title, canCreateDirectories: true });
+    return typeof sel === 'string' ? sel : null;
   }
-
+  /** «Выбрать папку…» on the welcome screen (and «Выбрать другую…» on the next ones). Cancel changes nothing. */
+  async chooseFolder() {
+    const p = await this.pickFolder('Папка с заметками');
+    if (p) await this.showFound(p, this.start?.kind === 'found' && this.start.change);
+  }
+  /** «Создать новую папку…»: the same panel with «Новая папка»; the folder made becomes the notes folder. */
+  async createNewFolder() {
+    const p = await this.pickFolder('Новая папка для заметок');
+    if (p) await this.useFolder(p);
+  }
+  /** «Папка найдена»: count what is in the folder before opening it. */
+  async showFound(path: string, change = false) {
+    this.start = { kind: 'found', path, scan: null, change };
+    try {
+      const scan = await invoke<Scan>('scan_folder', { path });
+      if (this.start?.kind === 'found' && this.start.path === path) this.start = { ...this.start, scan };
+    } catch (e) {
+      this.say(this.errorText(e));
+      this.start = change ? null : { kind: 'welcome' };
+    }
+  }
+  /** «Открыть» on «Папка найдена». */
+  async openFound() {
+    if (this.start?.kind !== 'found') return;
+    await this.useFolder(this.start.path);
+  }
+  /** Esc on «Папка найдена» while changing the folder: stay with the current one. */
+  backFromFound() {
+    if (this.start?.kind === 'found' && this.start.change) this.start = null;
+  }
   async useFolder(path: string) {
     await invoke('set_notes_dir', { path });
+    this.start = null;
+    this.folderGone = false;
+    this.orphans = {};
+    this.conflicts = {};
     await this.load();
+  }
+  /** «Повторить»: the remembered folder (found again by its bookmark if it moved). */
+  async retryFolder(): Promise<boolean> {
+    if (!isTauri) return false;
+    if (this.folderGone) {
+      await this.reload(); // back at the same place
+      if (!this.folderGone) return true;
+    }
+    const dir = await invoke<string | null>('retry_notes_dir');
+    if (!dir) return false;
+    if (dir !== this.dir || this.start) {
+      this.start = null;
+      await this.load();
+    } else await this.reload();
+    return true;
+  }
+  /**
+   * «Открыть другую папку…»: (1) the panel, (2) the question about unsaved tabs, (3) the tabs close, (4) «Папка
+   * найдена» for the new one. A cancel at 1 or 2 leaves the folder and the tabs as they are.
+   */
+  async changeFolder() {
+    if (this.sheetOpen) return;
+    const p = await this.pickFolder('Другая папка с заметками');
+    if (!p) return;
+    if (!(await this.confirmClose(this.layout.panes.flatMap((x) => x.tabs)))) return;
+    await this.flush();
+    this.layout = emptyLayout();
+    this.orphans = {};
+    await this.showFound(p, true);
+  }
+  /** «Показать в Finder» for the notes folder. */
+  async revealFolder() {
+    if (!this.dir) return;
+    const { revealItemInDir } = await import('@tauri-apps/plugin-opener');
+    await revealItemInDir(this.dir);
+  }
+  /** ⌘⇧W, the red button: the window goes, the app stays in the Dock with everything in memory. */
+  async hideWindow() {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    await getCurrentWindow().hide();
   }
 
   async useSample() {
@@ -549,10 +646,15 @@ class Store {
     });
     // back in front: check the open files again in case an event was missed
     window.addEventListener('focus', () => this.activated());
+    // «Изменить…» in the settings window: the change happens here, where the tabs are
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'cmd:changeFolder' && e.newValue) void this.changeFolder();
+    });
     window.addEventListener('blur', () => (this.appActive = false));
     if (!isTauri) return;
     const { listen } = await import('@tauri-apps/api/event');
     await listen('notes-changed', () => this.reload());
+    await listen('quit-requested', () => this.quit()); // «Завершить» from the Dock
   }
 
   setText(text: string, path: string = this.curPath) {
@@ -1149,6 +1251,8 @@ class Store {
   }
 }
 
+export type Scan = { name: string; path: string; shown: string; org: number; folders: number; other: number; capped: boolean; big: boolean };
+export type StartScreen = { kind: 'welcome' } | { kind: 'found'; path: string; scan: Scan | null; change: boolean } | { kind: 'missing'; path: string } | null;
 export type Unsaved = { tab: Tab; kind: 'file' | 'note'; name: string };
 export type Conflict = { path: string; name: string; disk: string; diskRaw: string; eol: Eol; mtime: number; postponed: boolean };
 export type DiskAnswer = 'disk' | 'mine' | 'later' | 'saveas' | 'keep' | 'close';

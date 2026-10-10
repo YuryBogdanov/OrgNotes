@@ -43,6 +43,7 @@ export async function installTauriMock(page: Page, files: Record<string, string>
         emit();
       };
       w.__TAURI_INTERNALS__ = {
+        metadata: { currentWindow: { label: 'main' }, currentWebview: { windowLabel: 'main', label: 'main' } },
         transformCallback(cb: (e: unknown) => void) {
           cbs[nid] = cb;
           return nid++;
@@ -56,13 +57,54 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             return 1;
           }
           if (cmd === 'plugin:event|unlisten') return;
-          if (cmd === 'get_notes_dir') return '/mock';
+          // the notes folder: a test can start without one (__noDir), with a remembered one that is gone (__missing),
+          // or pick folders in the system dialog (__picks); files of another folder live under its own prefix
+          const root = () => (w.__noDir ? null : (w.__dir ?? '/mock'));
+          if (cmd === 'get_notes_dir') return root();
+          if (cmd === 'notes_dir_status') return { dir: w.__missing ? null : root(), missing: w.__missing ?? null };
+          if (cmd === 'retry_notes_dir') {
+            if (!w.__missing) return w.__gone ? null : root();
+            if (!w.__missingBack) return null;
+            w.__dir = w.__missing;
+            w.__missing = null;
+            w.__noDir = false;
+            return w.__dir;
+          }
+          if (cmd === 'set_notes_dir') {
+            w.__dir = args.path;
+            w.__noDir = false;
+            w.__missing = null;
+            w.__log.push(['set_dir', args.path]);
+            return;
+          }
+          if (cmd === 'scan_folder') {
+            if (w.__scanDelay) await new Promise((r) => setTimeout(r, w.__scanDelay));
+            const keys = Object.keys(disk).filter((k) => k.startsWith(args.path + '/') && !k.slice(args.path.length + 1).split('/').some((x) => x.startsWith('.')));
+            const dirs = new Set<string>();
+            for (const k of keys) {
+              const parts = k.slice(args.path.length + 1).split('/').slice(0, -1);
+              parts.forEach((_, i) => dirs.add(parts.slice(0, i + 1).join('/')));
+            }
+            const org = keys.filter((k) => k.endsWith('.org')).length;
+            const name = args.path.split('/').pop();
+            return { name, path: args.path, shown: args.path.replace(/^\/Users\/[^/]+/, '~'), org, folders: dirs.size, other: keys.length - org, capped: !!w.__big, big: !!w.__big };
+          }
+          if (cmd === 'plugin:dialog|open') {
+            w.__log.push(['pick', args.options]);
+            return (w.__picks ?? []).shift() ?? null;
+          }
+          if (cmd === 'plugin:window|hide') {
+            w.__log.push(['hide']);
+            return;
+          }
           if (cmd === 'sample_notes_dir') return null;
           if (cmd === 'list_org_files') {
             // snapshot first, answer later: like a slow disk read racing with the user's typing
+            if (w.__gone) throw 'unavailable'; // the folder went away while the app runs
+            const r = (root() ?? '/mock') + '/';
             const snapshot = Object.entries(disk)
-              .filter(([path]) => path.endsWith('.org') && !path.replace('/mock/', '').split('/').some((p) => p.startsWith('.')))
-              .map(([path, text]) => ({ name: path.replace('/mock/', ''), path, text, mtime: mtime[path] ?? 0 }));
+              .filter(([path]) => path.startsWith(r) && path.endsWith('.org') && !path.slice(r.length).split('/').some((p) => p.startsWith('.')))
+              .map(([path, text]) => ({ name: path.slice(r.length), path, text, mtime: mtime[path] ?? 0 }));
             if (listDelay) await new Promise((r) => setTimeout(r, listDelay));
             return snapshot;
           }
@@ -91,8 +133,9 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           if (cmd === 'list_folders') {
             if (listDelay) await new Promise((r) => setTimeout(r, listDelay));
             const out = new Set<string>(folders);
-            for (const p of Object.keys(disk)) {
-              const parts = p.replace('/mock/', '').split('/').slice(0, -1);
+            const r = (root() ?? '/mock') + '/';
+            for (const p of Object.keys(disk).filter((k) => k.startsWith(r))) {
+              const parts = p.slice(r.length).split('/').slice(0, -1);
               if (parts.some((x) => x.startsWith('.'))) continue;
               parts.forEach((_, i) => out.add(parts.slice(0, i + 1).join('/')));
             }
