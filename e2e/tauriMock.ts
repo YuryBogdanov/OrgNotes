@@ -33,6 +33,11 @@ export async function installTauriMock(page: Page, files: Record<string, string>
         mtime[path] = Date.now();
         emit();
       };
+      // an event from the Rust side (e.g. `titlebar` in full screen)
+      w.__emitEvent = (event: string, payload: unknown) => {
+        const id = listeners[event];
+        if (id) cbs[id]({ event, id: 1, payload });
+      };
       w.__rmDisk = (path: string) => {
         delete disk[path];
         emit();
@@ -95,6 +100,10 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           }
           if (cmd === 'plugin:window|hide') {
             w.__log.push(['hide']);
+            return;
+          }
+          if (cmd === 'plugin:window|set_fullscreen') {
+            w.__log.push(['fullscreen', args.value]);
             return;
           }
           if (cmd === 'sample_notes_dir') return null;

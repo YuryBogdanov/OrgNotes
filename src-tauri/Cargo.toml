@@ -23,7 +23,7 @@ trash = "5"
 window-vibrancy = "0.6"
 # a bookmark of the notes folder finds it again after it was renamed or moved
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", features = ["NSURL", "NSData", "NSError", "NSString", "NSArray"] }
+objc2-foundation = { version = "0.3", features = ["NSURL", "NSData", "NSError", "NSString", "NSArray", "NSGeometry"] }
 
 [dev-dependencies]
 muda = "=0.20.0"

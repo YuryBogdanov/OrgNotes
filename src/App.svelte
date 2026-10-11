@@ -202,7 +202,8 @@
   {#if store.loaded}<Settings standalone />{/if}
 {:else}
 <!-- the agenda builder is a sheet over the whole window: the window stays visible under it but takes no input -->
-<div class="win" inert={!!store.builder}>
+<!-- full screen with the menu bar shown: the whole window moves down by it, the traffic lights come into the toolbar -->
+<div class="win" inert={!!store.builder} class:menu={store.titlebar.fullscreen && store.titlebar.lights} style:--menu="{store.titlebar.menu}px">
   <Dialogs />
   <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
@@ -223,7 +224,21 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="toolbar" data-tauri-drag-region onmousedown={drag}>
     <div class="left">
-    <div class="lights-gap"></div>
+    <!-- room for the traffic lights; in full screen only while they are shown (with the menu bar) -->
+    <div class="lights-gap" class:gone={!store.titlebar.lights}>
+      {#if store.titlebar.fullscreen && store.titlebar.lights}
+        <!-- in full screen macOS's own buttons are hidden (Rust): these stand in, as in full screen — no minimise -->
+        <div class="lights" role="group" aria-label="Кнопки окна">
+          <button class="light close" aria-label="Закрыть окно" onclick={() => store.closeFromFullscreen()}>
+            <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.8 3.8l4.4 4.4M8.2 3.8l-4.4 4.4" /></svg>
+          </button>
+          <button class="light mini" aria-label="Свернуть окно" disabled></button>
+          <button class="light zoom" aria-label="Выйти из полноэкранного режима" onclick={() => store.leaveFullscreen()}>
+            <svg viewBox="0 0 12 12" aria-hidden="true"><path class="fill" d="M3.3 6.3v2.4h2.4zM8.7 5.7V3.3H6.3z" /></svg>
+          </button>
+        </div>
+      {/if}
+    </div>
     <button class="ibtn" aria-label="Показать или скрыть навигатор" onclick={() => (store.showNav = !store.showNav)}>
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5" /><path d="M8 3.5v13" /></svg>
     </button>
@@ -302,13 +317,26 @@
   /* «обновлён с диска»: does not take the focus or block typing, goes after 4 s */
   .toast { position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 9px 14px; background: var(--bar); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); font-size: 12.5px; color: var(--fg); pointer-events: none; }
   .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .win { height: 100%; display: flex; flex-direction: column; }
+  .win { height: 100%; display: flex; flex-direction: column; transition: transform 0.2s ease; }
+  .win.menu { transform: translateY(var(--menu)); }
+  .lights { display: flex; gap: 8px; margin-left: 4px; }
+  .light { width: 12px; height: 12px; padding: 0; border: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18); }
+  .light svg { width: 8px; height: 8px; opacity: 0; stroke: rgba(0, 0, 0, 0.55); stroke-width: 1.3; stroke-linecap: round; fill: none; }
+  .light svg .fill { fill: rgba(0, 0, 0, 0.55); stroke: none; }
+  .lights:hover .light svg { opacity: 1; }
+  .light.close { background: #ff5f57; }
+  .light.zoom { background: #28c840; }
+  .light.mini { background: color-mix(in srgb, var(--fg) 22%, transparent); box-shadow: none; }
+  .light:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .win { transition: none; } }
   /* as in the design: three columns, the path pill in the middle of the window, as wide as its content */
   .toolbar {
     flex: 0 0 52px; display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; grid-template-rows: 100%; align-items: center; gap: 12px; padding: 0 14px;
     background: var(--bar-bg); border-bottom: 1px solid var(--line);
   }
-  .lights-gap { flex: 0 0 68px; }
+  .lights-gap { flex: 0 0 68px; transition: flex-basis 0.2s ease, margin 0.2s ease; }
+  .lights-gap.gone { flex-basis: 0; margin-right: -12px; } /* and the gap after it */
+  @media (prefers-reduced-motion: reduce) { .lights-gap { transition: none; } }
   :global(html:not(.tauri)) .lights-gap { flex-basis: 4px; }
   .ibtn { width: 30px; height: 28px; border: 0; background: transparent; color: var(--fg2); border-radius: 6px; padding: 0; display: flex; align-items: center; justify-content: center; }
   .ibtn:hover:not(:disabled) { background: var(--field); }

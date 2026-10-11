@@ -70,6 +70,132 @@ mod bookmark {
     }
 }
 
+/// Full screen and the traffic lights. In full screen macOS hides the window buttons and slides them down in a thin
+/// title bar of their own (under the menu bar) while the pointer is at the top of the screen. We hide that bar and
+/// let the page draw the buttons in its own toolbar instead, moved down by the menu bar. AppKit says nothing about
+/// the reveal, so the bar is checked a few times a second and every change goes to the page as `titlebar`
+/// {fullscreen, lights, menu}: `lights` = the buttons are shown now, `menu` = the height of the menu bar then.
+#[cfg(target_os = "macos")]
+mod titlebar {
+    use objc2::{msg_send, runtime::AnyObject};
+    use objc2_foundation::NSRect;
+    use serde::Serialize;
+    use std::sync::atomic::{AtomicPtr, Ordering};
+    use std::time::Duration;
+    use tauri::{AppHandle, Emitter, Manager};
+
+    #[derive(Serialize, Clone, Copy, PartialEq)]
+    pub struct State {
+        pub fullscreen: bool,
+        pub lights: bool,
+        pub menu: f64,
+    }
+
+    const FULL_SCREEN: usize = 1 << 14; // NSWindowStyleMaskFullScreen
+    const WINDOWED: State = State { fullscreen: false, lights: true, menu: 0.0 };
+    /// The full-screen title bar whose looks we hid (its background and buttons); they come back when full screen ends.
+    static HIDDEN: AtomicPtr<AnyObject> = AtomicPtr::new(std::ptr::null_mut());
+
+    /// Show or hide what the thin full-screen bar draws: its background, its decoration and the three buttons. The bar
+    /// itself stays (hiding it whole stops macOS from showing the menu bar and from leaving full screen).
+    unsafe fn looks(btn: *mut AnyObject, hidden: bool) {
+        let title: *mut AnyObject = msg_send![btn, superview]; // NSTitlebarView: the buttons
+        if title.is_null() {
+            return;
+        }
+        let container: *mut AnyObject = msg_send![title, superview]; // NSTitlebarContainerView
+        for parent in [title, container] {
+            if parent.is_null() {
+                continue;
+            }
+            let subs: *mut AnyObject = msg_send![parent, subviews];
+            let n: usize = msg_send![subs, count];
+            for i in 0..n {
+                let v: *mut AnyObject = msg_send![subs, objectAtIndex: i];
+                let cls: *const objc2::runtime::AnyClass = msg_send![v, class];
+                let name = (*cls).name().to_bytes();
+                // the buttons (_NSThemeCloseWidget…), the bar's background and its bottom line; not the title view
+                let drawn = name.starts_with(b"_NSTheme") || name == b"NSTitlebarBackgroundView" || name == b"_NSTitlebarDecorationView";
+                if drawn {
+                    let _: () = msg_send![v, setHidden: hidden];
+                }
+            }
+        }
+    }
+
+    /// Must run on the main thread.
+    unsafe fn read(ns_window: *mut std::ffi::c_void) -> Option<State> {
+        if ns_window.is_null() {
+            return None;
+        }
+        let w = &*(ns_window as *const AnyObject);
+        let mask: usize = msg_send![w, styleMask];
+        let btn: *mut AnyObject = msg_send![w, standardWindowButton: 0usize];
+        if mask & FULL_SCREEN == 0 {
+            // back from full screen: the buttons go home to the window and must be seen again
+            if !HIDDEN.swap(std::ptr::null_mut(), Ordering::SeqCst).is_null() && !btn.is_null() {
+                looks(btn, false);
+            }
+            return Some(WINDOWED);
+        }
+        let none = State { fullscreen: true, lights: false, menu: 0.0 };
+        if btn.is_null() {
+            return Some(none);
+        }
+        // in full screen the buttons live in a title bar window of their own, under the menu bar
+        let bar: *mut AnyObject = msg_send![btn, window];
+        if bar.is_null() || bar == ns_window as *mut AnyObject {
+            return Some(none);
+        }
+        if HIDDEN.load(Ordering::SeqCst) != bar {
+            looks(btn, true);
+            let _: () = msg_send![bar, setIgnoresMouseEvents: true]; // clicks go to our toolbar under it
+            HIDDEN.store(bar, Ordering::SeqCst);
+        }
+        // the bar stays in place; showing and hiding it is its opacity
+        let visible: bool = msg_send![bar, isVisible];
+        let alpha: f64 = msg_send![bar, alphaValue];
+        if !(visible && alpha > 0.5) {
+            return Some(none);
+        }
+        let screen: *mut AnyObject = msg_send![w, screen];
+        let menu = if screen.is_null() {
+            0.0
+        } else {
+            let f: NSRect = msg_send![bar, frame];
+            let s: NSRect = msg_send![screen, frame];
+            (s.origin.y + s.size.height - (f.origin.y + f.size.height)).max(0.0).round()
+        };
+        Some(State { fullscreen: true, lights: true, menu })
+    }
+
+    pub fn watch(app: &AppHandle) {
+        let app = app.clone();
+        std::thread::spawn(move || {
+            let mut last: Option<State> = None;
+            loop {
+                std::thread::sleep(Duration::from_millis(80));
+                let Some(win) = app.get_webview_window("main") else { continue };
+                let (tx, rx) = std::sync::mpsc::channel();
+                let w2 = win.clone();
+                if app
+                    .run_on_main_thread(move || {
+                        let _ = tx.send(w2.ns_window().ok().and_then(|p| unsafe { read(p) }));
+                    })
+                    .is_err()
+                {
+                    return;
+                }
+                let Ok(Some(st)) = rx.recv() else { continue };
+                if last != Some(st) {
+                    last = Some(st);
+                    let _ = win.emit("titlebar", st);
+                }
+            }
+        });
+    }
+}
+
 #[derive(Default)]
 struct AppState {
     dir: Mutex<Option<PathBuf>>,
@@ -843,6 +969,8 @@ pub fn run() {
                 }
             }
             let handle = app.handle().clone();
+            #[cfg(target_os = "macos")]
+            titlebar::watch(&handle);
             migrate_config(&handle);
             let state = app.state::<AppState>();
             // ORG_DIR overrides the remembered folder (handy for development)
