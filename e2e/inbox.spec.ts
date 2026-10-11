@@ -107,9 +107,9 @@ test.describe('quick entry', () => {
     const t0 = Date.now();
     await page.keyboard.press('Enter');
     await expect(cap(page)).toHaveCount(0);
-    await expect.poll(() => disk(page), { timeout: 400 }).toMatch(/\* TODO Позвонить юристу\n:PROPERTIES:\n:CREATED: \[\d{4}-\d{2}-\d{2} \w{3} \d{2}:\d{2}\]\n:END:\n$/);
+    await expect.poll(() => disk(page), { timeout: 400 }).toMatch(/^#\+TITLE: Inbox\n\* TODO Позвонить юристу\n:PROPERTIES:\n:CREATED: \[\d{4}-\d{2}-\d{2} \w{3} \d{2}:\d{2}\]\n:END:\n\n\* TODO Позвонить в банк/);
     expect(Date.now() - t0).toBeLessThan(500); // not after the autosave pause
-    expect((await disk(page)).startsWith(INBOX())).toBe(true);
+    expect((await disk(page)).endsWith(INBOX().slice('#+TITLE: Inbox\n'.length))).toBe(true); // the rest untouched
     await expect(page.locator('.toast')).toContainText('Добавлено в Inbox');
     await expect(titles(page).first()).toHaveText('Позвонить юристу'); // the newest on top
     await expect(modes(page).locator('.badge')).toHaveText('5');
@@ -131,7 +131,7 @@ test.describe('quick entry', () => {
     await page.keyboard.press('Tab');
     await page.keyboard.press('Meta+Enter');
     await expect(cap(page)).toHaveCount(0);
-    await expect.poll(() => disk(page)).toMatch(/\* TODO Подготовить презентацию\n:PROPERTIES:\n:CREATED: [^\n]+\n:END:\nПлан найма\n,\* бюджет на Q4\n$/);
+    await expect.poll(() => disk(page)).toMatch(/^#\+TITLE: Inbox\n\* TODO Подготовить презентацию\n:PROPERTIES:\n:CREATED: [^\n]+\n:END:\nПлан найма\n,\* бюджет на Q4\n\n\* TODO Позвонить в банк/);
   });
 
   test('Esc keeps the draft for next time; without an Inbox file the stub comes and nothing typed is lost', async ({ page }) => {
@@ -162,7 +162,7 @@ test.describe('quick entry', () => {
     await page.keyboard.press('Shift+Meta+i');
     await page.keyboard.type('Новая');
     await page.keyboard.press('Enter');
-    await expect.poll(() => disk(page)).toContain('* TODO Проверить доступы подрядчика срочно\n* TODO Новая');
+    await expect.poll(() => disk(page)).toMatch(/^#\+TITLE: Inbox\n\* TODO Новая\n[^]*\* TODO Проверить доступы подрядчика срочно\n$/);
     await expect(page.locator('section.pane .cm-line', { hasText: 'TODO Новая' })).toBeVisible();
     await expect(page.getByRole('dialog', { name: /изменился|Файл/ })).toHaveCount(0);
   });

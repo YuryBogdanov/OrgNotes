@@ -7,7 +7,7 @@ import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links'
 import { displayName, noteName, withOrg } from './names';
 import { appendTask, refile, setPlanning, setTags } from './edits';
 import { DEFAULT_LEVELS, type LevelView } from './orgIndent';
-import { DEFAULT_INBOX, append, entry, inboxItems, insert, readInbox, remove, subtree, withInbox, type InboxConfig, type InboxItem } from './inbox';
+import { DEFAULT_INBOX, entry, inboxItems, insert, prepend, readInbox, remove, subtree, withInbox, type InboxConfig, type InboxItem } from './inbox';
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
 import { EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
@@ -527,14 +527,14 @@ class Store {
     const h = f?.headings.find((x) => x.line === item.line && x.title === item.title);
     return f && h ? { f, h } : null;
   }
-  /** Quick entry: a task at the end of the Inbox file, on disk at once. */
+  /** Quick entry: a task at the top of the Inbox file, on disk at once. */
   async addToInbox(title: string, details: string): Promise<'ok' | 'nofile' | 'empty' | 'error'> {
     if (!title.trim()) return 'empty';
     const f = this.inboxFile;
     if (!f) return 'nofile';
     const status = this.inboxCfg.status && f.wf.open.includes(this.inboxCfg.status) ? this.inboxCfg.status : startOf(sequenceFor(f.wf, null));
     const task = entry(title, details, status, this.inboxCfg.created ? new Date() : null);
-    return (await this.inboxWrite([{ path: f.path, text: append(f.text, task) }])) ? 'ok' : 'error';
+    return (await this.inboxWrite([{ path: f.path, text: prepend(f.text, task) }])) ? 'ok' : 'error';
   }
   async inboxDone(item: InboxItem) {
     const r = this.inboxHeading(item);

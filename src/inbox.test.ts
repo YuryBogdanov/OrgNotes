@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_INBOX, ago, append, entry, inboxItems, insert, readInbox, remove, subtree, withInbox } from './inbox';
+import { DEFAULT_INBOX, ago, append, entry, inboxItems, insert, prepend, readInbox, remove, subtree, withInbox } from './inbox';
 import { DEFAULT_WORKFLOW, parseHeadings } from './org';
 
 const INBOX = [
@@ -54,6 +54,21 @@ describe('writing', () => {
     expect(append('* A', '* TODO B')).toBe('* A\n* TODO B\n');
     expect(append('* A\n\n\n', '* TODO B')).toBe('* A\n* TODO B\n');
     expect(append('', '* TODO B')).toBe('* TODO B\n');
+  });
+  it('prepended: after the preamble, before the first heading, one blank line below it', () => {
+    expect(prepend('#+TITLE: Inbox\n* TODO A\n', '* TODO B')).toBe('#+TITLE: Inbox\n* TODO B\n\n* TODO A\n');
+    expect(prepend('#+TITLE: Inbox\n\n* TODO A\ntext\n\n* TODO C', '* TODO B\n:PROPERTIES:\n:END:')).toBe(
+      '#+TITLE: Inbox\n\n* TODO B\n:PROPERTIES:\n:END:\n\n* TODO A\ntext\n\n* TODO C\n',
+    );
+    expect(prepend('* TODO A\n', '* TODO B')).toBe('* TODO B\n\n* TODO A\n');
+    // a heading-like line inside a block is not a heading
+    expect(prepend('#+BEGIN_SRC\n* x\n#+END_SRC\n* A\n', '* B')).toBe('#+BEGIN_SRC\n* x\n#+END_SRC\n* B\n\n* A\n');
+    // no headings yet: after the preamble with a blank line; an empty file gets just the task
+    expect(prepend('#+TITLE: inbox\n\n\n', '* TODO B')).toBe('#+TITLE: inbox\n\n* TODO B\n');
+    expect(prepend('', '* TODO B')).toBe('* TODO B\n');
+    expect(prepend('\n\n', '* TODO B')).toBe('* TODO B\n');
+    // twice: the newest on top, the tasks don't stick together
+    expect(prepend(prepend('* A\n', '* B'), '* C')).toBe('* C\n\n* B\n\n* A\n');
   });
   it('removing and moving a subtree: levels recounted, :CREATED: and details go with it', () => {
     const h = hs.find((x) => x.title === 'Согласовать отпуск')!;
