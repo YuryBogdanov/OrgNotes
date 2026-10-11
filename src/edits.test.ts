@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appendTask, parseDate, refile, setPlanning, setTags, splitTags } from './edits';
+import { appendTask, parseDate, setPlanning, setTags, splitTags } from './edits';
 import { DEFAULT_WORKFLOW, parseHeadings } from './org';
 
 const now = new Date(2026, 9, 10, 15, 30); // Sat 10 Oct 2026
@@ -62,15 +62,7 @@ describe('tags', () => {
   });
 });
 
-describe('refile and new task', () => {
-  it('moves the subtree to the end of the other file as a top-level heading', () => {
-    const src = '* Q4\n** TODO Бюджет\nтекст\n*** DONE Заявки\n** Найм\n';
-    const h = hs(src)[1];
-    const r = refile(src, h, '* Архив\n\n');
-    expect(r.src).toBe('* Q4\n** Найм\n');
-    expect(r.dst).toBe('* Архив\n* TODO Бюджет\nтекст\n** DONE Заявки\n');
-    expect(refile(src, h, '').dst).toBe('* TODO Бюджет\nтекст\n** DONE Заявки\n');
-  });
+describe('new task', () => {
   it('appends a task at the end', () => {
     expect(appendTask('* Q4\n\n', 'TODO')).toEqual({ text: '* Q4\n* TODO \n', line: 1 });
     expect(appendTask('', 'NEW')).toEqual({ text: '* NEW \n', line: 0 });

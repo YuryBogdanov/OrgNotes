@@ -41,7 +41,7 @@
     await store.inboxDelete(it);
     list?.focus();
   }
-  const refile = (it: InboxItem) => (store.refileReq = { item: it, n: Date.now() });
+  const refile = (it: InboxItem) => store.startRefile('inbox', it);
 
   // ---- the date popover ----------------------------------------------------------------------------------------
   let datePop = $state<{ it: InboxItem; x: number; y: number; kind: 'SCHEDULED' | 'DEADLINE' } | null>(null);
@@ -127,7 +127,7 @@
     <div class="list" bind:this={list} role="listbox" tabindex="0" aria-label="Задачи Inbox" aria-activedescendant="ib-{sel}" onkeydown={key}>
       {#each items as it, i (it.line + ':' + it.title)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="row" class:sel={i === sel} class:leaving={leaving === it.line} id="ib-{i}" role="option" aria-selected={i === sel} data-line={it.line}
+        <div class="row" class:sel={i === sel} class:leaving={leaving === it.line || store.inboxLeaving === it.line} id="ib-{i}" role="option" aria-selected={i === sel} data-line={it.line}
           onclick={() => { sel = i; list?.focus(); }} ondblclick={() => store.openInboxItem(it)} oncontextmenu={(e) => context(e, it, i)}>
           <button class="check" aria-label="Готово: {it.title}" title="Готово" onclick={(e) => { e.stopPropagation(); void done(it); }}></button>
           <div class="main">

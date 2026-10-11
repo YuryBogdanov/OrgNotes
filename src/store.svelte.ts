@@ -5,9 +5,10 @@ import {
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { displayName, noteName, withOrg } from './names';
-import { appendTask, refile, setPlanning, setTags } from './edits';
+import { appendTask, setPlanning, setTags } from './edits';
+import { bareTitle, caretAfter, keyOf, moveTo, moveWithin } from './refile';
 import { DEFAULT_LEVELS, type LevelView } from './orgIndent';
-import { DEFAULT_INBOX, entry, inboxItems, insert, prepend, readInbox, remove, subtree, withInbox, type InboxConfig, type InboxItem } from './inbox';
+import { DEFAULT_INBOX, entry, inboxItems, prepend, readInbox, remove, withInbox, type InboxConfig, type InboxItem } from './inbox';
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
 import { EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
@@ -123,7 +124,7 @@ class Store {
   errorReq = $state<{ title: string; text: string; resolve: () => void } | null>(null);
   /** While a sheet is up the rest of the window does not react: no shortcuts, no menu commands. */
   get sheetOpen() {
-    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refileReq || this.pickInbox);
+    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refile || this.pickInbox);
   }
   /** The command palette; `start` opens it right at a step ("Создать файл…" ⇧⌘N, "Перейти к файлу…" ⇧⌘O). */
   palette = $state<{ start?: 'newFile' | 'goto'; n: number } | null>(null);
@@ -492,26 +493,29 @@ class Store {
   }
   /** What the Inbox actions changed in this session, for ⌘Z in the list: each step is one or two files. */
   private inboxUndo: { path: string; before: string; after: string }[][] = [];
-  private async inboxWrite(steps: { path: string; text: string }[]): Promise<boolean> {
+  /** Write files one by one, at once; the step to take it back, or null (and why, said) when a write failed. */
+  private async writeSteps(steps: { path: string; text: string }[]): Promise<{ path: string; before: string; after: string }[] | null> {
     const done: { path: string; before: string; after: string }[] = [];
     for (const st of steps) {
       const f = this.files.find((x) => x.path === st.path);
-      if (!f) return false;
+      if (!f) return null;
       const before = f.text;
       const err = await this.writeNow(st.path, st.text);
       if (err) {
         this.say('Не удалось записать «' + displayName(f.name) + '»: ' + err);
-        return false; // what was written before stays (a move writes the target first: nothing is lost)
+        return null; // what was written before stays (a move writes the target first: nothing is lost)
       }
       done.push({ path: st.path, before, after: st.text });
     }
-    this.inboxUndo.push(done);
-    return true;
+    return done;
   }
-  /** ⌘Z in the Inbox list: the last action is taken back (if the files were not changed since). */
-  async undoInbox(): Promise<boolean> {
-    const step = this.inboxUndo.pop();
-    if (!step) return false;
+  private async inboxWrite(steps: { path: string; text: string }[]): Promise<boolean> {
+    const done = await this.writeSteps(steps);
+    if (done) this.inboxUndo.push(done);
+    return !!done;
+  }
+  /** Take a step back, if its files were not changed since. */
+  private async undoStep(step: { path: string; before: string; after: string }[]): Promise<boolean> {
     for (const s of [...step].reverse()) {
       const f = this.files.find((x) => x.path === s.path);
       if (!f || f.text !== s.after) {
@@ -521,6 +525,14 @@ class Store {
     }
     for (const s of [...step].reverse()) await this.writeNow(s.path, s.before);
     return true;
+  }
+  /** ⌘Z in the Inbox list: the last action is taken back (if the files were not changed since). */
+  async undoInbox(): Promise<boolean> {
+    const step = this.inboxUndo.pop();
+    if (!step) return false;
+    if (await this.undoStep(step)) return true;
+    this.inboxUndo.push(step);
+    return false;
   }
   private inboxHeading(item: InboxItem): { f: NoteFile; h: Heading } | null {
     const f = this.inboxFile;
@@ -549,26 +561,6 @@ class Store {
   async inboxDate(item: InboxItem, kind: 'SCHEDULED' | 'DEADLINE', date: Date | null) {
     const r = this.inboxHeading(item);
     if (r) await this.inboxWrite([{ path: r.f.path, text: setPlanning(r.f.text, r.h, kind, date) }]);
-  }
-  /** «Перенести»: into another file — at its end, or as the last child of a heading there. The target is written
-   *  first, then the task leaves the Inbox: a failure loses nothing. */
-  async inboxRefile(item: InboxItem, path: string, underLine: number | null) {
-    const r = this.inboxHeading(item);
-    const dst = this.files.find((x) => x.path === path);
-    if (!r || !dst || dst.path === r.f.path) return;
-    const under = underLine === null ? null : dst.headings.find((x) => x.line === underLine) ?? null;
-    const moved = insert(dst.text, subtree(r.f.text, r.h), r.h.level, under);
-    const ok = await this.inboxWrite([{ path: dst.path, text: moved }, { path: r.f.path, text: remove(r.f.text, r.h) }]);
-    if (!ok) return;
-    const name = displayName(dst.name);
-    const line = (() => {
-      const nf = this.files.find((x) => x.path === dst.path);
-      return nf?.headings.find((x) => x.title === r.h.title && x.keyword === r.h.keyword && (!under || x.line > under.line))?.line ?? 0;
-    })();
-    this.note(`Перенесено в «${name}»`, [
-      { label: 'Открыть', run: () => { const i = this.files.findIndex((x) => x.path === dst.path); if (i >= 0) this.open(i, line); } },
-      { label: 'Отменить', run: () => void this.undoInbox() },
-    ], 6000);
   }
   /** «Открыть»: the Inbox file in the editor, at the task. */
   openInboxItem(item: InboxItem) {
@@ -600,8 +592,6 @@ class Store {
   capture = $state<{ n: number } | null>(null);
   /** «Выбрать файл…» for the Inbox: the palette of files. */
   pickInbox = $state(0);
-  /** «Перенести» of an Inbox task: the palette of where to (a file, a heading in it). */
-  refileReq = $state<{ item: InboxItem; n: number } | null>(null);
   openCapture() {
     if (this.sheetOpen && !this.capture) return;
     this.capture = { n: Date.now() };
@@ -1085,16 +1075,117 @@ class Store {
   setPlanning(kind: 'SCHEDULED' | 'DEADLINE', date: Date | null) { this.patch((t, h) => setPlanning(t, h, kind, date)); }
   setTags(tags: string[]) { this.patch((t, h) => setTags(t, h, tags)); }
 
-  /** "Перенести в другой файл…": the heading under the cursor with its subtree goes to the end of file `to`. */
-  refileTo(to: number) {
-    const f = this.file;
-    const h = f?.headings[this.selected];
-    const dst = this.files[to];
-    if (!f || !h || !dst || dst.path === f.path) return;
-    const r = refile(f.text, h, dst.text);
-    this.setText(r.src, f.path);
-    this.setText(r.dst, dst.path);
-    this.say(`Перенесено в «${displayName(dst.name)}»`);
+  // ---- «Перенести»: a heading with its subtree into a file, under a heading there or at its 1st level ----------
+  /** What is being moved: the heading under the cursor (the palette's command) or an Inbox task. */
+  refile = $state<{ from: 'palette' | 'inbox'; path: string; line: number; title: string; item?: InboxItem; n: number } | null>(null);
+  /** The Inbox task going away after «Перенести» (the same short fade as «Готово»). */
+  inboxLeaving = $state<number | null>(null);
+  startRefile(from: 'palette' | 'inbox', item?: InboxItem) {
+    const f = from === 'inbox' ? this.inboxFile : this.file;
+    const h = from === 'inbox' ? (item ? this.inboxHeading(item)?.h : undefined) : f?.headings[this.selected];
+    if (!f || !h) return;
+    this.refile = { from, path: f.path, line: h.line, title: h.title, item, n: Date.now() };
+  }
+  /** The heading being moved, as it is now. */
+  refileSource(): { f: NoteFile; h: Heading } | null {
+    const r = this.refile;
+    if (!r) return null;
+    const f = this.files.find((x) => x.path === r.path);
+    const h = f?.headings.find((x) => x.line === r.line && x.title === r.title);
+    return f && h ? { f, h } : null;
+  }
+  private recentKey() {
+    return 'refile:recent:' + (this.dir ?? '');
+  }
+  /** The last places moved to, newest first, one per file: its path and the heading's key ('' = the 1st level). */
+  refileRecent(): { path: string; key: string }[] {
+    try {
+      const v = JSON.parse(lsGet(this.recentKey()) ?? '[]');
+      return Array.isArray(v) ? v.filter((x) => x && typeof x.path === 'string' && typeof x.key === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+  /** «НЕДАВНИЕ» of step 1: the last places moved to, then recently opened files (the own file only as a place
+   *  moved to before). */
+  refileRecentFiles(self: string): string[] {
+    const opened = [...this.layout.panes.flatMap((p) => p.tabs.flatMap((t) => (t.kind === 'file' && t.path ? [t.path] : []))), ...this.history.map((h) => h.path), this.curPath].reverse();
+    return [...new Set([...this.refileRecent().map((x) => x.path), ...opened.filter((p) => p && p !== self)])];
+  }
+  /**
+   * Move it. The target is saved first (its unsaved edits go along) and re-read from disk; a heading chosen there
+   * that is gone now gives 'gone' and the dialog stays. Then the target is written, and only then the source.
+   */
+  async refileMove(dstPath: string, under: { key: string; line: number } | null): Promise<'ok' | 'gone' | 'error'> {
+    const req = this.refile;
+    if (!req) return 'error';
+    const d0 = this.files.find((x) => x.path === dstPath);
+    if (d0 && d0.text !== d0.disk && !this.conflicts[dstPath]) {
+      clearTimeout(this.timers.get(dstPath));
+      this.timers.delete(dstPath);
+      const err = await this.save(dstPath);
+      if (err) {
+        this.say('Не удалось записать «' + displayName(d0.name) + '»: ' + err);
+        return 'error';
+      }
+    }
+    await this.reload();
+    const src = this.refileSource();
+    const dst = this.files.find((x) => x.path === dstPath);
+    if (!src || !dst) {
+      this.refile = null;
+      this.say('Не удалось перенести: файл изменился');
+      return 'error';
+    }
+    const same = dst.path === src.f.path;
+    let uh: Heading | null = null;
+    if (under) {
+      const inside = (x: Heading) => same && x.line >= src.h.line && x.line < src.h.end;
+      const found = dst.headings.filter((x) => keyOf(x) === under.key && !inside(x));
+      uh = found.sort((a, b) => Math.abs(a.line - under.line) - Math.abs(b.line - under.line))[0] ?? null;
+      if (!uh) return 'gone';
+    }
+    this.refile = null;
+    if (req.from === 'inbox') {
+      this.inboxLeaving = src.h.line;
+      await new Promise((r) => setTimeout(r, 180));
+      this.inboxLeaving = null;
+    }
+    let steps: { path: string; text: string }[];
+    let line: number;
+    if (same) {
+      const r = moveWithin(src.f.text, src.h, uh);
+      steps = [{ path: dst.path, text: r.text }];
+      line = r.line;
+    } else {
+      const r = moveTo(src.f.text, src.h, dst.text, uh);
+      steps = [{ path: dst.path, text: r.dst }, { path: src.f.path, text: r.src }];
+      line = r.line;
+    }
+    const done = await this.writeSteps(steps);
+    if (!done) return 'error';
+    if (req.from === 'inbox') this.inboxUndo.push(done);
+    const rec = [{ path: dst.path, key: uh ? keyOf(uh) : '' }, ...this.refileRecent().filter((x) => x.path !== dst.path)].slice(0, 20);
+    lsSet(this.recentKey(), JSON.stringify(rec));
+    if (req.from === 'palette') this.caretAfterRefile(src.f.path, src.h, same ? line : null);
+    const name = displayName(dst.name);
+    this.note(`Перенесено в ${name}${uh ? ' › ' + bareTitle(uh.title) : ''}`, [
+      { label: 'Открыть', run: () => { const i = this.files.findIndex((x) => x.path === dst.path); if (i >= 0) this.open(i, line); } },
+      { label: 'Отменить', run: () => void this.undoStep(done).then((ok) => { if (ok) this.inboxUndo = this.inboxUndo.filter((s) => s !== done); }) },
+    ], 3000);
+    return 'ok';
+  }
+  /** The caret in the source (if shown in the active tab) on the heading that came after the moved one, else on
+   *  the one before. `movedAt`: where the heading went, when it stayed in the same file. */
+  private caretAfterRefile(path: string, h: Heading, movedAt: number | null) {
+    const f = this.files.find((x) => x.path === path);
+    const t = this.tab;
+    if (!f || t?.kind !== 'file' || t.path !== path) return;
+    const m = movedAt === null ? undefined : f.headings.find((x) => x.line === movedAt);
+    const size = m ? m.end - m.line : 0;
+    const rest = m ? f.headings.filter((x) => x.line < m.line || x.line >= m.end) : f.headings;
+    const at = m && m.line <= h.line ? h.line + size : h.line;
+    this.revealLine(caretAfter(rest, at), true);
   }
   /** "Новая задача": a top-level task at the end of the current file, the caret after its keyword. */
   newTask() {

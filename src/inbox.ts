@@ -141,12 +141,6 @@ export function entry(title: string, details: string, status: string, created: D
   if (d.trim()) for (const l of d.split('\n')) out.push(/^\*+\s/.test(l) ? ',' + l : l);
   return out.join('\n');
 }
-/** The file with a task added at its end (the file keeps ending with a line break). */
-export function append(text: string, task: string): string {
-  const body = text.replace(/\n*$/, '');
-  return (body ? body + '\n' : '') + task + '\n';
-}
-
 /**
  * The file with a task added at its top: after the preamble (#+TITLE and the like, kept as it is), before the first
  * heading, with one blank line between the task and the heading below it, so the newest is seen first on opening.
@@ -162,29 +156,9 @@ export function prepend(text: string, task: string): string {
   return lines.slice(0, first).map((l) => l + '\n').join('') + task + '\n\n' + (rest.endsWith('\n') ? rest : rest + '\n');
 }
 
-/** The lines a heading takes with everything under it. */
-export const subtree = (text: string, h: Heading) => text.split('\n').slice(h.line, h.end);
 /** The file without a heading and everything under it. */
 export function remove(text: string, h: Heading): string {
   const lines = text.split('\n');
   lines.splice(h.line, h.end - h.line);
   return lines.join('\n');
-}
-
-/**
- * A subtree placed into another file: at its end as a top-level heading, or as the last child of `under` (the
- * levels are recounted; :CREATED: and the details go with it).
- */
-export function insert(dst: string, tree: string[], level: number, under: Heading | null): string {
-  const shift = (under ? under.level + 1 : 1) - level;
-  const moved = tree.map((l) => l.replace(/^(\*+)(\s)/, (_, s: string, sp: string) => '*'.repeat(Math.max(1, s.length + shift)) + sp));
-  while (moved.length && moved[moved.length - 1].trim() === '') moved.pop();
-  if (!under) return append(dst, moved.join('\n'));
-  const lines = dst.split('\n');
-  // after the last non-blank line of the heading's subtree
-  let at = under.end;
-  while (at > under.line + 1 && (lines[at - 1] ?? '').trim() === '') at--;
-  lines.splice(at, 0, ...moved);
-  const out = lines.join('\n');
-  return out.endsWith('\n') ? out : out + '\n';
 }
