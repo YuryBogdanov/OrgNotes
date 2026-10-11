@@ -48,6 +48,7 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
           text: 'Вид',
           items: [
             it('palette', 'Командная палитра', 'Shift+CmdOrCtrl+KeyP'),
+            it('jumpBar', 'Строка пути', 'Control+CmdOrCtrl+KeyJ'),
             sep,
             it('splitRight', 'Разделить вправо', 'CmdOrCtrl+Backslash'),
             it('splitDown', 'Разделить вниз', 'Alt+CmdOrCtrl+Backslash', false),

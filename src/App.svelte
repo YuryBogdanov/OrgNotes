@@ -10,6 +10,7 @@
   import DiskSheet from './DiskSheet.svelte';
   import StartScreen from './StartScreen.svelte';
   import EmptyFolder from './EmptyFolder.svelte';
+  import JumpBar from './JumpBar.svelte';
   import { installMenu, type AppMenu } from './menu';
   import { MIN_PANE, secondKind } from './layout';
   import { displayPath } from './names';
@@ -85,6 +86,7 @@
     },
     newTab: () => store.newUntitled(store.layout.active),
     palette: () => store.togglePalette(),
+    jumpBar: () => store.jumpReq++,
     paletteNewFile: () => store.openPalette('newFile'),
     paletteGoto: () => store.openPalette('goto'),
     closePane: () => store.closePane(store.layout.active),
@@ -140,6 +142,7 @@
     if (e.altKey && k === 'ArrowRight') return 'paneRight';
     if (e.altKey && e.code === 'KeyW') return 'closeOthers';
     if (e.ctrlKey && e.code === 'KeyW') return 'closePane';
+    if (e.ctrlKey && e.code === 'KeyJ') return 'jumpBar';
     if (e.shiftKey && e.code === 'KeyW') return 'closeWindow';
     if (e.shiftKey && e.code === 'KeyP') return 'palette';
     if (e.shiftKey && e.code === 'KeyN') return 'paletteNewFile';
@@ -225,9 +228,7 @@
       {:else if store.tab?.kind === 'untitled'}
         <span class="last">{store.tab.title}</span><span class="sep">·</span><span>не сохранено</span>
       {:else if crumbs.length}
-        {#each crumbs as c, i}
-          {#if i}<span class="sep">›</span>{/if}<span class:last={i === crumbs.length - 1}>{c}</span>
-        {/each}
+        <JumpBar />
       {:else}
         <span>Заметки</span>
       {/if}
@@ -304,11 +305,12 @@
   .ibtn:disabled { opacity: 0.35; }
   .path {
     flex: 1 1 360px; max-width: 640px; min-width: 200px; height: 28px; display: flex; align-items: center; gap: 8px;
-    padding: 0 12px; background: var(--field); border-radius: 7px; color: var(--fg2); font-size: 12.5px; white-space: nowrap; overflow: hidden;
+    padding: 0 12px 0 6px; background: var(--field); border-radius: 7px; color: var(--fg2); font-size: 12.5px; white-space: nowrap;
+    overflow: visible; /* the path bar's menus hang below it */
   }
   .pfirst, .last { color: var(--fg); }
   .sep { color: var(--fg3); }
-  .date { margin-left: auto; color: var(--fg3); padding-left: 12px; }
+  .date { margin-left: auto; color: var(--fg3); padding-left: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
   /* "Открыть в панели": three icon buttons in a grey capsule, the pressed one on a light plate */
   .seg3 { display: flex; padding: 2px; background: var(--field); border-radius: 8px; gap: 2px; }
