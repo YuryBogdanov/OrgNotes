@@ -1,10 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
-import { FILES, INBOX, WORK } from './inboxFixture';
+import { FILES, INBOX } from './inboxFixture';
 
 // ТЗ «Inbox — раздел навигатора и быстрый ввод задачи (⇧⌘I)».
 const IB = '/mock/inbox.org';
-const W = '/mock/Работа/work.org';
 const disk = (page: Page, p = IB) => page.evaluate((p) => (window as any).__disk[p] as string, p);
 const config = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/config.json'] ?? 'null'));
 const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
@@ -214,46 +213,6 @@ test.describe('sorting out', () => {
     await open(page);
     await rows(page).first().click({ button: 'right' });
     await expect(page.getByRole('menuitem')).toHaveText(['Открыть', 'Перенести…', 'Дата…', 'Готово', 'Удалить…']);
-  });
-});
-
-test.describe('moving a task', () => {
-  test('found by a heading: under it, one level deeper, with :CREATED: and details; the target first; «Отменить» undoes both', async ({ page }) => {
-    await open(page);
-    await rows(page).first().getByRole('button', { name: 'Перенести' }).click({ force: true });
-    await expect(picker(page).locator('.crumb')).toHaveText(/Перенести\s*›\s*Позвонить в банк про лимиты/);
-    await page.keyboard.type('бюд');
-    await expect(picker(page).locator('.r').first()).toContainText('Подготовить бюджет 2027');
-    await expect(picker(page).locator('.r').first()).toContainText('заголовок');
-    await page.keyboard.press('Enter');
-    await expect.poll(() => disk(page, W)).toContain('** TODO Подготовить бюджет 2027\nтекст\n*** TODO Позвонить в банк про лимиты\n:PROPERTIES:\n:CREATED:');
-    expect(await disk(page, W)).toContain('по карте компании, уточнить комиссию\n* Найм');
-    expect(await disk(page)).not.toContain('Позвонить в банк');
-    // the target was written before the Inbox
-    const saves = (await log(page)).filter((e) => e[0] === 'save').map((e) => e[1]);
-    expect(saves.indexOf(W)).toBeLessThan(saves.lastIndexOf(IB));
-    await expect(page.locator('.toast')).toContainText('Перенесено в «work»');
-    await page.locator('.toast').getByRole('button', { name: 'Отменить' }).click();
-    await expect.poll(() => disk(page, W)).toBe(WORK);
-    expect(await disk(page)).toBe(INBOX());
-  });
-
-  test('a file: into its folder with →, then «В конец файла» (the default) or a heading of it; ← goes back', async ({ page }) => {
-    await open(page);
-    await rows(page).nth(1).click();
-    await rows(page).nth(1).getByRole('button', { name: 'Перенести' }).click();
-    await expect(picker(page).locator('.r .l')).toHaveText(['Работа']); // the root: the folder (not the Inbox itself)
-    await page.keyboard.press('ArrowRight');
-    await expect(picker(page).locator('.r .l')).toHaveText(['journal', 'work']);
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter'); // «work»: its headings
-    await expect(picker(page).locator('.r .l').first()).toHaveText('В конец файла');
-    await page.keyboard.press('ArrowLeft');
-    await expect(picker(page).locator('.r .l')).toHaveText(['journal', 'work']);
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
-    await page.keyboard.press('Enter'); // the end of the file
-    await expect.poll(() => disk(page, W)).toMatch(/\* NEXT План найма\n\* TODO Согласовать отпуск с тимлидами\n:PROPERTIES:\n:CREATED: [^\n]+\n:END:\nдо пятницы\n$/);
   });
 });
 

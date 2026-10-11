@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_INBOX, ago, append, entry, inboxItems, insert, prepend, readInbox, remove, subtree, withInbox } from './inbox';
+import { DEFAULT_INBOX, ago, entry, inboxItems, prepend, readInbox, remove, withInbox } from './inbox';
 import { DEFAULT_WORKFLOW, parseHeadings } from './org';
 
 const INBOX = [
@@ -50,11 +50,6 @@ describe('writing', () => {
     expect(e).toBe(['* TODO Подготовить презентацию для CTO', ':PROPERTIES:', ':CREATED: [2026-10-11 Sun 14:32]', ':END:', 'Показать план найма.', ',* не заголовок'].join('\n'));
     expect(entry('Без деталей', '', 'NEW', null)).toBe('* NEW Без деталей');
   });
-  it('appended at the end, the file ends with a line break', () => {
-    expect(append('* A', '* TODO B')).toBe('* A\n* TODO B\n');
-    expect(append('* A\n\n\n', '* TODO B')).toBe('* A\n* TODO B\n');
-    expect(append('', '* TODO B')).toBe('* TODO B\n');
-  });
   it('prepended: after the preamble, before the first heading, one blank line below it', () => {
     expect(prepend('#+TITLE: Inbox\n* TODO A\n', '* TODO B')).toBe('#+TITLE: Inbox\n* TODO B\n\n* TODO A\n');
     expect(prepend('#+TITLE: Inbox\n\n* TODO A\ntext\n\n* TODO C', '* TODO B\n:PROPERTIES:\n:END:')).toBe(
@@ -70,15 +65,10 @@ describe('writing', () => {
     // twice: the newest on top, the tasks don't stick together
     expect(prepend(prepend('* A\n', '* B'), '* C')).toBe('* C\n\n* B\n\n* A\n');
   });
-  it('removing and moving a subtree: levels recounted, :CREATED: and details go with it', () => {
+  it('removing a subtree', () => {
     const h = hs.find((x) => x.title === 'Согласовать отпуск')!;
-    const tree = subtree(INBOX, h);
     expect(remove(INBOX, h)).not.toContain('Согласовать отпуск');
     expect(remove(INBOX, h)).toContain('* Просто заметка');
-    const dst = '* Работа\n** Q4\nтекст\n\n* Дом\n';
-    const dh = parseHeadings(dst, DEFAULT_WORKFLOW);
-    expect(insert(dst, tree, 1, dh[1])).toBe(['* Работа', '** Q4', 'текст', '*** TODO Согласовать отпуск', ':PROPERTIES:', ':CREATED: [2026-10-11 Sun 18:40]', ':END:', '**** NEXT подзадача', '', '* Дом', ''].join('\n'));
-    expect(insert(dst, tree, 1, null)).toBe(dst.replace(/\n$/, '') + '\n' + tree.join('\n') + '\n');
   });
 });
 

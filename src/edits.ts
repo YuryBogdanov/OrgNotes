@@ -118,21 +118,7 @@ export function setTags(text: string, h: Heading, tags: string[]): string {
 /** «budget, finance #q4» → ["budget", "finance", "q4"]: spaces, commas and colons separate tags. */
 export const splitTags = (s: string) => [...new Set(s.split(/[\s,:;#]+/).map((t) => t.trim()).filter(Boolean))];
 
-// ---- moving a subtree, adding a task ----------------------------------------------------------------
-
-/**
- * Move a heading with everything under it to the end of another file, as a top-level heading (its sub-headings
- * keep their depth relative to it). Returns both texts.
- */
-export function refile(src: string, h: Heading, dst: string): { src: string; dst: string } {
-  const lines = src.split('\n');
-  const tree = lines.splice(h.line, h.end - h.line);
-  const shift = 1 - h.level;
-  const moved = tree.map((l) => l.replace(/^(\*+)(\s)/, (_, stars: string, sp: string) => '*'.repeat(Math.max(1, stars.length + shift)) + sp));
-  while (moved.length && moved[moved.length - 1] === '') moved.pop();
-  const body = dst.replace(/\n*$/, '');
-  return { src: lines.join('\n'), dst: (body ? body + '\n' : '') + moved.join('\n') + '\n' };
-}
+// ---- adding a task ----------------------------------------------------------------
 
 /** A new top-level task at the end of a file; returns the text and its line (for the caret). */
 export function appendTask(text: string, keyword: string): { text: string; line: number } {

@@ -20,6 +20,7 @@
   import NavPanel from './NavPanel.svelte';
   import Capture from './Capture.svelte';
   import Picker from './Picker.svelte';
+  import Refile from './Refile.svelte';
   import CaptureWindow from './CaptureWindow.svelte';
   import { displayName as nameOf } from './names';
 
@@ -249,8 +250,8 @@
       {/key}
     </div>
   {/if}
-  {#if store.pickInbox}{#key store.pickInbox}<Picker mode="inbox" onclose={() => (store.pickInbox = 0)} />{/key}{/if}
-  {#if store.refileReq}{#key store.refileReq.n}<Picker mode="refile" item={store.refileReq.item} onclose={() => (store.refileReq = null)} />{/key}{/if}
+  {#if store.pickInbox}{#key store.pickInbox}<Picker onclose={() => (store.pickInbox = 0)} />{/key}{/if}
+  {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
   {#if store.toast}
     <div class="toast" class:acts={!!store.toast.actions} role="status">
       <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 10a6.5 6.5 0 1 1-2-4.7M16.5 3.5V6.5h-3" /></svg>

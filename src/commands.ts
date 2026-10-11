@@ -135,7 +135,7 @@ register({
 });
 register({
   id: 'refile', title: 'Перенести в другой файл…', icon: 'refile', group: 'heading', synonyms: ['переместить', 'refile'],
-  when: (c) => onHeading(c) && store.files.length > 1, run: refileStep,
+  when: onHeading, run: () => store.startRefile('palette'),
 });
 register({
   id: 'newFile', title: 'Создать файл…', icon: 'newfile', group: 'general', key: '⇧⌘N', synonyms: ['новый файл', 'заметка'],
@@ -176,16 +176,15 @@ function matchCommand(q: string, c: Command): { m: Match; at: number[] } | null 
 const rank = <T extends { m: Match; w: number; i: number }>(a: T, b: T) =>
   a.m.wordStart !== b.m.wordStart ? (a.m.wordStart ? -1 : 1) : a.m.span - b.m.span || b.w - a.w || a.i - b.i;
 
-function fileRows(q: string, except?: string, run?: (i: number) => Step | void): Row[] {
+function fileRows(q: string): Row[] {
   const out: { r: Row; m: Match; w: number; i: number }[] = [];
   store.files.forEach((f, i) => {
-    if (f.path === except) return;
     const name = displayName(f.name);
     const m = fuzzy(q, name);
     if (!m) return;
     out.push({
       m, w: 0, i,
-      r: { id: 'file:' + f.path, group: 'ФАЙЛЫ', title: name, at: m.at, icon: 'file', hint: dirOf(f.name), run: () => (run ? run(i) : store.jump(i, 0)) },
+      r: { id: 'file:' + f.path, group: 'ФАЙЛЫ', title: name, at: m.at, icon: 'file', hint: dirOf(f.name), run: () => store.jump(i, 0) },
     });
   });
   return out.sort(rank).map((x) => x.r);
@@ -313,17 +312,6 @@ function tagsStep(c: Ctx): Step {
           ? { id: 'tags', group: 'ТЕГИ', title: `Сохранить теги: ${tags.join(', ')}`, icon: 'tag', run: () => store.setTags(tags) }
           : { id: 'tags', group: 'ТЕГИ', title: before.length ? 'Убрать все теги' : 'Введите теги через пробел', icon: 'tag', run: before.length ? () => store.setTags([]) : undefined },
       ];
-    },
-  };
-}
-
-function refileStep(c: Ctx): Step {
-  return {
-    placeholder: 'В какой файл',
-    plate: headingPlate(c),
-    rows: (q) => {
-      const rows = fileRows(q, c.file!.path, (i) => store.refileTo(i));
-      return rows.length ? rows : [NOTHING];
     },
   };
 }

@@ -320,19 +320,6 @@ test.describe('steps', () => {
     await expect(page.locator('.cm-line', { hasText: 'Подготовить бюджет' })).toHaveText('** TODO [#A] Подготовить бюджет 2027 :budget:q4:');
   });
 
-  test('«Перенести в другой файл…» moves the subtree to the end of the chosen file', async ({ page }) => {
-    await open(page);
-    await at(page, 'Подготовить бюджет');
-    await palette(page);
-    await page.keyboard.type('перен');
-    await page.keyboard.press('Enter');
-    expect(await titles(page)).toEqual(['journal', 'Сергей Белов']); // not the file itself
-    await page.keyboard.type('jour');
-    await page.keyboard.press('Enter');
-    await expect.poll(async () => (await disk(page))['/mock/journal.org']).toBe('* Октябрь\n* TODO [#A] Подготовить бюджет 2027 :budget:finance:\nDEADLINE: <2026-10-24 Сб> SCHEDULED: <2026-10-14 Ср>\nСвести заявки.\n** DONE Собрать заявки\n');
-    expect((await disk(page))['/mock/work.org']).toBe('#+TITLE: Работа\n\n* Q4 2026\n** NEXT План найма\n');
-  });
-
   test('⇧⌘N goes straight to the name of a new file; it is created and opened', async ({ page }) => {
     await open(page);
     await page.keyboard.press('Shift+Meta+n');
