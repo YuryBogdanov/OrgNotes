@@ -83,7 +83,7 @@ test.describe('the segments', () => {
 });
 
 test.describe('the menus', () => {
-  test('the file segment: the files of its folder, the current one checked and lit first', async ({ page }) => {
+  test('the file segment: everything in its folder, the current one checked and lit first', async ({ page }) => {
     await open(page);
     await enter(page);
     await page.keyboard.press('ArrowDown');
@@ -96,7 +96,7 @@ test.describe('the menus', () => {
     await expect(on(page)).toHaveText('journal');
   });
 
-  test('a folder segment: the folders beside it; → opens a folder, ← closes it, Esc one level at a time', async ({ page }) => {
+  test('a folder segment: everything in the folder that holds it; → opens a folder, ← closes it, Esc one level at a time', async ({ page }) => {
     await open(page);
     await enter(page);
     await page.keyboard.press('ArrowLeft');
@@ -124,19 +124,56 @@ test.describe('the menus', () => {
     await expect(page.locator('section.pane .cm-content')).toBeFocused();
   });
 
+  test('folders and files together: folders (with ›) first, a line, then files, each by name; the filter looks at both', async ({ page }) => {
+    await installTauriMock(page, {
+      '/mock/Работа/Планирование/план.org': '* План\n** TODO Бюджет\n',
+      '/mock/Работа/Планирование/Архив/старое.org': '* Старое\n',
+      '/mock/Работа/Планирование/Встречи/планёрка.org': '* Планёрка\n',
+      '/mock/Работа/Планирование/бюджет.org': '* Бюджет\n',
+      '/mock/Работа/итоги.org': '* Итоги\n',
+      '/mock/Работа/Команды/цели.org': '* Цели\n',
+    });
+    await page.goto('/');
+    await expect(page.locator('.cm-content').first()).toBeVisible();
+    await page.locator('.nav .row[data-key="/mock/Работа/Планирование/план.org"]').click();
+    await page.locator('section.pane .cm-line', { hasText: 'Бюджет' }).click();
+    await enter(page);
+    await page.keyboard.press('ArrowDown'); // the file «план»: its folder has five things — two folders, three files
+    const m = menus(page).first();
+    await expect(items(m)).toHaveText(['Архив', 'Встречи', 'бюджет', 'план']);
+    await expect(m.locator(':scope > .line')).toHaveCount(1);
+    expect(await m.locator(':scope > *').evaluateAll((els) => els.map((e) => (e.classList.contains('line') ? '—' : e.querySelector('.nm')?.textContent)))).toEqual(['Архив', 'Встречи', '—', 'бюджет', 'план']);
+    await expect(m.locator('.item', { hasText: 'Архив' }).locator('.more')).toHaveCount(1); // a folder opens a submenu
+    await expect(m.locator('.item', { hasText: 'бюджет' }).locator('.more')).toHaveCount(0);
+    await expect(on(page)).toHaveText('план');
+    // a folder segment: everything in «Работа» — its folders and its own file
+    await page.keyboard.press('ArrowLeft');
+    await expect(items(menus(page).first())).toHaveText(['Команды', 'Планирование', 'итоги']);
+    await expect(on(page)).toHaveText('Планирование');
+    // the filter looks at folders and files alike, the line only where both are left
+    await typeKeys(page, 'и');
+    await expect(items(menus(page).first())).toHaveText(['Планирование', 'итоги']);
+    await expect(menus(page).first().locator(':scope > .line')).toHaveCount(1);
+    await typeKeys(page, 'т');
+    await expect(items(menus(page).first())).toHaveText(['итоги']);
+    await expect(menus(page).first().locator(':scope > .line')).toHaveCount(0);
+    await page.keyboard.press('Enter'); // a file from the menu of a folder segment opens
+    await expect(page.locator('section.pane.active .tab.active, section.pane .tab[aria-selected="true"]').first()).toContainText('итоги');
+  });
+
   test('← → on a top menu go to the neighbour segment\'s menu', async ({ page }) => {
     await open(page);
     await enter(page);
     await page.keyboard.press('Home');
-    await page.keyboard.press('ArrowDown'); // «Работа»: the top folders
-    await expect(items(menus(page).first())).toHaveText(['Личное', 'Работа']);
+    await page.keyboard.press('ArrowDown'); // «Работа»: everything at the top, folders then files
+    await expect(items(menus(page).first())).toHaveText(['Личное', 'Работа', 'inbox']);
     await page.keyboard.press('Escape');
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('ArrowDown'); // «Планирование»
     await expect(items(menus(page).first())).toHaveText(['Планирование', 'Проекты', 'Протоколы', 'Ёлка'].sort((a, b) => a.localeCompare(b, 'ru')));
     await page.keyboard.press('ArrowLeft'); // to «Работа»'s menu, without closing
     await expect(menus(page)).toHaveCount(1);
-    await expect(items(menus(page).first())).toHaveText(['Личное', 'Работа']);
+    await expect(items(menus(page).first())).toHaveText(['Личное', 'Работа', 'inbox']);
     await expect(seg(page, 0)).toHaveClass(/open/);
   });
 
