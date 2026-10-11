@@ -539,6 +539,20 @@
             </div>
           </div>
           <p class="help">Только вид в редакторе: звёздочки и пробелы в файлах не меняются. «Вид › Структурный вид» включает и выключает обе настройки сразу. Настройки хранятся на этом Mac.</p>
+          <div class="cap">ОФОРМЛЕННЫЙ ТЕКСТ</div>
+          <div class="opts">
+            <div class="opt">
+              <label for="rich-on">Оформленный текст</label>
+              <button id="rich-on" class="switch" role="switch" aria-checked={store.rich} aria-label="Оформленный текст"
+                onclick={() => store.setRich(!store.rich)}><span></span></button>
+            </div>
+            <div class="opt">
+              <label for="rich-nums">Номера строк в оформленном виде</label>
+              <button id="rich-nums" class="switch" role="switch" aria-checked={store.richNumbers} aria-label="Номера строк в оформленном виде"
+                onclick={() => store.setRichNumbers(!store.richNumbers)}><span></span></button>
+            </div>
+          </div>
+          <p class="help">Статусы, приоритеты и теги — капсулами, даты — плашками, заголовки крупнее, разметка без служебных символов. Строка под курсором показывается как есть. Текст файла не меняется. То же — «Вид › Оформленный текст» и переключатель «Текст / Оформление» над редактором. Настройки хранятся на этом Mac.</p>
           <div class="cap">DRAWERS</div>
           <div class="opts">
             <div class="opt">

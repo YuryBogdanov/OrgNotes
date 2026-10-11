@@ -89,3 +89,56 @@ button { cursor: default; }
 .cm-link { color: var(--link); text-decoration: underline; cursor: pointer; }
 .cm-linkmark { color: var(--fg3); }
 .cm-tablesep { color: var(--fg3); }
+
+/* «Оформленный текст» (orgRich.ts): only looks, the text in the file is the same */
+.cm-rich .cm-content { padding-left: 16px; }
+.cm-rich .cm-line { line-height: 24px; }
+.cm-rich .cm-r-h { font-weight: 700; }
+.cm-rich .cm-r-h1 { font-size: 20px; line-height: 30px; padding-top: 14px; }
+.cm-rich .cm-r-h2 { font-size: 17px; line-height: 26px; padding-top: 8px; }
+.cm-rich .cm-r-h3 { font-size: 15px; line-height: 24px; padding-top: 4px; }
+.cm-rich .cm-r-h4 { font-size: 13px; }
+.cm-rich .cm-r-hdone { color: var(--fg2) !important; }
+.cm-rich .cm-r-title { font: 700 26px var(--ui); line-height: 38px; }
+.cm-rich .cm-r-ftags { line-height: 28px; }
+.cm-rich .cm-r-plan { line-height: 28px; }
+.cm-r-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 7px 0 -16px; vertical-align: middle; background: var(--h1); }
+.cm-r-dot2 { width: 8px; height: 8px; margin-right: 8px; background: var(--h2); }
+.cm-r-dot3 { width: 7px; height: 7px; margin-right: 9px; background: var(--h3); }
+.cm-r-dot4 { width: 6px; height: 6px; margin-right: 10px; background: var(--fg2); }
+.cm-r-cap { display: inline-block; padding: 0 6px; border-radius: 5px; font: 700 10.5px var(--ui); letter-spacing: 0.02em; line-height: 20px; vertical-align: middle; }
+.cm-r-cap.prio { color: var(--wait); background: color-mix(in srgb, var(--wait) 15%, transparent); margin-left: 4px; }
+.cm-r-tags { display: inline-flex; gap: 4px; margin-left: 10px; vertical-align: middle; }
+.cm-r-tags.right { float: right; margin-right: 16px; }
+.cm-r-cap.tag { font-size: 11px; font-weight: 600; color: var(--tagfg); background: var(--field); }
+.cm-r-bar { display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; font: 600 11.5px var(--ui); color: var(--fg2); vertical-align: middle; }
+.cm-r-track { position: relative; width: 44px; height: 6px; border-radius: 3px; background: var(--field); overflow: hidden; }
+.cm-r-track span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--done); }
+.cm-r-chip { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 6px; font: 12px var(--ui); line-height: 22px; vertical-align: middle; }
+.cm-r-ct { font-weight: 600; }
+.cm-r-rel { opacity: 0.8; }
+.cm-r-chip.sched { color: var(--ts); background: color-mix(in srgb, var(--ts) 11%, transparent); }
+.cm-r-chip.plain { color: var(--fg2); background: var(--field); }
+.cm-r-chip.dead { color: var(--fg); background: var(--field); }
+.cm-r-chip.dead.near { color: var(--wait); }
+.cm-r-chip.dead.over { color: var(--todo); background: color-mix(in srgb, var(--todo) 14%, transparent); }
+.cm-r-chip.closed { color: var(--fg2); background: var(--field); }
+.cm-r-chip.drawer { color: var(--fg2); background: transparent; padding-left: 0; }
+.cm-rich .cm-r-drawer .cm-foldPlaceholder { display: none; }
+.cm-r-box { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; box-sizing: border-box; margin-right: 8px; border: 1.5px solid var(--fg3); border-radius: 4px; vertical-align: middle; color: var(--onacc); }
+.cm-r-box.on { background: var(--acc); border-color: var(--acc); }
+.cm-r-box.part::after { content: ''; width: 7px; height: 1.5px; background: var(--fg2); }
+.cm-r-checked { color: var(--fg2); }
+.cm-r-bullet { color: var(--fg2); }
+.cm-r-b { font-weight: 700; }
+.cm-r-i { font-style: italic; }
+.cm-r-u { text-decoration: underline; text-underline-offset: 2px; }
+.cm-r-s { text-decoration: line-through; }
+.cm-r-code { padding: 0 4px; border-radius: 4px; background: var(--side); color: var(--ts); }
+.cm-rich .cm-r-trule { height: 0; overflow: hidden; line-height: 0; font-size: 0; }
+.cm-rich .cm-r-thead { background: var(--side); font-weight: 700; }
+.cm-r-pipe { color: transparent; box-shadow: inset 1px 0 0 var(--line); }
+.cm-r-pipe.edge { box-shadow: none; }
+.cm-rich .cm-foldPlaceholder { display: inline-flex; align-items: center; height: 18px; margin-left: 6px; padding: 0 6px; border-radius: 5px; font: 11px var(--ui); vertical-align: middle; }
+.cm-r-click, .cm-r-status { cursor: pointer; }
+.cm-r-click:hover, .cm-r-status:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--acc) 30%, transparent); }
