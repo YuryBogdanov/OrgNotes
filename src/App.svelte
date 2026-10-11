@@ -10,6 +10,7 @@
   import DiskSheet from './DiskSheet.svelte';
   import StartScreen from './StartScreen.svelte';
   import EmptyFolder from './EmptyFolder.svelte';
+  import JumpBar from './JumpBar.svelte';
   import { installMenu, type AppMenu } from './menu';
   import { MIN_PANE, secondKind } from './layout';
   import { displayPath } from './names';
@@ -85,6 +86,7 @@
     },
     newTab: () => store.newUntitled(store.layout.active),
     palette: () => store.togglePalette(),
+    jumpBar: () => store.jumpReq++,
     paletteNewFile: () => store.openPalette('newFile'),
     paletteGoto: () => store.openPalette('goto'),
     closePane: () => store.closePane(store.layout.active),
@@ -140,6 +142,7 @@
     if (e.altKey && k === 'ArrowRight') return 'paneRight';
     if (e.altKey && e.code === 'KeyW') return 'closeOthers';
     if (e.ctrlKey && e.code === 'KeyW') return 'closePane';
+    if (e.ctrlKey && e.code === 'KeyJ') return 'jumpBar';
     if (e.shiftKey && e.code === 'KeyW') return 'closeWindow';
     if (e.shiftKey && e.code === 'KeyP') return 'palette';
     if (e.shiftKey && e.code === 'KeyN') return 'paletteNewFile';
@@ -152,7 +155,6 @@
     if (e.altKey) return null;
     return ({ '[': 'back', n: 'newFile', ',': 'settings', t: 'newTab', w: 'closeTab', s: 'save', q: 'quit', '1': 'notes', '2': 'agenda' } as Record<string, string>)[k] ?? null;
   }
-  const today = new Date().toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 
   onMount(() => {
     store.load();
@@ -212,6 +214,7 @@
   {#if !store.start}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="toolbar" data-tauri-drag-region onmousedown={drag}>
+    <div class="left">
     <div class="lights-gap"></div>
     <button class="ibtn" aria-label="Показать или скрыть навигатор" onclick={() => (store.showNav = !store.showNav)}>
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5" /><path d="M8 3.5v13" /></svg>
@@ -219,19 +222,17 @@
     <button class="ibtn" aria-label="Назад (⌘[)" title="Назад (⌘[)" disabled={store.history.length === 0} onclick={() => store.back()}>
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6" /></svg>
     </button>
+    </div>
     <div class="path">
       {#if store.mode === 'agenda'}
         <span class="last">Агенда</span>
       {:else if store.tab?.kind === 'untitled'}
         <span class="last">{store.tab.title}</span><span class="sep">·</span><span>не сохранено</span>
       {:else if crumbs.length}
-        {#each crumbs as c, i}
-          {#if i}<span class="sep">›</span>{/if}<span class:last={i === crumbs.length - 1}>{c}</span>
-        {/each}
+        <JumpBar />
       {:else}
         <span>Заметки</span>
       {/if}
-      <span class="date">{today}</span>
     </div>
     <div class="right">
       <div class="seg3" role="group" aria-label="Открыть в панели">
@@ -293,8 +294,9 @@
   .toast { position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 9px 14px; background: var(--bar); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); font-size: 12.5px; color: var(--fg); pointer-events: none; }
   .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .win { height: 100%; display: flex; flex-direction: column; }
+  /* as in the design: three columns, the path pill in the middle of the window, as wide as its content */
   .toolbar {
-    flex: 0 0 52px; display: flex; align-items: center; gap: 12px; padding: 0 14px;
+    flex: 0 0 52px; display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; grid-template-rows: 100%; align-items: center; gap: 12px; padding: 0 14px;
     background: var(--bar-bg); border-bottom: 1px solid var(--line);
   }
   .lights-gap { flex: 0 0 68px; }
@@ -302,14 +304,16 @@
   .ibtn { width: 30px; height: 28px; border: 0; background: transparent; color: var(--fg2); border-radius: 6px; padding: 0; display: flex; align-items: center; justify-content: center; }
   .ibtn:hover:not(:disabled) { background: var(--field); }
   .ibtn:disabled { opacity: 0.35; }
+  .left { justify-self: start; display: flex; align-items: center; gap: 12px; min-width: 0; }
   .path {
-    flex: 1 1 360px; max-width: 640px; min-width: 200px; height: 28px; display: flex; align-items: center; gap: 8px;
-    padding: 0 12px; background: var(--field); border-radius: 7px; color: var(--fg2); font-size: 12.5px; white-space: nowrap; overflow: hidden;
+    justify-self: center; max-width: 100%; min-width: 0; height: 28px; display: flex; align-items: center; gap: 2px;
+    padding: 0 6px; background: var(--field); border-radius: 7px; color: var(--fg2); font-size: 12.5px; white-space: nowrap;
+    overflow: visible; /* the path bar's menus hang below it */
   }
+  .path > span { padding: 0 4px; } /* plain text in the pill (agenda, a new note) lines up with the segments */
   .pfirst, .last { color: var(--fg); }
   .sep { color: var(--fg3); }
-  .date { margin-left: auto; color: var(--fg3); padding-left: 12px; }
-  .right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .right { justify-self: end; display: flex; align-items: center; gap: 12px; }
   /* "Открыть в панели": three icon buttons in a grey capsule, the pressed one on a light plate */
   .seg3 { display: flex; padding: 2px; background: var(--field); border-radius: 8px; gap: 2px; }
   .seg3 button { width: 30px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); padding: 0; display: flex; align-items: center; justify-content: center; }

@@ -1,5 +1,5 @@
 import {
-  activeTab, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
+  activeTab, addPane, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
   openFile, openFromAgenda, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
   newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED,
 } from './layout';
@@ -127,6 +127,43 @@ class Store {
     this.inspectorTab = t;
     lsSet('inspector:tab', t);
   }
+  /** Where the caret was last in each file (any tab): a file opened from the path bar goes back there. */
+  private lastCursor: Record<string, { line: number; col: number }> = {};
+  /**
+   * A file picked in the path bar: in the active pane (⌥↩: the neighbour pane, made if there is none). A tab that
+   * already shows it is reused — in another pane too, which becomes active; the active file tab is retargeted as
+   * from the navigator, unless it holds unsaved text: then the file opens in a new tab. The editor gets the focus.
+   */
+  openFromJump(path: string, other: boolean) {
+    const L = this.layout;
+    const at = this.lastCursor[path] ?? { line: 0, col: 1 };
+    const focus = (pi: number, ti: number) => {
+      L.active = pi;
+      L.panes[pi].active = ti;
+      const t = L.panes[pi].tabs[ti];
+      t.reveal = { line: t.cursor.line, n: Date.now(), focus: true, col: Math.max(0, t.cursor.col - 1) };
+    };
+    if (other && L.panes.length < 2) {
+      const t = newTab('file', path, at.line, true);
+      t.cursor = { ...at };
+      t.reveal = { line: at.line, n: Date.now(), focus: true, col: Math.max(0, at.col - 1) };
+      L.active = addPane(L, 'right', t);
+      return;
+    }
+    const pi = other ? 1 - L.active : L.active;
+    const find = (p: number) => L.panes[p]?.tabs.findIndex((t) => t.kind === 'file' && t.path === path) ?? -1;
+    if (find(pi) >= 0) return focus(pi, find(pi));
+    const elsewhere = L.panes.findIndex((_, i) => i !== pi && find(i) >= 0);
+    if (!other && elsewhere >= 0) return focus(elsewhere, find(elsewhere));
+    const cur = L.panes[pi].tabs[L.panes[pi].active];
+    const t = openFile(L, pi, path, at.line, { replace: !(cur && this.isUnsaved(cur)), focus: true });
+    t.cursor = { ...at };
+    t.reveal = { line: at.line, n: Date.now(), focus: true, col: Math.max(0, at.col - 1) };
+    L.active = pi;
+  }
+  /** ⌃⌘J: the path bar takes the keyboard (the bar listens to this). */
+  jumpReq = $state(0);
+
   /** "Показать структуру файла": the inspector with its outline. */
   showOutline() {
     this.showInspector = true;
@@ -736,6 +773,7 @@ class Store {
   /** The editor of a tab reports its caret; leaving the heading opened from the agenda drops the caption. */
   setTabCursor(tab: Tab, line: number, col: number) {
     tab.cursor = { line, col };
+    if (tab.kind === 'file' && tab.path) this.lastCursor[tab.path] = { line, col };
     if (tab.fromAgenda) {
       const f = this.fileOf(tab);
       const at = f ? headingAt(f.headings, line) : -1;
