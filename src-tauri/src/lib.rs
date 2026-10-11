@@ -149,8 +149,10 @@ fn watch(app: &AppHandle, dir: &Path) -> Option<Debouncer<RecommendedWatcher>> {
                     .file_name()
                     .map_or(false, |n| n.to_string_lossy().starts_with('.'));
                 let org = e.path.extension().map_or(false, |x| x == "org");
+                // the project config (statuses, agendas): every window reads it again
+                let config = e.path.ends_with(Path::new(CONFIG_DIR).join(CONFIG_FILE));
                 // no extension: a folder was added, renamed or removed
-                !hidden && (org || e.path.extension().is_none())
+                config || (!hidden && (org || e.path.extension().is_none()))
             });
             if relevant {
                 let _ = handle.emit("notes-changed", ());
