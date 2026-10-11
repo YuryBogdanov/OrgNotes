@@ -1,18 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Compartment, EditorState, Prec, RangeSetBuilder, type Range } from '@codemirror/state';
+  import { Compartment, EditorState, MapMode, Prec, RangeSetBuilder, type Range, type StateEffect, type Transaction } from '@codemirror/state';
   import { Decoration, EditorView, ViewPlugin, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-  import { foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
-  import { headingLines, toneFor, type Workflow } from './org';
+  import { codeFolding, foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
+  import { drawerRanges, headingLines, toneFor, type DrawerRange, type Workflow } from './org';
   import { toneStyle } from './colors';
   import { extractLinks, type OrgLink } from './links';
   import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftSubtree, type Result } from './outline';
   import type { Text } from '@codemirror/state';
   import { DEFAULT_LEVELS, orgIndent, type LevelView } from './orgIndent';
 
-  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, onchange, oncursor, onfollow }: {
+  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, onchange, oncursor, onfollow }: {
     levels?: LevelView; // «Структурный вид»: one star per level, text moved by level
+    drawers?: boolean; // drawers folded when a file opens and when the app adds one (:PROPERTIES:, :LOGBOOK:)
     hint?: string; // grey placeholder in an empty document
     resetOn?: number; // bumped when the text was silently reloaded from disk: the undo history starts over
     text: string; fileKey: string; wf: Workflow;
@@ -40,6 +41,66 @@
     if (!s) cache.set(doc, (s = headingLines(doc.toString().split('\n'))));
     return s;
   };
+
+  // drawers per document version, by the line (0-based) they start on
+  const drawerCache = new WeakMap<Text, Map<number, DrawerRange>>();
+  const drawerMap = (doc: Text) => {
+    let m = drawerCache.get(doc);
+    if (!m) drawerCache.set(doc, (m = new Map(drawerRanges(doc.toString().split('\n')).map((d) => [d.start, d]))));
+    return m;
+  };
+  /** The folded range of a drawer: from the end of its first line to the end of its :END: line. */
+  const drawerFold = (doc: Text, d: DrawerRange) => ({ from: doc.line(d.start + 1).to, to: doc.line(d.end + 1).to });
+  let drawersOn = true; // read by the editor's extensions, which outlive a render
+  $effect.pre(() => {
+    drawersOn = drawers;
+  });
+  /** Fold every drawer of the document (a file just opened). */
+  function foldAllDrawers(v: EditorView) {
+    if (!drawersOn) return;
+    const effects = [...drawerMap(v.state.doc).values()].map((d) => foldEffect.of(drawerFold(v.state.doc, d)));
+    if (effects.length) v.dispatch({ effects });
+  }
+  // what the user types, pastes, deletes or undoes: a drawer made this way stays open
+  const BY_HAND = ['input.type', 'input.paste', 'input.drop', 'input.complete', 'delete', 'undo', 'redo'];
+  /** A drawer the app adds (Inbox, a status with LOGBOOK, a file changed on disk) comes folded. */
+  const foldNewDrawers = EditorState.transactionExtender.of((tr: Transaction) => {
+    if (!drawersOn || !tr.docChanged || BY_HAND.some((e) => tr.isUserEvent(e))) return null;
+    const before = new Set<number>();
+    for (const d of drawerMap(tr.startState.doc).values()) {
+      const at = tr.changes.mapPos(tr.startState.doc.line(d.start + 1).from, 1, MapMode.TrackDel);
+      if (at !== null) before.add(at);
+    }
+    const effects: StateEffect<unknown>[] = [];
+    for (const d of drawerMap(tr.newDoc).values())
+      if (!before.has(tr.newDoc.line(d.start + 1).from)) effects.push(foldEffect.of(drawerFold(tr.newDoc, d)));
+    return effects.length ? { effects } : null;
+  });
+  /** Tab on a drawer's first line: fold or open it; the caret goes to that line, so the next Tab finds it again. */
+  function toggleDrawer(v: EditorView, d: DrawerRange) {
+    const r = drawerFold(v.state.doc, d);
+    let folded = false;
+    foldedRanges(v.state).between(r.from, r.from, (a, b) => {
+      if (a === r.from && b === r.to) folded = true;
+    });
+    const head = v.state.selection.main.head;
+    v.dispatch({ effects: (folded ? unfoldEffect : foldEffect).of(r), selection: head > r.from ? { anchor: r.from } : undefined });
+    return true;
+  }
+  /** Folds on drawers that are not drawers any more (an :END: gone): taken away, the text shows. */
+  function dropStaleFolds(v: EditorView) {
+    const doc = v.state.doc;
+    const heads = headingSet(doc);
+    const drawersHere = drawerMap(doc);
+    const stale: { from: number; to: number }[] = [];
+    foldedRanges(v.state).between(0, doc.length, (from, to) => {
+      const line = doc.lineAt(from);
+      if (line.to !== from || heads.has(line.number - 1)) return;
+      const d = drawersHere.get(line.number - 1);
+      if (!d || drawerFold(doc, d).to !== to) stale.push({ from, to });
+    });
+    if (stale.length) queueMicrotask(() => v.dispatch({ effects: stale.map((r) => unfoldEffect.of(r)) }));
+  }
 
   const linkCache = new WeakMap<Text, OrgLink[]>();
   const linksIn = (doc: Text) => {
@@ -86,8 +147,10 @@
     cycleState.set(v, state);
     const targets = foldTargets(text, state).lines;
     const effects = [] as ReturnType<typeof foldEffect.of>[];
+    const heads = headingSet(v.state.doc);
+    // only the headings' folds: drawers keep theirs (as org-cycle-hide-drawers)
     foldedRanges(v.state).between(0, v.state.doc.length, (from, to) => {
-      effects.push(unfoldEffect.of({ from, to }));
+      if (heads.has(v.state.doc.lineAt(from).number - 1)) effects.push(unfoldEffect.of({ from, to }));
     });
     const fold: { from: number; to: number }[] = [];
     for (const ln of targets) {
@@ -108,7 +171,10 @@
   const orgFold = foldService.of((state, lineStart) => {
     const line = state.doc.lineAt(lineStart);
     const heads = headingSet(state.doc);
-    if (!heads.has(line.number - 1)) return null;
+    if (!heads.has(line.number - 1)) {
+      const d = drawerMap(state.doc).get(line.number - 1);
+      return d ? drawerFold(state.doc, d) : null;
+    }
     const m = HEAD.exec(line.text)!;
     let end = line.to;
     let content = false; // a heading followed only by blank lines has nothing to fold
@@ -236,7 +302,19 @@
       extensions: [
         lineNumbers(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(),
         scrollPastEnd(), // the last line can be scrolled up to the top, as in Xcode (room below, not lines in the file)
-        undo.of(history()), orgFold, foldGutter(), plugin, structure.of(orgIndent(levels, headingSet)),
+        undo.of(history()), orgFold, foldNewDrawers,
+        codeFolding({
+          placeholderDOM: (_v, onclick) => {
+            const el = document.createElement('span');
+            el.className = 'cm-foldPlaceholder';
+            el.textContent = '…';
+            el.title = 'Свёрнуто — Tab или клик, чтобы развернуть';
+            el.setAttribute('aria-label', 'Свёрнуто');
+            el.onclick = onclick;
+            return el;
+          },
+        }),
+        foldGutter(), plugin, structure.of(orgIndent(levels, headingSet)),
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         EditorView.domEventHandlers({
@@ -280,14 +358,20 @@
               return true;
             } },
           { key: 'Tab', run: (v) => {
-              const l = v.state.doc.lineAt(v.state.selection.main.head);
+              // the visible line: after an arrow the caret may sit at the end of a folded drawer, on its hidden :END:
+              const l = v.state.doc.lineAt(v.lineBlockAt(v.state.selection.main.head).from);
               cycleState.delete(v);
-              return headingSet(v.state.doc).has(l.number - 1) ? toggleFold(v) : false;
+              if (headingSet(v.state.doc).has(l.number - 1)) return toggleFold(v); // a heading: its subtree
+              const d = drawerMap(v.state.doc).get(l.number - 1);
+              return d ? toggleDrawer(v, d) : false; // the first line of a drawer: that drawer only
             } },
           ...foldKeymap, ...historyKeymap, ...defaultKeymap,
         ]),
         EditorView.updateListener.of((u) => {
-          if (u.docChanged) onchange(u.state.doc.toString());
+          if (u.docChanged) {
+            onchange(u.state.doc.toString());
+            dropStaleFolds(u.view);
+          }
           if (u.selectionSet || u.docChanged) {
             const h = u.state.selection.main.head;
             const l = u.state.doc.lineAt(h);
@@ -309,6 +393,7 @@
 
   onMount(() => {
     view = new EditorView({ state: makeState(text, wf), parent: host });
+    foldAllDrawers(view);
     lastKey = fileKey;
     lastLevels = JSON.stringify(levels);
     lastReset = resetOn;
@@ -323,6 +408,7 @@
       lastKey = k;
       lastReset = r;
       view.setState(makeState(t, w));
+      foldAllDrawers(view);
       restoreCaret();
     } else if (r !== lastReset) {
       // reloaded from disk (no edits here): the caret keeps its line and column, the scroll stays, and ⌘Z
@@ -332,36 +418,40 @@
       const line = view.state.doc.lineAt(sel.head);
       const col = sel.head - line.from;
       const top = view.scrollDOM.scrollTop;
-      if (view.state.doc.toString() !== t) view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: t } });
+      patchTo(view, t); // the unchanged parts keep their folds; drawers new on disk come folded
       const doc = view.state.doc;
       const ln = doc.line(Math.min(line.number, doc.lines));
       view.dispatch({ selection: { anchor: Math.min(ln.from + col, ln.to) }, effects: undo.reconfigure([]) });
       view.dispatch({ effects: undo.reconfigure(history()) });
       view.scrollDOM.scrollTop = top;
     } else {
-      const cur = view.state.doc.toString();
-      if (cur !== t) {
-        // minimal diff, so cursor, folds and undo history survive external patches
-        let a = 0;
-        const max = Math.min(cur.length, t.length);
-        while (a < max && cur[a] === t[a]) a++;
-        let b = 0;
-        while (b < max - a && cur[cur.length - 1 - b] === t[t.length - 1 - b]) b++;
-        // The change replaces [a, cur.length - b). Positions inside it would be mapped to its start, which
-        // for a big rewrite means "top of the file": keep the cursor on the same line and column instead.
-        const sel = view.state.selection.main;
-        const inside = sel.head > a && sel.head < cur.length - b;
-        const line = view.state.doc.lineAt(sel.head);
-        const col = sel.head - line.from;
-        view.dispatch({ changes: { from: a, to: cur.length - b, insert: t.slice(a, t.length - b) } });
-        if (inside) {
-          const doc = view.state.doc;
-          const ln = doc.line(Math.min(line.number, doc.lines));
-          view.dispatch({ selection: { anchor: Math.min(ln.from + col, ln.to) } });
-        }
-      }
+      patchTo(view, t);
     }
   });
+
+  /** Bring the document to `t` with the smallest change, so cursor, folds and undo history survive. */
+  function patchTo(view: EditorView, t: string) {
+    const cur = view.state.doc.toString();
+    if (cur !== t) {
+      let a = 0;
+      const max = Math.min(cur.length, t.length);
+      while (a < max && cur[a] === t[a]) a++;
+      let b = 0;
+      while (b < max - a && cur[cur.length - 1 - b] === t[t.length - 1 - b]) b++;
+      // The change replaces [a, cur.length - b). Positions inside it would be mapped to its start, which
+      // for a big rewrite means "top of the file": keep the cursor on the same line and column instead.
+      const sel = view.state.selection.main;
+      const inside = sel.head > a && sel.head < cur.length - b;
+      const line = view.state.doc.lineAt(sel.head);
+      const col = sel.head - line.from;
+      view.dispatch({ changes: { from: a, to: cur.length - b, insert: t.slice(a, t.length - b) } });
+      if (inside) {
+        const doc = view.state.doc;
+        const ln = doc.line(Math.min(line.number, doc.lines));
+        view.dispatch({ selection: { anchor: Math.min(ln.from + col, ln.to) } });
+      }
+    }
+  }
 
   $effect(() => {
     const l = levels;

@@ -235,6 +235,44 @@ function toDate(m: RegExpMatchArray | null): OrgDate | undefined {
 }
 
 /** 0-based indices of real heading lines; `* foo` inside #+BEGIN_…/#+END_… blocks is plain text. */
+/** A drawer's first line (`:PROPERTIES:`, `:LOGBOOK:`, `:NOTES:` …) and its `:END:` line, 0-based. */
+export interface DrawerRange {
+  start: number;
+  end: number;
+}
+const DRAWER_OPEN = /^\s*:([A-Za-z0-9_-]+):\s*$/;
+const DRAWER_END = /^\s*:END:\s*$/i;
+/**
+ * The drawers of a text: from a line that is only `:NAME:` to the nearest `:END:`. One that reaches a heading or
+ * the end of the file first is not a drawer (plain text). Not inside #+BEGIN_…/#+END_… blocks, like headings.
+ */
+export function drawerRanges(lines: string[]): DrawerRange[] {
+  const heads = headingLines(lines);
+  const out: DrawerRange[] = [];
+  let block: RegExp | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (block) {
+      if (block.test(l)) block = null;
+      continue;
+    }
+    const b = /^\s*#\+BEGIN_(\w+)/i.exec(l);
+    if (b) {
+      block = new RegExp(`^\\s*#\\+END_${b[1]}\\b`, 'i');
+      continue;
+    }
+    if (heads.has(i) || DRAWER_END.test(l) || !DRAWER_OPEN.test(l)) continue;
+    for (let j = i + 1; j < lines.length && !heads.has(j); j++) {
+      if (DRAWER_END.test(lines[j])) {
+        out.push({ start: i, end: j });
+        i = j;
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 export function headingLines(lines: Iterable<string>): Set<number> {
   const out = new Set<number>();
   let block: RegExp | null = null;

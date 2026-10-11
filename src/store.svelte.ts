@@ -149,6 +149,12 @@ class Store {
   }
   /** «Уровни заголовков» (Настройки → Основные, a view preference of this Mac): one star per level, text by level. */
   levels = $state<LevelView>(readLevels());
+  /** Drawers folded when a file opens and when the app adds one (a preference of this Mac). */
+  foldDrawers = $state(lsGet('editor:drawers') !== '0');
+  setFoldDrawers(on: boolean) {
+    this.foldDrawers = on;
+    lsSet('editor:drawers', on ? '1' : '0'); // the other window hears it through the storage event
+  }
   setLevels(l: Partial<LevelView>) {
     this.levels = { ...this.levels, ...l, step: Math.max(1, Math.min(4, Math.round(l.step ?? this.levels.step))) };
     lsSet('editor:levels', JSON.stringify(this.levels)); // the other window hears it through the storage event
@@ -1012,6 +1018,7 @@ class Store {
     window.addEventListener('storage', (e) => {
       if (e.key === 'nav:headings') this.navHeadings = e.newValue === '1';
       if (e.key === 'editor:levels') this.levels = readLevels();
+      if (e.key === 'editor:drawers') this.foldDrawers = lsGet('editor:drawers') !== '0';
       if (e.key === 'capture:key' || e.key === 'capture:global') {
         this.captureKey = lsGet('capture:key') || DEFAULT_CAPTURE_KEY;
         this.captureGlobal = lsGet('capture:global') !== '0';
