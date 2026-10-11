@@ -502,6 +502,15 @@
             </div>
           </div>
           <p class="help">Только вид в редакторе: звёздочки и пробелы в файлах не меняются. «Вид › Структурный вид» включает и выключает обе настройки сразу. Настройки хранятся на этом Mac.</p>
+          <div class="cap">DRAWERS</div>
+          <div class="opts">
+            <div class="opt">
+              <label for="fold-drawers">Сворачивать drawers при открытии файла</label>
+              <button id="fold-drawers" class="switch" role="switch" aria-checked={store.foldDrawers} aria-label="Сворачивать drawers при открытии файла"
+                onclick={() => store.setFoldDrawers(!store.foldDrawers)}><span></span></button>
+            </div>
+          </div>
+          <p class="help">Блоки :PROPERTIES:, :LOGBOOK: и другие показываются одной строкой с «…», в том числе новые — от Inbox и смены статуса. Tab на этой строке или клик по «…» разворачивает. Только вид: файл не меняется. Настройка хранится на этом Mac.</p>
         </section>
       </div>
     {:else}

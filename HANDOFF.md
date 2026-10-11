@@ -87,6 +87,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 | `outline.ts` | Editor structure commands (promote/move subtree, cycle fold, status/priority cycling). |
 | `layout.ts` | Panes/tabs model (1–2 panes), serialise/restore. Agenda tabs carry `agenda` (custom agenda id). |
 | `Editor.svelte` | CodeMirror setup, decorations (keywords, links shown descriptive), fold service, keymaps; compartments for undo and the structural view. `scrollPastEnd`. |
+| Drawers (in `Editor.svelte`, `org.ts` `drawerRanges`) | Folded like headings via the same `foldService`; folded on open and when the app adds one (a `transactionExtender` skips typed/pasted/undone text); ⇧Tab and heading Tab leave them as they are. |
 | `orgIndent.ts` | «Структурный вид»: one star per level (marker widget; hidden stars stay in DOM with `display:none`), indents, atomic ranges, Backspace = level up. |
 | `links.ts` | Link extraction line by line (uniorg per candidate line, cached by line text; a whole-file parse was ~9 s on 50k lines), resolution, backlinks, rewrite on rename. |
 | `App.svelte` | Window shell: toolbar (grid, centred path), `NavPanel`, panes, inspector, sheets/overlays, menu actions, browser-shortcut fallback. `#settings` and `#capture` hash = other windows. |
@@ -125,7 +126,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 - **App config (Rust):** the notes dir and its bookmark, in the app config dir. Identifier `dev.local.panopticon`.
 - **localStorage (per Mac):**
   - `layout:<dir>`, `lastFile:<dir>`, `saveAsDir:…`;
-  - `nav:mode`, `nav:headings`, `inspector:tab`, `editor:levels`;
+  - `nav:mode`, `nav:headings`, `inspector:tab`, `editor:levels`, `editor:drawers` ('0' = drawers open on open);
   - `capture:key`, `capture:global`, `capture:draft`, `capture:file`;
   - one-shot commands from the settings window: `cmd:changeFolder`, `cmd:newAgenda`.
 
@@ -166,8 +167,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
    Known: the reveal = the strip's `alphaValue` (its frame never moves). Hiding its whole contentView breaks the reveal
    and the exit from full screen. On notch MacBooks the window starts below the menu bar. Next step: get the
    permissions, or ask the user (1) do the lights stay while the pointer goes down, (2) do the glyphs show on hover.
-2. **⇧⌘I from another program** (Inbox) — never verified by hand. Check that the panel appears and that the main
-   window does not come forward.
+2. **⇧⌘I from another program** (Inbox) — verified by the user by hand on 2026-10-11: works.
 3. **Inspector says «Состояние»** — should be «Статус».
 4. **Not built yet:**
    - the six built-in agendas from the mockup (Неделя, Сегодня…) and «Дублировать в мои»;

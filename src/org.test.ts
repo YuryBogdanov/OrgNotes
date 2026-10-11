@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_WORKFLOW, firstOpen, startOf, headingAt, headingLines, joinEol, toneFor, parseHeadings, parseProjectConfig, parseWorkflow, resolveWorkflow, sequenceFor, setKeyword, setPriority, shiftTimestamp, splitEol, subtreeProgress } from './org';
+import { DEFAULT_WORKFLOW, drawerRanges, firstOpen, startOf, headingAt, headingLines, joinEol, toneFor, parseHeadings, parseProjectConfig, parseWorkflow, resolveWorkflow, sequenceFor, setKeyword, setPriority, shiftTimestamp, splitEol, subtreeProgress } from './org';
 
 // Saturday, 10 October 2026, 12:00
 const NOW = new Date(2026, 9, 10, 12, 0);
@@ -320,5 +320,21 @@ describe('status change behaviour', () => {
   it('reads behaviour from the project config, with defaults', () => {
     expect(parseProjectConfig('{}').config.behavior).toEqual({ closed: true, logbook: false });
     expect(parseProjectConfig('{"behavior":{"closedTimestamp":false,"logbook":true}}').config.behavior).toEqual({ closed: false, logbook: true });
+  });
+});
+
+describe('drawers', () => {
+  const d = (t: string) => drawerRanges(t.split('\n')).map((r) => [r.start, r.end]);
+  it('from a `:NAME:` line to the nearest :END:, any name, spaces and case allowed', () => {
+    expect(d('* A\n:PROPERTIES:\n:CREATED: [2026-10-11]\n:END:\ntext\n  :LOGBOOK:  \n- State "DONE"\n  :end:\n:NOTES:\n:my-x_1:\n:END:')).toEqual([[1, 3], [5, 7], [8, 10]]);
+  });
+  it('one before the first heading counts; :END: alone and a property line do not open one', () => {
+    expect(d(':PROPERTIES:\n:ID: x\n:END:\n* A')).toEqual([[0, 2]]);
+    expect(d('* A\n:END:\n:CREATED: x\n:END:')).toEqual([]);
+  });
+  it('unclosed before a heading or the end: not a drawer; inside #+BEGIN blocks: not either', () => {
+    expect(d('* A\n:PROPERTIES:\n:ID: x\n* B\n:END:')).toEqual([]);
+    expect(d('* A\n:LOGBOOK:\n- x')).toEqual([]);
+    expect(d('#+BEGIN_SRC org\n:PROPERTIES:\n:END:\n#+END_SRC\n:NOTES:\n:END:')).toEqual([[4, 5]]);
   });
 });
