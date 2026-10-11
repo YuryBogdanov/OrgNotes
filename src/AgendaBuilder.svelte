@@ -24,11 +24,10 @@
   const preview = $derived(runAgenda(draft, store.files, today, 50));
   const dotStyle = (b: Block) => toneStyle(toneOf(b.color) ?? toneOf('blue')!);
 
+  // the focus goes to the name (all of it selected for a new agenda); on closing the store puts it back
   onMount(() => {
-    if (isNew) {
-      nameEl?.focus();
-      nameEl?.select(); // «Новая агенда», ready to be typed over
-    }
+    nameEl?.focus();
+    if (isNew) nameEl?.select(); // «Новая агенда», ready to be typed over
   });
 
   // ---- what the pickers offer --------------------------------------------------------------------------------
@@ -435,13 +434,6 @@
     }
   }
 
-  async function drag(e: MouseEvent) {
-    if (e.button !== 0 || !('__TAURI_INTERNALS__' in window)) return;
-    if ((e.target as HTMLElement).closest('button, input')) return;
-    const { getCurrentWindow } = await import('@tauri-apps/api/window');
-    if (e.detail === 2) getCurrentWindow().toggleMaximize();
-    else getCurrentWindow().startDragging();
-  }
   const chev = 'M2 4.5l4 4 4-4';
 </script>
 
@@ -459,17 +451,12 @@
   </span>
 {/snippet}
 
-<div class="builder" role="dialog" aria-modal="true" aria-label="Конструктор агенды">
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="toolbar" data-tauri-drag-region onmousedown={drag}>
-    <div class="lights-gap"></div>
-    <div class="path" aria-label="Путь">
-      <span>Агенда</span><span class="sep" aria-hidden="true">›</span><span class="cur">{draft.name.trim() || 'Новая агенда'}</span><span class="sep" aria-hidden="true">›</span><span>Редактирование</span>
-    </div>
-    <div class="acts">
-      <button class="btn" onclick={cancel}>Отмена</button>
-      <button class="btn primary" disabled={!!problem} title={problem ?? 'Сохранить агенду (⌘S)'} aria-keyshortcuts="Meta+S" onclick={save}>Сохранить агенду</button>
-    </div>
+<!-- the window under the sheet stays visible, dimmed; a click on the dimming does not close the builder -->
+<div class="builder">
+  <div class="win" role="dialog" aria-modal="true" aria-label="Конструктор агенды">
+  <div class="whead">
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h12M4 10h8M4 14h5" /></svg>
+    <div class="wt"><span class="wn">{draft.name.trim() || 'Новая агенда'}</span><span class="ws">{isNew ? 'Создание' : 'Редактирование'}</span></div>
   </div>
 
   <div class="cols">
@@ -620,6 +607,29 @@
     </div>
   </div>
 
+  <div class="wfoot">
+    <span class="fh">Изменения применяются после сохранения</span>
+    <div class="acts">
+      <button class="btn" onclick={cancel}>Отмена</button>
+      <button class="btn primary" disabled={!!problem} title={problem ?? 'Сохранить агенду (⌘S)'} aria-keyshortcuts="Meta+S" onclick={save}>Сохранить агенду</button>
+    </div>
+  </div>
+
+  {#if confirmCancel}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="cdim" onmousedown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}>
+      <div class="csheet" role="alertdialog" aria-modal="true" aria-label="Отменить изменения агенды?">
+        <h2>Отменить изменения агенды?</h2>
+        <p>{isNew ? 'Новая агенда не будет создана.' : `Изменения в агенде «${store.builder?.orig?.name}» не сохранятся.`}</p>
+        <div class="sb">
+          <button class="btn" onclick={() => store.closeBuilder()}>Отменить</button>
+          <button class="btn primary" bind:this={stayBtn} onclick={() => (confirmCancel = false)}>Остаться</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+  </div>
+
   {#if pop}
     {@const r = pop.anchor.getBoundingClientRect()}
     {@const w = pop.kind === 'status' && sets.length > 1 ? 280 : pop.kind === 'path' || pop.kind === 'sources' ? 300 : pop.kind === 'group' || pop.kind === 'sort' ? Math.max(200, r.width) : pop.kind === 'date' ? 230 : 200}
@@ -689,46 +699,45 @@
   {/if}
 
   {#if picker}
-    {@const pk = picker}
-    <ColorPicker title="Цвет блока" value={pk.block.color} keyword={pk.block.name} fallback={toneOf('blue')!} anchor={pk.anchor}
-      onpick={(c) => (pk.block.color = c || 'blue')} onclose={() => (picker = null)} />
+    <!-- (optional chaining: the props are read once more while the popover goes away) -->
+    <ColorPicker title="Цвет блока" value={picker?.block.color ?? 'blue'} keyword={picker?.block.name ?? ''} fallback={toneOf('blue')!} anchor={picker?.anchor as HTMLElement}
+      onpick={(c) => picker && (picker.block.color = c || 'blue')} onclose={() => (picker = null)} />
   {/if}
 
-  {#if confirmCancel}
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="dim" onmousedown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}>
-      <div class="sheet" role="alertdialog" aria-modal="true" aria-label="Отменить изменения агенды?">
-        <h2>Отменить изменения агенды?</h2>
-        <p>{isNew ? 'Новая агенда не будет создана.' : `Изменения в агенде «${store.builder?.orig?.name}» не сохранятся.`}</p>
-        <div class="sb">
-          <button class="btn" onclick={() => store.closeBuilder()}>Отменить</button>
-          <button class="btn primary" bind:this={stayBtn} onclick={() => (confirmCancel = false)}>Остаться</button>
-        </div>
-      </div>
-    </div>
-  {/if}
 </div>
 
 <style>
-  .builder { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--bg); color: var(--fg); }
-  .toolbar { flex: 0 0 52px; display: flex; align-items: center; gap: 12px; padding: 0 14px; background: var(--bar); border-bottom: 1px solid var(--line); }
-  .lights-gap { flex: 0 0 68px; }
-  :global(html:not(.tauri)) .builder .lights-gap { flex-basis: 4px; }
-  .path { flex: 1 1 360px; max-width: 560px; min-width: 0; height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--field); border-radius: 7px; color: var(--fg2); font-size: 12.5px; white-space: nowrap; overflow: hidden; }
-  .path .cur { color: var(--fg); overflow: hidden; text-overflow: ellipsis; }
-  .path .sep { color: var(--fg3); }
-  .acts { margin-left: auto; display: flex; gap: 10px; }
-  .btn { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--field); color: var(--fg); font-size: 12.5px; white-space: nowrap; }
-  .btn.primary { background: var(--acc); color: var(--onacc); font-weight: 600; padding: 0 16px; }
+  /* a sheet over the dimmed window, above its toolbar: header 56, content (scrolls inside), footer 56 always whole */
+  .builder { position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, 0.42); color: var(--fg); }
+  .win {
+    position: absolute; left: 50%; top: 36px; bottom: 36px; transform: translateX(-50%); width: min(1100px, calc(100% - 72px));
+    display: grid; grid-template-rows: 56px minmax(0, 1fr) 56px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5); overflow: hidden; container-type: inline-size;
+  }
+  .whead, .wfoot { display: flex; align-items: center; gap: 12px; padding: 0 22px; background: var(--bar); }
+  .whead { border-bottom: 1px solid var(--line); }
+  .wfoot { border-top: 1px solid var(--line); gap: 10px; }
+  .wt { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+  .wn { font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ws { font-size: 11.5px; color: var(--fg2); }
+  .fh { font-size: 12px; color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .acts { margin-left: auto; display: flex; gap: 10px; flex: 0 0 auto; }
+  .btn { height: 28px; padding: 0 16px; border: 0; border-radius: 6px; background: var(--field); color: var(--fg); font-size: 13px; white-space: nowrap; }
+  .btn.primary { background: var(--acc); color: var(--onacc); font-weight: 600; padding: 0 18px; }
   .btn:disabled { opacity: 0.45; }
   .btn:focus-visible, .slot:focus-visible, .val:focus-visible, .addc:focus-visible, .addb:focus-visible, .ib:focus-visible, .x:focus-visible, .dotbtn:focus-visible, .plus:focus-visible, .chipx:focus-visible, .grip:focus-visible, .block:focus-visible {
     outline: 2px solid var(--acc); outline-offset: 1px;
   }
 
-  .cols { flex: 1; min-height: 0; display: flex; flex-wrap: wrap; overflow: auto; }
+  .cols { min-height: 0; display: flex; overflow: hidden; }
   .ed { flex: 1 1 560px; min-width: 0; background: var(--side); border-right: 1px solid var(--line); overflow: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 18px; }
   .pv { flex: 1 1 440px; min-width: 0; overflow: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 6px; }
-  @media (max-width: 1040px) { .ed, .pv { flex-basis: 100%; } .cols { overflow: auto; } .ed { border-right: 0; border-bottom: 1px solid var(--line); } }
+  /* an app window under 960 pt (the sheet: 888 minus its border): the preview goes under the editor, the content scrolls as one */
+  @container (max-width: 885px) {
+    .cols { flex-wrap: wrap; overflow: auto; }
+    .ed, .pv { flex-basis: 100%; overflow: visible; }
+    .ed { border-right: 0; border-bottom: 1px solid var(--line); }
+  }
   .grp { display: flex; flex-direction: column; gap: 10px; }
   .cap { font-size: 11px; font-weight: 600; color: var(--fg2); letter-spacing: 0.02em; }
   .row2 { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -841,9 +850,9 @@
   .form input[type='number'] { width: 64px; }
   .fb { display: flex; justify-content: flex-end; gap: 8px; }
 
-  .dim { position: fixed; left: 0; right: 0; top: 52px; bottom: 0; z-index: 110; background: rgba(0, 0, 0, 0.2); display: flex; justify-content: center; align-items: flex-start; }
-  .sheet { width: 420px; max-width: calc(100% - 32px); padding: 18px; border-radius: 0 0 12px 12px; background: var(--bg); border: 1px solid var(--line); border-top: 0; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); }
-  .sheet h2 { margin: 0 0 6px; font-size: 13px; font-weight: 700; }
-  .sheet p { margin: 0 0 14px; font-size: 12px; color: var(--fg2); line-height: 1.45; }
+  .cdim { position: absolute; inset: 56px 0 0; z-index: 110; background: rgba(0, 0, 0, 0.2); display: flex; justify-content: center; align-items: flex-start; }
+  .csheet { width: 420px; max-width: calc(100% - 32px); padding: 18px; border-radius: 0 0 12px 12px; background: var(--bg); border: 1px solid var(--line); border-top: 0; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); }
+  .csheet h2 { margin: 0 0 6px; font-size: 13px; font-weight: 700; }
+  .csheet p { margin: 0 0 14px; font-size: 12px; color: var(--fg2); line-height: 1.45; }
   .sb { display: flex; justify-content: flex-end; gap: 8px; }
 </style>

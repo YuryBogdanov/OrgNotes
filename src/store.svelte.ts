@@ -268,8 +268,7 @@ class Store {
     } catch {
       /* reported by parseProjectConfig */
     }
-    this.agendas = readAgendas(parsed?.agendas);
-    if (this.agendaSel && !this.agendas.some((a) => a.id === this.agendaSel)) this.selectAgenda('');
+    this.agendas = readAgendas(parsed?.agendas); // a tab of a deleted agenda shows the built-in one
     // only the statuses make the notes be read again; agendas alone do not
     const same = JSON.stringify(config) === JSON.stringify(this.config);
     this.config = config;
@@ -370,35 +369,75 @@ class Store {
 
   // ---- custom agendas («Мои агенды», `agendas` in config.json) -------------------------------------------------
   agendas = $state.raw<Agenda[]>([]);
-  /** The agenda shown in agenda tabs: '' is the built-in one. */
-  agendaSel = $state(lsGet('agenda:sel') ?? '');
-  selectAgenda(id: string) {
-    this.agendaSel = id;
-    lsSet('agenda:sel', id);
-  }
+  /** The custom agenda shown by the active tab (undefined: a file, or the built-in agenda). */
   get agenda(): Agenda | undefined {
-    return this.agendas.find((a) => a.id === this.agendaSel);
+    return this.agendaOf(this.tab);
+  }
+  agendaOf(t: Tab | undefined): Agenda | undefined {
+    return t?.kind === 'agenda' && t.agenda ? this.agendas.find((a) => a.id === t.agenda) : undefined;
+  }
+  /** The left navigator: the files, or the list of agendas. A setting of the window: switching tabs or panes keeps it. */
+  navMode = $state<'files' | 'agendas'>(lsGet('nav:mode') === 'agendas' ? 'agendas' : 'files');
+  setNavMode(m: 'files' | 'agendas') {
+    this.navMode = m;
+    this.showNav = true;
+    lsSet('nav:mode', m);
+  }
+  /**
+   * An agenda picked in the list opens in the active pane: the agenda tab there shows it now; from a file tab,
+   * a tab that already shows it is reused, else a new agenda tab comes.
+   */
+  openAgendaHere(id: string) {
+    const L = this.layout;
+    const p = L.panes[L.active];
+    if (!p) return;
+    const cur = p.tabs[p.active];
+    if (cur?.kind === 'agenda') {
+      cur.agenda = id || undefined;
+    } else {
+      const i = p.tabs.findIndex((t) => t.kind === 'agenda' && (t.agenda ?? '') === id);
+      if (i >= 0) p.active = i;
+      else {
+        const t = newTab('agenda');
+        if (id) t.agenda = id;
+        const at = p.tabs.length ? p.active + 1 : 0;
+        p.tabs.splice(at, 0, t);
+        p.active = at;
+      }
+    }
+    this.persistLayout();
   }
   /** The builder: an editable copy of the agenda; `orig` is null for a new one. */
   builder = $state<{ draft: Agenda; orig: Agenda | null; n: number } | null>(null);
   /** ⌘S while the builder is open: «Сохранить агенду» (the builder watches this). */
   builderSave = $state(0);
   /** «Новая агенда»: opens the builder with an empty agenda (nothing is saved until «Сохранить агенду»). */
-  newAgendaInBuilder() {
+  newAgendaInBuilder(from?: Element | null) {
     if (this.builder) return;
+    this.builderFrom = from ?? (document.activeElement as Element | null);
     this.builder = { draft: newAgenda(), orig: null, n: Date.now() };
   }
-  editAgenda(id: string) {
+  editAgenda(id: string, from?: Element | null) {
     const a = this.agendas.find((x) => x.id === id);
     if (!a || this.builder) return;
+    this.builderFrom = from ?? (document.activeElement as Element | null);
     this.builder = { draft: cloneAgenda(a), orig: a, n: Date.now() };
+  }
+  /** Where the builder was opened from: the focus goes back there when it closes (a clicked button has none in WebKit). */
+  private builderFrom: Element | null = null;
+  private leaveBuilder() {
+    this.builder = null;
+    const el = this.builderFrom as HTMLElement | null;
+    this.builderFrom = null;
+    // after the window under the sheet takes input again
+    if (el?.isConnected) setTimeout(() => el.isConnected && el.focus());
   }
   get builderDirty() {
     const b = this.builder;
     return !!b && (!b.orig || !sameAgenda(b.draft, b.orig));
   }
   closeBuilder() {
-    this.builder = null;
+    this.leaveBuilder();
   }
   /** «Сохранить агенду»: writes it (a saved one is replaced whole), closes the builder and shows the agenda. */
   async saveAgenda(a: Agenda): Promise<boolean> {
@@ -411,9 +450,8 @@ class Store {
       return withAgendas(raw, list);
     });
     if (!ok) return false;
-    this.builder = null;
-    this.selectAgenda(copy.id);
-    if (this.mode !== 'agenda') this.showAgendaHere();
+    this.leaveBuilder();
+    this.openAgendaHere(copy.id);
     return true;
   }
   async deleteAgenda(id: string) {

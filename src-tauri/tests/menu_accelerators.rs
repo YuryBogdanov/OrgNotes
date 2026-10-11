@@ -26,6 +26,8 @@ fn every_menu_accelerator_parses() {
         "CmdOrCtrl+W",
         "Control+CmdOrCtrl+ArrowLeft",
         "Control+CmdOrCtrl+ArrowRight",
+        "Control+CmdOrCtrl+Digit1",
+        "Control+CmdOrCtrl+Digit2",
         "Control+CmdOrCtrl+KeyJ",
         "Control+CmdOrCtrl+KeyW",
         "Shift+CmdOrCtrl+Backslash",

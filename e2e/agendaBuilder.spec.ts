@@ -6,20 +6,20 @@ import { MY_DAY, NOTES, withAgenda } from './agendaFixture';
 const config = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/config.json'] ?? 'null'));
 const builder = (page: Page) => page.getByRole('dialog', { name: 'Конструктор агенды' });
 const list = (page: Page) => page.getByRole('navigation', { name: 'Список агенд' });
-const pop = (page: Page) => builder(page).locator('.pop');
+const pop = (page: Page) => page.locator('.builder .pop'); // above the window, so nothing in it clips the menus
 const preview = (page: Page) => builder(page).getByLabel('Предпросмотр');
 const previewBlocks = (page: Page) => preview(page).locator('.ph2 .pt');
 const block = (page: Page, i: number) => builder(page).locator('.bwrap').nth(i);
 const saveBtn = (page: Page) => builder(page).getByRole('button', { name: 'Сохранить агенду' });
 const opt = (page: Page, label: string) => pop(page).locator('.opt', { has: page.locator('.ol', { hasText: new RegExp(`^${label}$`) }) });
 
-/** The app with an agenda alone in the window (⌘2): the list of agendas takes the navigator's place. */
+/** The app with the navigator in the «Агенда» mode. */
 async function start(page: Page, files: Record<string, string> = NOTES()) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await installTauriMock(page, files);
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
-  await page.keyboard.press('Meta+2');
+  await page.getByRole('tablist', { name: 'Режимы навигатора' }).getByRole('tab', { name: 'Агенда' }).click();
   await expect(list(page)).toBeVisible();
 }
 const newAgenda = async (page: Page) => {
@@ -35,7 +35,9 @@ test.describe('entering, saving, cancelling', () => {
     await expect(name).toBeFocused();
     await expect(name).toHaveValue('Новая агенда');
     expect(await name.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd])).toEqual([0, 'Новая агенда'.length]);
-    await expect(builder(page).getByLabel('Путь')).toHaveText(/Агенда\s*›\s*Новая агенда\s*›\s*Редактирование/);
+    await expect(builder(page).locator('.whead')).toHaveText(/Новая агенда\s*Создание/);
+    await page.keyboard.type('Утро');
+    await expect(builder(page).locator('.whead')).toHaveText(/Утро\s*Создание/); // follows the name field
     await expect(builder(page).locator('.src')).toContainText('все файлы');
     await expect(builder(page).locator('.bwrap')).toHaveCount(1);
     await expect(builder(page).locator('.bname')).toHaveValue('Без названия');
@@ -440,9 +442,9 @@ test.describe('the rest', () => {
   test('in a narrow pane next to a file: long statuses are whole, the custom agenda keeps «Редактировать…»', async ({ page }) => {
     const meetings = { ...MY_DAY, id: 'a-m', name: 'Только встречи', blocks: [{ name: 'Встречи', color: 'blue', conds: [{ field: 'status', op: 'in', values: [{ set: 'Встречи', name: 'MEETING' }, { set: 'Цели на квартал', name: 'ACTIVE' }] }] }] };
     await start(page, withAgenda(NOTES(), meetings));
-    await list(page).getByRole('button', { name: 'Только встречи' }).click();
-    await page.keyboard.press('Meta+1'); // back to the file; the agenda goes to a second pane
-    await page.getByRole('button', { name: 'Агенда', exact: true }).click();
+    await page.locator('.toolbar').getByRole('button', { name: 'Агенда', exact: true }).click(); // the toolbar: an agenda in a second pane
+    await page.locator('section.pane').nth(1).locator('.agenda .scroll').click();
+    await list(page).getByRole('button', { name: 'Только встречи' }).click(); // opens in the active pane
     const ag = page.locator('section.pane').nth(1).locator('.agenda');
     await expect(ag.locator('.kw')).toHaveText(['MEETING', 'ACTIVE']);
     for (const kw of await ag.locator('.kw').all()) expect(await kw.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
@@ -461,6 +463,115 @@ test.describe('the rest', () => {
     await page.keyboard.press('Escape');
     await builder(page).getByRole('button', { name: '+ Условие' }).click();
     expect((await builder(page).innerText()).toLowerCase()).not.toContain('состояни');
+  });
+});
+
+test.describe('the sheet', () => {
+  test('a window over the dimmed app: header, content, footer; a click on the dimming does nothing; the app takes no input', async ({ page }) => {
+    await start(page, withAgenda(NOTES(), MY_DAY));
+    await list(page).getByRole('button', { name: 'Мой день' }).click();
+    const opener = page.locator('.agenda').getByRole('button', { name: 'Редактировать…' });
+    await opener.click();
+    const win = builder(page);
+    const box = (await win.boundingBox())!;
+    expect(box.y).toBe(36);
+    expect(Math.round(box.x + box.width / 2)).toBe(720);
+    expect(box.width).toBe(1100);
+    await expect(win.locator('.whead')).toHaveText(/Мой день\s*Редактирование/);
+    await expect(win.locator('.wfoot')).toContainText('Изменения применяются после сохранения');
+    await expect(page.locator('.builder')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0.42)');
+    // the dimming covers the toolbar too, and the window under it is inert
+    expect(await page.evaluate(() => document.elementFromPoint(720, 20)?.closest('.builder') !== null)).toBe(true);
+    expect(await page.locator('body > .win, .win[inert]').first().getAttribute('inert')).not.toBeNull();
+    await expect(win.getByRole('textbox').first()).toBeFocused(); // the name, also when editing
+    await page.mouse.click(10, 450);
+    await expect(win).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(win).toHaveCount(0);
+    await expect(opener).toBeFocused(); // back where it came from
+  });
+
+  test('the footer is always whole: a low window, long content scrolled; under 960 pt the preview goes below', async ({ page }) => {
+    await start(page, withAgenda(NOTES(), MY_DAY));
+    await list(page).getByRole('button', { name: 'Мой день' }).dblclick();
+    await block(page, 1).locator('.block').click();
+    await page.setViewportSize({ width: 960, height: 640 });
+    const foot = builder(page).locator('.wfoot');
+    const check = async () => {
+      const f = (await foot.boundingBox())!;
+      const w = (await builder(page).boundingBox())!;
+      expect(f.height).toBe(56);
+      expect(Math.round(f.y + f.height)).toBeLessThanOrEqual(Math.round(w.y + w.height));
+      await expect(foot.getByRole('button', { name: 'Сохранить агенду' })).toBeInViewport({ ratio: 1 });
+    };
+    await check();
+    await builder(page).locator('.cols').evaluate((el) => el.scrollTo(0, 10000));
+    await check();
+    // 960 − 72 = 888 pt: still side by side; one point less and the preview goes under the editor
+    const side = async () => (await preview(page).boundingBox())!.x > (await builder(page).locator('.ed').boundingBox())!.x + 100;
+    expect(await side()).toBe(true);
+    await page.setViewportSize({ width: 950, height: 640 });
+    expect(await side()).toBe(false);
+    await check();
+  });
+
+  test('menus are not cut by the content: the field menu of the last block opens upwards inside the window', async ({ page }) => {
+    await start(page, withAgenda(NOTES(), MY_DAY));
+    await page.setViewportSize({ width: 1200, height: 700 });
+    await list(page).getByRole('button', { name: 'Мой день' }).dblclick();
+    await block(page, 3).locator('.block').click();
+    const add = block(page, 3).getByRole('button', { name: '+ Условие' });
+    await add.scrollIntoViewIfNeeded();
+    await add.click();
+    const menu = pop(page);
+    await expect(menu.locator('.opt')).toHaveCount(8);
+    const m = (await menu.boundingBox())!;
+    expect(m.y).toBeGreaterThanOrEqual(0);
+    expect(m.y + m.height).toBeLessThanOrEqual(700);
+    // the last item is the topmost thing at its place (nothing clips it)
+    const last = (await menu.locator('.opt').last().boundingBox())!;
+    expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.pop'), [last.x + 20, last.y + last.height / 2])).toBe(true);
+  });
+});
+
+test.describe('the navigator mode «Агенда»', () => {
+  test('a mode of the bar: «Заметки» and «Агенда» switch, the others are not there yet; ⌃⌘1 / ⌃⌘2; it survives a reload', async ({ page }) => {
+    await start(page);
+    const modes = page.getByRole('tablist', { name: 'Режимы навигатора' });
+    await expect(modes.getByRole('tab')).toHaveCount(6);
+    await expect(modes.getByRole('tab', { name: 'Агенда' })).toHaveAttribute('aria-selected', 'true');
+    await expect(modes.getByRole('tab', { name: 'Теги' })).toBeDisabled();
+    await expect(list(page)).toContainText('ВСТРОЕННЫЕ');
+    await expect(list(page)).toContainText('Выбранная агенда открывается в активной панели.');
+    await page.keyboard.press('Control+Meta+1');
+    await expect(page.locator('.nav')).toBeVisible();
+    await expect(modes.getByRole('tab', { name: 'Заметки' })).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Control+Meta+2');
+    await expect(list(page)).toBeVisible();
+    await page.reload();
+    await expect(list(page)).toBeVisible();
+  });
+
+  test('two editors: the navigator stays in its mode when the active pane changes; a pick opens in the active pane and is marked there', async ({ page }) => {
+    await start(page, withAgenda(NOTES(), MY_DAY));
+    await page.locator('.toolbar').getByRole('button', { name: 'Агенда', exact: true }).click(); // the built-in agenda on the right
+    const panes = page.locator('section.pane');
+    await panes.nth(0).locator('.cm-content').click(); // the file pane is active
+    await expect(list(page)).toBeVisible();
+    await expect(list(page).locator('[aria-current]')).toHaveCount(0); // no agenda in the active pane
+    await panes.nth(1).locator('.agenda .scroll').click();
+    await expect(list(page)).toBeVisible();
+    await expect(list(page).getByRole('button', { name: 'Агенда', exact: true })).toHaveAttribute('aria-current', 'true');
+    await list(page).getByRole('button', { name: 'Мой день' }).click();
+    await expect(panes.nth(1).locator('.agenda .h1')).toHaveText('Мой день'); // the agenda tab of the active pane shows it
+    await expect(list(page).getByRole('button', { name: 'Мой день' })).toHaveAttribute('aria-current', 'true');
+    await expect(page.locator('.toolbar .path')).toHaveText(/Агенда\s*›\s*Мой день/);
+    // from the file pane: a new agenda tab there
+    await panes.nth(0).locator('.cm-content').click();
+    await list(page).getByRole('button', { name: 'Агенда', exact: true }).click();
+    await expect(panes.nth(0).getByRole('tab')).toHaveCount(2);
+    await expect(panes.nth(1).locator('.agenda .h1')).toHaveText('Мой день'); // the other pane keeps its own
+    await expect(list(page)).toBeVisible();
   });
 });
 

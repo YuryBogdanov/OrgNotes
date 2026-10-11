@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
   import { store } from './store.svelte';
-  import Navigator from './Navigator.svelte';
   import Inspector from './Inspector.svelte';
   import Pane from './Pane.svelte';
   import SaveAsSheet from './SaveAsSheet.svelte';
@@ -18,7 +17,7 @@
   import Dialogs from './Dialogs.svelte';
   import Settings from './Settings.svelte';
   import AgendaBuilder from './AgendaBuilder.svelte';
-  import AgendaList from './AgendaList.svelte';
+  import NavPanel from './NavPanel.svelte';
 
   // the Settings window is this same app loaded with #settings: it shows only the settings
   const isSettingsWindow = location.hash === '#settings';
@@ -116,6 +115,8 @@
     agenda: () => store.showAgendaHere(),
     back: () => store.back(),
     nav: () => (store.showNav = !store.showNav),
+    navFiles: () => store.setNavMode('files'),
+    navAgendas: () => store.setNavMode('agendas'),
     insp: () => (store.showInspector = !store.showInspector),
   };
   $effect(() => {
@@ -145,6 +146,8 @@
     if (e.altKey && e.code === 'KeyW') return 'closeOthers';
     if (e.ctrlKey && e.code === 'KeyW') return 'closePane';
     if (e.ctrlKey && e.code === 'KeyJ') return 'jumpBar';
+    if (e.ctrlKey && e.code === 'Digit1') return 'navFiles';
+    if (e.ctrlKey && e.code === 'Digit2') return 'navAgendas';
     if (e.shiftKey && e.code === 'KeyW') return 'closeWindow';
     if (e.shiftKey && e.code === 'KeyP') return 'palette';
     if (e.shiftKey && e.code === 'KeyN') return 'paletteNewFile';
@@ -198,7 +201,8 @@
 {#if isSettingsWindow}
   {#if store.loaded}<Settings standalone />{/if}
 {:else}
-<div class="win">
+<!-- the agenda builder is a sheet over the whole window: the window stays visible under it but takes no input -->
+<div class="win" inert={!!store.builder}>
   <Dialogs />
   <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
@@ -213,7 +217,6 @@
     </div>
   {/if}
   {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
-  {#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
   {#if store.settingsOpen}<Settings />{/if}
   <!-- a start screen comes instead of the window (no toolbar, no navigator) -->
   {#if !store.start}
@@ -262,8 +265,7 @@
 
   <div class="body" bind:clientWidth={bodyW}>
     {#if fit.nav}
-      <!-- an agenda alone in the window: the list of agendas takes the navigator's place -->
-      <aside class="side" style="width:{store.navW}px">{#if store.mode === 'agenda' && store.layout.panes.length === 1}<AgendaList />{:else}<Navigator />{/if}</aside>
+      <aside class="side" style="width:{store.navW}px"><NavPanel /></aside>
       <Splitter onresize={(dx) => (store.navW = clamp(store.navW + dx, 180, 480))} />
     {/if}
 
@@ -293,6 +295,7 @@
   </div>
   {/if}
 </div>
+{#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
 {/if}
 
 <style>

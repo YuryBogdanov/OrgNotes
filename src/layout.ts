@@ -16,6 +16,7 @@ export interface Tab {
   fromAgenda?: { line: number; title: string } | null; // "Открыто из агенды" caption
   title?: string; // untitled tabs: "Без названия", "Без названия 2", …
   text?: string; // untitled tabs: the text, not on disk until "Сохранить как…"
+  agenda?: string; // agenda tabs: the id of a custom agenda («Мои агенды»); none = the built-in one
 }
 export interface Pane {
   id: string;
@@ -39,7 +40,7 @@ const reveal = (line: number, focus = false) => ({ line, n: ++revealSeq, focus }
 export function newTab(kind: TabKind, path?: string, line = 0, focus = false): Tab {
   return { id: uid('t'), kind, path, cursor: { line, col: 0 }, reveal: kind === 'file' ? reveal(line, focus) : null, fromAgenda: null };
 }
-export const copyTab = (t: Tab): Tab => ({ ...newTab(t.kind, t.path, t.cursor.line), cursor: { ...t.cursor }, reveal: t.kind === 'file' ? reveal(t.cursor.line) : null });
+export const copyTab = (t: Tab): Tab => ({ ...newTab(t.kind, t.path, t.cursor.line), cursor: { ...t.cursor }, reveal: t.kind === 'file' ? reveal(t.cursor.line) : null, agenda: t.agenda });
 const newPane = (tabs: Tab[]): Pane => ({ id: uid('p'), tabs, active: 0 });
 
 export const emptyLayout = (first?: Tab): Layout => ({ panes: [newPane(first ? [first] : [])], active: 0, ratio: 0.5 });
@@ -138,7 +139,7 @@ export function closePane(L: Layout, pi: number) {
   L.panes = [keep];
   L.active = 0;
 }
-const sameContent = (a: Tab, b: Tab) => a.kind === b.kind && (a.kind === 'agenda' || (a.kind === 'file' && a.path === b.path) || a.id === b.id);
+const sameContent = (a: Tab, b: Tab) => a.kind === b.kind && ((a.kind === 'agenda' && (a.agenda ?? '') === (b.agenda ?? '')) || (a.kind === 'file' && a.path === b.path) || a.id === b.id);
 
 /** "Оставить одну панель": close the inactive pane. */
 export const keepOne = (L: Layout) => closePane(L, 1 - L.active);
@@ -305,7 +306,7 @@ export function serialize(L: Layout): string {
     panes: L.panes.map((p) => {
       const tabs = p.tabs.filter((t) => t.kind !== 'untitled');
       const act = p.tabs[p.active];
-      return { active: Math.max(0, tabs.indexOf(act)), tabs: tabs.map((t) => ({ kind: t.kind, path: t.path, cursor: t.cursor })) };
+      return { active: Math.max(0, tabs.indexOf(act)), tabs: tabs.map((t) => ({ kind: t.kind, path: t.path, cursor: t.cursor, ...(t.agenda ? { agenda: t.agenda } : {}) })) };
     }),
   });
 }
@@ -320,7 +321,7 @@ export function restore(raw: string | null, exists: (path: string) => boolean): 
       const tabs: Tab[] = [];
       let active = 0;
       (Array.isArray(sp.tabs) ? sp.tabs : []).forEach((st: any, i: number) => {
-        if (st?.kind === 'agenda') tabs.push(newTab('agenda'));
+        if (st?.kind === 'agenda') tabs.push({ ...newTab('agenda'), ...(typeof st.agenda === 'string' && st.agenda ? { agenda: st.agenda } : {}) });
         else if (st?.kind === 'file' && typeof st.path === 'string' && exists(st.path)) {
           const t = newTab('file', st.path, st.cursor?.line ?? 0);
           t.cursor = { line: st.cursor?.line ?? 0, col: st.cursor?.col ?? 0 };

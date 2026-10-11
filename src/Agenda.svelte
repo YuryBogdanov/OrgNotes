@@ -20,7 +20,12 @@
     items: Item[]; empty?: boolean; more?: number;
   };
 
-  const custom = $derived(store.agenda);
+  // each agenda tab shows its own agenda
+  const tab = $derived.by(() => {
+    const p = store.layout.panes[pane];
+    return p?.tabs[p.active];
+  });
+  const custom = $derived(store.agendaOf(tab));
   const midnight = $derived(new Date(store.today.getFullYear(), store.today.getMonth(), store.today.getDate()));
 
   // ---- the built-in agenda: open tasks and events of the next 30 days, by day ----------------------------------
@@ -151,7 +156,7 @@
   }
   // another agenda picked in the list: the selection starts over
   $effect(() => {
-    void store.agendaSel;
+    void custom?.id;
     sel = -1;
     selKey = '';
   });
@@ -166,7 +171,7 @@
         <div class="h1">{custom ? custom.name : 'Агенда'}</div>
         <div class="sub">{custom ? `${tasksCount(total)} · ${sourcesWord}` : `${total} записей · ближайшие 30 дней`}</div>
       </div>
-      {#if custom}<button class="edit" onclick={() => store.editAgenda(custom.id)}>Редактировать…</button>{/if}
+      {#if custom}<button class="edit" onclick={(e) => store.editAgenda(custom.id, e.currentTarget)}>Редактировать…</button>{/if}
     </header>
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div class="scroll" bind:this={list} role="listbox" tabindex="0" aria-label="Задачи агенды" aria-activedescendant={sel >= 0 ? `ag-${pane}-${sel}` : undefined}
