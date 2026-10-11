@@ -69,7 +69,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   The notes are in Russian: what is new, how to update, and the Gatekeeper step. The user merges the PR afterwards.
 - **Signing:** ad-hoc (`bundle.macOS.signingIdentity: "-"`), no Developer ID or notarisation. On another Mac it
   needs «Всё равно открыть» or `xattr -dr com.apple.quarantine /Applications/Panopticon.app`. Minimum macOS 13.
-- **Releases so far:** v0.1.0 (first build, new icon), v0.1.1 (path-bar menus), v0.2.0 (Inbox). The user's other
+- **Releases so far:** v0.1.0 (first build, new icon), v0.1.1 (path-bar menus), v0.2.0 (Inbox), v0.3.0 (Inbox review, refile tree, drawers). The user's other
   machine is Apple Silicon.
 - **Icon:** `src-tauri/icons/source.png` (designer square) → a script makes `app-icon.png` (824/1024 rounded square,
   radius 185, shadow) and `src/assets/app-icon.png` (512, welcome screen) → `npx tauri icon …` →
