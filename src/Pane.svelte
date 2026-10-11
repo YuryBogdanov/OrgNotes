@@ -5,6 +5,7 @@
   import Agenda from './Agenda.svelte';
   import Review from './Review.svelte';
   import RichMenu from './RichMenu.svelte';
+  import { setPlanning, weekdayNames } from './edits';
   import type { RichPick } from './orgRich';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import { parseHeadings } from './org';
@@ -42,7 +43,20 @@
     return h ? [...h.path, h.title] : [];
   });
 
-  let richPick = $state<{ pick: RichPick; path: string } | null>(null); // a click on a drawn status, priority or date
+  let richPick = $state<{ pick: RichPick; path: string } | null>(null); // a click on a drawn status or priority
+  /** A drawn date opens the palette's calendar for its heading; a status or a priority, a small menu. */
+  function richChoice(pick: RichPick, path: string) {
+    if (pick.kind !== 'date') return void (richPick = { pick, path });
+    const f = store.files.find((x) => x.path === path);
+    const h = f?.headings.find((x) => x.line === pick.line);
+    if (!f || !h) return;
+    const kind = pick.date ?? 'SCHEDULED';
+    const old = new RegExp(`${kind}:\\s*(<[^>]*>)`).exec(f.text.split('\n')[h.line + 1] ?? '')?.[1];
+    store.openCalendar({
+      kind, initial: pick.value ?? new Date(), current: pick.value ?? null, old, names: weekdayNames(f.text), plate: { kind: 'heading', h, file: f },
+      pick: (d) => store.patchAt(path, pick.line, (t, hh) => setPlanning(t, hh, kind, d)),
+    });
+  }
 
   // ---- the tab context menu ------------------------------------------------------------------
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
@@ -258,7 +272,7 @@
     </div>
     <div class="ed">
       <Editor text={file.text} fileKey={tab.id + '|' + file.path} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} resetOn={store.diskGen[file.path] ?? 0} levels={store.levels} drawers={store.foldDrawers} rich={store.rich} richNumbers={store.richNumbers}
-        onrich={(pick) => (richPick = { pick, path: file.path })}
+        onrich={(pick) => richChoice(pick, file.path)}
         onchange={(t) => store.setText(t, file.path)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>
     {#if tab.fromAgenda}

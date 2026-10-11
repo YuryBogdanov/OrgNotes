@@ -7,6 +7,7 @@ import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links'
 import { displayName, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags } from './edits';
 import { bareTitle, caretAfter, keyOf, moveTo, moveWithin } from './refile';
+import type { CalSpec, Plate } from './commands';
 import { closingStatus, locate, nextOpen, reviewQueue, short, type Result, type ReviewItem } from './review';
 import { DEFAULT_LEVELS, type LevelView } from './orgIndent';
 import { DEFAULT_INBOX, append, entry, inboxItems, prepend, readInbox, remove, withInbox, type InboxConfig, type InboxItem } from './inbox';
@@ -38,7 +39,7 @@ function build(name: string, path: string, text: string, disk: string, diskRaw: 
 }
 
 /** Where the palette opens: a step of a command at once (the card's buttons in «Разбор Inbox» use the heading ones). */
-export type PaletteStart = 'newFile' | 'goto' | 'status' | 'priority' | 'schedule' | 'deadline' | 'tags';
+export type PaletteStart = 'newFile' | 'goto' | 'status' | 'priority' | 'schedule' | 'deadline' | 'tags' | 'calendar';
 const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
 function readLevels(): LevelView {
@@ -134,6 +135,12 @@ class Store {
   openPalette(start?: PaletteStart) {
     if (this.unsavedReq || this.saveAsReq || this.errorReq) return;
     this.palette = { start, n: Date.now() };
+  }
+  /** The calendar opened on its own (the review's «Отложить», a date chip): what it is for and where it writes. */
+  calReq: (CalSpec & { plate?: Plate }) | null = null;
+  openCalendar(spec: CalSpec & { plate?: Plate }) {
+    this.calReq = spec;
+    this.openPalette('calendar');
   }
   /** ⇧⌘P: opens, or closes an open palette. */
   togglePalette() {

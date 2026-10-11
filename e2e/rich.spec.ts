@@ -135,13 +135,16 @@ test.describe('editing', () => {
     await expect(line(page, 'Свести расходы').locator('.cm-r-status')).toHaveText('DONE');
   });
 
-  test('priority and date menus; a checkbox ticks and the cookie is counted again; «› Свойства» opens the drawer', async ({ page }) => {
+  test('the priority menu and the date calendar; a checkbox ticks and the cookie is counted again; «› Свойства» opens the drawer', async ({ page }) => {
     await open(page);
     await line(page, 'Подготовить бюджет').locator('.cm-r-cap.prio').click();
     await page.getByRole('menu', { name: 'Приоритет' }).locator('.row', { hasText: 'B' }).click();
     await expect.poll(() => disk(page)).toContain('** TODO [#B] Подготовить бюджет 2027');
     await ed(page).locator('.cm-r-chip.sched', { hasText: 'завтра' }).click();
-    await page.getByRole('menu', { name: 'Запланировано' }).locator('.row', { hasText: 'Через неделю' }).click();
+    await expect(page.getByRole('dialog', { name: 'Командная палитра' }).locator('.cal')).toBeVisible(); // the palette's calendar (ТЗ 20)
+    await page.keyboard.press('.'); // today
+    await page.keyboard.press('Shift+ArrowDown'); // a week on
+    await page.keyboard.press('Enter');
     const d = new Date();
     d.setDate(d.getDate() + 7);
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

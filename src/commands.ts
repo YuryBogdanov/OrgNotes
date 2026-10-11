@@ -5,7 +5,8 @@
 import { store, type NoteFile } from './store.svelte';
 import { fuzzy, better, type Match } from './fuzzy';
 import { displayName } from './names';
-import { parseDate } from './edits';
+import { parseDate, weekdayNames } from './edits';
+import { shiftDate } from './calendar';
 import type { Heading, OrgDate } from './org';
 
 export const ICONS = {
@@ -22,6 +23,7 @@ export const ICONS = {
   file: 'M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4',
   folder: 'M3 6a1.5 1.5 0 0 1 1.5-1.5H8l1.5 2h6A1.5 1.5 0 0 1 17 8v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5z',
   check: 'M4 10.5l4 4 8-9',
+  cal: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3M6.5 11h2M11.5 11h2M6.5 14h2',
   inbox: 'M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4',
   prio: 'M10 3v10M10 16.5v.01',
   clear: 'M5 5l10 10M15 5L5 15',
@@ -58,12 +60,27 @@ export type Plate =
   | { kind: 'general'; file: NoteFile; line: number }
   | { kind: 'headings'; file: NoteFile }
   | { kind: 'text'; text: string; right?: string };
+/** «Выбрать дату…»: the calendar of three months (ТЗ «выбор даты в календаре»). */
+export interface CalSpec {
+  kind: 'SCHEDULED' | 'DEADLINE';
+  initial: Date; // chosen when it opens
+  current: Date | null; // the task's date of this kind now (a dashed frame)
+  old?: string; // its stamp, whose time and repeat are kept
+  names: string[]; // the day names the file writes
+  pick: (d: Date) => void;
+  back?: () => Step; // ⌫ on an empty field
+}
+export type Unit = 'day' | 'week' | 'month' | 'year';
 export interface Step {
   placeholder: string;
   ghost?: (q: string) => string; // a grey hint after what was typed («#» → «заголовок»)
   initial?: string;
   plate: (q: string) => Plate | null;
   rows: (q: string) => Row[];
+  token?: { icon: Icon; text: string }; // the step's label at the start of the field («Запланировать»)
+  calendar?: CalSpec; // the step is the calendar
+  shift?: (unit: Unit, n: number) => Step; // ⇧ + arrows on the step open the calendar moved from its first date
+  foot?: [string, string][]; // the keys at the bottom
 }
 export interface Command {
   id: string;
@@ -284,6 +301,11 @@ function statusStep(c: Ctx): Step {
   };
 }
 
+const DATE_FOOT: [string, string][] = [['↑ ↓', 'выбрать'], ['⇧ + стрелки', 'календарь'], ['↩', 'выполнить'], ['⎋', 'закрыть']];
+const CAL_FOOT: [string, string][] = [['⇧ ← →', 'день'], ['⇧ ↑ ↓', 'неделя'], ['⌥⇧ ← →', 'месяц'], ['⌥⇧ ↑ ↓', 'год'], ['.', 'сегодня'], ['↩', 'выбрать'], ['⌫', 'к вариантам'], ['⎋', 'закрыть']];
+const dateToken = (kind: 'SCHEDULED' | 'DEADLINE') => ({ icon: (kind === 'SCHEDULED' ? 'sched' : 'dead') as Icon, text: kind === 'SCHEDULED' ? 'Запланировать' : 'Дедлайн' });
+const jsDate = (d: OrgDate) => new Date(d.y, d.m - 1, d.d);
+
 function dateStep(c: Ctx, kind: 'SCHEDULED' | 'DEADLINE'): Step {
   const group = kind === 'SCHEDULED' ? 'ЗАПЛАНИРОВАТЬ' : 'ДЕДЛАЙН';
   const icon: Icon = kind === 'SCHEDULED' ? 'sched' : 'dead';
@@ -291,9 +313,13 @@ function dateStep(c: Ctx, kind: 'SCHEDULED' | 'DEADLINE'): Step {
   const pick = (d: Date | null) => () => store.setPlanning(kind, d);
   const today = new Date();
   const day = (n: number) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + n);
-  return {
-    placeholder: 'Дата: сегодня, завтра, пт, 14 окт, +3д',
+  const base = current ? jsDate(current) : day(0);
+  const step: Step = {
+    placeholder: 'сегодня, завтра, пт, 14 окт, +3д',
     plate: headingPlate(c),
+    token: dateToken(kind),
+    foot: DATE_FOOT,
+    shift: (unit, n) => calendarStep(c, kind, shiftDate(base, unit, n)),
     rows: (q) => {
       if (q.trim()) {
         const d = parseDate(q);
@@ -303,11 +329,29 @@ function dateStep(c: Ctx, kind: 'SCHEDULED' | 'DEADLINE'): Step {
         { id: 'today', group, title: 'Сегодня', icon, hint: long(day(0)), run: pick(day(0)) },
         { id: 'tomorrow', group, title: 'Завтра', icon, hint: long(day(1)), run: pick(day(1)) },
         { id: 'week', group, title: 'Через неделю', icon, hint: long(day(7)), run: pick(day(7)) },
+        { id: 'cal', group, title: 'Выбрать дату…', icon: 'cal', hint: 'календарь на 3 месяца', key: '⇧ + стрелки', run: () => calendarStep(c, kind, base) },
       ];
       if (current) rows.push({ id: 'clear', group, title: 'Убрать дату', icon: 'clear', hint: short(current), run: pick(null) });
       return rows;
     },
   };
+  return step;
+}
+
+/** The calendar for a heading of the current file: the date is written like «Запланировать…» writes it. */
+function calendarStep(c: Ctx, kind: 'SCHEDULED' | 'DEADLINE', initial: Date): Step {
+  const f = c.file!;
+  const h = c.heading!;
+  const cur = kind === 'SCHEDULED' ? h.scheduled : h.deadline;
+  const old = new RegExp(`${kind}:\\s*(<[^>]*>)`).exec(f.text.split('\n')[h.line + 1] ?? '')?.[1];
+  return calStep(
+    { kind, initial, current: cur ? jsDate(cur) : null, old, names: weekdayNames(f.text), pick: (d) => store.setPlanning(kind, d), back: () => dateStep(c, kind) },
+    headingPlate(c),
+  );
+}
+/** The calendar step itself (also for «Отложить» of the Inbox review and a date chip of «Оформленный текст»). */
+export function calStep(spec: CalSpec, plate: (q: string) => Plate | null): Step {
+  return { placeholder: '+10, 21 окт… или ⇧ + стрелки', plate, token: dateToken(spec.kind), calendar: spec, foot: spec.back ? CAL_FOOT : CAL_FOOT.filter(([k]) => k !== '⌫'), rows: () => [] };
 }
 
 function priorityStep(c: Ctx): Step {
