@@ -1,7 +1,7 @@
 // Inbox: one chosen .org file where tasks are put quickly, to be sorted out later. Pure functions on its text, so the
 // panel, the quick entry and the tests share them.
 
-import { inactiveStamp, type Heading, type Workflow } from './org';
+import { headingLines, inactiveStamp, type Heading, type Workflow } from './org';
 
 /** The project's Inbox settings (`inbox` in .orgnotes/config.json): they belong to the notes folder. */
 export interface InboxConfig {
@@ -145,6 +145,21 @@ export function entry(title: string, details: string, status: string, created: D
 export function append(text: string, task: string): string {
   const body = text.replace(/\n*$/, '');
   return (body ? body + '\n' : '') + task + '\n';
+}
+
+/**
+ * The file with a task added at its top: after the preamble (#+TITLE and the like, kept as it is), before the first
+ * heading, with one blank line between the task and the heading below it, so the newest is seen first on opening.
+ */
+export function prepend(text: string, task: string): string {
+  const lines = text.split('\n');
+  const first = Math.min(...headingLines(lines));
+  if (!isFinite(first)) {
+    const body = text.replace(/\n\s*$/, '');
+    return (body.trim() ? body + '\n\n' : '') + task + '\n';
+  }
+  const rest = lines.slice(first).join('\n');
+  return lines.slice(0, first).map((l) => l + '\n').join('') + task + '\n\n' + (rest.endsWith('\n') ? rest : rest + '\n');
 }
 
 /** The lines a heading takes with everything under it. */
