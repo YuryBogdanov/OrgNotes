@@ -176,6 +176,8 @@ class Store {
     if (t?.kind !== 'file') return;
     t.reveal = { line, n: Date.now() + Math.random(), focus };
   }
+  /** Full screen: the traffic lights are hidden until the pointer goes to the top of the screen (Rust watches them). */
+  titlebar = $state({ fullscreen: false, lights: true, menu: 0 });
   navW = $state(248);
   inspW = $state(272);
   saveState = $state<'saved' | 'saving' | 'memory'>(isTauri ? 'saved' : 'memory');
@@ -798,6 +800,15 @@ class Store {
     await revealItemInDir(this.dir);
   }
   /** ⌘⇧W, the red button: the window goes, the app stays in the Dock with everything in memory. */
+  /** The traffic lights drawn in our toolbar in full screen: green leaves full screen, red closes (hides) the window. */
+  async leaveFullscreen() {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    await getCurrentWindow().setFullscreen(false);
+  }
+  async closeFromFullscreen() {
+    await this.leaveFullscreen();
+    setTimeout(() => void this.hideWindow(), 800); // after the window is back from its space
+  }
   async hideWindow() {
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
     await getCurrentWindow().hide();
@@ -826,6 +837,7 @@ class Store {
     if (!isTauri) return;
     const { listen } = await import('@tauri-apps/api/event');
     await listen('notes-changed', () => this.reload());
+    await listen<{ fullscreen: boolean; lights: boolean; menu: number }>('titlebar', (e) => (this.titlebar = e.payload));
     await listen('quit-requested', () => this.quit()); // «Завершить» from the Dock
   }
 
