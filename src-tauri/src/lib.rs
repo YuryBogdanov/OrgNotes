@@ -71,16 +71,16 @@ mod bookmark {
 }
 
 /// Full screen and the traffic lights. In full screen macOS hides the window buttons and slides them down in a thin
-/// title bar of their own (under the menu bar) while the pointer is at the top of the screen. We hide that bar and
-/// let the page draw the buttons in its own toolbar instead, moved down by the menu bar. AppKit says nothing about
-/// the reveal, so the bar is checked a few times a second and every change goes to the page as `titlebar`
-/// {fullscreen, lights, menu}: `lights` = the buttons are shown now, `menu` = the height of the menu bar then.
+/// title bar of their own (under the menu bar) while the pointer is at the top of the screen. That bar is made
+/// invisible and click-through, and the page draws the buttons in its own toolbar instead, below the menu bar. AppKit
+/// says nothing about the reveal, so the bar is checked a few times a second and every change goes to the page as
+/// `titlebar` {fullscreen, lights, menu}: `lights` = the buttons are shown now, `menu` = the height of the menu bar.
 #[cfg(target_os = "macos")]
 mod titlebar {
-    use objc2::{msg_send, runtime::AnyObject};
+    use objc2::{class, msg_send, rc::Retained, runtime::AnyObject};
     use objc2_foundation::NSRect;
     use serde::Serialize;
-    use std::sync::atomic::{AtomicPtr, Ordering};
+    use std::sync::Mutex;
     use std::time::Duration;
     use tauri::{AppHandle, Emitter, Manager};
 
@@ -93,33 +93,58 @@ mod titlebar {
 
     const FULL_SCREEN: usize = 1 << 14; // NSWindowStyleMaskFullScreen
     const WINDOWED: State = State { fullscreen: false, lights: true, menu: 0.0 };
-    /// The full-screen title bar whose looks we hid (its background and buttons); they come back when full screen ends.
-    static HIDDEN: AtomicPtr<AnyObject> = AtomicPtr::new(std::ptr::null_mut());
 
-    /// Show or hide what the thin full-screen bar draws: its background, its decoration and the three buttons. The bar
-    /// itself stays (hiding it whole stops macOS from showing the menu bar and from leaving full screen).
-    unsafe fn looks(btn: *mut AnyObject, hidden: bool) {
-        let title: *mut AnyObject = msg_send![btn, superview]; // NSTitlebarView: the buttons
-        if title.is_null() {
+    /// Views of the full-screen bar we hid, with whether they were hidden before; put back when full screen ends.
+    /// Only touched on the main thread.
+    struct Hidden(Vec<(Retained<AnyObject>, bool)>);
+    unsafe impl Send for Hidden {}
+    static HIDDEN: Mutex<Hidden> = Mutex::new(Hidden(Vec::new()));
+
+    /// Hide everything the bar draws — its backgrounds (AppKit shows them again on every reveal, so this runs on every
+    /// check), the buttons — except the views that hold the buttons: hiding those, or the bar's content view, stops
+    /// macOS from showing the menu bar and from leaving full screen.
+    unsafe fn quiet(bar: *mut AnyObject, btn: *mut AnyObject) {
+        let mut keep: Vec<*mut AnyObject> = Vec::new(); // the chain from the content view down to the buttons
+        let mut v: *mut AnyObject = msg_send![btn, superview];
+        while !v.is_null() {
+            keep.push(v);
+            v = msg_send![v, superview];
+        }
+        let content: *mut AnyObject = msg_send![bar, contentView];
+        if content.is_null() {
             return;
         }
-        let container: *mut AnyObject = msg_send![title, superview]; // NSTitlebarContainerView
-        for parent in [title, container] {
-            if parent.is_null() {
+        let mut hidden = HIDDEN.lock().unwrap();
+        let mut stack = vec![content];
+        while let Some(v) = stack.pop() {
+            if keep.contains(&v) {
+                let subs: *mut AnyObject = msg_send![v, subviews];
+                let n: usize = msg_send![subs, count];
+                for i in 0..n {
+                    stack.push(msg_send![subs, objectAtIndex: i]);
+                }
                 continue;
             }
-            let subs: *mut AnyObject = msg_send![parent, subviews];
-            let n: usize = msg_send![subs, count];
-            for i in 0..n {
-                let v: *mut AnyObject = msg_send![subs, objectAtIndex: i];
-                let cls: *const objc2::runtime::AnyClass = msg_send![v, class];
-                let name = (*cls).name().to_bytes();
-                // the buttons (_NSThemeCloseWidget…), the bar's background and its bottom line; not the title view
-                let drawn = name.starts_with(b"_NSTheme") || name == b"NSTitlebarBackgroundView" || name == b"_NSTitlebarDecorationView";
-                if drawn {
-                    let _: () = msg_send![v, setHidden: hidden];
+            let was: bool = msg_send![v, isHidden];
+            if !hidden.0.iter().any(|(x, _)| Retained::as_ptr(x) as *mut AnyObject == v) {
+                if let Some(r) = Retained::retain(v) {
+                    hidden.0.push((r, was));
                 }
             }
+            if !was {
+                let _: () = msg_send![v, setHidden: true];
+            }
+        }
+        let clear: *mut AnyObject = msg_send![class!(NSColor), clearColor];
+        let _: () = msg_send![bar, setBackgroundColor: clear];
+        let _: () = msg_send![bar, setIgnoresMouseEvents: true]; // clicks go to our toolbar under it
+    }
+
+    /// Back from full screen: the buttons and the title bar's views go home to the window, as they were.
+    unsafe fn restore() {
+        let mut hidden = HIDDEN.lock().unwrap();
+        for (v, was) in hidden.0.drain(..) {
+            let _: () = msg_send![&*v, setHidden: was];
         }
     }
 
@@ -132,10 +157,7 @@ mod titlebar {
         let mask: usize = msg_send![w, styleMask];
         let btn: *mut AnyObject = msg_send![w, standardWindowButton: 0usize];
         if mask & FULL_SCREEN == 0 {
-            // back from full screen: the buttons go home to the window and must be seen again
-            if !HIDDEN.swap(std::ptr::null_mut(), Ordering::SeqCst).is_null() && !btn.is_null() {
-                looks(btn, false);
-            }
+            restore();
             return Some(WINDOWED);
         }
         let none = State { fullscreen: true, lights: false, menu: 0.0 };
@@ -147,11 +169,7 @@ mod titlebar {
         if bar.is_null() || bar == ns_window as *mut AnyObject {
             return Some(none);
         }
-        if HIDDEN.load(Ordering::SeqCst) != bar {
-            looks(btn, true);
-            let _: () = msg_send![bar, setIgnoresMouseEvents: true]; // clicks go to our toolbar under it
-            HIDDEN.store(bar, Ordering::SeqCst);
-        }
+        quiet(bar, btn);
         // the bar stays in place; showing and hiding it is its opacity
         let visible: bool = msg_send![bar, isVisible];
         let alpha: f64 = msg_send![bar, alphaValue];

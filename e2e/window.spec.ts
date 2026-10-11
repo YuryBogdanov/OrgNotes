@@ -11,7 +11,7 @@ const titlebar = (page: Page, fullscreen: boolean, shown: boolean, menu = 0) =>
   page.evaluate(([fullscreen, lights, menu]) => (window as any).__emitEvent('titlebar', { fullscreen, lights, menu }), [fullscreen, shown, menu] as const);
 const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 
-test('full screen: the navigator button moves left while the lights are hidden; with the menu bar our own lights come and the window moves down', async ({ page }) => {
+test('full screen: the navigator button moves left while the lights are hidden; with the menu bar our own lights come and the toolbar grows by it', async ({ page }) => {
   await installTauriMock(page, { '/mock/a.org': '* A\n' });
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
@@ -27,6 +27,9 @@ test('full screen: the navigator button moves left while the lights are hidden; 
   await titlebar(page, true, true, 33); // the pointer at the top: the menu bar comes
   await expect.poll(() => left(page)).toBe(normal);
   await expect.poll(() => top(page)).toBe(y0 + 33); // below the menu bar
+  // the toolbar grows by the menu bar, so nothing of the page shows in a gap above it
+  expect(Math.round((await page.locator('.toolbar').boundingBox())!.y)).toBe(0);
+  await expect.poll(async () => Math.round((await page.locator('.toolbar').boundingBox())!.height)).toBe(52 + 33);
   await expect(lights(page)).toBeVisible();
   // our lights sit on the line of the navigator button
   const l = (await lights(page).boundingBox())!;
@@ -34,7 +37,7 @@ test('full screen: the navigator button moves left while the lights are hidden; 
   expect(Math.abs(l.y + l.height / 2 - (b.y + b.height / 2))).toBeLessThanOrEqual(1);
   await expect(lights(page).getByRole('button', { name: 'Свернуть окно' })).toBeDisabled(); // as in full screen
   await lights(page).getByRole('button', { name: 'Выйти из полноэкранного режима' }).click();
-  expect(await log(page)).toContainEqual(['fullscreen', false]);
+  await expect.poll(() => log(page)).toContainEqual(['fullscreen', false]);
 
   await titlebar(page, true, false);
   await expect.poll(() => left(page)).toBe(14);

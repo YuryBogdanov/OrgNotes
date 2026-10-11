@@ -202,8 +202,9 @@
   {#if store.loaded}<Settings standalone />{/if}
 {:else}
 <!-- the agenda builder is a sheet over the whole window: the window stays visible under it but takes no input -->
-<!-- full screen with the menu bar shown: the whole window moves down by it, the traffic lights come into the toolbar -->
-<div class="win" inert={!!store.builder} class:menu={store.titlebar.fullscreen && store.titlebar.lights} style:--menu="{store.titlebar.menu}px">
+<!-- full screen with the menu bar shown: the toolbar grows by it (its buttons stay just below it), the traffic lights
+     come into the toolbar -->
+<div class="win" inert={!!store.builder} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
   <Dialogs />
   <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
@@ -317,8 +318,7 @@
   /* «обновлён с диска»: does not take the focus or block typing, goes after 4 s */
   .toast { position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 9px 14px; background: var(--bar); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); font-size: 12.5px; color: var(--fg); pointer-events: none; }
   .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .win { height: 100%; display: flex; flex-direction: column; transition: transform 0.2s ease; }
-  .win.menu { transform: translateY(var(--menu)); }
+  .win { height: 100%; display: flex; flex-direction: column; }
   .lights { display: flex; gap: 8px; margin-left: 4px; }
   .light { width: 12px; height: 12px; padding: 0; border: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18); }
   .light svg { width: 8px; height: 8px; opacity: 0; stroke: rgba(0, 0, 0, 0.55); stroke-width: 1.3; stroke-linecap: round; fill: none; }
@@ -328,10 +328,11 @@
   .light.zoom { background: #28c840; }
   .light.mini { background: color-mix(in srgb, var(--fg) 22%, transparent); box-shadow: none; }
   .light:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
-  @media (prefers-reduced-motion: reduce) { .win { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .toolbar { transition: none; } }
   /* as in the design: three columns, the path pill in the middle of the window, as wide as its content */
   .toolbar {
-    flex: 0 0 52px; display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; grid-template-rows: 100%; align-items: center; gap: 12px; padding: 0 14px;
+    flex: 0 0 calc(52px + var(--menu, 0px)); display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; grid-template-rows: 100%; align-items: center; gap: 12px;
+    padding: var(--menu, 0px) 14px 0; box-sizing: border-box; transition: flex-basis 0.2s ease, padding 0.2s ease;
     background: var(--bar-bg); border-bottom: 1px solid var(--line);
   }
   .lights-gap { flex: 0 0 68px; transition: flex-basis 0.2s ease, margin 0.2s ease; }
