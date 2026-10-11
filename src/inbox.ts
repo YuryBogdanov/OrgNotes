@@ -8,12 +8,13 @@ export interface InboxConfig {
   file: string | null; // relative path of the Inbox file; null = not set up yet
   status: string | null; // status of a new task; null = the first open status of the file
   created: boolean; // write :CREATED:
+  add: 'top' | 'end'; // where a new task goes: the top of the file (after its preamble) or its end
   order: 'new' | 'file'; // newest on top, or as in the file
   counter: boolean; // the badge on the Inbox button
   details: boolean; // the first line of details under the title
   confirm: boolean; // «Добавлено в Inbox» after a quick entry
 }
-export const DEFAULT_INBOX: InboxConfig = { file: null, status: null, created: true, order: 'new', counter: true, details: true, confirm: true };
+export const DEFAULT_INBOX: InboxConfig = { file: null, status: null, created: true, add: 'top', order: 'new', counter: true, details: true, confirm: true };
 
 export function readInbox(raw: unknown): InboxConfig {
   const v = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
@@ -22,6 +23,7 @@ export function readInbox(raw: unknown): InboxConfig {
     file: typeof v.file === 'string' && v.file.trim() ? v.file.trim() : null,
     status: typeof v.status === 'string' && v.status.trim() ? v.status.trim() : null,
     created: bool('created'),
+    add: v.add === 'end' ? 'end' : 'top',
     order: v.order === 'file' ? 'file' : 'new',
     counter: bool('counter'),
     details: bool('details'),
@@ -154,6 +156,12 @@ export function prepend(text: string, task: string): string {
   }
   const rest = lines.slice(first).join('\n');
   return lines.slice(0, first).map((l) => l + '\n').join('') + task + '\n\n' + (rest.endsWith('\n') ? rest : rest + '\n');
+}
+
+/** The file with a task added at its end, one blank line before it so the tasks don't stick together. */
+export function append(text: string, task: string): string {
+  const body = text.replace(/\n\s*$/, '');
+  return (body.trim() ? body + '\n\n' : '') + task + '\n';
 }
 
 /** The file without a heading and everything under it. */

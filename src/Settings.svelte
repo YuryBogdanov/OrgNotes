@@ -3,6 +3,7 @@
   import { toneFor, type Workflow } from './org';
   import { toneOf, toneStyle, colorName } from './colors';
   import ColorPicker from './ColorPicker.svelte';
+  import Picker from './Picker.svelte';
   import {
     MAX_KEYWORD, addState, checkKey, normalizeKey, addWorkflow, canRemoveState, canRemoveWorkflow, checkKeyword, displayName, dropState, dropWorkflow,
     effectiveKeys, fromConfig, initialOf, moveState, normalizeKeyword, orgLine, pendingState, removeState, removeWorkflow,
@@ -277,13 +278,17 @@
       confirmAgenda = null;
       return;
     }
-    if (e.key === 'Escape' && !standalone && !picker && !rename && !confirmDelete) store.settingsOpen = false;
+    if (e.key === 'Escape' && !standalone && !picker && !pickFile && !rename && !confirmDelete) store.settingsOpen = false;
   }
 
   const TABS = ['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы'];
   const READY = ['Основные', 'Статусы', 'Агенды', 'Inbox'];
 
   // ---- Inbox ---------------------------------------------------------------------------------------------------
+  let pickFile = $state(false); // «Выбрать…»: the palette of files, the same as in the Inbox stub
+  const inboxPath = $derived(
+    !store.inboxCfg.file ? 'Не выбран' : store.inboxCfg.file.split('/').join(' / ') + (store.inboxFile ? '' : ' — не найден'),
+  );
   const inboxStates = $derived.by(() => {
     const seqs = store.inboxFile?.wf.sequences ?? store.config.workflows;
     return [...new Set(seqs.flatMap((sq) => sq.states.filter((x) => !x.done).map((x) => x.name)))];
@@ -361,15 +366,21 @@
           <div class="cap">ФАЙЛ</div>
           <div class="opts">
             <div class="opt">
-              <label for="ib-file">Файл Inbox</label>
-              <select id="ib-file" class="sel" value={store.inboxCfg.file ?? ''} onchange={(e) => store.setInbox({ file: e.currentTarget.value || null })}>
-                <option value="">Не выбран</option>
-                {#each [...store.files].sort((a, b) => a.name.localeCompare(b.name, 'ru')) as f (f.path)}<option value={f.name}>{f.name}</option>{/each}
+              <span id="ib-file">Файл Inbox</span>
+              <span class="ibfile">
+                <span class="val" aria-labelledby="ib-file" data-testid="ib-file">{inboxPath}</span>
+                <button class="change" aria-label="Выбрать файл Inbox" onclick={() => (pickFile = true)}>Выбрать…</button>
+              </span>
+            </div>
+            <div class="opt">
+              <label for="ib-add">Куда добавлять</label>
+              <select id="ib-add" class="sel" value={store.inboxCfg.add} onchange={(e) => store.setInbox({ add: e.currentTarget.value === 'end' ? 'end' : 'top' })}>
+                <option value="top">В начало файла</option>
+                <option value="end">В конец файла</option>
               </select>
             </div>
-            <div class="opt"><span>Куда добавлять</span><span class="val">В конец файла</span></div>
           </div>
-          <p class="help">Сюда попадают новые задачи; задачи, записанные в файл вручную, тоже появляются в списке. Новые задачи записываются сразу на диск. Файл свой у каждой рабочей папки.</p>
+          <p class="help">Сюда попадают новые задачи; задачи, записанные в файл вручную, тоже появляются в списке. Новые задачи записываются сразу на диск, между задачами — пустая строка. В начало — после строк вроде #+TITLE, перед первой задачей. Файл свой у каждой рабочей папки.</p>
 
           <div class="cap">БЫСТРЫЙ ВВОД</div>
           <div class="opts">
@@ -654,6 +665,8 @@
         anchor={picker?.anchor as HTMLElement} onpick={(c) => (pickerState.color = c)} onclose={() => (picker = null)} />
     {/if}
 
+    {#if pickFile}<Picker onclose={() => (pickFile = false)} />{/if}
+
     {#if confirmAgenda}
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
       <div class="modal" onmousedown={() => (confirmAgenda = null)}>
@@ -742,6 +755,8 @@
   .opts { display: flex; flex-direction: column; gap: 6px; }
   .sel { height: 26px; max-width: 260px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 0 6px; font-size: 12.5px; }
   .val { font-size: 12.5px; color: var(--fg2); }
+  .ibfile { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .ibfile .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .keyrec { min-width: 110px; height: 26px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
   .keyrec.rec { border-color: var(--acc); color: var(--acc); font-weight: 400; letter-spacing: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 25%, transparent); }
   .stepper { display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 7px; background: var(--field); }
