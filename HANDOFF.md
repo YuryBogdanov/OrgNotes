@@ -14,6 +14,7 @@ text, it never re-serialises a tree. The UI is in Russian; code comments are in 
 ## 2. How the user works with you
 
 - The user writes in Russian; answer in Russian, short and concrete.
+- Specs also live in the repo as `docs/NN-name.md` (e.g. «реализуй ТЗ 16-perenos-v-drugoy-fayl.md»).
 - Work comes as **ТЗ (specs) in Claude Docs**, as claude.ai artifact links. Read them with the docs tools: `read`
   on `{"object":"project","id":<id>}`, then on the tab's content node. They may be updated later; re-read the
   changed parts.
@@ -119,7 +120,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 - **Per notes folder:** `<notes>/.orgnotes/config.json`:
   - `workflows` (status sets), `behavior` (closedTimestamp, logbook);
   - `agendas` (custom agendas);
-  - `inbox` {file, status, created, order, counter, details, confirm}; defaults are omitted.
+  - `inbox` {file, status, created, add (top|end, default top), order, counter, details, confirm}; defaults are omitted.
   Both windows write it via `store.updateConfig(raw => …)`, which re-reads the newest text first.
 - **App config (Rust):** the notes dir and its bookmark, in the app config dir. Identifier `dev.local.panopticon`.
 - **localStorage (per Mac):**
@@ -177,7 +178,6 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
    - circles instead of stars (the architecture is ready: `Marker` widget in `orgIndent.ts`).
 5. **Small known deviations:**
    - The menu item «Новая задача в Inbox…» always shows ⇧⌘I, even after the shortcut is changed.
-   - The Inbox file in Settings is a `<select>`.
-   - «Создать inbox.org» writes `#+TITLE: inbox`.
+    - «Создать inbox.org» writes `#+TITLE: inbox`.
 6. **`sample_notes_dir`** is compiled from `CARGO_MANIFEST_DIR`. It only works on the build machine; elsewhere the
    button is hidden, which is fine.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_INBOX, ago, entry, inboxItems, prepend, readInbox, remove, withInbox } from './inbox';
+import { DEFAULT_INBOX, ago, append, entry, inboxItems, prepend, readInbox, remove, withInbox } from './inbox';
 import { DEFAULT_WORKFLOW, parseHeadings } from './org';
 
 const INBOX = [
@@ -50,6 +50,13 @@ describe('writing', () => {
     expect(e).toBe(['* TODO Подготовить презентацию для CTO', ':PROPERTIES:', ':CREATED: [2026-10-11 Sun 14:32]', ':END:', 'Показать план найма.', ',* не заголовок'].join('\n'));
     expect(entry('Без деталей', '', 'NEW', null)).toBe('* NEW Без деталей');
   });
+  it('appended (the other setting): at the end, one blank line before it', () => {
+    expect(append('#+TITLE: Inbox\n* TODO A\n', '* TODO B')).toBe('#+TITLE: Inbox\n* TODO A\n\n* TODO B\n');
+    expect(append('* TODO A\ntext\n\n\n', '* TODO B')).toBe('* TODO A\ntext\n\n* TODO B\n');
+    expect(append('', '* TODO B')).toBe('* TODO B\n');
+    expect(append('\n\n', '* TODO B')).toBe('* TODO B\n');
+    expect(append(append('* A', '* B'), '* C')).toBe('* A\n\n* B\n\n* C\n');
+  });
   it('prepended: after the preamble, before the first heading, one blank line below it', () => {
     expect(prepend('#+TITLE: Inbox\n* TODO A\n', '* TODO B')).toBe('#+TITLE: Inbox\n* TODO B\n\n* TODO A\n');
     expect(prepend('#+TITLE: Inbox\n\n* TODO A\ntext\n\n* TODO C', '* TODO B\n:PROPERTIES:\n:END:')).toBe(
@@ -80,5 +87,10 @@ describe('settings', () => {
     expect(JSON.parse(raw)).toEqual({ version: 1, workflows: [], inbox: { file: 'inbox.org', counter: false } });
     expect(readInbox(JSON.parse(raw).inbox)).toEqual(c);
     expect(JSON.parse(withInbox(raw, DEFAULT_INBOX)).inbox).toBeUndefined();
+    // where a task goes: the top by default, the end only when set
+    expect(DEFAULT_INBOX.add).toBe('top');
+    expect(readInbox({ add: 'end' }).add).toBe('end');
+    expect(readInbox({ add: 'middle' }).add).toBe('top');
+    expect(JSON.parse(withInbox(null, { ...DEFAULT_INBOX, add: 'end' })).inbox).toEqual({ add: 'end' });
   });
 });

@@ -221,13 +221,37 @@ test.describe('settings → Inbox', () => {
     await installTauriMock(page, FILES());
     await page.goto('/#settings');
     await page.getByRole('tab', { name: 'Inbox' }).click();
-    await expect(page.getByLabel('Файл Inbox')).toHaveValue('inbox.org');
+    await expect(page.getByTestId('ib-file')).toHaveText('inbox.org');
+    await expect(page.getByLabel('Куда добавлять')).toHaveValue('top');
+    await page.getByLabel('Куда добавлять').selectOption('end');
     await page.getByLabel('Статус новой задачи').selectOption('NEXT');
     await page.getByRole('switch', { name: 'Записывать дату создания' }).click();
     await page.getByLabel('Порядок').selectOption('file');
     await page.getByRole('switch', { name: 'Счётчик на кнопке Inbox' }).click();
     await page.getByRole('switch', { name: 'Показывать детали под заголовком' }).click();
-    await expect.poll(async () => (await config(page)).inbox).toEqual({ file: 'inbox.org', status: 'NEXT', created: false, order: 'file', counter: false, details: false });
+    await expect.poll(async () => (await config(page)).inbox).toEqual({ file: 'inbox.org', status: 'NEXT', created: false, add: 'end', order: 'file', counter: false, details: false });
+  });
+
+  test('«Выбрать…»: the palette of files, the chosen one shown as a path; a missing file says so', async ({ page }) => {
+    await installTauriMock(page, { ...FILES(), '/mock/.orgnotes/config.json': JSON.stringify({ version: 1, inbox: { file: 'gone.org' } }) });
+    await page.goto('/#settings');
+    await page.getByRole('tab', { name: 'Inbox' }).click();
+    await expect(page.getByTestId('ib-file')).toHaveText('gone.org — не найден');
+    await page.getByRole('button', { name: 'Выбрать файл Inbox' }).click();
+    await expect(page.locator('.pal')).toContainText('Файл Inbox');
+    await page.keyboard.type('journ');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('ib-file')).toHaveText('Работа / journal.org');
+    await expect.poll(async () => (await config(page)).inbox).toEqual({ file: 'Работа/journal.org' });
+    await expect(page.locator('.pal')).toHaveCount(0);
+  });
+
+  test('«В конец файла»: the quick entry goes to the end, a blank line before it', async ({ page }) => {
+    await open(page, { ...FILES(), '/mock/.orgnotes/config.json': JSON.stringify({ version: 1, inbox: { file: 'inbox.org', add: 'end', created: false } }) });
+    await page.keyboard.press('Shift+Meta+i');
+    await page.keyboard.type('В конец');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => page.evaluate((p) => (window as any).__disk[p] as string, IB)).toBe(INBOX() + '\n* TODO В конец\n');
   });
 
   test('the shortcut: recorded from the keys, for any program or not; a taken one says so', async ({ page }) => {
