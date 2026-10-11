@@ -11,13 +11,17 @@
   import type { Text } from '@codemirror/state';
   import { DEFAULT_LEVELS, orgIndent, type LevelView } from './orgIndent';
   import { orgRich, type RichPick } from './orgRich';
+  import { findExtension, findField, foundInfo, moveFind, setFind, type FindQuery } from './findView';
 
-  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, rich = false, richNumbers = false, onrich, onnarrow, onchange, oncursor, onfollow }: {
+  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, rich = false, richNumbers = false, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
     levels?: LevelView; // «Структурный вид»: one star per level, text moved by level
     drawers?: boolean; // drawers folded when a file opens and when the app adds one (:PROPERTIES:, :LOGBOOK:)
     rich?: boolean; // «Оформленный текст»: drawn like org-modern (implies the structural view)
     richNumbers?: boolean; // line numbers while drawn
     onrich?: (p: RichPick) => void; // a click on a status, a priority or a date that asks for a choice
+    find?: (FindQuery & { go: number; dir: 1 | -1 }) | null; // ⌘F: the query; a new `go` steps to the next / previous match
+    onfound?: (info: { total: number; cur: number; folded: number; wrapped: boolean } | null) => void;
+    onapi?: (api: { selection: () => string }) => void; // what the pane asks of the editor (⌘F, ⌘E take the selection)
     // «Разбор Inbox»: only these lines of the file are shown and edited (as org-narrow-to-subtree); `end` exclusive
     narrow?: { line: number; end: number } | null;
     onnarrow?: (line: number, last: number) => void; // where the shown lines are now (they move with edits)
@@ -361,7 +365,7 @@
       extensions: [
         numbers.of(numbersExt()), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(),
         ...(narrow ? narrowing(narrow) : [scrollPastEnd()]), // the last line can be scrolled up to the top, as in Xcode (room below, not lines in the file)
-        undo.of(history()), orgFold, foldNewDrawers,
+        undo.of(history()), orgFold, foldNewDrawers, findExtension,
         codeFolding({
           placeholderDOM: (_v, onclick) => {
             const el = document.createElement('span');
@@ -431,6 +435,7 @@
             onchange(u.state.doc.toString());
             dropStaleFolds(u.view);
           }
+          if (u.startState.field(findField, false) !== u.state.field(findField, false) || u.transactions.some((tr) => tr.effects.length)) onfound?.(foundInfo(u.view));
           if (u.selectionSet || u.docChanged) {
             const h = u.state.selection.main.head;
             const l = u.state.doc.lineAt(h);
@@ -457,6 +462,14 @@
     lastLevels = viewKey();
     lastReset = resetOn;
     restoreCaret(); // a pending reveal, if any, is applied right after by its own effect
+    onapi?.({
+      selection: () => {
+        const v = view;
+        if (!v) return '';
+        const r = v.state.selection.main;
+        return v.state.sliceDoc(r.from, r.to);
+      },
+    });
     return () => view?.destroy();
   });
 
@@ -517,6 +530,46 @@
     if (!view || k === lastLevels) return;
     lastLevels = k;
     view.dispatch({ effects: [structure.reconfigure(structureExt(wf)), numbers.reconfigure(numbersExt())] });
+  });
+
+  // ---- ⌘F: the query to the find field; a step selects the match and brings it to the upper third ----------
+  let lastFind = '';
+  let lastGo = 0;
+  function toMatch(v: EditorView, select: boolean) {
+    const f = v.state.field(findField, false);
+    if (!f || f.cur < 0) return;
+    const s = f.starts[f.cur];
+    const scroll = EditorView.scrollIntoView(s, { y: 'start', yMargin: Math.round(v.scrollDOM.clientHeight / 3) });
+    // «select.search»: a user's caret, so a drawn line («Оформленный текст») shows its text; a fold over it opens
+    v.dispatch(select ? { selection: { anchor: s, head: s + f.len }, effects: scroll, userEvent: 'select.search' } : { effects: scroll });
+  }
+  $effect(() => {
+    const f = find;
+    const k = fileKey;
+    if (!view) return;
+    if (!f || !f.q) {
+      if (view.state.field(findField, false)) {
+        const st = view.state.field(findField)!;
+        const s = st.cur >= 0 && st.show ? st.starts[st.cur] : null;
+        // closing: the caret stays on the current match
+        view.dispatch({ effects: setFind.of(null), ...(s !== null ? { selection: { anchor: s, head: s + st.len } } : {}) });
+      }
+      lastFind = '';
+      return;
+    }
+    const key = JSON.stringify([k, f.q, f.cs, f.word, f.show, f.at ?? null]);
+    if (key !== lastFind) {
+      lastFind = key;
+      // ↩ right after typing (before the pause ran out) comes with the new query: it selects the first match
+      const stepped = f.go !== lastGo;
+      lastGo = f.go;
+      view.dispatch({ effects: setFind.of(f) });
+      toMatch(view, f.at != null || stepped);
+    } else if (f.go !== lastGo) {
+      lastGo = f.go;
+      view.dispatch({ effects: moveFind.of(f.dir) });
+      toMatch(view, true);
+    }
   });
 
   $effect(() => {

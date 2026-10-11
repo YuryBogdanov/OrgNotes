@@ -8,6 +8,7 @@ import { displayName, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags } from './edits';
 import { bareTitle, caretAfter, keyOf, moveTo, moveWithin } from './refile';
 import type { CalSpec, Plate } from './commands';
+import { searchFile, type Hit, type Scope } from './search';
 import { closingStatus, locate, nextOpen, reviewQueue, short, type Result, type ReviewItem } from './review';
 import { DEFAULT_LEVELS, type LevelView } from './orgIndent';
 import { DEFAULT_INBOX, append, entry, inboxItems, prepend, readInbox, remove, withInbox, type InboxConfig, type InboxItem } from './inbox';
@@ -445,7 +446,7 @@ class Store {
     return t?.kind === 'agenda' && t.agenda ? this.agendas.find((a) => a.id === t.agenda) : undefined;
   }
   /** The left navigator: the files, or the list of agendas. A setting of the window: switching tabs or panes keeps it. */
-  navMode = $state<NavMode>((['files', 'inbox', 'agendas'] as const).find((m) => m === lsGet('nav:mode')) ?? 'files');
+  navMode = $state<NavMode>((['files', 'inbox', 'agendas', 'search'] as const).find((m) => m === lsGet('nav:mode')) ?? 'files');
   setNavMode(m: NavMode) {
     this.navMode = m;
     this.showNav = true;
@@ -1226,6 +1227,105 @@ class Store {
     ], 3000);
     return 'ok';
   }
+  // ---- search: ⌘F in a pane, ⇧⌘F in every file ------------------------------------------------------------
+  /** «Aa» and «Слово», shared by both searches (this Mac). */
+  findCase = $state(lsGet('find:cs') === '1');
+  findWord = $state(lsGet('find:word') === '1');
+  setFindOpts(o: { cs?: boolean; word?: boolean }) {
+    if (o.cs !== undefined) lsSet('find:cs', (this.findCase = o.cs) ? '1' : '0');
+    if (o.word !== undefined) lsSet('find:word', (this.findWord = o.word) ? '1' : '0');
+  }
+  /** What a pane's find bar is asked (the menu, the keys, a jump from the search in every file). */
+  findReq = $state<{ kind: 'open' | 'next' | 'prev' | 'useSel' | 'jump'; pane: number; n: number; q?: string; at?: { path: string; line: number; col: number } } | null>(null);
+  askFind(kind: 'open' | 'next' | 'prev' | 'useSel') {
+    this.findReq = { kind, pane: this.layout.active, n: Date.now() + Math.random() };
+  }
+  /** The search in every file: its query, where, the results (kept until the app quits). */
+  search = $state<SearchState>({ q: '', ran: '', scope: 'all', running: false, groups: [], total: 0, capped: false, scanned: 0, sel: null, focusN: 0 });
+  private searchRun = 0;
+  /** ⇧⌘F: the section «Поиск», the field in focus (the editor's one-line selection in it, not searched yet). */
+  openSearch(selection = '') {
+    this.setNavMode('search');
+    if (selection && !selection.includes('\n')) this.search.q = selection;
+    this.search.focusN++;
+  }
+  private recentKey2() {
+    return 'search:recent';
+  }
+  searchRecent(): { q: string; t: number }[] {
+    try {
+      const v = JSON.parse(lsGet(this.recentKey2()) ?? '[]');
+      return Array.isArray(v) ? v.filter((x) => x && typeof x.q === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+  clearSearchRecent() {
+    lsSet(this.recentKey2(), '[]');
+    this.search.focusN++;
+  }
+  /** ↩: every .org file of the folder (the open ones with their unsaved edits), a portion at a time; a new run stops
+   *  the old one. */
+  async runSearch() {
+    const q = this.search.q.trim();
+    if (!q) return;
+    const run = ++this.searchRun;
+    lsSet(this.recentKey2(), JSON.stringify([{ q, t: Date.now() }, ...this.searchRecent().filter((x) => x.q !== q)].slice(0, 8)));
+    const opts = { cs: this.findCase, word: this.findWord };
+    const scope = this.search.scope;
+    const open = new Set(this.layout.panes.flatMap((p) => p.tabs.flatMap((t) => (t.kind === 'file' && t.path ? [t.path] : []))));
+    const files = [...this.files];
+    const groups: SearchGroup[] = [];
+    let total = 0;
+    let capped = false;
+    Object.assign(this.search, { ran: q, running: true, groups: [], total: 0, capped: false, scanned: 0, sel: null });
+    const order = (a: SearchGroup, b: SearchGroup) =>
+      Number(open.has(b.path)) - Number(open.has(a.path)) || b.hits.length - a.hits.length || a.name.localeCompare(b.name, 'ru');
+    const show = () => {
+      const g = [...groups].sort(order);
+      g.forEach((x, i) => (x.open = i < 5));
+      Object.assign(this.search, { groups: g, total, capped });
+    };
+    for (let i = 0; i < files.length; i++) {
+      if (run !== this.searchRun) return;
+      const f = files[i];
+      const hits = searchFile(f.text, f.headings, q, opts, scope, SEARCH_CAP - total);
+      if (hits.length) groups.push({ path: f.path, name: f.name, hits, open: false, all: false, stamp: f.text });
+      total += hits.length;
+      if (total >= SEARCH_CAP) {
+        capped = true;
+        break;
+      }
+      if (i % 40 === 39) {
+        this.search.scanned = i + 1;
+        show();
+        await new Promise((r) => setTimeout(r, 0)); // the window stays alive on a big folder
+      }
+    }
+    if (run !== this.searchRun) return;
+    show();
+    this.search.running = false;
+  }
+  /** A result: its file in the active pane at the match; the pane's find bar with the same query. */
+  openHit(g: number, i: number) {
+    const grp = this.search.groups[g];
+    const hit = grp?.hits[i];
+    const idx = grp ? this.files.findIndex((f) => f.path === grp.path) : -1;
+    if (!hit || idx < 0) return;
+    this.search.sel = { g, i };
+    this.open(idx, hit.line, false);
+    this.findReq = { kind: 'jump', pane: this.layout.active, n: Date.now() + Math.random(), q: this.search.ran, at: { path: grp.path, line: hit.line, col: hit.col } };
+  }
+  /** ⌥⌘G / ⇧⌥⌘G: the next / previous result, from file to file. */
+  searchStep(dir: 1 | -1) {
+    const flat = this.search.groups.flatMap((g, gi) => g.hits.map((_, i) => ({ g: gi, i })));
+    if (!flat.length) return;
+    const s = this.search.sel;
+    const at = s ? flat.findIndex((x) => x.g === s.g && x.i === s.i) : -1;
+    const next = flat[(at + dir + flat.length) % flat.length];
+    this.openHit(next.g, next.i);
+  }
+
   // ---- «Разбор Inbox»: the tasks one by one, as cards, in a tab of their own ---------------------------------
   /** The review going on: its queue (fixed when it starts), the card shown (-1: the summary), the tasks there were. */
   review = $state<{ items: ReviewItem[]; cur: number; known: string[] } | null>(null);
@@ -1982,7 +2082,29 @@ class Store {
 }
 
 export const DEFAULT_CAPTURE_KEY = 'Shift+CmdOrCtrl+KeyI';
-export type NavMode = 'files' | 'inbox' | 'agendas';
+export type NavMode = 'files' | 'inbox' | 'agendas' | 'search';
+/** The search in every file: up to this many matches are listed. */
+export const SEARCH_CAP = 1000;
+export interface SearchGroup {
+  path: string;
+  name: string; // relative
+  hits: Hit[];
+  open: boolean; // its results shown
+  all: boolean; // «Ещё N» opened: every result, not the first 4
+  stamp: string; // the text searched: the file changed since when it differs
+}
+export interface SearchState {
+  q: string; // the field
+  ran: string; // the query of the results shown
+  scope: Scope;
+  running: boolean;
+  groups: SearchGroup[];
+  total: number;
+  capped: boolean; // more than SEARCH_CAP: only the first shown
+  scanned: number; // files looked at so far
+  sel: { g: number; i: number } | null;
+  focusN: number; // bumped: the field takes the focus
+}
 export type Scan = { name: string; path: string; shown: string; org: number; folders: number; other: number; capped: boolean; big: boolean };
 export type StartScreen = { kind: 'welcome' } | { kind: 'found'; path: string; scan: Scan | null; change: boolean } | { kind: 'missing'; path: string } | null;
 export type Unsaved = { tab: Tab; kind: 'file' | 'note'; name: string };

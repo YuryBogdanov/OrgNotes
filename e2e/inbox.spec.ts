@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
-import { FILES, INBOX } from './inboxFixture';
+import { FILES, INBOX, NOW } from './inboxFixture';
 
 // ТЗ «Inbox — раздел навигатора и быстрый ввод задачи (⇧⌘I)».
 const IB = '/mock/inbox.org';
@@ -71,6 +71,7 @@ test.describe('the navigator', () => {
 
 test.describe('the list', () => {
   test('open top-level tasks, newest first, those without :CREATED: at the end; a details line; relative time', async ({ page }) => {
+    await page.clock.setFixedTime(NOW); // the stamps are counted from the last 14:00
     await open(page);
     await expect(titles(page)).toHaveText(['Позвонить в банк про лимиты', 'Согласовать отпуск с тимлидами', 'Идея: ежемесячный обзор рисков', 'Проверить доступы подрядчика']);
     await expect(rows(page).first().locator('.det')).toHaveText('по карте компании, уточнить комиссию');

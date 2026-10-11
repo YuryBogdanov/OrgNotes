@@ -142,3 +142,14 @@ button { cursor: default; }
 .cm-rich .cm-foldPlaceholder { display: inline-flex; align-items: center; height: 18px; margin-left: 6px; padding: 0 6px; border-radius: 5px; font: 11px var(--ui); vertical-align: middle; }
 .cm-r-click, .cm-r-status { cursor: pointer; }
 .cm-r-click:hover, .cm-r-status:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--acc) 30%, transparent); }
+
+/* ⌘F: matches (soft yellow), the current one (strong yellow, dark text), ticks on the scroll bar */
+:root { --hl: rgba(255, 204, 0, 0.38); --hlCur: #ffc400; --hlCurFg: #1d1d1f; }
+@media (prefers-color-scheme: dark) { :root { --hl: rgba(255, 214, 10, 0.28); --hlCur: #ffd60a; --hlCurFg: #1d1d1f; } }
+.cm-find { background: var(--hl); border-radius: 2px; }
+.cm-find-cur { background: var(--hlCur); color: var(--hlCurFg) !important; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hlCur) 70%, #000); }
+.cm-find-cur * { color: var(--hlCurFg) !important; }
+.cm-find-folded { display: inline-flex; align-items: center; height: 17px; margin-left: 8px; padding: 0 7px; border-radius: 9px; background: var(--hl); color: var(--fg); font: 11px var(--ui); vertical-align: middle; }
+.cm-find-ticks { position: absolute; top: 0; right: 0; bottom: 0; width: 8px; pointer-events: none; z-index: 5; }
+.cm-find-ticks span { position: absolute; right: 1px; width: 6px; height: 2px; border-radius: 1px; background: var(--hlCur); opacity: 0.8; }
+.cm-find-ticks span.cur { height: 3px; opacity: 1; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hlCur) 60%, #000); }
