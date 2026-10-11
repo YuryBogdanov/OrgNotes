@@ -19,6 +19,11 @@ npm run dev              # только веб-версия на http://localhos
 Собрать `Panopticon.app`: `npx tauri build --bundles app`. Иконка собирается из `src-tauri/icons/source.png`
 (квадрат дизайнера) → `app-icon.png` (шаблон macOS: скруглённый квадрат 824 на 1024) → `npx tauri icon`.
 
+Релиз: `scripts/release-mac.sh` собирает приложение (Apple Silicon, ad-hoc подпись всего бандла) и кладёт архив в
+`dist-release/Panopticon-<версия>-macos-arm64.zip`; его прикладываем к релизу на GitHub. Подписи Developer ID и
+нотаризации нет, поэтому при первом запуске на другом Mac: «Системные настройки → Конфиденциальность и безопасность →
+Всё равно открыть» (или `xattr -dr com.apple.quarantine /Applications/Panopticon.app`).
+
 ```bash
 ORG_DIR=~/notes npx tauri dev
 ```
