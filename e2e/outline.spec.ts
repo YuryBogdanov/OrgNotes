@@ -144,9 +144,10 @@ test('Shift+Up/Down set the priority on a heading line and select text elsewhere
 
 test('Shift+Tab folds everything, then opens level by level, then everything, then folds again', async ({ page }) => {
   await open(page);
+  // the lines' text (the file's: in the structural view only one star of a heading is seen)
   const headings = async () =>
-    (await page.locator('.cm-line').allInnerTexts()).filter((t) => /^\*+ /.test(t)).map((t) => t.replace(/…$/, ''));
-  const bodies = async () => (await page.locator('.cm-line').allInnerTexts()).filter((t) => /body/.test(t));
+    (await page.locator('.cm-line').allTextContents()).filter((t) => /^\*+ /.test(t)).map((t) => t.replace(/…$/, ''));
+  const bodies = async () => (await page.locator('.cm-line').allTextContents()).filter((t) => /body/.test(t));
 
   await page.locator('.cm-line', { hasText: /^\* Gamma$/ }).click();
   await page.keyboard.press('Shift+Tab'); // everything folded

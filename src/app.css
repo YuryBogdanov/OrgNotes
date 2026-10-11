@@ -70,6 +70,7 @@ button { cursor: default; }
 .cm-editor .cm-selectionBackground, .cm-editor.cm-focused .cm-selectionBackground { background: var(--sel) !important; }
 .cm-editor .cm-foldGutter .cm-gutterElement { padding: 0 4px; color: var(--fg3); }
 .cm-editor .cm-foldPlaceholder { background: var(--field); border: 0; color: var(--fg2); border-radius: 4px; padding: 0 6px; }
+.cm-org-lead { display: none; } /* «Структурный вид»: the stars before the last one of a heading */
 .cm-h1 { color: var(--h1); font-weight: 700; }
 .cm-h2 { color: var(--h2); font-weight: 700; }
 .cm-h3 { color: var(--h3); font-weight: 700; }

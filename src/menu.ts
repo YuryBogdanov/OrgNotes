@@ -49,6 +49,7 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
           items: [
             it('palette', 'Командная палитра', 'Shift+CmdOrCtrl+KeyP'),
             it('jumpBar', 'Строка пути', 'Control+CmdOrCtrl+KeyJ'),
+            it('structure', 'Структурный вид'), // a shortcut is decided after a week of use
             sep,
             it('splitRight', 'Разделить вправо', 'CmdOrCtrl+Backslash'),
             it('splitDown', 'Разделить вниз', 'Alt+CmdOrCtrl+Backslash', false),

@@ -244,7 +244,7 @@
       {/each}
     </div>
     <div class="ed">
-      <Editor text={file.text} fileKey={tab.id + '|' + file.path} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} resetOn={store.diskGen[file.path] ?? 0}
+      <Editor text={file.text} fileKey={tab.id + '|' + file.path} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} resetOn={store.diskGen[file.path] ?? 0} levels={store.levels}
         onchange={(t) => store.setText(t, file.path)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>
     {#if tab.fromAgenda}
@@ -267,7 +267,7 @@
       </div>
     {/if}
     <div class="ed">
-      <Editor text={tab.text ?? ''} fileKey={tab.id} wf={store.untitledWf} reveal={tab.reveal} initial={tab.cursor} hint="Начните писать…"
+      <Editor text={tab.text ?? ''} fileKey={tab.id} wf={store.untitledWf} reveal={tab.reveal} initial={tab.cursor} hint="Начните писать…" levels={store.levels}
         onchange={(t) => (tab.text = t)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>
     <div class="unsaved" bind:clientWidth={uw} bind:this={bottom}>
