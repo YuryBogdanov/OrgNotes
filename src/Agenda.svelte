@@ -161,7 +161,7 @@
 <div class="agenda">
 
   <div class="view">
-    <header>
+    <header class:custom={!!custom}>
       <div>
         <div class="h1">{custom ? custom.name : 'Агенда'}</div>
         <div class="sub">{custom ? `${tasksCount(total)} · ${sourcesWord}` : `${total} записей · ближайшие 30 дней`}</div>
@@ -235,7 +235,8 @@
   .item.sel .go { opacity: 1; }
   .foot { flex: 0 0 26px; display: flex; align-items: center; gap: 14px; padding: 0 12px; background: var(--side); border-top: 1px solid var(--line); font-size: 11.5px; color: var(--fg2); }
   .time { flex: 0 0 42px; font-size: 12px; color: var(--fg2); font-family: var(--mono); }
-  .kw { flex: 0 0 52px; text-align: center; padding: 1px 4px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* as wide as the status needs (MEETING, IN-PROGRESS…), at least the column of the short ones */
+  .kw { flex: 0 0 auto; min-width: 52px; box-sizing: border-box; text-align: center; padding: 1px 4px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
   .kw.ev { color: var(--fg2); background: var(--field); }
   .main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
   .ttl { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -246,14 +247,19 @@
   .mark.late { color: var(--todo); }
   /* in a pane next to a file: the compact rows of the design, one line each, no big header */
   @container (max-width: 760px) {
-    header { display: none; }
+    header:not(.custom) { display: none; }
+    /* a custom agenda keeps a slim header: its name and «Редактировать…» */
+    header.custom { align-items: center; padding: 8px 12px 8px 18px; }
+    header.custom .h1 { font-size: 14px; }
+    header.custom .sub { display: none; }
+    header.custom .edit { height: 22px; padding: 0 10px; font-size: 12px; }
     .scroll { padding: 4px 10px 12px; }
     .gh { padding: 12px 8px 5px; gap: 8px; }
     .gt { font-size: 12.5px; }
     .gs { font-size: 11.5px; }
     .item { min-height: 36px; padding: 4px 8px; gap: 10px; }
     .time { flex-basis: 38px; font-size: 11.5px; }
-    .kw { flex-basis: 40px; }
+    .kw { min-width: 40px; }
     .main { flex-direction: row; align-items: baseline; gap: 10px; }
     .ttl { flex: 1 1 auto; min-width: 0; font-size: 13px; }
     .src { flex: 0 1 auto; max-width: 45%; }

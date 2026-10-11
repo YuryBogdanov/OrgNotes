@@ -808,7 +808,7 @@
   .pg { padding: 4px 0 2px 16px; font-size: 12px; font-weight: 600; color: var(--fg2); }
   .pnone { padding: 2px 0 4px 16px; font-size: 12.5px; color: var(--fg2); }
   .prow { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 4px 10px; margin-bottom: 4px; border-radius: 7px; background: var(--side); }
-  .kw { flex: 0 0 52px; text-align: center; padding: 1px 4px; border-radius: 4px; font-size: 10px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kw { flex: 0 0 auto; min-width: 52px; box-sizing: border-box; text-align: center; padding: 1px 4px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; }
   .pm { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .ptt { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ps { font-size: 11.5px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

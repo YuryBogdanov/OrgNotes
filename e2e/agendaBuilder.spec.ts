@@ -437,6 +437,21 @@ test.describe('the rest', () => {
     await expect(page.locator('.agenda .gh', { hasText: 'Просрочено' })).toContainText('4 задачи');
   });
 
+  test('in a narrow pane next to a file: long statuses are whole, the custom agenda keeps «Редактировать…»', async ({ page }) => {
+    const meetings = { ...MY_DAY, id: 'a-m', name: 'Только встречи', blocks: [{ name: 'Встречи', color: 'blue', conds: [{ field: 'status', op: 'in', values: [{ set: 'Встречи', name: 'MEETING' }, { set: 'Цели на квартал', name: 'ACTIVE' }] }] }] };
+    await start(page, withAgenda(NOTES(), meetings));
+    await list(page).getByRole('button', { name: 'Только встречи' }).click();
+    await page.keyboard.press('Meta+1'); // back to the file; the agenda goes to a second pane
+    await page.getByRole('button', { name: 'Агенда', exact: true }).click();
+    const ag = page.locator('section.pane').nth(1).locator('.agenda');
+    await expect(ag.locator('.kw')).toHaveText(['MEETING', 'ACTIVE']);
+    for (const kw of await ag.locator('.kw').all()) expect(await kw.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await expect(ag.locator('.h1')).toHaveText('Только встречи');
+    await ag.getByRole('button', { name: 'Редактировать…' }).click();
+    await expect(builder(page)).toBeVisible();
+    await expect(builder(page).getByRole('textbox').first()).toHaveValue('Только встречи');
+  });
+
   test('the word is «статус» everywhere: «состояние» is on no screen of the builder', async ({ page }) => {
     await start(page, withAgenda(NOTES(), MY_DAY));
     await list(page).getByRole('button', { name: 'Мой день' }).dblclick();
