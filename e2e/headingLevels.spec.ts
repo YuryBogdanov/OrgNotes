@@ -272,3 +272,17 @@ test('a file of 50 000 lines opens and takes typing without delay, as without th
   expect(Date.now() - t1).toBeLessThan(1000);
   await expect(page.locator('.cm-link').first()).toHaveText('ссылка'); // links are still found
 });
+
+test('a long file scrolls past its end: the last line can go up to the top, and the file gets no new lines', async ({ page }) => {
+  const text = Array.from({ length: 120 }, (_, i) => `строка ${i + 1}`).join('\n') + '\n';
+  await open(page, text);
+  const scroller = page.locator('section.pane.active .cm-scroller');
+  await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  const top = (await scroller.boundingBox())!.y;
+  const last = (await page.locator('.cm-line', { hasText: /^строка 120$/ }).boundingBox())!.y;
+  expect(last - top).toBeLessThan(60); // at the top of the editor, not at its bottom
+  await page.locator('.cm-line', { hasText: /^строка 120$/ }).click();
+  await page.keyboard.press('Meta+s');
+  expect(await disk(page)).toBe(text);
+  expect(await page.locator('.cm-line').count()).toBeLessThanOrEqual(122);
+});

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Compartment, EditorState, Prec, RangeSetBuilder, type Range } from '@codemirror/state';
-  import { Decoration, EditorView, ViewPlugin, placeholder as cmPlaceholder, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+  import { Decoration, EditorView, ViewPlugin, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
   import { foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
   import { headingLines, toneFor, type Workflow } from './org';
@@ -235,6 +235,7 @@
       doc,
       extensions: [
         lineNumbers(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(),
+        scrollPastEnd(), // the last line can be scrolled up to the top, as in Xcode (room below, not lines in the file)
         undo.of(history()), orgFold, foldGutter(), plugin, structure.of(orgIndent(levels, headingSet)),
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
