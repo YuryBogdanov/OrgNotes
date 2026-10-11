@@ -15,12 +15,12 @@ export const DEFAULT_LEVELS: LevelView = { oneStar: true, indent: true, step: 2 
 export const MAX_INDENT = 16;
 
 /** The headings of a document: their line indices (0-based, ascending) and levels. */
-interface Outline {
+export interface Outline {
   lines: number[];
   levels: number[];
 }
 const outlines = new WeakMap<Text, Outline>();
-function outlineOf(doc: Text, heads: Set<number>): Outline {
+export function outlineOf(doc: Text, heads: Set<number>): Outline {
   let o = outlines.get(doc);
   if (!o) {
     const lines = [...heads].sort((a, b) => a - b);
@@ -30,7 +30,7 @@ function outlineOf(doc: Text, heads: Set<number>): Outline {
   return o;
 }
 /** The level of the nearest heading at or above a line; 0 before the first heading. */
-function levelAt(o: Outline, line: number): number {
+export function levelAt(o: Outline, line: number): number {
   let lo = 0;
   let hi = o.lines.length - 1;
   let found = -1;

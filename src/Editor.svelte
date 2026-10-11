@@ -10,10 +10,14 @@
   import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftSubtree, type Result } from './outline';
   import type { Text } from '@codemirror/state';
   import { DEFAULT_LEVELS, orgIndent, type LevelView } from './orgIndent';
+  import { orgRich, type RichPick } from './orgRich';
 
-  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, onnarrow, onchange, oncursor, onfollow }: {
+  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, rich = false, richNumbers = false, onrich, onnarrow, onchange, oncursor, onfollow }: {
     levels?: LevelView; // «Структурный вид»: one star per level, text moved by level
     drawers?: boolean; // drawers folded when a file opens and when the app adds one (:PROPERTIES:, :LOGBOOK:)
+    rich?: boolean; // «Оформленный текст»: drawn like org-modern (implies the structural view)
+    richNumbers?: boolean; // line numbers while drawn
+    onrich?: (p: RichPick) => void; // a click on a status, a priority or a date that asks for a choice
     // «Разбор Inbox»: only these lines of the file are shown and edited (as org-narrow-to-subtree); `end` exclusive
     narrow?: { line: number; end: number } | null;
     onnarrow?: (line: number, last: number) => void; // where the shown lines are now (they move with edits)
@@ -35,6 +39,7 @@
   const undo = new Compartment();
   const structure = new Compartment(); // switching the view is not an edit: no undo step, no unsaved mark
   let lastLevels = '';
+  const numbers = new Compartment(); // line numbers: off while drawn, unless asked for
 
   const HEAD = /^(\*+)\s/;
   // heading lines per document version; ignores `* x` inside #+BEGIN_…/#+END_… blocks
@@ -280,6 +285,18 @@
     return { all: build(items), atomic: build(hidden) };
   }
 
+  // ---- the look: the structural view, or «Оформленный текст» (which includes it) ----------------------------
+  const viewKey = () => JSON.stringify([levels, rich, richNumbers]);
+  const numbersExt = () => (rich && !richNumbers ? [] : lineNumbers());
+  function structureExt(words: Workflow) {
+    if (!rich) return orgIndent(levels, headingSet);
+    return orgRich({
+      wf: words, heads: headingSet, drawers: drawerMap,
+      links: (doc) => linksIn(doc).map((l) => ({ from: l.from, to: l.to })),
+      onPick: (p) => onrich?.(p),
+    });
+  }
+
   // ---- narrowing to one subtree ----------------------------------------------------------------------
   /** The shown part: from the start of the first line to the end of the last non-blank one. */
   function narrowRange(doc: Text, n: { line: number; end: number }) {
@@ -342,7 +359,7 @@
     return EditorState.create({
       doc,
       extensions: [
-        lineNumbers(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(),
+        numbers.of(numbersExt()), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(),
         ...(narrow ? narrowing(narrow) : [scrollPastEnd()]), // the last line can be scrolled up to the top, as in Xcode (room below, not lines in the file)
         undo.of(history()), orgFold, foldNewDrawers,
         codeFolding({
@@ -356,7 +373,7 @@
             return el;
           },
         }),
-        foldGutter(), plugin, structure.of(orgIndent(levels, headingSet)),
+        foldGutter(), plugin, structure.of(structureExt(words)),
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         EditorView.domEventHandlers({
@@ -437,7 +454,7 @@
     view = new EditorView({ state: makeState(text, wf), parent: host });
     foldAllDrawers(view);
     lastKey = fileKey;
-    lastLevels = JSON.stringify(levels);
+    lastLevels = viewKey();
     lastReset = resetOn;
     restoreCaret(); // a pending reveal, if any, is applied right after by its own effect
     return () => view?.destroy();
@@ -496,11 +513,10 @@
   }
 
   $effect(() => {
-    const l = levels;
-    const k = JSON.stringify(l);
+    const k = viewKey();
     if (!view || k === lastLevels) return;
     lastLevels = k;
-    view.dispatch({ effects: structure.reconfigure(orgIndent(l, headingSet)) });
+    view.dispatch({ effects: [structure.reconfigure(structureExt(wf)), numbers.reconfigure(numbersExt())] });
   });
 
   $effect(() => {

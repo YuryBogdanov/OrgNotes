@@ -128,6 +128,7 @@
     navAgendas: () => store.setNavMode('agendas'),
     capture: () => store.openCapture(),
     review: () => store.startReview(),
+    rich: () => store.setRich(!store.rich),
     insp: () => (store.showInspector = !store.showInspector),
   };
   $effect(() => {
@@ -143,6 +144,7 @@
     menu.setEnabled('dupLeft', two && pi === 1 && t?.kind !== 'untitled');
     menu.setEnabled('revealInNav', t?.kind === 'file');
     menu.setEnabled('copyPath', t?.kind === 'file');
+    menu.setChecked('rich', store.rich);
   });
   /** The same shortcuts when there is no native menu (plain browser, tests). */
   function shortcut(e: KeyboardEvent): string | null {

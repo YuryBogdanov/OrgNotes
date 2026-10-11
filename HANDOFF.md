@@ -88,6 +88,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 | `layout.ts` | Panes/tabs model (1–2 panes), serialise/restore. Agenda tabs carry `agenda` (custom agenda id). |
 | `Editor.svelte` | CodeMirror setup, decorations (keywords, links shown descriptive), fold service, keymaps; compartments for undo and the structural view. `scrollPastEnd`. |
 | Drawers (in `Editor.svelte`, `org.ts` `drawerRanges`) | Folded like headings via the same `foldService`; folded on open and when the app adds one (a `transactionExtender` skips typed/pasted/undone text); ⇧Tab and heading Tab leave them as they are. |
+| `orgRich.ts`, `rich.ts`, `RichMenu.svelte` | «Оформленный текст» (ТЗ 19, like org-modern): replaces the structural view in the `structure` compartment when `store.rich`; line decorations + widgets per visible line; lines touched by a user-placed caret (`userCaret` field) show raw text. Clicks on status/priority/date open `RichMenu` (writes via `store.patchAt`). Stage 2 (proportional font) and 3 (blocks) not built. |
 | `orgIndent.ts` | «Структурный вид»: one star per level (marker widget; hidden stars stay in DOM with `display:none`), indents, atomic ranges, Backspace = level up. |
 | `links.ts` | Link extraction line by line (uniorg per candidate line, cached by line text; a whole-file parse was ~9 s on 50k lines), resolution, backlinks, rewrite on rename. |
 | `App.svelte` | Window shell: toolbar (grid, centred path), `NavPanel`, panes, inspector, sheets/overlays, menu actions, browser-shortcut fallback. `#settings` and `#capture` hash = other windows. |
@@ -128,7 +129,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 - **App config (Rust):** the notes dir and its bookmark, in the app config dir. Identifier `dev.local.panopticon`.
 - **localStorage (per Mac):**
   - `layout:<dir>`, `lastFile:<dir>`, `saveAsDir:…`;
-  - `nav:mode`, `nav:headings`, `inspector:tab`, `editor:levels`, `editor:drawers` ('0' = drawers open on open);
+  - `nav:mode`, `nav:headings`, `inspector:tab`, `editor:levels`, `editor:drawers` ('0' = drawers open on open), `editor:rich`, `editor:richNumbers`;
   - `capture:key`, `capture:global`, `capture:draft`, `capture:file`;
   - one-shot commands from the settings window: `cmd:changeFolder`, `cmd:newAgenda`.
 

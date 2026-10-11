@@ -4,6 +4,8 @@
   import Editor from './Editor.svelte';
   import Agenda from './Agenda.svelte';
   import Review from './Review.svelte';
+  import RichMenu from './RichMenu.svelte';
+  import type { RichPick } from './orgRich';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import { parseHeadings } from './org';
   import { targetOf, type Tab } from './layout';
@@ -39,6 +41,8 @@
     const h = hs[k];
     return h ? [...h.path, h.title] : [];
   });
+
+  let richPick = $state<{ pick: RichPick; path: string } | null>(null); // a click on a drawn status, priority or date
 
   // ---- the tab context menu ------------------------------------------------------------------
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
@@ -247,9 +251,14 @@
       {#each crumbs as c, i}
         {#if i}<span class="sep" aria-hidden="true">›</span>{/if}<span class:last={i === crumbs.length - 1}>{c}</span>
       {/each}
+      <div class="vt" role="group" aria-label="Вид текста">
+        <button aria-pressed={!store.rich} class:on={!store.rich} onclick={() => store.setRich(false)}>Текст</button>
+        <button aria-pressed={store.rich} class:on={store.rich} onclick={() => store.setRich(true)}>Оформление</button>
+      </div>
     </div>
     <div class="ed">
-      <Editor text={file.text} fileKey={tab.id + '|' + file.path} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} resetOn={store.diskGen[file.path] ?? 0} levels={store.levels} drawers={store.foldDrawers}
+      <Editor text={file.text} fileKey={tab.id + '|' + file.path} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} resetOn={store.diskGen[file.path] ?? 0} levels={store.levels} drawers={store.foldDrawers} rich={store.rich} richNumbers={store.richNumbers}
+        onrich={(pick) => (richPick = { pick, path: file.path })}
         onchange={(t) => store.setText(t, file.path)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>
     {#if tab.fromAgenda}
@@ -292,6 +301,7 @@
 {#if tip}
   <div class="tip" role="tooltip" style="left:{tip.x}px;top:{tip.y}px">{tip.text}</div>
 {/if}
+{#if richPick}<RichMenu pick={richPick.pick} path={richPick.path} onclose={() => (richPick = null)} />{/if}
 {#if menu}
   <ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => { menu = null; menuTab = null; }} />
 {/if}
@@ -340,6 +350,9 @@
   .tab:hover .dot { opacity: 0; }
   .x:hover { background: rgba(128, 128, 128, 0.28); }
   .fill { flex: 1 1 auto; align-self: stretch; min-width: 12px; }
+  .vt { margin-left: auto; flex: 0 0 auto; display: flex; padding: 1px; background: var(--field); border-radius: 7px; gap: 2px; }
+  .vt button { height: 19px; padding: 0 9px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 11.5px; }
+  .vt button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); }
   .crumbs { flex: 0 0 24px; display: flex; align-items: center; gap: 6px; padding: 0 12px; font-size: 11.5px; color: var(--fg2); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
   .crumbs .sep { color: var(--fg3); }
   .crumbs .last { color: var(--fg); }

@@ -152,6 +152,17 @@ class Store {
   }
   /** «Уровни заголовков» (Настройки → Основные, a view preference of this Mac): one star per level, text by level. */
   levels = $state<LevelView>(readLevels());
+  /** «Оформленный текст»: the editor draws the file like org-modern; with it, its line numbers (this Mac). */
+  rich = $state(lsGet('editor:rich') === '1');
+  richNumbers = $state(lsGet('editor:richNumbers') === '1');
+  setRich(on: boolean) {
+    this.rich = on;
+    lsSet('editor:rich', on ? '1' : '0'); // the other window hears it through the storage event
+  }
+  setRichNumbers(on: boolean) {
+    this.richNumbers = on;
+    lsSet('editor:richNumbers', on ? '1' : '0');
+  }
   /** Drawers folded when a file opens and when the app adds one (a preference of this Mac). */
   foldDrawers = $state(lsGet('editor:drawers') !== '0');
   setFoldDrawers(on: boolean) {
@@ -1024,6 +1035,8 @@ class Store {
       if (e.key === 'nav:headings') this.navHeadings = e.newValue === '1';
       if (e.key === 'editor:levels') this.levels = readLevels();
       if (e.key === 'editor:drawers') this.foldDrawers = lsGet('editor:drawers') !== '0';
+      if (e.key === 'editor:rich') this.rich = lsGet('editor:rich') === '1';
+      if (e.key === 'editor:richNumbers') this.richNumbers = lsGet('editor:richNumbers') === '1';
       if (e.key === 'capture:key' || e.key === 'capture:global') {
         this.captureKey = lsGet('capture:key') || DEFAULT_CAPTURE_KEY;
         this.captureGlobal = lsGet('capture:global') !== '0';
@@ -1083,6 +1096,12 @@ class Store {
     this.setText(fn(f.text, h, f.wf), f.path);
   }
   setKeyword(kw: string | null) { this.patch((t, h, wf) => setKeyword(t, h, kw, wf)); }
+  /** The same on the heading at a line of a file (a click on a drawn capsule: the caret does not move). */
+  patchAt(path: string, line: number, fn: (text: string, h: Heading, wf: Workflow) => string) {
+    const f = this.files.find((x) => x.path === path);
+    const h = f?.headings.find((x) => x.line === line);
+    if (f && h) this.setText(fn(f.text, h, f.wf), f.path);
+  }
   setPriority(p: string | null) { this.patch((t, h) => setPriority(t, h, p)); }
   setPlanning(kind: 'SCHEDULED' | 'DEADLINE', date: Date | null) { this.patch((t, h) => setPlanning(t, h, kind, date)); }
   setTags(tags: string[]) { this.patch((t, h) => setTags(t, h, tags)); }

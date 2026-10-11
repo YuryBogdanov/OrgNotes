@@ -168,6 +168,11 @@ register({
   when: (c) => c.noFolder, run: () => void store.chooseFolder(),
 });
 
+register({
+  id: 'rich', title: 'Оформленный текст', icon: 'head', group: 'general', synonyms: ['оформление', 'вид', 'org-modern', 'красиво'],
+  when: () => true, hint: () => (store.rich ? 'включён' : 'выключен'), run: () => store.setRich(!store.rich),
+});
+
 // ---- matching -------------------------------------------------------------------------------------------------
 
 /** The best match of the query in a title or one of its synonyms (only the title's letters are made bold). */

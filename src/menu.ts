@@ -5,14 +5,17 @@
 export type MenuActions = Record<string, () => void>;
 export interface AppMenu {
   setEnabled(id: string, on: boolean): void;
+  setChecked(id: string, on: boolean): void;
 }
 
 export async function installMenu(actions: MenuActions): Promise<AppMenu | null> {
   if (!('__TAURI_INTERNALS__' in window) || (window as any).__ORG_SETTINGS_OVERLAY__) return null;
   try {
-    const { Menu } = await import('@tauri-apps/api/menu');
+    const { Menu, CheckMenuItem } = await import('@tauri-apps/api/menu');
     const it = (id: string, text: string, accelerator?: string, enabled = true) => ({ id, text, accelerator, enabled, action: () => actions[id]?.() });
     const sep = { item: 'Separator' as const };
+    // a check item: its tick follows the setting (setChecked)
+    const rich = await CheckMenuItem.new({ id: 'rich', text: 'Оформленный текст', checked: false, action: () => actions.rich?.() });
     const menu = await Menu.new({
       items: [
         {
@@ -51,6 +54,7 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
             it('palette', 'Командная палитра', 'Shift+CmdOrCtrl+KeyP'),
             it('jumpBar', 'Строка пути', 'Control+CmdOrCtrl+KeyJ'),
             it('structure', 'Структурный вид'), // a shortcut is decided after a week of use
+            rich,
             sep,
             it('splitRight', 'Разделить вправо', 'CmdOrCtrl+Backslash'),
             it('splitDown', 'Разделить вниз', 'Alt+CmdOrCtrl+Backslash', false),
@@ -85,6 +89,12 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
         menu
           .get(id)
           .then((m) => (m as { setEnabled?: (v: boolean) => Promise<void> } | null)?.setEnabled?.(on))
+          .catch(() => {});
+      },
+      setChecked(id, on) {
+        menu
+          .get(id)
+          .then((m) => (m as { setChecked?: (v: boolean) => Promise<void> } | null)?.setChecked?.(on))
           .catch(() => {});
       },
     };
