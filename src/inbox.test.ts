@@ -91,6 +91,9 @@ describe('settings', () => {
     expect(DEFAULT_INBOX.add).toBe('top');
     expect(readInbox({ add: 'end' }).add).toBe('end');
     expect(readInbox({ add: 'middle' }).add).toBe('top');
+    // «Разбор»: the statuses, the order of the cards, when a task lies too long
+    expect(readInbox({ reviewDone: 'HELD', reviewOrder: 'new', stale: 14 })).toMatchObject({ reviewDone: 'HELD', reviewCancel: 'CANCELLED', reviewOrder: 'new', stale: 14 });
+    expect(readInbox({ stale: 5, reviewOrder: 'x' })).toMatchObject({ stale: 7, reviewOrder: 'old' });
     expect(JSON.parse(withInbox(null, { ...DEFAULT_INBOX, add: 'end' })).inbox).toEqual({ add: 'end' });
   });
 });

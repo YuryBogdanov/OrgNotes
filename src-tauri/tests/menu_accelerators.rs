@@ -17,6 +17,7 @@ fn every_menu_accelerator_parses() {
         "CmdOrCtrl+2",
         "CmdOrCtrl+Backslash",
         "CmdOrCtrl+BracketLeft",
+        "Shift+CmdOrCtrl+KeyR",
         "CmdOrCtrl+Comma",
         "CmdOrCtrl+Digit0",
         "CmdOrCtrl+KeyT",

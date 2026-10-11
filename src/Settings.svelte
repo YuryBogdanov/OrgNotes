@@ -4,6 +4,7 @@
   import { toneOf, toneStyle, colorName } from './colors';
   import ColorPicker from './ColorPicker.svelte';
   import Picker from './Picker.svelte';
+  import { days } from './review';
   import {
     MAX_KEYWORD, addState, checkKey, normalizeKey, addWorkflow, canRemoveState, canRemoveWorkflow, checkKeyword, displayName, dropState, dropWorkflow,
     effectiveKeys, fromConfig, initialOf, moveState, normalizeKeyword, orgLine, pendingState, removeState, removeWorkflow,
@@ -289,6 +290,13 @@
   const inboxPath = $derived(
     !store.inboxCfg.file ? 'Не выбран' : store.inboxCfg.file.split('/').join(' / ') + (store.inboxFile ? '' : ' — не найден'),
   );
+  // «Разбор»: the done statuses «Выполнено» and «Отменить» may write
+  const doneStates = $derived.by(() => {
+    const seqs = store.inboxFile?.wf.sequences ?? store.config.workflows;
+    return [...new Set(seqs.flatMap((sq) => sq.states.filter((x) => x.done).map((x) => x.name)))];
+  });
+  /** The chosen status, or (renamed or deleted in «Статусы») the 1st / 2nd done status of «Задачи». */
+  const shownStatus = (v: string, i: number) => (doneStates.includes(v) ? v : (doneStates[i] ?? v));
   const inboxStates = $derived.by(() => {
     const seqs = store.inboxFile?.wf.sequences ?? store.config.workflows;
     return [...new Set(seqs.flatMap((sq) => sq.states.filter((x) => !x.done).map((x) => x.name)))];
@@ -436,6 +444,35 @@
                 onclick={() => store.setInbox({ details: !store.inboxCfg.details })}><span></span></button>
             </div>
           </div>
+          <div class="cap">РАЗБОР</div>
+          <div class="opts">
+            <div class="opt">
+              <label for="rv-done">Статус «Выполнено»</label>
+              <select id="rv-done" class="sel" value={shownStatus(store.inboxCfg.reviewDone, 0)} onchange={(e) => store.setInbox({ reviewDone: e.currentTarget.value })}>
+                {#each doneStates as st (st)}<option value={st}>{st}</option>{/each}
+              </select>
+            </div>
+            <div class="opt">
+              <label for="rv-cancel">Статус «Отменено»</label>
+              <select id="rv-cancel" class="sel" value={shownStatus(store.inboxCfg.reviewCancel, 1)} onchange={(e) => store.setInbox({ reviewCancel: e.currentTarget.value })}>
+                {#each doneStates as st (st)}<option value={st}>{st}</option>{/each}
+              </select>
+            </div>
+            <div class="opt">
+              <span id="rv-order">Порядок карточек</span>
+              <div class="segs" role="radiogroup" aria-labelledby="rv-order">
+                <button role="radio" aria-checked={store.inboxCfg.reviewOrder === 'old'} class:on={store.inboxCfg.reviewOrder === 'old'} onclick={() => store.setInbox({ reviewOrder: 'old' })}>Старые сначала</button>
+                <button role="radio" aria-checked={store.inboxCfg.reviewOrder === 'new'} class:on={store.inboxCfg.reviewOrder === 'new'} onclick={() => store.setInbox({ reviewOrder: 'new' })}>Новые сначала</button>
+              </div>
+            </div>
+            <div class="opt">
+              <label for="rv-stale">Считать задачу залежавшейся через</label>
+              <select id="rv-stale" class="sel" value={String(store.inboxCfg.stale)} onchange={(e) => store.setInbox({ stale: +e.currentTarget.value })}>
+                {#each [3, 7, 14, 30] as d (d)}<option value={String(d)}>{days(d)}</option>{/each}
+              </select>
+            </div>
+          </div>
+          <p class="help">«Разобрать» показывает задачи Inbox по одной. У задачи из другого набора статусов «Выполнено» и «Отменить» ставят первый и второй завершающие статусы её набора. Залежавшиеся задачи помечаются цветом в списке и на карточке.</p>
         </section>
       </div>
     {:else if tab === 'Агенды'}
@@ -764,6 +801,9 @@
   .opts { display: flex; flex-direction: column; gap: 6px; }
   .sel { height: 26px; max-width: 260px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 0 6px; font-size: 12.5px; }
   .val { font-size: 12.5px; color: var(--fg2); }
+  .segs { display: flex; padding: 2px; background: var(--field); border-radius: 7px; gap: 2px; }
+  .segs button { height: 22px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 12px; }
+  .segs button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); font-weight: 500; }
   .ibfile { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .ibfile .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .keyrec { min-width: 110px; height: 26px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }

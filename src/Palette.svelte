@@ -6,7 +6,7 @@
 <script lang="ts">
   import { onDestroy, onMount, tick } from 'svelte';
   import { store } from './store.svelte';
-  import { ICONS, bare, contextOf, gotoStep, mainStep, nameStep, type Row, type Step } from './commands';
+  import { ICONS, bare, contextOf, gotoStep, headingStep, mainStep, nameStep, type Row, type Step } from './commands';
   import { runs } from './fuzzy';
   import { displayName } from './names';
   import { toneFor } from './org';
@@ -16,7 +16,7 @@
   // its next step in the same window; Esc anywhere cancels the whole thing.
   const ctx = contextOf();
   const start = store.palette?.start;
-  let step: Step = $state(start === 'goto' ? gotoStep() : start === 'newFile' ? nameStep(ctx, 'file') : mainStep(ctx));
+  let step: Step = $state(start === 'goto' ? gotoStep() : start === 'newFile' ? nameStep(ctx, 'file') : start ? headingStep(ctx, start) : mainStep(ctx));
   let q = $state(step.initial ?? '');
   let sel = $state(0); // an index into the selectable rows
 

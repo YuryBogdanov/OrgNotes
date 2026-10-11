@@ -4,6 +4,7 @@
   import { ago, type InboxItem } from './inbox';
   import { displayName } from './names';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
+  import { ageDays, ageShort, days, subLabel, tasksWord, type ReviewItem } from './review';
 
   // The navigator in the «Inbox» mode: the unsorted tasks of the Inbox file and what to do with them — open, move,
   // date, done, delete. Not set up yet (or the file is gone): a stub to choose or create the file.
@@ -42,6 +43,23 @@
     list?.focus();
   }
   const refile = (it: InboxItem) => store.startRefile('inbox', it);
+
+  // ---- «Разбор» ---------------------------------------------------------------------------------------------
+  const review = $derived(store.review);
+  const pending = $derived(file ? store.reviewPending : []);
+  const oldest = $derived(Math.max(0, ...pending.map((x) => ageDays(x.created) ?? 0)));
+  const handled = $derived(review ? review.items.filter((x) => x.result && x.result !== 'skip').length : 0);
+  const skippedN = $derived(review ? review.items.filter((x) => x.result === 'skip').length : 0);
+  const MARK: Record<string, string> = { done: 'var(--done)', cancel: 'var(--fg3)', move: 'var(--acc)', defer: 'var(--ts)', delete: 'var(--fg3)' };
+  const SEG: Record<string, string> = { ...MARK, skip: 'var(--wait)' };
+  const segColor = (it: ReviewItem, i: number) => (it.result ? SEG[it.result] : i === review?.cur ? 'var(--fg2)' : 'var(--field)');
+  const closed = (it: ReviewItem) => it.result === 'done' || it.result === 'cancel' || it.result === 'move' || it.result === 'delete';
+  const isStale = (it: ReviewItem) => !closed(it) && (ageDays(it.created) ?? 0) > store.inboxCfg.stale;
+  function showCard(i: number) {
+    const at = store.layout.panes.flatMap((p, pi) => p.tabs.map((t, ti) => ({ t, pi, ti }))).find((x) => x.t.kind === 'review');
+    if (at) store.activateTab(at.pi, at.ti);
+    store.reviewShow(i);
+  }
 
   // ---- the date popover ----------------------------------------------------------------------------------------
   let datePop = $state<{ it: InboxItem; x: number; y: number; kind: 'SCHEDULED' | 'DEADLINE' } | null>(null);
@@ -104,8 +122,14 @@
 
 <div class="inbox">
   <div class="head">
-    <span class="title">INBOX</span>
-    {#if file}<span class="fname" title={file.name}>{displayName(file.name)}</span>{/if}
+    <span class="title" title={file?.name}>{file ? `INBOX · ${items.length}` : 'INBOX'}</span>
+    {#if file && review}
+      <button class="rv stop" onclick={() => store.endReview()}>
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h10v10H5z" /></svg>Закончить</button>
+    {:else if file}
+      <button class="rv" disabled={!pending.length} title={pending.length ? 'Разобрать Inbox (⇧⌘R)' : 'Нечего разбирать'} onclick={() => store.startReview()}>
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4.5l9 5.5-9 5.5z" /></svg>Разобрать</button>
+    {/if}
     <button class="plus" aria-label="Новая задача в Inbox (⇧⌘I)" title="Новая задача в Inbox (⇧⌘I)" onclick={() => store.openCapture()}>
       <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
     </button>
@@ -120,9 +144,37 @@
       <button class="primary" onclick={() => (store.pickInbox = Date.now())}>Выбрать файл…</button>
       <button class="link" onclick={() => store.createInboxFile()}>Создать inbox.org в рабочей папке</button>
     </div>
+  {:else if review}
+    <div class="prog">
+      <div class="pt"><span>Разобрано {handled} из {review.items.length}</span><span>{review.cur < 0 ? (skippedN ? `${skippedN} ${skippedN === 1 ? 'пропущена' : 'пропущено'}` : 'всё') : `осталось ${review.items.length - handled}`}</span></div>
+      <div class="segs" aria-hidden="true">{#each review.items as it, i (it.id)}<span style:background={segColor(it, i)}></span>{/each}</div>
+    </div>
+    <div class="list rlist" role="listbox" aria-label="Очередь разбора">
+      {#each review.items as it, i (it.id)}
+        {@const c = MARK[it.result ?? '']}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="rrow" class:cur={i === review.cur} class:closed={closed(it)} role="option" aria-selected={i === review.cur} tabindex="-1" onclick={() => showCard(i)}>
+          <span class="mark" class:skip={it.result === 'skip'} style:background={c ?? 'transparent'} style:border-color={c ?? (it.result === 'skip' ? 'var(--wait)' : 'var(--fg3)')} aria-hidden="true">
+            {#if it.result === 'done'}<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg>
+            {:else if it.result === 'cancel' || it.result === 'delete'}<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" /></svg>
+            {:else if it.result === 'move'}<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h11M11 6l4 4-4 4" /></svg>
+            {:else if it.result === 'defer'}<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M10 5v5l3 2" /></svg>{/if}
+          </span>
+          <div class="main">
+            <span class="t" class:strike={it.result === 'done' || it.result === 'cancel' || it.result === 'delete'}>{it.title}</span>
+            <span class="sub" style:color={it.result === 'skip' ? 'var(--wait)' : it.result === 'move' ? 'var(--acc)' : it.result === 'defer' ? 'var(--ts)' : ''}>{subLabel(it, i === review.cur)}</span>
+          </div>
+          <span class="when" class:stale={isStale(it)}>{ageShort(it.created)}</span>
+        </div>
+      {/each}
+    </div>
+    <div class="foot">Порядок — {store.inboxCfg.reviewOrder === 'old' ? 'от старых к новым' : 'от новых к старым'}. Задача старше {days(store.inboxCfg.stale)} помечена цветом.</div>
   {:else if !items.length}
     <div class="empty">Inbox разобран: задач нет.<br />Новая — кнопкой «+» или ⇧⌘I.</div>
   {:else}
+    {#if pending.length}
+      <div class="prog"><div class="pt"><span>{tasksWord(pending.length)}</span>{#if oldest}<span>самой старой {days(oldest)}</span>{/if}</div></div>
+    {/if}
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div class="list" bind:this={list} role="listbox" tabindex="0" aria-label="Задачи Inbox" aria-activedescendant="ib-{sel}" onkeydown={key}>
       {#each items as it, i (it.line + ':' + it.title)}
@@ -193,8 +245,26 @@
   .inbox { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .head { display: flex; align-items: center; gap: 8px; padding: 8px 8px 4px 14px; }
   .title { font-size: 11px; font-weight: 600; color: var(--fg2); letter-spacing: 0.02em; }
-  .fname { flex: 1; min-width: 0; font-size: 11.5px; color: var(--fg3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .plus { margin-left: auto; width: 26px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); display: flex; align-items: center; justify-content: center; }
+  .title { flex: 1; min-width: 0; }
+  .rv { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: var(--acc); color: var(--onacc); font-size: 12.5px; font-weight: 600; }
+  .rv:disabled { opacity: 0.45; }
+  .rv.stop { border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+  .prog { display: flex; flex-direction: column; gap: 6px; padding: 0 14px 10px; }
+  .pt { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--fg2); }
+  .segs { display: flex; gap: 3px; height: 4px; }
+  .segs span { flex: 1; border-radius: 2px; }
+  .rlist { border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 1px; }
+  .rrow { display: flex; align-items: flex-start; gap: 8px; min-height: 44px; padding: 6px 8px; border-radius: 7px; cursor: default; }
+  .rrow:hover { background: color-mix(in srgb, var(--sel) 55%, transparent); }
+  .rrow.cur { background: var(--sel); box-shadow: inset 0 0 0 1px var(--acc); }
+  .rrow.cur .t { font-weight: 600; }
+  .rrow.closed .t { color: var(--fg2); }
+  .rrow .main { gap: 2px; }
+  .mark { flex: 0 0 16px; height: 16px; margin-top: 1px; box-sizing: border-box; border-radius: 8px; border: 1.5px solid; color: var(--onacc); display: flex; align-items: center; justify-content: center; }
+  .strike { text-decoration: line-through; }
+  .sub { font-size: 11.5px; color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .when.stale { color: var(--wait); }
+  .plus { margin-left: 0; width: 26px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); display: flex; align-items: center; justify-content: center; }
   .plus:hover { background: var(--field); color: var(--acc); }
   .stub { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 20px 18px 60px; text-align: center; }
   .box { color: var(--fg3); margin-bottom: 4px; }

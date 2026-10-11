@@ -226,7 +226,7 @@ test.describe('settings → Inbox', () => {
     await page.getByLabel('Куда добавлять').selectOption('end');
     await page.getByLabel('Статус новой задачи').selectOption('NEXT');
     await page.getByRole('switch', { name: 'Записывать дату создания' }).click();
-    await page.getByLabel('Порядок').selectOption('file');
+    await page.getByLabel('Порядок', { exact: true }).selectOption('file');
     await page.getByRole('switch', { name: 'Счётчик на кнопке Inbox' }).click();
     await page.getByRole('switch', { name: 'Показывать детали под заголовком' }).click();
     await expect.poll(async () => (await config(page)).inbox).toEqual({ file: 'inbox.org', status: 'NEXT', created: false, add: 'end', order: 'file', counter: false, details: false });

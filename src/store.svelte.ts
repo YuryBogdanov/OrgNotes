@@ -7,6 +7,7 @@ import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links'
 import { displayName, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags } from './edits';
 import { bareTitle, caretAfter, keyOf, moveTo, moveWithin } from './refile';
+import { closingStatus, locate, nextOpen, reviewQueue, short, type Result, type ReviewItem } from './review';
 import { DEFAULT_LEVELS, type LevelView } from './orgIndent';
 import { DEFAULT_INBOX, append, entry, inboxItems, prepend, readInbox, remove, withInbox, type InboxConfig, type InboxItem } from './inbox';
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
@@ -36,6 +37,8 @@ function build(name: string, path: string, text: string, disk: string, diskRaw: 
   };
 }
 
+/** Where the palette opens: a step of a command at once (the card's buttons in «Разбор Inbox» use the heading ones). */
+export type PaletteStart = 'newFile' | 'goto' | 'status' | 'priority' | 'schedule' | 'deadline' | 'tags';
 const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
 function readLevels(): LevelView {
@@ -127,8 +130,8 @@ class Store {
     return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refile || this.pickInbox);
   }
   /** The command palette; `start` opens it right at a step ("Создать файл…" ⇧⌘N, "Перейти к файлу…" ⇧⌘O). */
-  palette = $state<{ start?: 'newFile' | 'goto'; n: number } | null>(null);
-  openPalette(start?: 'newFile' | 'goto') {
+  palette = $state<{ start?: PaletteStart; n: number } | null>(null);
+  openPalette(start?: PaletteStart) {
     if (this.unsavedReq || this.saveAsReq || this.errorReq) return;
     this.palette = { start, n: Date.now() };
   }
@@ -252,7 +255,9 @@ class Store {
     return t?.kind === 'file' ? (t.path ?? '') : '';
   }
   get cur(): number {
-    return this.files.findIndex((f) => f.path === this.curPath);
+    const t = this.tab;
+    const path = t?.kind === 'review' ? (t.path ?? '') : this.curPath; // a review: the card's file
+    return this.files.findIndex((f) => f.path === path);
   }
   get file(): NoteFile | undefined {
     return this.files[this.cur] ?? this.orphans[this.curPath];
@@ -1075,7 +1080,7 @@ class Store {
     const f = this.file;
     const h = f?.headings[this.selected];
     if (!f || !h) return;
-    this.setText(fn(f.text, h, f.wf));
+    this.setText(fn(f.text, h, f.wf), f.path);
   }
   setKeyword(kw: string | null) { this.patch((t, h, wf) => setKeyword(t, h, kw, wf)); }
   setPriority(p: string | null) { this.patch((t, h) => setPriority(t, h, p)); }
@@ -1084,7 +1089,7 @@ class Store {
 
   // ---- «Перенести»: a heading with its subtree into a file, under a heading there or at its 1st level ----------
   /** What is being moved: the heading under the cursor (the palette's command) or an Inbox task. */
-  refile = $state<{ from: 'palette' | 'inbox'; path: string; line: number; title: string; item?: InboxItem; n: number } | null>(null);
+  refile = $state<{ from: 'palette' | 'inbox' | 'review'; path: string; line: number; title: string; item?: InboxItem; n: number } | null>(null);
   /** The Inbox task going away after «Перенести» (the same short fade as «Готово»). */
   inboxLeaving = $state<number | null>(null);
   startRefile(from: 'palette' | 'inbox', item?: InboxItem) {
@@ -1124,6 +1129,15 @@ class Store {
    * that is gone now gives 'gone' and the dialog stays. Then the target is written, and only then the source.
    */
   async refileMove(dstPath: string, under: { key: string; line: number } | null): Promise<'ok' | 'gone' | 'error'> {
+    const review = this.refile?.from === 'review';
+    if (review) this.reviewBusy = true; // the task leaves the Inbox: not a change on disk for the review
+    try {
+      return await this.refileMoveNow(dstPath, under);
+    } finally {
+      if (review) this.reviewBusy = false;
+    }
+  }
+  private async refileMoveNow(dstPath: string, under: { key: string; line: number } | null): Promise<'ok' | 'gone' | 'error'> {
     const req = this.refile;
     if (!req) return 'error';
     const d0 = this.files.find((x) => x.path === dstPath);
@@ -1176,11 +1190,201 @@ class Store {
     lsSet(this.recentKey(), JSON.stringify(rec));
     if (req.from === 'palette') this.caretAfterRefile(src.f.path, src.h, same ? line : null);
     const name = displayName(dst.name);
+    if (req.from === 'review') {
+      this.reviewMoved(dst.path, line, `${name}${uh ? ' › ' + bareTitle(uh.title) : ''}`, done);
+      return 'ok';
+    }
     this.note(`Перенесено в ${name}${uh ? ' › ' + bareTitle(uh.title) : ''}`, [
       { label: 'Открыть', run: () => { const i = this.files.findIndex((x) => x.path === dst.path); if (i >= 0) this.open(i, line); } },
       { label: 'Отменить', run: () => void this.undoStep(done).then((ok) => { if (ok) this.inboxUndo = this.inboxUndo.filter((s) => s !== done); }) },
     ], 3000);
     return 'ok';
+  }
+  // ---- «Разбор Inbox»: the tasks one by one, as cards, in a tab of their own ---------------------------------
+  /** The review going on: its queue (fixed when it starts), the card shown (-1: the summary), the tasks there were. */
+  review = $state<{ items: ReviewItem[]; cur: number; known: string[] } | null>(null);
+  /** An action is being written: the review does not take the task's absence for a change on disk. */
+  private reviewBusy = false;
+  /** Takes the last action of the review back (the toast's «Отменить», ⌘Z on the summary). */
+  reviewUndoLast: (() => void) | null = null;
+  /** The queue a review would start with now. */
+  get reviewPending(): ReviewItem[] {
+    const f = this.inboxFile;
+    return f ? reviewQueue(f.text, f.headings, f.wf, f.path, this.inboxCfg.reviewOrder) : [];
+  }
+  private taskKeys(): string[] {
+    const f = this.inboxFile;
+    return f ? reviewQueue(f.text, f.headings, f.wf, f.path, 'old').map((x) => x.created ?? x.title) : [];
+  }
+  /** «Разобрать»: a review of `items` (by default what is in the Inbox now) in the «Разбор Inbox» tab. */
+  startReview(items: ReviewItem[] = this.reviewPending) {
+    if (!items.length) return;
+    this.reviewUndoLast = null;
+    this.review = { items, cur: 0, known: this.taskKeys() };
+    const at = this.layout.panes.flatMap((p, pi) => p.tabs.map((t, ti) => ({ t, pi, ti }))).find((x) => x.t.kind === 'review');
+    if (at) this.activateTab(at.pi, at.ti);
+    else {
+      const p = this.layout.panes[this.layout.active];
+      p.tabs.splice(p.tabs.length ? p.active + 1 : 0, 0, newTab('review', items[0].path));
+      p.active = p.tabs.length ? p.tabs.findIndex((t) => t.kind === 'review') : 0;
+    }
+    this.reviewShow(0);
+  }
+  /** «Закончить»: the tab goes; everything is on disk already. */
+  endReview() {
+    this.review = null;
+    for (let pi = this.layout.panes.length - 1; pi >= 0; pi--) {
+      const p = this.layout.panes[pi];
+      for (let ti = p.tabs.length - 1; ti >= 0; ti--) if (p.tabs[ti].kind === 'review') closeTab(this.layout, pi, ti);
+    }
+    this.persistLayout();
+  }
+  get reviewItem(): ReviewItem | undefined {
+    const r = this.review;
+    return r && r.cur >= 0 ? r.items[r.cur] : undefined;
+  }
+  /** The file and the heading of a task, as they are now. */
+  reviewHeading(it: ReviewItem): { f: NoteFile; h: Heading } | null {
+    const f = this.files.find((x) => x.path === it.path);
+    const h = f && locate(f.text, f.headings, it);
+    return f && h ? { f, h } : null;
+  }
+  /** Show a card (or the summary, -1); the tab follows the card's file, so the palette and the inspector see it. */
+  reviewShow(i: number) {
+    const r = this.review;
+    if (!r) return;
+    r.cur = i;
+    const it = r.items[i];
+    const t = this.layout.panes.flatMap((p) => p.tabs).find((x) => x.kind === 'review');
+    if (t) {
+      t.path = it?.path;
+      const h = it && this.reviewHeading(it);
+      if (h) t.cursor = { line: h.h.line, col: 0 };
+    }
+  }
+  /** The card's editor reports where the task is now (it moves with edits). */
+  reviewAt(it: ReviewItem, line: number) {
+    it.line = line;
+    const h = this.reviewHeading(it);
+    if (h) it.title = h.h.title;
+  }
+  private reviewNext() {
+    const r = this.review;
+    if (r) this.reviewShow(nextOpen(r.items, r.cur));
+  }
+  /** ⌥⌘[: the card before, as it is now (a moved task in its new file). */
+  reviewBack() {
+    const r = this.review;
+    if (!r) return;
+    let i = r.cur < 0 ? r.items.length - 1 : r.cur - 1;
+    while (i >= 0 && r.items[i].result === 'delete') i--;
+    if (i >= 0) this.reviewShow(i);
+  }
+  /** Write an action, mark the task, go on; the toast takes it back. */
+  private async reviewWrite(it: ReviewItem, text: (f: NoteFile, h: Heading) => string | null, mark: Partial<ReviewItem> & { result: Result }, toast: string) {
+    const r = this.reviewHeading(it);
+    if (!r) return;
+    const t = text(r.f, r.h);
+    if (t === null) return;
+    this.reviewBusy = true;
+    const before = { result: it.result, note: it.note, keyword: it.keyword };
+    const step = await this.writeSteps([{ path: r.f.path, text: t }]);
+    this.reviewBusy = false;
+    if (!step) return;
+    Object.assign(it, mark);
+    const at = this.review?.items.indexOf(it) ?? -1;
+    this.reviewNext();
+    const undo = () => void this.undoStep(step).then((ok) => { if (ok) this.reviewUndone(it, before, at); });
+    this.reviewUndoLast = undo;
+    this.note(toast, [{ label: 'Отменить', run: undo }], 4000);
+  }
+  private reviewUndone(it: ReviewItem, before: Partial<ReviewItem>, at: number) {
+    this.reviewUndoLast = null;
+    Object.assign(it, before);
+    if (this.review && at >= 0) this.reviewShow(at);
+  }
+  /** The status «Выполнено» / «Отменить» writes for this task (null: its set has none). */
+  reviewStatus(it: ReviewItem, which: 'done' | 'cancel'): string | null {
+    const r = this.reviewHeading(it);
+    const wf = r?.f.wf ?? this.inboxFile?.wf;
+    return wf ? closingStatus(wf, r?.h.keyword ?? it.keyword, which, which === 'done' ? this.inboxCfg.reviewDone : this.inboxCfg.reviewCancel) : null;
+  }
+  async reviewClose(which: 'done' | 'cancel') {
+    const it = this.reviewItem;
+    const kw = it && this.reviewStatus(it, which);
+    if (!it || !kw) return;
+    const word = which === 'done' ? 'Выполнено' : 'Отменено';
+    await this.reviewWrite(it, (f, h) => setKeyword(f.text, h, kw, f.wf), { result: which, keyword: kw, note: `${word} · ${kw}` }, `${word}: ${it.title}`);
+  }
+  async reviewDefer(date: Date) {
+    const it = this.reviewItem;
+    if (!it) return;
+    await this.reviewWrite(it, (f, h) => setPlanning(f.text, h, 'SCHEDULED', date), { result: 'defer', note: `Отложена до ${short(date)} · в Inbox` }, `Отложена до ${short(date)}: ${it.title}`);
+  }
+  async reviewDelete() {
+    const it = this.reviewItem;
+    if (!it) return;
+    await this.reviewWrite(it, (f, h) => remove(f.text, h), { result: 'delete', note: 'Удалена' }, `Удалено: ${it.title}`);
+  }
+  reviewSkip() {
+    const it = this.reviewItem;
+    if (!it) return;
+    it.result = 'skip';
+    this.reviewNext();
+  }
+  /** «Перенести…»: the move of ТЗ 16 over the tab; Esc comes back to the same card. */
+  reviewMove() {
+    const it = this.reviewItem;
+    const r = it && this.reviewHeading(it);
+    if (r) this.refile = { from: 'review', path: r.f.path, line: r.h.line, title: r.h.title, n: Date.now() };
+  }
+  private reviewMoved(path: string, line: number, label: string, step: { path: string; before: string; after: string }[]) {
+    const it = this.reviewItem;
+    if (!it) return;
+    const before = { result: it.result, note: it.note, path: it.path, line: it.line };
+    const at = this.review!.cur;
+    Object.assign(it, { result: 'move' as Result, note: '→ ' + label, path, line });
+    this.reviewNext();
+    const undo = () => void this.undoStep(step).then((ok) => { if (ok) this.reviewUndone(it, before, at); });
+    this.reviewUndoLast = undo;
+    this.note(`Перенесено в ${label}`, [{ label: 'Отменить', run: undo }], 4000);
+  }
+  /** «Открыть в файле»: the task's file at its heading, in the other pane (or a new tab), the review goes on. */
+  reviewOpenInFile() {
+    const it = this.reviewItem;
+    const r = it && this.reviewHeading(it);
+    if (!r) return;
+    const here = this.layout.active;
+    const p = this.layout.panes[here];
+    const reviewTab = p.tabs[p.active];
+    const other = this.layout.panes.length > 1 ? 1 - here : here;
+    openFile(this.layout, other, r.f.path, r.h.line, { replace: false, focus: false });
+    // one pane: a new tab next to the review, which stays in front
+    this.layout.active = here;
+    p.active = Math.max(0, p.tabs.indexOf(reviewTab));
+    this.persistLayout();
+  }
+  /** A change on disk: tasks gone from their file leave the queue quietly; the current one says so. */
+  reviewSync() {
+    const r = this.review;
+    if (!r || this.reviewBusy || this.refile) return;
+    const cur = r.items[r.cur];
+    const gone = r.items.filter((it) => (!it.result || it.result === 'skip') && !this.reviewHeading(it));
+    if (!gone.length) return;
+    const curGone = !!cur && gone.includes(cur);
+    r.items = r.items.filter((it) => !gone.includes(it));
+    const i = cur && !curGone ? r.items.indexOf(cur) : Math.min(r.cur, r.items.length) - 1;
+    r.cur = i;
+    if (curGone) {
+      this.reviewShow(nextOpen(r.items, Math.max(-1, i)));
+      this.note('Задача изменена вне приложения и пропущена');
+    }
+  }
+  /** Tasks put into the Inbox since the review started (they wait for the next one). */
+  get reviewAdded(): ReviewItem[] {
+    const r = this.review;
+    if (!r) return [];
+    return this.reviewPending.filter((x) => !r.known.includes(x.created ?? x.title));
   }
   /** The caret in the source (if shown in the active tab) on the heading that came after the moved one, else on
    *  the one before. `movedAt`: where the heading went, when it stayed in the same file. */
