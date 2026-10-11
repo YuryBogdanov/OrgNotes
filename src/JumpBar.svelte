@@ -3,8 +3,8 @@
   import { store } from './store.svelte';
   import { displayName, displayPath } from './names';
 
-  // The path of the active file in the toolbar, Xcode's jump bar: each segment opens a menu (a folder: the folders
-  // beside it, each with its contents in a submenu; the file: the files of its folder). ⌃⌘J gives it the keyboard:
+  // The path of the active file in the toolbar, Xcode's jump bar: each segment opens a menu with everything in the
+  // folder that holds it — its folders (each with its contents in a submenu), a line, its files. ⌃⌘J gives it the keyboard:
   // ←/→ between segments, ↓/↩ open a menu, typing filters it, Esc goes back one step and finally into the text.
   type Item = { kind: 'folder' | 'file'; rel: string; label: string; current: boolean };
   type Level = { items: Item[]; sel: number; filter: string; parent?: string; at?: { left: number; top: number } };
@@ -24,14 +24,14 @@
     store.folders.filter((f) => parentOf(f) === dir).map((f) => ({ kind: 'folder' as const, rel: f, label: f.split('/').pop()!, current: f === current })).sort(byName);
   const filesIn = (dir: string, current = '') =>
     store.files.filter((f) => parentOf(f.name) === dir).map((f) => ({ kind: 'file' as const, rel: f.name, label: displayName(f.name), current: f.name === current })).sort(byName);
-  /** What a segment's menu shows: for a folder, the folders beside it; for the file, the files of its folder. */
+  /** A folder's contents: its folders first, then its files, each by name as in the navigator; the path's own
+   *  entries are checked. */
+  const contentsOf = (dir: string) => [...foldersIn(dir, segs.find((s) => s.kind === 'folder' && parentOf(s.rel) === dir)?.rel), ...filesIn(dir, file?.name)];
+  /** What a segment's menu shows: everything in the folder that holds it (folders and files alike). */
   function menuOf(i: number): Item[] {
     const s = segs[i];
-    if (!s) return [];
-    return s.kind === 'file' ? filesIn(parentOf(s.rel), s.rel) : foldersIn(parentOf(s.rel), s.rel);
+    return s ? contentsOf(parentOf(s.rel)) : [];
   }
-  /** A folder's contents: its folders first, then its files; the path's own entries are checked. */
-  const contentsOf = (dir: string) => [...foldersIn(dir, segs.find((s) => s.kind === 'folder' && parentOf(s.rel) === dir)?.rel), ...filesIn(dir, file?.name)];
 
   // ---- state ---------------------------------------------------------------------------------------------------
   let focusIdx = $state<number | null>(null); // the segment with the keyboard (the ring)
@@ -225,6 +225,7 @@
       <div class="filter" aria-label="Фильтр"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5" /><path d="M13.5 13.5L17 17" /></svg><span class="ft">{l.filter}</span><span class="caret" aria-hidden="true"></span></div>
     {/if}
     {#each list as it, j (it.rel)}
+      {#if j && it.kind === 'file' && list[j - 1].kind === 'folder'}<div class="line" role="separator"></div>{/if}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="item" class:on={j === l.sel} role="menuitem" tabindex="-1" aria-current={it.current ? 'true' : undefined} data-rel={it.rel}
         onmousemove={(e) => { e.stopPropagation(); hover(depth, j); }} onclick={(e) => { e.stopPropagation(); pick(it, e.altKey); }}>
@@ -291,5 +292,6 @@
   .nm b { font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
   .more { flex: 0 0 9px; margin-left: auto; color: var(--fg3); }
   .item.on .more { color: inherit; }
+  .line { flex: 0 0 1px; height: 1px; margin: 4px 8px; background: var(--line); }
   .keys { margin: 5px 3px 2px; padding-top: 6px; border-top: 1px solid var(--line); font-size: 11px; color: var(--fg3); line-height: 1.5; white-space: normal; }
 </style>
