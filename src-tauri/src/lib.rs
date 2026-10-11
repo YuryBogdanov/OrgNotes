@@ -74,7 +74,8 @@ mod bookmark {
 /// title bar of their own (under the menu bar) while the pointer is at the top of the screen. That bar is made
 /// invisible and click-through, and the page draws the buttons in its own toolbar instead, below the menu bar. AppKit
 /// says nothing about the reveal, so the bar is checked a few times a second and every change goes to the page as
-/// `titlebar` {fullscreen, lights, menu}: `lights` = the buttons are shown now, `menu` = the height of the menu bar.
+/// `titlebar` {fullscreen, lights, menu}: `lights` = the buttons are shown now, `menu` = how much of the window the
+/// menu bar covers then.
 #[cfg(target_os = "macos")]
 mod titlebar {
     use objc2::{class, msg_send, rc::Retained, runtime::AnyObject};
@@ -176,13 +177,19 @@ mod titlebar {
         if !(visible && alpha > 0.5) {
             return Some(none);
         }
+        // how much of the window the menu bar covers: nothing on a screen with a notch (the window starts below the
+        // menu bar there), its height on a screen without one
         let screen: *mut AnyObject = msg_send![w, screen];
-        let menu = if screen.is_null() {
+        let app: *mut AnyObject = msg_send![class!(NSApplication), sharedApplication];
+        let main_menu: *mut AnyObject = msg_send![app, mainMenu];
+        let menu = if screen.is_null() || main_menu.is_null() {
             0.0
         } else {
-            let f: NSRect = msg_send![bar, frame];
+            let height: f64 = msg_send![main_menu, menuBarHeight];
+            let f: NSRect = msg_send![w, frame];
             let s: NSRect = msg_send![screen, frame];
-            (s.origin.y + s.size.height - (f.origin.y + f.size.height)).max(0.0).round()
+            let menu_bottom = s.origin.y + s.size.height - height;
+            (f.origin.y + f.size.height - menu_bottom).max(0.0).round()
         };
         Some(State { fullscreen: true, lights: true, menu })
     }
