@@ -3,7 +3,8 @@
   "identifier": "default",
   "windows": [
     "main",
-    "settings"
+    "settings",
+    "capture"
   ],
   "permissions": [
     "core:default",
@@ -17,6 +18,8 @@
     "core:window:allow-start-dragging",
     "dialog:default",
     "opener:allow-reveal-item-in-dir",
-    "opener:default"
+    "opener:default",
+    "core:window:allow-set-size",
+    "core:window:allow-is-visible"
   ]
 }

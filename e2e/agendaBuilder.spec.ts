@@ -535,7 +535,7 @@ test.describe('the sheet', () => {
 });
 
 test.describe('the navigator mode «Агенда»', () => {
-  test('a mode of the bar: «Заметки» and «Агенда» switch, the others are not there yet; ⌃⌘1 / ⌃⌘2; it survives a reload', async ({ page }) => {
+  test('a mode of the bar: «Файлы» and «Агенда» switch, the others are not there yet; ⌃⌘1 / ⌃⌘3; it survives a reload', async ({ page }) => {
     await start(page);
     const modes = page.getByRole('tablist', { name: 'Режимы навигатора' });
     await expect(modes.getByRole('tab')).toHaveCount(6);
@@ -545,8 +545,8 @@ test.describe('the navigator mode «Агенда»', () => {
     await expect(list(page)).toContainText('Выбранная агенда открывается в активной панели.');
     await page.keyboard.press('Control+Meta+1');
     await expect(page.locator('.nav')).toBeVisible();
-    await expect(modes.getByRole('tab', { name: 'Заметки' })).toHaveAttribute('aria-selected', 'true');
-    await page.keyboard.press('Control+Meta+2');
+    await expect(modes.getByRole('tab', { name: 'Файлы' })).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Control+Meta+3');
     await expect(list(page)).toBeVisible();
     await page.reload();
     await expect(list(page)).toBeVisible();

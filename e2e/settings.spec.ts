@@ -185,7 +185,7 @@ test.describe('table', () => {
 
   test('tabs are in the order of the mockup, including Календарь', async ({ page }) => {
     await openSettings(page);
-    expect(await page.getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Файлы']);
+    expect(await page.getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы']);
   });
 });
 

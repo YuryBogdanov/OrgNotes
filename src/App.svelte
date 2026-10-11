@@ -18,9 +18,15 @@
   import Settings from './Settings.svelte';
   import AgendaBuilder from './AgendaBuilder.svelte';
   import NavPanel from './NavPanel.svelte';
+  import Capture from './Capture.svelte';
+  import Picker from './Picker.svelte';
+  import CaptureWindow from './CaptureWindow.svelte';
+  import { displayName as nameOf } from './names';
 
   // the Settings window is this same app loaded with #settings: it shows only the settings
   const isSettingsWindow = location.hash === '#settings';
+  // the quick entry from another program: a panel of its own with only the entry (the main window does the writing)
+  const isCaptureWindow = location.hash === '#capture';
   const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
   const file = $derived(store.file);
   // toolbar path: the folders and the file of the active tab (the heading crumbs live in the pane)
@@ -117,7 +123,9 @@
     back: () => store.back(),
     nav: () => (store.showNav = !store.showNav),
     navFiles: () => store.setNavMode('files'),
+    navInbox: () => store.setNavMode('inbox'),
     navAgendas: () => store.setNavMode('agendas'),
+    capture: () => store.openCapture(),
     insp: () => (store.showInspector = !store.showInspector),
   };
   $effect(() => {
@@ -148,7 +156,9 @@
     if (e.ctrlKey && e.code === 'KeyW') return 'closePane';
     if (e.ctrlKey && e.code === 'KeyJ') return 'jumpBar';
     if (e.ctrlKey && e.code === 'Digit1') return 'navFiles';
-    if (e.ctrlKey && e.code === 'Digit2') return 'navAgendas';
+    if (e.ctrlKey && e.code === 'Digit2') return 'navInbox';
+    if (e.ctrlKey && e.code === 'Digit3') return 'navAgendas';
+    if (e.shiftKey && e.code === 'KeyI') return 'capture';
     if (e.shiftKey && e.code === 'KeyW') return 'closeWindow';
     if (e.shiftKey && e.code === 'KeyP') return 'palette';
     if (e.shiftKey && e.code === 'KeyN') return 'paletteNewFile';
@@ -162,7 +172,20 @@
     return ({ '[': 'back', n: 'newFile', ',': 'settings', t: 'newTab', w: 'closeTab', s: 'save', q: 'quit', '1': 'notes', '2': 'agenda' } as Record<string, string>)[k] ?? null;
   }
 
+  // the panel of the quick entry knows the Inbox file's name from here
+  $effect(() => {
+    const f = store.inboxFile;
+    if (isSettingsWindow || isCaptureWindow) return;
+    try {
+      if (f) localStorage.setItem('capture:file', nameOf(f.name) + '.org');
+      else localStorage.removeItem('capture:file');
+    } catch {
+      /* no storage */
+    }
+  });
+
   onMount(() => {
+    if (isCaptureWindow) return; // a thin panel: no files, no menu
     store.load();
     store.listen();
     if (isSettingsWindow) return;
@@ -199,7 +222,9 @@
   }
 </script>
 
-{#if isSettingsWindow}
+{#if isCaptureWindow}
+  <CaptureWindow />
+{:else if isSettingsWindow}
   {#if store.loaded}<Settings standalone />{/if}
 {:else}
 <!-- the agenda builder is a sheet over the whole window: the window stays visible under it but takes no input -->
@@ -213,10 +238,24 @@
   {#if store.start && !isSettingsWindow}<StartScreen />{/if}
   {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
   {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
+  {#if store.capture}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="capscrim" onmousedown={(e) => { if (e.target === e.currentTarget) store.capture = null; }}>
+      {#key store.capture.n}
+        <Capture file={store.inboxFile ? nameOf(store.inboxFile.name) + '.org' : null}
+          onsubmit={(t, d) => store.addToInbox(t, d)}
+          onpick={() => { store.capture = null; store.pickInbox = Date.now(); }}
+          onclose={(added) => { store.capture = null; if (added && store.inboxCfg.confirm) store.note('Добавлено в Inbox', undefined, 1600); }} />
+      {/key}
+    </div>
+  {/if}
+  {#if store.pickInbox}{#key store.pickInbox}<Picker mode="inbox" onclose={() => (store.pickInbox = 0)} />{/key}{/if}
+  {#if store.refileReq}{#key store.refileReq.n}<Picker mode="refile" item={store.refileReq.item} onclose={() => (store.refileReq = null)} />{/key}{/if}
   {#if store.toast}
-    <div class="toast" role="status">
+    <div class="toast" class:acts={!!store.toast.actions} role="status">
       <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 10a6.5 6.5 0 1 1-2-4.7M16.5 3.5V6.5h-3" /></svg>
       <span>{store.toast.text}</span>
+      {#each store.toast.actions ?? [] as a}<button class="tbtn" onclick={() => { store.toast = null; a.run(); }}>{a.label}</button>{/each}
     </div>
   {/if}
   {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
@@ -318,6 +357,9 @@
 <style>
   /* «обновлён с диска»: does not take the focus or block typing, goes after 4 s */
   .toast { position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); padding: 9px 14px; background: var(--bar); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22); font-size: 12.5px; color: var(--fg); pointer-events: none; }
+  .toast.acts { pointer-events: auto; }
+  .tbtn { flex: 0 0 auto; height: 22px; padding: 0 10px; border: 0; border-radius: 5px; background: var(--field); color: var(--acc); font-size: 12px; font-weight: 600; }
+  .capscrim { position: fixed; inset: 0; z-index: 96; background: rgba(0, 0, 0, 0.28); display: flex; align-items: flex-start; justify-content: center; padding-top: 110px; }
   .toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .win { height: 100%; display: flex; flex-direction: column; }
   .lights { display: flex; gap: 8px; margin-left: 4px; }

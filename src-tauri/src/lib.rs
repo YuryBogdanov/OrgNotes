@@ -953,6 +953,72 @@ fn migrate_config(app: &AppHandle) {
     }
 }
 
+// ---- quick entry (⇧⌘I) ----------------------------------------------------------------------------------------
+// A system-wide shortcut. With the main window in front the entry opens inside it; from any other program it is a
+// panel of its own (the «capture» window, made hidden at start) that does not bring the main window forward. The
+// page writes the task: the panel hands it to the main window, which owns the files.
+
+const CAPTURE: &str = "capture";
+
+fn make_capture_window(app: &AppHandle) {
+    if app.get_webview_window(CAPTURE).is_some() {
+        return;
+    }
+    let _ = tauri::WebviewWindowBuilder::new(app, CAPTURE, tauri::WebviewUrl::App("index.html#capture".into()))
+        .title("Новая задача в Inbox")
+        .inner_size(640.0, 172.0)
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .resizable(false)
+        .skip_taskbar(true)
+        .visible(false)
+        .center()
+        .build();
+}
+
+fn show_capture(app: &AppHandle) {
+    let main_in_front = app
+        .get_webview_window("main")
+        .map(|w| w.is_visible().unwrap_or(false) && w.is_focused().unwrap_or(false))
+        .unwrap_or(false);
+    if main_in_front {
+        let _ = app.emit_to("main", "capture-here", ());
+        return;
+    }
+    make_capture_window(app);
+    if let Some(w) = app.get_webview_window(CAPTURE) {
+        let _ = w.center();
+        let _ = w.show();
+        let _ = w.set_focus();
+        let _ = w.emit_to(CAPTURE, "capture-open", ());
+    }
+}
+
+/// The quick entry's shortcut (e.g. "Shift+CmdOrCtrl+KeyI"); `global` = from any program. Off: only the menu item
+/// of the app has it. An error says the shortcut is taken or not valid.
+#[tauri::command]
+fn set_capture_shortcut(app: AppHandle, accelerator: String, global: bool) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+    let gs = app.global_shortcut();
+    let _ = gs.unregister_all();
+    if !global || accelerator.trim().is_empty() {
+        return Ok(());
+    }
+    gs.on_shortcut(accelerator.as_str(), |app, _shortcut, event| {
+        if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+            show_capture(app);
+        }
+    })
+    .map_err(|e| e.to_string())
+}
+
+/// The panel asks the main window to show itself (e.g. «Выбрать файл…» when the Inbox is not set up).
+#[tauri::command]
+fn show_main_window(app: AppHandle) {
+    show_main(&app);
+}
+
 fn show_main(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
@@ -965,6 +1031,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             get_notes_dir,
@@ -983,7 +1050,9 @@ pub fn run() {
             quit_app,
             rename_entry,
             move_entry,
-            trash_entry
+            trash_entry,
+            set_capture_shortcut,
+            show_main_window
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -996,6 +1065,7 @@ pub fn run() {
             let handle = app.handle().clone();
             #[cfg(target_os = "macos")]
             titlebar::watch(&handle);
+            make_capture_window(&handle);
             migrate_config(&handle);
             let state = app.state::<AppState>();
             // ORG_DIR overrides the remembered folder (handy for development)
