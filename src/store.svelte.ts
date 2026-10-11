@@ -6,6 +6,7 @@ import {
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { displayName, noteName, withOrg } from './names';
 import { appendTask, refile, setPlanning, setTags } from './edits';
+import { DEFAULT_LEVELS, type LevelView } from './orgIndent';
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
 import { EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
@@ -35,6 +36,21 @@ function build(name: string, path: string, text: string, disk: string, diskRaw: 
 
 const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
+function readLevels(): LevelView {
+  try {
+    const v = JSON.parse(lsGet('editor:levels') ?? 'null');
+    if (v && typeof v === 'object') {
+      return {
+        oneStar: typeof v.oneStar === 'boolean' ? v.oneStar : DEFAULT_LEVELS.oneStar,
+        indent: typeof v.indent === 'boolean' ? v.indent : DEFAULT_LEVELS.indent,
+        step: Number.isInteger(v.step) && v.step >= 1 && v.step <= 4 ? v.step : DEFAULT_LEVELS.step,
+      };
+    }
+  } catch {
+    /* unreadable: the defaults */
+  }
+  return { ...DEFAULT_LEVELS };
+}
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core');
@@ -121,6 +137,17 @@ class Store {
   setNavHeadings(on: boolean) {
     this.navHeadings = on;
     lsSet('nav:headings', on ? '1' : '0'); // the main window hears it through the storage event
+  }
+  /** «Уровни заголовков» (Настройки → Основные, a view preference of this Mac): one star per level, text by level. */
+  levels = $state<LevelView>(readLevels());
+  setLevels(l: Partial<LevelView>) {
+    this.levels = { ...this.levels, ...l, step: Math.max(1, Math.min(4, Math.round(l.step ?? this.levels.step))) };
+    lsSet('editor:levels', JSON.stringify(this.levels)); // the other window hears it through the storage event
+  }
+  /** «Вид › Структурный вид»: both switches on or off at once, to see the file as it is without the settings. */
+  toggleStructure() {
+    const on = !(this.levels.oneStar || this.levels.indent);
+    this.setLevels({ oneStar: on, indent: on });
   }
   /** The inspector's tab, remembered for the window. */
   inspectorTab = $state<'task' | 'outline'>(lsGet('inspector:tab') === 'outline' ? 'outline' : 'task');
@@ -823,6 +850,7 @@ class Store {
     // the settings window changes view preferences of this Mac
     window.addEventListener('storage', (e) => {
       if (e.key === 'nav:headings') this.navHeadings = e.newValue === '1';
+      if (e.key === 'editor:levels') this.levels = readLevels();
     });
     // back in front: check the open files again in case an event was missed
     window.addEventListener('focus', () => this.activated());

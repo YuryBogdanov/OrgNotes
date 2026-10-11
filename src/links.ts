@@ -27,39 +27,63 @@ type UNode = {
   children?: UNode[];
 };
 
+/**
+ * Every link of a note, with its offsets. A whole-document parse costs seconds on a big file (and almost every Org
+ * file has a `<` of a timestamp), so only the lines that can hold a link are parsed, each on its own; blocks
+ * (#+BEGIN_…/#+END_…) are skipped, as a full parse would read them as code. A link is on one line.
+ */
 export function extractLinks(text: string): OrgLink[] {
-  if (!text.includes('[[') && !text.includes('://') && !text.includes('mailto:') && !text.includes('<')) return [];
-  let ast: UNode;
+  if (!text.includes('[[') && !text.includes('://') && !text.includes('mailto:') && !text.includes('file:')) return [];
+  const out: OrgLink[] = [];
+  let block: RegExp | null = null;
+  let base = 0;
+  let lineNo = 0;
+  for (const lineText of text.split('\n')) {
+    if (block) {
+      if (block.test(lineText)) block = null;
+    } else {
+      const b = /^\s*#\+BEGIN_(\w+)/i.exec(lineText);
+      if (b) block = new RegExp(`^\\s*#\\+END_${b[1]}\\b`, 'i');
+      else if (/\[\[|:\/\/|mailto:|file:/.test(lineText)) {
+        for (const l of linksOfLine(lineText)) {
+          const a: OrgLink = { ...l, from: base + l.from, to: base + l.to, line: lineNo };
+          if (l.descFrom != null) {
+            a.descFrom = base + l.descFrom;
+            a.descTo = base + l.descTo!;
+          }
+          out.push(a);
+        }
+      }
+    }
+    base += lineText.length + 1;
+    lineNo++;
+  }
+  return out.sort((a, b) => a.from - b.from);
+}
+
+/** The links of one line, offsets from its start; remembered by the line's text (most lines stay the same between
+ *  two versions of a note, so typing re-parses only the line being edited). */
+const lineCache = new Map<string, OrgLink[]>();
+function linksOfLine(text: string): OrgLink[] {
+  const known = lineCache.get(text);
+  if (known) return known;
+  const out: OrgLink[] = [];
+  let ast: UNode | null = null;
   try {
     ast = parse(text, { trackPosition: true }) as unknown as UNode;
   } catch {
-    return [];
+    /* no links */
   }
-  const starts: number[] = [0];
-  for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 10) starts.push(i + 1);
-  const lineOf = (off: number) => {
-    let lo = 0;
-    let hi = starts.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi + 1) >> 1;
-      if (starts[mid] <= off) lo = mid;
-      else hi = mid - 1;
-    }
-    return lo;
-  };
-
-  const out: OrgLink[] = [];
   const walk = (n: UNode) => {
     if (n.type === 'link' && n.position) {
-      const from = n.position.start.offset;
-      const to = n.position.end.offset;
       const l: OrgLink = {
-        from, to,
+        from: n.position.start.offset,
+        to: n.position.end.offset,
         format: (n.format as OrgLink['format']) ?? 'bracket',
         type: n.linkType ?? 'fuzzy',
         raw: n.rawLink ?? '',
         path: n.path ?? '',
-        line: lineOf(from),
+        line: 0,
       };
       const hasDesc = l.format === 'bracket' && n.contentsBegin != null && n.contentsEnd != null && n.contentsEnd > n.contentsBegin;
       if (hasDesc) {
@@ -71,8 +95,10 @@ export function extractLinks(text: string): OrgLink[] {
     }
     n.children?.forEach(walk);
   };
-  walk(ast);
-  return out.sort((a, b) => a.from - b.from);
+  if (ast) walk(ast);
+  if (lineCache.size > 50000) lineCache.clear(); // a bound, not an exact LRU
+  lineCache.set(text, out);
+  return out;
 }
 
 /** Title shown for a link in lists: description, else the target. */

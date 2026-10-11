@@ -364,6 +364,28 @@
               onclick={() => store.setNavHeadings(!store.navHeadings)}><span></span></button>
           </div>
           <p class="help">Структура файла всегда есть в инспекторе, на вкладке «Структура», и в командной палитре по «#». Настройка хранится на этом Mac.</p>
+          <div class="cap">УРОВНИ ЗАГОЛОВКОВ</div>
+          <div class="opts">
+            <div class="opt">
+              <label for="one-star">Одна звёздочка на уровень</label>
+              <button id="one-star" class="switch" role="switch" aria-checked={store.levels.oneStar} aria-label="Одна звёздочка на уровень"
+                onclick={() => store.setLevels({ oneStar: !store.levels.oneStar })}><span></span></button>
+            </div>
+            <div class="opt">
+              <label for="indent-text">Сдвигать текст по уровню</label>
+              <button id="indent-text" class="switch" role="switch" aria-checked={store.levels.indent} aria-label="Сдвигать текст по уровню"
+                onclick={() => store.setLevels({ indent: !store.levels.indent })}><span></span></button>
+            </div>
+            <div class="opt">
+              <span id="step-l">Шаг отступа</span>
+              <div class="stepper" role="group" aria-labelledby="step-l">
+                <button aria-label="Меньше" disabled={store.levels.step <= 1} onclick={() => store.setLevels({ step: store.levels.step - 1 })}>−</button>
+                <span class="sv" aria-live="polite">{store.levels.step} симв.</span>
+                <button aria-label="Больше" disabled={store.levels.step >= 4} onclick={() => store.setLevels({ step: store.levels.step + 1 })}>+</button>
+              </div>
+            </div>
+          </div>
+          <p class="help">Только вид в редакторе: звёздочки и пробелы в файлах не меняются. «Вид › Структурный вид» включает и выключает обе настройки сразу. Настройки хранятся на этом Mac.</p>
         </section>
       </div>
     {:else}
@@ -612,6 +634,13 @@
   .add { width: 100%; margin-top: 4px; height: 30px; border: 1px dashed var(--line); background: transparent; border-radius: 7px; color: var(--acc); }
   .help { font-size: 12px; line-height: 1.5; color: var(--fg2); padding: 10px 6px; }
   .general { max-width: 560px; }
+  .opts { display: flex; flex-direction: column; gap: 6px; }
+  .stepper { display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 7px; background: var(--field); }
+  .stepper button { width: 24px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; font-size: 14px; }
+  .stepper button:hover:not(:disabled) { background: var(--bg); }
+  .stepper button:disabled { opacity: 0.35; }
+  .stepper button:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+  .sv { min-width: 56px; text-align: center; font-size: 12.5px; font-variant-numeric: tabular-nums; }
   .alist { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .arow { display: flex; align-items: center; gap: 9px; height: 36px; padding: 0 8px 0 12px; background: var(--side); }
   .arow + .arow { border-top: 1px solid var(--line); }

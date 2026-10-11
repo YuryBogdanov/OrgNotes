@@ -88,6 +88,7 @@
     newTab: () => store.newUntitled(store.layout.active),
     palette: () => store.togglePalette(),
     jumpBar: () => store.jumpReq++,
+    structure: () => store.toggleStructure(),
     paletteNewFile: () => store.openPalette('newFile'),
     paletteGoto: () => store.openPalette('goto'),
     closePane: () => store.closePane(store.layout.active),

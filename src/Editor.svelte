@@ -9,8 +9,10 @@
   import { extractLinks, type OrgLink } from './links';
   import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftSubtree, type Result } from './outline';
   import type { Text } from '@codemirror/state';
+  import { DEFAULT_LEVELS, orgIndent, type LevelView } from './orgIndent';
 
-  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, onchange, oncursor, onfollow }: {
+  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, onchange, oncursor, onfollow }: {
+    levels?: LevelView; // «Структурный вид»: one star per level, text moved by level
     hint?: string; // grey placeholder in an empty document
     resetOn?: number; // bumped when the text was silently reloaded from disk: the undo history starts over
     text: string; fileKey: string; wf: Workflow;
@@ -27,6 +29,8 @@
   let lastReveal = 0;
   let lastReset = 0;
   const undo = new Compartment();
+  const structure = new Compartment(); // switching the view is not an edit: no undo step, no unsaved mark
+  let lastLevels = '';
 
   const HEAD = /^(\*+)\s/;
   // heading lines per document version; ignores `* x` inside #+BEGIN_…/#+END_… blocks
@@ -231,7 +235,7 @@
       doc,
       extensions: [
         lineNumbers(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(),
-        undo.of(history()), orgFold, foldGutter(), plugin,
+        undo.of(history()), orgFold, foldGutter(), plugin, structure.of(orgIndent(levels, headingSet)),
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         EditorView.domEventHandlers({
@@ -305,6 +309,7 @@
   onMount(() => {
     view = new EditorView({ state: makeState(text, wf), parent: host });
     lastKey = fileKey;
+    lastLevels = JSON.stringify(levels);
     lastReset = resetOn;
     restoreCaret(); // a pending reveal, if any, is applied right after by its own effect
     return () => view?.destroy();
@@ -355,6 +360,14 @@
         }
       }
     }
+  });
+
+  $effect(() => {
+    const l = levels;
+    const k = JSON.stringify(l);
+    if (!view || k === lastLevels) return;
+    lastLevels = k;
+    view.dispatch({ effects: structure.reconfigure(orgIndent(l, headingSet)) });
   });
 
   $effect(() => {
