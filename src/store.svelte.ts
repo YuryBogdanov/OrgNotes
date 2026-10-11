@@ -7,8 +7,9 @@ import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links'
 import { displayName, noteName, withOrg } from './names';
 import { appendTask, refile, setPlanning, setTags } from './edits';
 import { DEFAULT_LEVELS, type LevelView } from './orgIndent';
+import { DEFAULT_INBOX, append, entry, inboxItems, insert, readInbox, remove, subtree, withInbox, type InboxConfig, type InboxItem } from './inbox';
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
-import { EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
+import { EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
 export interface NoteFile {
   name: string; // relative path inside the notes folder
@@ -105,7 +106,14 @@ class Store {
   /** The sheet about a changed or deleted file. */
   diskReq = $state<{ kind: 'changed' | 'deleted'; path: string; resolve: (a: DiskAnswer) => void } | null>(null);
   /** «work» обновлён с диска — a status line at the bottom of the editor for 4 s. */
-  toast = $state<{ text: string; n: number } | null>(null);
+  toast = $state<{ text: string; n: number; actions?: { label: string; run: () => void }[] } | null>(null);
+  /** A short note at the bottom (with buttons, e.g. «Открыть», «Отменить»); it goes after a few seconds. */
+  note(text: string, actions?: { label: string; run: () => void }[], ms = 4000) {
+    this.toastNames = [];
+    this.toast = { text, n: Date.now(), actions };
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => (this.toast = null), ms);
+  }
   private toastNames: string[] = [];
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
   /** The window is in front: disk questions wait for it. */
@@ -115,7 +123,7 @@ class Store {
   errorReq = $state<{ title: string; text: string; resolve: () => void } | null>(null);
   /** While a sheet is up the rest of the window does not react: no shortcuts, no menu commands. */
   get sheetOpen() {
-    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder);
+    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refileReq || this.pickInbox);
   }
   /** The command palette; `start` opens it right at a step ("Создать файл…" ⇧⌘N, "Перейти к файлу…" ⇧⌘O). */
   palette = $state<{ start?: 'newFile' | 'goto'; n: number } | null>(null);
@@ -298,6 +306,7 @@ class Store {
       /* reported by parseProjectConfig */
     }
     this.agendas = readAgendas(parsed?.agendas); // a tab of a deleted agenda shows the built-in one
+    this.inboxCfg = readInbox(parsed?.inbox);
     // only the statuses make the notes be read again; agendas alone do not
     const same = JSON.stringify(config) === JSON.stringify(this.config);
     this.config = config;
@@ -406,8 +415,8 @@ class Store {
     return t?.kind === 'agenda' && t.agenda ? this.agendas.find((a) => a.id === t.agenda) : undefined;
   }
   /** The left navigator: the files, or the list of agendas. A setting of the window: switching tabs or panes keeps it. */
-  navMode = $state<'files' | 'agendas'>(lsGet('nav:mode') === 'agendas' ? 'agendas' : 'files');
-  setNavMode(m: 'files' | 'agendas') {
+  navMode = $state<NavMode>((['files', 'inbox', 'agendas'] as const).find((m) => m === lsGet('nav:mode')) ?? 'files');
+  setNavMode(m: NavMode) {
     this.navMode = m;
     this.showNav = true;
     lsSet('nav:mode', m);
@@ -436,6 +445,168 @@ class Store {
     }
     this.persistLayout();
   }
+  // ---- Inbox (`inbox` in config.json: the file and how it works; every change goes to disk at once) -----------
+  inboxCfg = $state.raw<InboxConfig>(DEFAULT_INBOX);
+  get inboxFile(): NoteFile | undefined {
+    const f = this.inboxCfg.file;
+    return f ? this.files.find((x) => x.name === f) : undefined;
+  }
+  /** The unsorted tasks of the Inbox file. */
+  get inboxList(): InboxItem[] {
+    const f = this.inboxFile;
+    return f ? inboxItems(f.text, f.headings, f.wf, this.inboxCfg.order) : [];
+  }
+  async setInbox(c: Partial<InboxConfig>) {
+    const next = { ...this.inboxCfg, ...c };
+    await this.updateConfig((raw) => withInbox(raw, { ...readInbox(this.inboxIn(raw)), ...c }));
+    this.inboxCfg = next;
+  }
+  private inboxIn(raw: string | null) {
+    try {
+      return raw ? JSON.parse(raw)?.inbox : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  /** «Создать inbox.org в рабочей папке»: an empty file in the root, set as the Inbox at once (an existing one is
+   *  simply taken). */
+  async createInboxFile() {
+    if (!this.files.some((f) => f.name === 'inbox.org')) {
+      try {
+        await this.flush();
+        if (isTauri) await invoke<string>('create_entry', { parent: this.abs(''), name: 'inbox.org', isDir: false });
+        await this.reload();
+      } catch (e) {
+        if (!String(e).includes('exist')) return this.say('Не удалось создать inbox.org: ' + e);
+      }
+    }
+    await this.setInbox({ file: 'inbox.org' });
+  }
+  /** Write a file now (not after the autosave pause): unsaved edits of its tab go along. Null, or why it failed. */
+  async writeNow(path: string, text: string): Promise<string | null> {
+    this.setText(text, path);
+    clearTimeout(this.timers.get(path));
+    this.timers.delete(path);
+    if (!isTauri) return null;
+    return this.save(path);
+  }
+  /** What the Inbox actions changed in this session, for ⌘Z in the list: each step is one or two files. */
+  private inboxUndo: { path: string; before: string; after: string }[][] = [];
+  private async inboxWrite(steps: { path: string; text: string }[]): Promise<boolean> {
+    const done: { path: string; before: string; after: string }[] = [];
+    for (const st of steps) {
+      const f = this.files.find((x) => x.path === st.path);
+      if (!f) return false;
+      const before = f.text;
+      const err = await this.writeNow(st.path, st.text);
+      if (err) {
+        this.say('Не удалось записать «' + displayName(f.name) + '»: ' + err);
+        return false; // what was written before stays (a move writes the target first: nothing is lost)
+      }
+      done.push({ path: st.path, before, after: st.text });
+    }
+    this.inboxUndo.push(done);
+    return true;
+  }
+  /** ⌘Z in the Inbox list: the last action is taken back (if the files were not changed since). */
+  async undoInbox(): Promise<boolean> {
+    const step = this.inboxUndo.pop();
+    if (!step) return false;
+    for (const s of [...step].reverse()) {
+      const f = this.files.find((x) => x.path === s.path);
+      if (!f || f.text !== s.after) {
+        this.say('Отменить нельзя: файл уже изменился');
+        return false;
+      }
+    }
+    for (const s of [...step].reverse()) await this.writeNow(s.path, s.before);
+    return true;
+  }
+  private inboxHeading(item: InboxItem): { f: NoteFile; h: Heading } | null {
+    const f = this.inboxFile;
+    const h = f?.headings.find((x) => x.line === item.line && x.title === item.title);
+    return f && h ? { f, h } : null;
+  }
+  /** Quick entry: a task at the end of the Inbox file, on disk at once. */
+  async addToInbox(title: string, details: string): Promise<'ok' | 'nofile' | 'empty' | 'error'> {
+    if (!title.trim()) return 'empty';
+    const f = this.inboxFile;
+    if (!f) return 'nofile';
+    const status = this.inboxCfg.status && f.wf.open.includes(this.inboxCfg.status) ? this.inboxCfg.status : startOf(sequenceFor(f.wf, null));
+    const task = entry(title, details, status, this.inboxCfg.created ? new Date() : null);
+    return (await this.inboxWrite([{ path: f.path, text: append(f.text, task) }])) ? 'ok' : 'error';
+  }
+  async inboxDone(item: InboxItem) {
+    const r = this.inboxHeading(item);
+    if (!r) return;
+    const kw = firstDone(sequenceFor(r.f.wf, r.h.keyword)) ?? r.f.wf.done[0];
+    if (kw) await this.inboxWrite([{ path: r.f.path, text: setKeyword(r.f.text, r.h, kw, r.f.wf) }]);
+  }
+  async inboxDelete(item: InboxItem) {
+    const r = this.inboxHeading(item);
+    if (r) await this.inboxWrite([{ path: r.f.path, text: remove(r.f.text, r.h) }]);
+  }
+  async inboxDate(item: InboxItem, kind: 'SCHEDULED' | 'DEADLINE', date: Date | null) {
+    const r = this.inboxHeading(item);
+    if (r) await this.inboxWrite([{ path: r.f.path, text: setPlanning(r.f.text, r.h, kind, date) }]);
+  }
+  /** «Перенести»: into another file — at its end, or as the last child of a heading there. The target is written
+   *  first, then the task leaves the Inbox: a failure loses nothing. */
+  async inboxRefile(item: InboxItem, path: string, underLine: number | null) {
+    const r = this.inboxHeading(item);
+    const dst = this.files.find((x) => x.path === path);
+    if (!r || !dst || dst.path === r.f.path) return;
+    const under = underLine === null ? null : dst.headings.find((x) => x.line === underLine) ?? null;
+    const moved = insert(dst.text, subtree(r.f.text, r.h), r.h.level, under);
+    const ok = await this.inboxWrite([{ path: dst.path, text: moved }, { path: r.f.path, text: remove(r.f.text, r.h) }]);
+    if (!ok) return;
+    const name = displayName(dst.name);
+    const line = (() => {
+      const nf = this.files.find((x) => x.path === dst.path);
+      return nf?.headings.find((x) => x.title === r.h.title && x.keyword === r.h.keyword && (!under || x.line > under.line))?.line ?? 0;
+    })();
+    this.note(`Перенесено в «${name}»`, [
+      { label: 'Открыть', run: () => { const i = this.files.findIndex((x) => x.path === dst.path); if (i >= 0) this.open(i, line); } },
+      { label: 'Отменить', run: () => void this.undoInbox() },
+    ], 6000);
+  }
+  /** «Открыть»: the Inbox file in the editor, at the task. */
+  openInboxItem(item: InboxItem) {
+    const f = this.inboxFile;
+    const i = f ? this.files.indexOf(f) : -1;
+    if (i >= 0) this.open(i, item.line);
+  }
+  /** The quick entry's shortcut and whether it works from any program (a preference of this Mac). */
+  captureKey = $state(lsGet('capture:key') || DEFAULT_CAPTURE_KEY);
+  captureGlobal = $state(lsGet('capture:global') !== '0');
+  /** Register the shortcut with the system; null, or why it could not be (taken by another program, say). */
+  async applyCaptureKey(): Promise<string | null> {
+    if (!isTauri) return null;
+    try {
+      await invoke('set_capture_shortcut', { accelerator: this.captureKey, global: this.captureGlobal });
+      return null;
+    } catch (e) {
+      return String(e);
+    }
+  }
+  async setCaptureKey(key: string, global: boolean): Promise<string | null> {
+    this.captureKey = key;
+    this.captureGlobal = global;
+    lsSet('capture:key', key);
+    lsSet('capture:global', global ? '1' : '0');
+    return this.applyCaptureKey();
+  }
+  /** The quick entry inside the window (⇧⌘I with the window in front, «+» in the Inbox panel). */
+  capture = $state<{ n: number } | null>(null);
+  /** «Выбрать файл…» for the Inbox: the palette of files. */
+  pickInbox = $state(0);
+  /** «Перенести» of an Inbox task: the palette of where to (a file, a heading in it). */
+  refileReq = $state<{ item: InboxItem; n: number } | null>(null);
+  openCapture() {
+    if (this.sheetOpen && !this.capture) return;
+    this.capture = { n: Date.now() };
+  }
+
   /** The builder: an editable copy of the agenda; `orig` is null for a new one. */
   builder = $state<{ draft: Agenda; orig: Agenda | null; n: number } | null>(null);
   /** ⌘S while the builder is open: «Сохранить агенду» (the builder watches this). */
@@ -851,6 +1022,10 @@ class Store {
     window.addEventListener('storage', (e) => {
       if (e.key === 'nav:headings') this.navHeadings = e.newValue === '1';
       if (e.key === 'editor:levels') this.levels = readLevels();
+      if (e.key === 'capture:key' || e.key === 'capture:global') {
+        this.captureKey = lsGet('capture:key') || DEFAULT_CAPTURE_KEY;
+        this.captureGlobal = lsGet('capture:global') !== '0';
+      }
     });
     // back in front: check the open files again in case an event was missed
     window.addEventListener('focus', () => this.activated());
@@ -866,6 +1041,20 @@ class Store {
     const { listen } = await import('@tauri-apps/api/event');
     await listen('notes-changed', () => this.reload());
     await listen<{ fullscreen: boolean; lights: boolean; menu: number }>('titlebar', (e) => (this.titlebar = e.payload));
+    if (location.hash !== '#settings') {
+      // the quick entry: ⇧⌘I with this window in front, and the tasks the panel hands over
+      const { emitTo } = await import('@tauri-apps/api/event');
+      await listen('capture-here', () => this.openCapture());
+      await listen<{ id: number; title: string; details: string }>('capture-submit', async (e) => {
+        const result = await this.addToInbox(e.payload.title, e.payload.details);
+        await emitTo('capture', 'capture-result', { id: e.payload.id, result });
+      });
+      await listen('capture-pick', () => {
+        this.setNavMode('inbox');
+        this.pickInbox = Date.now();
+      });
+      void this.applyCaptureKey();
+    }
     await listen('quit-requested', () => this.quit()); // «Завершить» from the Dock
   }
 
@@ -1464,6 +1653,8 @@ class Store {
   }
 }
 
+export const DEFAULT_CAPTURE_KEY = 'Shift+CmdOrCtrl+KeyI';
+export type NavMode = 'files' | 'inbox' | 'agendas';
 export type Scan = { name: string; path: string; shown: string; org: number; folders: number; other: number; capped: boolean; big: boolean };
 export type StartScreen = { kind: 'welcome' } | { kind: 'found'; path: string; scan: Scan | null; change: boolean } | { kind: 'missing'; path: string } | null;
 export type Unsaved = { tab: Tab; kind: 'file' | 'note'; name: string };

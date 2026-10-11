@@ -280,8 +280,40 @@
     if (e.key === 'Escape' && !standalone && !picker && !rename && !confirmDelete) store.settingsOpen = false;
   }
 
-  const TABS = ['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Файлы'];
-  const READY = ['Основные', 'Статусы', 'Агенды'];
+  const TABS = ['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы'];
+  const READY = ['Основные', 'Статусы', 'Агенды', 'Inbox'];
+
+  // ---- Inbox ---------------------------------------------------------------------------------------------------
+  const inboxStates = $derived.by(() => {
+    const seqs = store.inboxFile?.wf.sequences ?? store.config.workflows;
+    return [...new Set(seqs.flatMap((sq) => sq.states.filter((x) => !x.done).map((x) => x.name)))];
+  });
+  /** "Shift+CmdOrCtrl+KeyI" → «⇧⌘I». */
+  const keyLabel = (k: string) =>
+    k.split('+').map((p) => ({ Control: '⌃', Alt: '⌥', Shift: '⇧', CmdOrCtrl: '⌘', Super: '⌘' } as Record<string, string>)[p] ?? p.replace(/^Key|^Digit/, '')).join('');
+  let recording = $state(false);
+  let keyError = $state('');
+  async function recordKey(e: KeyboardEvent) {
+    if (!recording) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Escape') {
+      recording = false;
+      return;
+    }
+    if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return; // a modifier alone: wait for the key
+    if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+      keyError = 'Нужна хотя бы одна из клавиш ⌘, ⌃ или ⌥';
+      return;
+    }
+    const parts = [e.ctrlKey && 'Control', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'CmdOrCtrl', e.code].filter(Boolean) as string[];
+    recording = false;
+    await setKey(parts.join('+'), store.captureGlobal);
+  }
+  async function setKey(k: string, global: boolean) {
+    const err = await store.setCaptureKey(k, global);
+    keyError = err ? `Не удалось занять ${keyLabel(k)}: ${/registered|taken|exist/i.test(err) ? 'сочетание уже занято другой программой' : err}` : '';
+  }
 
   // ---- Агенды: «Мои агенды» -----------------------------------------------------------------------------
   let confirmAgenda = $state<{ id: string; name: string } | null>(null);
@@ -308,7 +340,8 @@
   const bannerCount = $derived(problems.length + Object.keys(errors).length);
 </script>
 
-<svelte:window onkeydown={key} />
+<!-- while the shortcut is being recorded every key goes to it (a clicked button has no focus in WebKit) -->
+<svelte:window onkeydown={(e) => (recording ? recordKey(e) : key(e))} onmousedown={(e) => { if (recording && !(e.target as Element).closest('.keyrec')) recording = false; }} />
 
 {#snippet body()}
   <div class="win" class:standalone role={standalone ? undefined : 'dialog'} aria-modal={standalone ? undefined : true} aria-label="Настройки">
@@ -322,7 +355,79 @@
       {#if !standalone}<button class="close" aria-label="Закрыть настройки" onclick={() => (store.settingsOpen = false)}>×</button>{/if}
     </header>
 
-    {#if tab === 'Агенды'}
+    {#if tab === 'Inbox'}
+      <div class="body">
+        <section class="general" aria-label="Inbox">
+          <div class="cap">ФАЙЛ</div>
+          <div class="opts">
+            <div class="opt">
+              <label for="ib-file">Файл Inbox</label>
+              <select id="ib-file" class="sel" value={store.inboxCfg.file ?? ''} onchange={(e) => store.setInbox({ file: e.currentTarget.value || null })}>
+                <option value="">Не выбран</option>
+                {#each [...store.files].sort((a, b) => a.name.localeCompare(b.name, 'ru')) as f (f.path)}<option value={f.name}>{f.name}</option>{/each}
+              </select>
+            </div>
+            <div class="opt"><span>Куда добавлять</span><span class="val">В конец файла</span></div>
+          </div>
+          <p class="help">Сюда попадают новые задачи; задачи, записанные в файл вручную, тоже появляются в списке. Новые задачи записываются сразу на диск. Файл свой у каждой рабочей папки.</p>
+
+          <div class="cap">БЫСТРЫЙ ВВОД</div>
+          <div class="opts">
+            <div class="opt">
+              <span id="ib-key">Сочетание клавиш</span>
+              <button class="keyrec" class:rec={recording} aria-labelledby="ib-key" onclick={() => { recording = true; keyError = ''; }}>
+                {recording ? 'Нажмите сочетание…' : keyLabel(store.captureKey)}
+              </button>
+            </div>
+            {#if keyError}<div class="err">{keyError}</div>{/if}
+            <div class="opt">
+              <label for="ib-global">Работает из любой программы</label>
+              <button id="ib-global" class="switch" role="switch" aria-checked={store.captureGlobal} aria-label="Работает из любой программы"
+                onclick={() => setKey(store.captureKey, !store.captureGlobal)}><span></span></button>
+            </div>
+            <div class="opt">
+              <label for="ib-confirm">Показывать подтверждение «Добавлено в Inbox»</label>
+              <button id="ib-confirm" class="switch" role="switch" aria-checked={store.inboxCfg.confirm} aria-label="Показывать подтверждение"
+                onclick={() => store.setInbox({ confirm: !store.inboxCfg.confirm })}><span></span></button>
+            </div>
+            <div class="opt">
+              <label for="ib-status">Статус новой задачи</label>
+              <select id="ib-status" class="sel" value={store.inboxCfg.status ?? ''} onchange={(e) => store.setInbox({ status: e.currentTarget.value || null })}>
+                <option value="">Начальный статус набора</option>
+                {#each inboxStates as st (st)}<option value={st}>{st}</option>{/each}
+              </select>
+            </div>
+            <div class="opt">
+              <label for="ib-created">Записывать дату создания (:CREATED:)</label>
+              <button id="ib-created" class="switch" role="switch" aria-checked={store.inboxCfg.created} aria-label="Записывать дату создания"
+                onclick={() => store.setInbox({ created: !store.inboxCfg.created })}><span></span></button>
+            </div>
+          </div>
+          <p class="help">Из любой программы: приложение должно быть запущено (окно можно закрыть, оно остаётся в Dock). Сочетание хранится на этом Mac.</p>
+
+          <div class="cap">СПИСОК</div>
+          <div class="opts">
+            <div class="opt">
+              <label for="ib-order">Порядок</label>
+              <select id="ib-order" class="sel" value={store.inboxCfg.order} onchange={(e) => store.setInbox({ order: e.currentTarget.value === 'file' ? 'file' : 'new' })}>
+                <option value="new">Новые сверху</option>
+                <option value="file">Как в файле</option>
+              </select>
+            </div>
+            <div class="opt">
+              <label for="ib-counter">Счётчик на кнопке Inbox</label>
+              <button id="ib-counter" class="switch" role="switch" aria-checked={store.inboxCfg.counter} aria-label="Счётчик на кнопке Inbox"
+                onclick={() => store.setInbox({ counter: !store.inboxCfg.counter })}><span></span></button>
+            </div>
+            <div class="opt">
+              <label for="ib-details">Показывать детали под заголовком</label>
+              <button id="ib-details" class="switch" role="switch" aria-checked={store.inboxCfg.details} aria-label="Показывать детали под заголовком"
+                onclick={() => store.setInbox({ details: !store.inboxCfg.details })}><span></span></button>
+            </div>
+          </div>
+        </section>
+      </div>
+    {:else if tab === 'Агенды'}
       <div class="body">
         <section class="general" aria-label="Агенды">
           <div class="cap">МОИ АГЕНДЫ</div>
@@ -635,6 +740,10 @@
   .help { font-size: 12px; line-height: 1.5; color: var(--fg2); padding: 10px 6px; }
   .general { max-width: 560px; }
   .opts { display: flex; flex-direction: column; gap: 6px; }
+  .sel { height: 26px; max-width: 260px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 0 6px; font-size: 12.5px; }
+  .val { font-size: 12.5px; color: var(--fg2); }
+  .keyrec { min-width: 110px; height: 26px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
+  .keyrec.rec { border-color: var(--acc); color: var(--acc); font-weight: 400; letter-spacing: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 25%, transparent); }
   .stepper { display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 7px; background: var(--field); }
   .stepper button { width: 24px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; font-size: 14px; }
   .stepper button:hover:not(:disabled) { background: var(--bg); }

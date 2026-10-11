@@ -228,7 +228,17 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             (w.__windows ??= ['main']).push(args.options.label);
             return;
           }
-          if (cmd.startsWith('plugin:event|')) return null; // emit, emit_to, ...
+          if (cmd === 'plugin:event|emit_to' || cmd === 'plugin:event|emit') {
+            w.__log.push(['emit', args.target?.label ?? args.target ?? null, args.event, args.payload]);
+            return null;
+          }
+          if (cmd.startsWith('plugin:event|')) return null;
+          if (cmd === 'set_capture_shortcut') {
+            if (w.__shortcutTaken === args.accelerator) throw 'HotKey already registered';
+            w.__log.push(['shortcut', args.accelerator, args.global]);
+            return null;
+          }
+          if (cmd === 'show_main_window') return null;
           if (cmd === 'plugin:opener|open_url') {
             w.__log.push(['open_url', args.url]);
             return;
