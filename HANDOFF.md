@@ -96,6 +96,8 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 | `Palette.svelte` + `commands.ts` + `fuzzy.ts` | Command palette (⇧⌘P), goto file (⇧⌘O), new file (⇧⌘N), `#` headings. |
 | `Agenda.svelte`, `AgendaList.svelte`, `AgendaBuilder.svelte`, `agendas.ts` | Built-in agenda + custom agendas (blocks of conditions, stored in config.json); the builder is a modal sheet. `agendas.ts` is the pure engine. |
 | `InboxPanel.svelte`, `Picker.svelte`, `Capture.svelte`, `CaptureWindow.svelte`, `inbox.ts` | Inbox section, where-to palette (choose file / refile), quick entry (in-window overlay and the `#capture` panel window), pure Inbox logic. |
+| `Review.svelte`, `review.ts` | «Разбор Inbox» (ТЗ 18): a tab of kind `review` whose `path` follows the card's file (so `store.file`/`selected`, the palette and the inspector work on the card); the card is an `Editor` with `narrow` (hidden lines outside the subtree, a change filter for user edits). Queue/actions in the store (`review*`). Action keys ⌥⌘1–5, ⌥⌘[ (⌘1/⌘2/⌘[ belong to the menu). |
+| `Refile.svelte`, `refile.ts` | Move a heading: file → place in a tree (ТЗ 16); `from` palette / inbox / review. |
 | `Settings.svelte` + `workflowEditor.ts` | Settings (own window, or a sheet in the browser). Ready tabs: Основные, Статусы, Агенды, Inbox. Теги/Календарь/Файлы are disabled. |
 | `Inspector.svelte`, `Outline.svelte` | Right panel: task properties / file structure. |
 | `CloseSheet`, `SaveAsSheet`, `DiskSheet`, `Dialogs`, `StartScreen`, `EmptyFolder`, `ColorPicker`, `ContextMenu`, `Splitter`, `Pane` | As named. `DiskSheet` = file changed on disk (diff in `diff.ts`). |
@@ -121,7 +123,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 - **Per notes folder:** `<notes>/.orgnotes/config.json`:
   - `workflows` (status sets), `behavior` (closedTimestamp, logbook);
   - `agendas` (custom agendas);
-  - `inbox` {file, status, created, add (top|end, default top), order, counter, details, confirm}; defaults are omitted.
+  - `inbox` {file, status, created, add (top|end, default top), order, counter, details, confirm, reviewDone, reviewCancel, reviewOrder, stale}; defaults are omitted.
   Both windows write it via `store.updateConfig(raw => …)`, which re-reads the newest text first.
 - **App config (Rust):** the notes dir and its bookmark, in the app config dir. Identifier `dev.local.panopticon`.
 - **localStorage (per Mac):**

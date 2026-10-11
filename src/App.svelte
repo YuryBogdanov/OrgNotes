@@ -127,6 +127,7 @@
     navInbox: () => store.setNavMode('inbox'),
     navAgendas: () => store.setNavMode('agendas'),
     capture: () => store.openCapture(),
+    review: () => store.startReview(),
     insp: () => (store.showInspector = !store.showInspector),
   };
   $effect(() => {
@@ -160,6 +161,7 @@
     if (e.ctrlKey && e.code === 'Digit2') return 'navInbox';
     if (e.ctrlKey && e.code === 'Digit3') return 'navAgendas';
     if (e.shiftKey && e.code === 'KeyI') return 'capture';
+    if (e.shiftKey && e.code === 'KeyR') return 'review';
     if (e.shiftKey && e.code === 'KeyW') return 'closeWindow';
     if (e.shiftKey && e.code === 'KeyP') return 'palette';
     if (e.shiftKey && e.code === 'KeyN') return 'paletteNewFile';
@@ -172,6 +174,11 @@
     if (e.altKey) return null;
     return ({ '[': 'back', n: 'newFile', ',': 'settings', t: 'newTab', w: 'closeTab', s: 'save', q: 'quit', '1': 'notes', '2': 'agenda' } as Record<string, string>)[k] ?? null;
   }
+
+  // closing the «Разбор Inbox» tab ends the review (everything is on disk already)
+  $effect(() => {
+    if (store.review && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'review'))) store.review = null;
+  });
 
   // the panel of the quick entry knows the Inbox file's name from here
   $effect(() => {

@@ -3,6 +3,7 @@
   import { headingAt } from './org';
   import Editor from './Editor.svelte';
   import Agenda from './Agenda.svelte';
+  import Review from './Review.svelte';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import { parseHeadings } from './org';
   import { targetOf, type Tab } from './layout';
@@ -21,7 +22,7 @@
     const h = file.headings[headingAt(file.headings, tab.cursor.line)];
     return h ? [...h.path, h.title] : [];
   });
-  const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : displayName(t.path ?? ''));
+  const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'review' ? 'Разбор Inbox' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : displayName(t.path ?? ''));
   // a file deleted on disk stays open: an italic name, and the tooltip says why
   const gone = (t: Tab) => t.kind === 'file' && !!store.orphans[t.path ?? ''];
   const dirty = (t: Tab) => {
@@ -52,7 +53,7 @@
       { label: 'Закрыть остальные', shortcut: '⌥⌘W', disabled: pane.tabs.length < 2, action: () => store.closeOthers(pi, idx(t)) },
       'sep',
       { label: 'Переместить в соседний редактор', shortcut: `⌃⌘${arrow}`, disabled: to < 0, action: () => store.moveTab(pi, idx(t)) },
-      { label: 'Продублировать в соседнем редакторе', shortcut: `⌥⌃⌘${arrow}`, disabled: to < 0 || t.kind === 'untitled', action: () => store.duplicateTab(pi, idx(t)) },
+      { label: 'Продублировать в соседнем редакторе', shortcut: `⌥⌃⌘${arrow}`, disabled: to < 0 || t.kind === 'untitled' || t.kind === 'review', action: () => store.duplicateTab(pi, idx(t)) },
     ];
     if (hasFile) {
       items.push('sep');
@@ -213,6 +214,8 @@
           <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2.2 2" aria-hidden="true"><path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" /></svg>
         {:else if t.kind === 'agenda'}
           <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2.5v3M13 2.5v3" /></svg>
+        {:else if t.kind === 'review'}
+          <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4" /></svg>
         {:else}
           <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" /></svg>
         {/if}
@@ -237,6 +240,8 @@
 
   {#if tab?.kind === 'agenda'}
     <div class="content"><Agenda pane={pi} /></div>
+  {:else if tab?.kind === 'review'}
+    <div class="content"><Review {tab} /></div>
   {:else if file && tab}
     <div class="crumbs" aria-label="Заголовок">
       {#each crumbs as c, i}

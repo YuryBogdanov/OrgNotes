@@ -65,6 +65,7 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
             it('notes', 'Заметки', 'CmdOrCtrl+1'),
             it('agenda', 'Агенда', 'CmdOrCtrl+2'),
             it('back', 'Назад', 'CmdOrCtrl+BracketLeft'),
+            it('review', 'Разобрать Inbox', 'Shift+CmdOrCtrl+KeyR'),
             sep,
             it('nav', 'Навигатор', 'CmdOrCtrl+Digit0'),
             it('navFiles', 'Навигатор: файлы', 'Control+CmdOrCtrl+Digit1'),

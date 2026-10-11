@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Compartment, EditorState, MapMode, Prec, RangeSetBuilder, type Range, type StateEffect, type Transaction } from '@codemirror/state';
+  import { Compartment, EditorState, MapMode, Prec, RangeSetBuilder, StateField, Transaction, type Range, type StateEffect } from '@codemirror/state';
   import { Decoration, EditorView, ViewPlugin, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
   import { codeFolding, foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
@@ -11,9 +11,12 @@
   import type { Text } from '@codemirror/state';
   import { DEFAULT_LEVELS, orgIndent, type LevelView } from './orgIndent';
 
-  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, onchange, oncursor, onfollow }: {
+  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, onnarrow, onchange, oncursor, onfollow }: {
     levels?: LevelView; // «Структурный вид»: one star per level, text moved by level
     drawers?: boolean; // drawers folded when a file opens and when the app adds one (:PROPERTIES:, :LOGBOOK:)
+    // «Разбор Inbox»: only these lines of the file are shown and edited (as org-narrow-to-subtree); `end` exclusive
+    narrow?: { line: number; end: number } | null;
+    onnarrow?: (line: number, last: number) => void; // where the shown lines are now (they move with edits)
     hint?: string; // grey placeholder in an empty document
     resetOn?: number; // bumped when the text was silently reloaded from disk: the undo history starts over
     text: string; fileKey: string; wf: Workflow;
@@ -277,6 +280,45 @@
     return { all: build(items), atomic: build(hidden) };
   }
 
+  // ---- narrowing to one subtree ----------------------------------------------------------------------
+  /** The shown part: from the start of the first line to the end of the last non-blank one. */
+  function narrowRange(doc: Text, n: { line: number; end: number }) {
+    let last = Math.min(n.end, doc.lines) - 1;
+    while (last > n.line && doc.line(last + 1).text.trim() === '') last--;
+    return { from: doc.line(Math.min(n.line + 1, doc.lines)).from, to: doc.line(Math.max(last, n.line) + 1).to };
+  }
+  const hiddenOutside = (st: EditorState, r: { from: number; to: number } | null) => {
+    if (!r) return Decoration.none;
+    const out: Range<Decoration>[] = [];
+    if (r.from > 0) out.push(Decoration.replace({ block: true }).range(0, r.from - 1));
+    if (r.to < st.doc.length) out.push(Decoration.replace({ block: true }).range(r.to + 1, st.doc.length));
+    return Decoration.set(out);
+  };
+  function narrowing(n: { line: number; end: number }) {
+    const field = StateField.define<{ from: number; to: number }>({
+      create: (st) => narrowRange(st.doc, n),
+      // typing at either edge stays inside
+      update: (r, tr) => (tr.docChanged ? { from: tr.changes.mapPos(r.from, -1), to: tr.changes.mapPos(r.to, 1) } : r),
+    });
+    return [
+      field,
+      EditorView.decorations.compute([field], (st) => hiddenOutside(st, st.field(field))),
+      EditorView.atomicRanges.of((v) => hiddenOutside(v.state, v.state.field(field))),
+      // the user cannot change what is hidden (the app's own patches, from disk or other tabs, still go through)
+      EditorState.changeFilter.of((tr) => {
+        if (!tr.annotation(Transaction.userEvent)) return true;
+        const r = tr.startState.field(field);
+        const len = tr.startState.doc.length;
+        return [0, Math.max(0, r.from - 1), Math.min(len, r.to + 1), len];
+      }),
+      EditorView.updateListener.of((u) => {
+        if (!u.docChanged) return;
+        const r = u.state.field(field);
+        onnarrow?.(u.state.doc.lineAt(r.from).number - 1, u.state.doc.lineAt(r.to).number - 1);
+      }),
+    ];
+  }
+
   function makeState(doc: string, words: Workflow) {
     const plugin = ViewPlugin.fromClass(
       class {
@@ -301,7 +343,7 @@
       doc,
       extensions: [
         lineNumbers(), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(),
-        scrollPastEnd(), // the last line can be scrolled up to the top, as in Xcode (room below, not lines in the file)
+        ...(narrow ? narrowing(narrow) : [scrollPastEnd()]), // the last line can be scrolled up to the top, as in Xcode (room below, not lines in the file)
         undo.of(history()), orgFold, foldNewDrawers,
         codeFolding({
           placeholderDOM: (_v, onclick) => {

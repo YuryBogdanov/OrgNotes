@@ -13,8 +13,12 @@ export interface InboxConfig {
   counter: boolean; // the badge on the Inbox button
   details: boolean; // the first line of details under the title
   confirm: boolean; // «Добавлено в Inbox» after a quick entry
+  reviewDone: string; // «Разбор»: what «Выполнено» writes (a done status)
+  reviewCancel: string; // what «Отменить» writes
+  reviewOrder: 'old' | 'new'; // the cards: oldest first or newest first
+  stale: number; // days after which a task counts as lying too long (3, 7, 14, 30)
 }
-export const DEFAULT_INBOX: InboxConfig = { file: null, status: null, created: true, add: 'top', order: 'new', counter: true, details: true, confirm: true };
+export const DEFAULT_INBOX: InboxConfig = { file: null, status: null, created: true, add: 'top', order: 'new', counter: true, details: true, confirm: true, reviewDone: 'DONE', reviewCancel: 'CANCELLED', reviewOrder: 'old', stale: 7 };
 
 export function readInbox(raw: unknown): InboxConfig {
   const v = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
@@ -28,6 +32,10 @@ export function readInbox(raw: unknown): InboxConfig {
     counter: bool('counter'),
     details: bool('details'),
     confirm: bool('confirm'),
+    reviewDone: typeof v.reviewDone === 'string' && v.reviewDone.trim() ? v.reviewDone.trim() : DEFAULT_INBOX.reviewDone,
+    reviewCancel: typeof v.reviewCancel === 'string' && v.reviewCancel.trim() ? v.reviewCancel.trim() : DEFAULT_INBOX.reviewCancel,
+    reviewOrder: v.reviewOrder === 'new' ? 'new' : 'old',
+    stale: [3, 7, 14, 30].includes(v.stale as number) ? (v.stale as number) : DEFAULT_INBOX.stale,
   };
 }
 /** config.json with the Inbox settings replaced; every other key stays. */

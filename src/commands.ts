@@ -22,6 +22,8 @@ export const ICONS = {
   file: 'M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4',
   folder: 'M3 6a1.5 1.5 0 0 1 1.5-1.5H8l1.5 2h6A1.5 1.5 0 0 1 17 8v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5z',
   check: 'M4 10.5l4 4 8-9',
+  inbox: 'M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4',
+  prio: 'M10 3v10M10 16.5v.01',
   clear: 'M5 5l10 10M15 5L5 15',
 };
 export type Icon = keyof typeof ICONS;
@@ -136,6 +138,10 @@ register({
 register({
   id: 'refile', title: 'Перенести в другой файл…', icon: 'refile', group: 'heading', synonyms: ['переместить', 'refile'],
   when: onHeading, run: () => store.startRefile('palette'),
+});
+register({
+  id: 'review', title: 'Разобрать Inbox', icon: 'inbox', group: 'general', key: '⇧⌘R', synonyms: ['разбор', 'inbox', 'карточки'],
+  when: () => store.reviewPending.length > 0, hint: () => `${store.reviewPending.length} в очереди`, run: () => store.startReview(),
 });
 register({
   id: 'newFile', title: 'Создать файл…', icon: 'newfile', group: 'general', key: '⇧⌘N', synonyms: ['новый файл', 'заметка'],
@@ -297,6 +303,30 @@ function dateStep(c: Ctx, kind: 'SCHEDULED' | 'DEADLINE'): Step {
       return rows;
     },
   };
+}
+
+function priorityStep(c: Ctx): Step {
+  const now = c.heading!.priority;
+  return {
+    placeholder: 'Приоритет',
+    plate: headingPlate(c),
+    rows: (q) => {
+      const rows: Row[] = [];
+      for (const p of ['A', 'B', 'C']) {
+        const m = fuzzy(q, p);
+        if (m) rows.push({ id: 'pr:' + p, group: 'ПРИОРИТЕТ', title: p, at: m.at, icon: 'prio', hint: p === now ? 'сейчас' : undefined, run: () => store.setPriority(p) });
+      }
+      const none = fuzzy(q, 'Без приоритета');
+      if (none && now) rows.push({ id: 'pr:none', group: 'ПРИОРИТЕТ', title: 'Без приоритета', at: none.at, icon: 'clear', run: () => store.setPriority(null) });
+      return rows.length ? rows : [NOTHING];
+    },
+  };
+}
+
+/** A heading command's step at once (the card's buttons in «Разбор Inbox»); without a heading, the commands. */
+export function headingStep(c: Ctx, kind: 'status' | 'priority' | 'schedule' | 'deadline' | 'tags'): Step {
+  if (!c.heading) return mainStep(c);
+  return kind === 'status' ? statusStep(c) : kind === 'priority' ? priorityStep(c) : kind === 'tags' ? tagsStep(c) : dateStep(c, kind === 'schedule' ? 'SCHEDULED' : 'DEADLINE');
 }
 
 function tagsStep(c: Ctx): Step {

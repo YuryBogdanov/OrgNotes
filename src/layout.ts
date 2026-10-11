@@ -2,7 +2,7 @@
 // active and receives keyboard input and commands. Plain data + functions that mutate it in place, so the
 // store can keep it in $state and tests can use plain objects.
 
-export type TabKind = 'file' | 'agenda' | 'untitled';
+export type TabKind = 'file' | 'agenda' | 'untitled' | 'review'; // review: «Разбор Inbox», its `path` is the card's file
 export interface Cursor {
   line: number;
   col: number;
@@ -302,9 +302,9 @@ export function serialize(L: Layout): string {
     v: 1,
     active: L.active,
     ratio: L.ratio,
-    // untitled tabs are not restored after a restart (their text is not on disk)
+    // untitled tabs are not restored after a restart (their text is not on disk), nor a review (it is a session)
     panes: L.panes.map((p) => {
-      const tabs = p.tabs.filter((t) => t.kind !== 'untitled');
+      const tabs = p.tabs.filter((t) => t.kind !== 'untitled' && t.kind !== 'review');
       const act = p.tabs[p.active];
       return { active: Math.max(0, tabs.indexOf(act)), tabs: tabs.map((t) => ({ kind: t.kind, path: t.path, cursor: t.cursor, ...(t.agenda ? { agenda: t.agenda } : {}) })) };
     }),
