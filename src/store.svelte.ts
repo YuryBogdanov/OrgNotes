@@ -6,6 +6,7 @@ import {
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { displayName, noteName, withOrg } from './names';
 import { appendTask, refile, setPlanning, setTags } from './edits';
+import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
 import { EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
 export interface NoteFile {
@@ -98,7 +99,7 @@ class Store {
   errorReq = $state<{ title: string; text: string; resolve: () => void } | null>(null);
   /** While a sheet is up the rest of the window does not react: no shortcuts, no menu commands. */
   get sheetOpen() {
-    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq);
+    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder);
   }
   /** The command palette; `start` opens it right at a step ("Создать файл…" ⇧⌘N, "Перейти к файлу…" ⇧⌘O). */
   palette = $state<{ start?: 'newFile' | 'goto'; n: number } | null>(null);
@@ -261,9 +262,18 @@ class Store {
     if (raw === this.configRaw) return false;
     this.configRaw = raw;
     const { config, warnings } = raw ? parseProjectConfig(raw) : { config: EMPTY_CONFIG, warnings: [] as string[] };
+    let parsed: any = null;
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch {
+      /* reported by parseProjectConfig */
+    }
+    this.agendas = readAgendas(parsed?.agendas); // a tab of a deleted agenda shows the built-in one
+    // only the statuses make the notes be read again; agendas alone do not
+    const same = JSON.stringify(config) === JSON.stringify(this.config);
     this.config = config;
     if (warnings.length) this.say('.orgnotes/config.json: ' + warnings[0] + (warnings.length > 1 ? ` (и ещё ${warnings.length - 1})` : ''));
-    return true;
+    return !same;
   }
 
   /** Re-parse every note with the current project config (unsaved edits stay). */
@@ -331,13 +341,134 @@ class Store {
   }
 
   /** Persist the project config (Settings) and apply it right away. */
-  async saveConfig(json: string) {
+  async saveConfig(json: string): Promise<boolean> {
     try {
       if (isTauri) await invoke('write_project_config', { text: json });
       if (this.takeConfig(json)) this.rebuildAll();
+      return true;
     } catch (e) {
       this.say('Не удалось сохранить настройки: ' + e);
+      return false;
     }
+  }
+  /**
+   * Change the project config from its newest text on disk: the settings window and the main window both write
+   * it (statuses, agendas), and neither may drop what the other just wrote.
+   */
+  async updateConfig(make: (raw: string | null) => string): Promise<boolean> {
+    let raw = this.configRaw;
+    if (isTauri) {
+      try {
+        raw = await this.readConfig();
+      } catch {
+        /* keep what we have */
+      }
+    }
+    return this.saveConfig(make(raw));
+  }
+
+  // ---- custom agendas («Мои агенды», `agendas` in config.json) -------------------------------------------------
+  agendas = $state.raw<Agenda[]>([]);
+  /** The custom agenda shown by the active tab (undefined: a file, or the built-in agenda). */
+  get agenda(): Agenda | undefined {
+    return this.agendaOf(this.tab);
+  }
+  agendaOf(t: Tab | undefined): Agenda | undefined {
+    return t?.kind === 'agenda' && t.agenda ? this.agendas.find((a) => a.id === t.agenda) : undefined;
+  }
+  /** The left navigator: the files, or the list of agendas. A setting of the window: switching tabs or panes keeps it. */
+  navMode = $state<'files' | 'agendas'>(lsGet('nav:mode') === 'agendas' ? 'agendas' : 'files');
+  setNavMode(m: 'files' | 'agendas') {
+    this.navMode = m;
+    this.showNav = true;
+    lsSet('nav:mode', m);
+  }
+  /**
+   * An agenda picked in the list opens in the active pane: the agenda tab there shows it now; from a file tab,
+   * a tab that already shows it is reused, else a new agenda tab comes.
+   */
+  openAgendaHere(id: string) {
+    const L = this.layout;
+    const p = L.panes[L.active];
+    if (!p) return;
+    const cur = p.tabs[p.active];
+    if (cur?.kind === 'agenda') {
+      cur.agenda = id || undefined;
+    } else {
+      const i = p.tabs.findIndex((t) => t.kind === 'agenda' && (t.agenda ?? '') === id);
+      if (i >= 0) p.active = i;
+      else {
+        const t = newTab('agenda');
+        if (id) t.agenda = id;
+        const at = p.tabs.length ? p.active + 1 : 0;
+        p.tabs.splice(at, 0, t);
+        p.active = at;
+      }
+    }
+    this.persistLayout();
+  }
+  /** The builder: an editable copy of the agenda; `orig` is null for a new one. */
+  builder = $state<{ draft: Agenda; orig: Agenda | null; n: number } | null>(null);
+  /** ⌘S while the builder is open: «Сохранить агенду» (the builder watches this). */
+  builderSave = $state(0);
+  /** «Новая агенда»: opens the builder with an empty agenda (nothing is saved until «Сохранить агенду»). */
+  newAgendaInBuilder(from?: Element | null) {
+    if (this.builder) return;
+    this.builderFrom = from ?? (document.activeElement as Element | null);
+    this.builder = { draft: newAgenda(), orig: null, n: Date.now() };
+  }
+  editAgenda(id: string, from?: Element | null) {
+    const a = this.agendas.find((x) => x.id === id);
+    if (!a || this.builder) return;
+    this.builderFrom = from ?? (document.activeElement as Element | null);
+    this.builder = { draft: cloneAgenda(a), orig: a, n: Date.now() };
+  }
+  /** Where the builder was opened from: the focus goes back there when it closes (a clicked button has none in WebKit). */
+  private builderFrom: Element | null = null;
+  private leaveBuilder() {
+    this.builder = null;
+    const el = this.builderFrom as HTMLElement | null;
+    this.builderFrom = null;
+    // after the window under the sheet takes input again
+    if (el?.isConnected) setTimeout(() => el.isConnected && el.focus());
+  }
+  get builderDirty() {
+    const b = this.builder;
+    return !!b && (!b.orig || !sameAgenda(b.draft, b.orig));
+  }
+  closeBuilder() {
+    this.leaveBuilder();
+  }
+  /** «Сохранить агенду»: writes it (a saved one is replaced whole), closes the builder and shows the agenda. */
+  async saveAgenda(a: Agenda): Promise<boolean> {
+    const copy = cloneAgenda(a);
+    const ok = await this.updateConfig((raw) => {
+      const list = this.agendasIn(raw);
+      const i = list.findIndex((x) => x.id === copy.id);
+      if (i >= 0) list[i] = copy;
+      else list.push(copy);
+      return withAgendas(raw, list);
+    });
+    if (!ok) return false;
+    this.leaveBuilder();
+    this.openAgendaHere(copy.id);
+    return true;
+  }
+  async deleteAgenda(id: string) {
+    await this.updateConfig((raw) => withAgendas(raw, this.agendasIn(raw).filter((x) => x.id !== id)));
+  }
+  private agendasIn(raw: string | null): Agenda[] {
+    try {
+      return readAgendas(raw ? JSON.parse(raw)?.agendas : null);
+    } catch {
+      return [];
+    }
+  }
+  /** Today, for relative dates in agendas: it changes at midnight (checked every minute and on coming back). */
+  today = $state(new Date());
+  private tickDay() {
+    const now = new Date();
+    if (now.toDateString() !== this.today.toDateString()) this.today = now;
   }
 
   private sorted(list: Listed[]) {
@@ -573,6 +704,7 @@ class Store {
   /** The window came to the front: questions put off with Esc come back, and the open files are read again. */
   activated() {
     this.appActive = true;
+    this.tickDay();
     // the folder may be back (a disk plugged in, a folder restored)
     if (this.start?.kind === 'missing' || this.folderGone) return void this.retryFolder();
     const c: Record<string, Conflict> = {};
@@ -686,7 +818,10 @@ class Store {
     // «Изменить…» in the settings window: the change happens here, where the tabs are
     window.addEventListener('storage', (e) => {
       if (e.key === 'cmd:changeFolder' && e.newValue) void this.changeFolder();
+      // «Новая агенда в конструкторе…» in the settings window: the builder opens here
+      if (e.key === 'cmd:newAgenda' && e.newValue) this.newAgendaInBuilder();
     });
+    setInterval(() => this.tickDay(), 60_000);
     window.addEventListener('blur', () => (this.appActive = false));
     if (!isTauri) return;
     const { listen } = await import('@tauri-apps/api/event');

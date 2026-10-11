@@ -125,10 +125,6 @@ test.describe('context menu', () => {
     await open(page);
     await navRow(page, 'Работа').locator('.chev').click(); // collapse the folder
     await expect(navRow(page, 'plan')).toHaveCount(0);
-    await page.evaluate(() => {
-      // open plan.org without the navigator: through a link in work.org would be overkill, use the store via a tab
-    });
-    await page.keyboard.press('Meta+2');
     await navRow(page, 'Работа').locator('.chev').click(); // expand, open plan, collapse again
     await navRow(page, 'plan').click();
     await navRow(page, 'Работа').locator('.chev').click();

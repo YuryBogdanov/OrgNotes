@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
   import { store } from './store.svelte';
-  import Navigator from './Navigator.svelte';
   import Inspector from './Inspector.svelte';
   import Pane from './Pane.svelte';
   import SaveAsSheet from './SaveAsSheet.svelte';
@@ -17,6 +16,8 @@
   import Splitter from './Splitter.svelte';
   import Dialogs from './Dialogs.svelte';
   import Settings from './Settings.svelte';
+  import AgendaBuilder from './AgendaBuilder.svelte';
+  import NavPanel from './NavPanel.svelte';
 
   // the Settings window is this same app loaded with #settings: it shows only the settings
   const isSettingsWindow = location.hash === '#settings';
@@ -96,7 +97,7 @@
       const p = store.layout.panes[store.layout.active];
       if (p) store.closeOthers(store.layout.active, p.active);
     },
-    save: () => store.saveActive(),
+    save: () => (store.builder ? store.builderSave++ : store.saveActive()),
     moveLeft: () => store.tabToSide(-1, false),
     moveRight: () => store.tabToSide(1, false),
     dupLeft: () => store.tabToSide(-1, true),
@@ -114,6 +115,8 @@
     agenda: () => store.showAgendaHere(),
     back: () => store.back(),
     nav: () => (store.showNav = !store.showNav),
+    navFiles: () => store.setNavMode('files'),
+    navAgendas: () => store.setNavMode('agendas'),
     insp: () => (store.showInspector = !store.showInspector),
   };
   $effect(() => {
@@ -143,6 +146,8 @@
     if (e.altKey && e.code === 'KeyW') return 'closeOthers';
     if (e.ctrlKey && e.code === 'KeyW') return 'closePane';
     if (e.ctrlKey && e.code === 'KeyJ') return 'jumpBar';
+    if (e.ctrlKey && e.code === 'Digit1') return 'navFiles';
+    if (e.ctrlKey && e.code === 'Digit2') return 'navAgendas';
     if (e.shiftKey && e.code === 'KeyW') return 'closeWindow';
     if (e.shiftKey && e.code === 'KeyP') return 'palette';
     if (e.shiftKey && e.code === 'KeyN') return 'paletteNewFile';
@@ -161,14 +166,16 @@
     store.listen();
     if (isSettingsWindow) return;
     // while a sheet is up, menu commands do nothing
-    const guarded = Object.fromEntries(Object.entries(actions).map(([id, run]) => [id, () => { if (!store.sheetOpen || (id === 'palette' && store.palette)) run(); }]));
+    // ⌘S in the agenda builder saves the agenda
+    const allowed = (id: string) => !store.sheetOpen || (id === 'palette' && store.palette) || (id === 'save' && store.builder && !store.unsavedReq && !store.saveAsReq && !store.errorReq && !store.diskReq);
+    const guarded = Object.fromEntries(Object.entries(actions).map(([id, run]) => [id, () => { if (allowed(id)) run(); }]));
     installMenu(guarded).then((m) => (menu = m));
     // closing the window only hides it (Rust side): the text stays in memory, so nothing to ask; quitting asks
     const key = (e: KeyboardEvent) => {
       if (menu) return; // the menu bar owns the shortcuts
       const id = shortcut(e);
-      if (store.sheetOpen && !(id === 'palette' && store.palette)) return; // the sheet has the keyboard; ⇧⌘P closes the palette
       if (!id) return;
+      if (!allowed(id)) return; // the sheet has the keyboard; ⇧⌘P closes the palette
       if (id === 'settings' && store.settingsOpen) {
         e.preventDefault();
         store.settingsOpen = false;
@@ -194,7 +201,8 @@
 {#if isSettingsWindow}
   {#if store.loaded}<Settings standalone />{/if}
 {:else}
-<div class="win">
+<!-- the agenda builder is a sheet over the whole window: the window stays visible under it but takes no input -->
+<div class="win" inert={!!store.builder}>
   <Dialogs />
   <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
@@ -225,7 +233,7 @@
     </div>
     <div class="path">
       {#if store.mode === 'agenda'}
-        <span class="last">Агенда</span>
+        {#if store.agenda}<span>Агенда</span><span class="sep">›</span><span class="last">{store.agenda.name}</span>{:else}<span class="last">Агенда</span>{/if}
       {:else if store.tab?.kind === 'untitled'}
         <span class="last">{store.tab.title}</span><span class="sep">·</span><span>не сохранено</span>
       {:else if crumbs.length}
@@ -257,7 +265,7 @@
 
   <div class="body" bind:clientWidth={bodyW}>
     {#if fit.nav}
-      <aside class="side" style="width:{store.navW}px"><Navigator /></aside>
+      <aside class="side" style="width:{store.navW}px"><NavPanel /></aside>
       <Splitter onresize={(dx) => (store.navW = clamp(store.navW + dx, 180, 480))} />
     {/if}
 
@@ -287,6 +295,7 @@
   </div>
   {/if}
 </div>
+{#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
 {/if}
 
 <style>

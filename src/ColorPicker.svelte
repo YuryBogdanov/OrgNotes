@@ -3,9 +3,10 @@
   import { PALETTE, colorName, toneOf, toneStyle, type Tone } from './colors';
 
   // Popover with a pointer: eight named colours (4 x 2), a live preview on both themes, and "Другой цвет…".
-  let { value, keyword, fallback, anchor, onpick, onclose }: {
+  let { value, keyword, fallback, anchor, onpick, onclose, title = 'Цвет статуса' }: {
     value: string; // palette id, #rrggbb or '' (automatic)
     keyword: string;
+    title?: string; // «Цвет блока» in the agenda builder
     fallback: Tone; // the colour in effect when `value` is empty
     anchor: HTMLElement;
     onpick: (color: string) => void;
@@ -64,10 +65,10 @@
 
 <svelte:window onmousedown={outside} onkeydown={key} />
 
-<div class="pop" bind:this={el} role="dialog" aria-label="Цвет статуса {keyword}"
+<div class="pop" bind:this={el} role="dialog" aria-label="{title} {keyword}"
   style="left:{place.left}px;width:{WIDTH}px;{place.above ? `bottom:${place.bottom}px` : `top:${place.top}px`}">
   <span class="arrow" class:below={place.above} style="left:{place.arrow - 7}px"></span>
-  <div class="hd"><b>Цвет статуса</b><span>{label}</span></div>
+  <div class="hd"><b>{title}</b><span>{label}</span></div>
 
   <div class="grid" role="radiogroup" aria-label="Цвета">
     {#each swatches as s, i (s.id)}

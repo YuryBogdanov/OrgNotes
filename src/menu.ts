@@ -65,6 +65,8 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
             it('back', 'Назад', 'CmdOrCtrl+BracketLeft'),
             sep,
             it('nav', 'Навигатор', 'CmdOrCtrl+Digit0'),
+            it('navFiles', 'Навигатор: заметки', 'Control+CmdOrCtrl+Digit1'),
+            it('navAgendas', 'Навигатор: агенды', 'Control+CmdOrCtrl+Digit2'),
             it('insp', 'Инспектор', 'Alt+CmdOrCtrl+Digit0'),
             sep,
             { item: 'Fullscreen' },

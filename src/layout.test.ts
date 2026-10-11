@@ -206,6 +206,19 @@ describe('moves, deletions and restarts', () => {
     expect(restore('{bad', () => true)).toBeNull();
     expect(restore(serialize(one('x.org')), () => false)).toBeNull();
   });
+  it('an agenda tab keeps its own agenda (a custom one) through a restart, and through a copy', () => {
+    const L = one();
+    const a = openAgenda(L, 0);
+    a.agenda = 'a-my-day';
+    const b = newTab('agenda'); // the built-in one
+    L.panes[0].tabs.push(b);
+    const back = restore(serialize(L), () => true)!;
+    expect(back.panes[0].tabs.map((t) => t.agenda)).toEqual([undefined, 'a-my-day', undefined]);
+    // two agenda tabs with different agendas are different content: a duplicate is made, not deduplicated
+    addPane(back, 'right', newTab('agenda'));
+    duplicateTab(back, 0, 1);
+    expect(back.panes[1].tabs.map((t) => t.agenda ?? '')).toEqual(['', 'a-my-day']);
+  });
 });
 
 describe('tab commands', () => {

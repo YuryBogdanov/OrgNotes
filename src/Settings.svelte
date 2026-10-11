@@ -26,7 +26,8 @@
     if (problems.length || j === baseline) return;
     const t = setTimeout(async () => {
       baseline = j;
-      await store.saveConfig(j);
+      // from the newest file: the main window may have written agendas meanwhile
+      await store.updateConfig((raw) => toJson(raw, draft));
       savedFlash = true;
       setTimeout(() => (savedFlash = false), 1500);
     }, 250);
@@ -272,11 +273,37 @@
   }
 
   function key(e: KeyboardEvent) {
+    if (e.key === 'Escape' && confirmAgenda) {
+      confirmAgenda = null;
+      return;
+    }
     if (e.key === 'Escape' && !standalone && !picker && !rename && !confirmDelete) store.settingsOpen = false;
   }
 
   const TABS = ['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Файлы'];
-  const READY = ['Основные', 'Статусы'];
+  const READY = ['Основные', 'Статусы', 'Агенды'];
+
+  // ---- Агенды: «Мои агенды» -----------------------------------------------------------------------------
+  let confirmAgenda = $state<{ id: string; name: string } | null>(null);
+  async function newAgenda() {
+    if (!standalone) {
+      store.settingsOpen = false;
+      store.newAgendaInBuilder();
+      return;
+    }
+    // the builder opens in the main window, which comes to the front
+    try {
+      localStorage.setItem('cmd:newAgenda', String(Date.now()));
+    } catch {
+      /* no storage */
+    }
+    try {
+      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+      await (await WebviewWindow.getByLabel('main'))?.setFocus();
+    } catch {
+      /* not in the app */
+    }
+  }
   let tab = $state('Статусы');
   const bannerCount = $derived(problems.length + Object.keys(errors).length);
 </script>
@@ -295,7 +322,29 @@
       {#if !standalone}<button class="close" aria-label="Закрыть настройки" onclick={() => (store.settingsOpen = false)}>×</button>{/if}
     </header>
 
-    {#if tab === 'Основные'}
+    {#if tab === 'Агенды'}
+      <div class="body">
+        <section class="general" aria-label="Агенды">
+          <div class="cap">МОИ АГЕНДЫ</div>
+          {#if store.agendas.length}
+            <div class="alist" role="list" aria-label="Мои агенды">
+              {#each store.agendas as a (a.id)}
+                <div class="arow" role="listitem">
+                  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 6h12M4 10h8M4 14h5" /></svg>
+                  <span class="an">{a.name}</span>
+                  <span class="ab">{a.blocks.length} {a.blocks.length % 10 === 1 && a.blocks.length % 100 !== 11 ? 'блок' : a.blocks.length % 10 >= 2 && a.blocks.length % 10 <= 4 && (a.blocks.length % 100 < 12 || a.blocks.length % 100 > 14) ? 'блока' : 'блоков'}</span>
+                  <button class="x" aria-label="Удалить агенду {a.name}" title="Удалить агенду" onclick={() => (confirmAgenda = { id: a.id, name: a.name })}>×</button>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <p class="help">Своих агенд пока нет. Агенда — это набор блоков, каждый выбирает задачи по условиям.</p>
+          {/if}
+          <div><button class="primary-b" onclick={newAgenda}>Новая агенда в конструкторе…</button></div>
+          <p class="help">Изменить агенду можно в навигаторе в режиме «Агенда» (⌃⌘2): правый клик по названию → «Редактировать…».</p>
+        </section>
+      </div>
+    {:else if tab === 'Основные'}
       <div class="body">
         <section class="general" aria-label="Основные">
           <div class="cap">РАБОЧАЯ ПАПКА</div>
@@ -478,6 +527,20 @@
         anchor={picker?.anchor as HTMLElement} onpick={(c) => (pickerState.color = c)} onclose={() => (picker = null)} />
     {/if}
 
+    {#if confirmAgenda}
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="modal" onmousedown={() => (confirmAgenda = null)}>
+        <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Удаление агенды" onmousedown={(e) => e.stopPropagation()}>
+          <h2>Удалить агенду «{confirmAgenda.name}»?</h2>
+          <p>Задачи и файлы не изменятся: удаляется только сама агенда.</p>
+          <div class="btns">
+            <button onclick={() => (confirmAgenda = null)}>Отмена</button>
+            <button class="danger-b" onclick={() => { const id = confirmAgenda!.id; confirmAgenda = null; void store.deleteAgenda(id); }}>Удалить</button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
     {#if rename}
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
       <div class="modal" onmousedown={() => chooseRename('cancel')}>
@@ -549,6 +612,12 @@
   .add { width: 100%; margin-top: 4px; height: 30px; border: 1px dashed var(--line); background: transparent; border-radius: 7px; color: var(--acc); }
   .help { font-size: 12px; line-height: 1.5; color: var(--fg2); padding: 10px 6px; }
   .general { max-width: 560px; }
+  .alist { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .arow { display: flex; align-items: center; gap: 9px; height: 36px; padding: 0 8px 0 12px; background: var(--side); }
+  .arow + .arow { border-top: 1px solid var(--line); }
+  .an { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ab { font-size: 12px; color: var(--fg2); }
+  .primary-b { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--acc); color: var(--onacc); font-size: 12.5px; font-weight: 600; }
   .folder { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
   .fname { font-size: 13px; font-weight: 600; }
   .fpath { font-size: 12px; color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
