@@ -2,11 +2,11 @@
   import { onMount, tick } from 'svelte';
   import { store } from './store.svelte';
   import { sequenceFor, setKeyword, setPriority, toneFor } from './org';
-  import { setPlanning } from './edits';
   import { toneStyle } from './colors';
   import type { RichPick } from './orgRich';
 
-  // The choice behind a drawn capsule of «Оформленный текст»: a status (of the task's set), a priority, a date.
+  // The choice behind a drawn capsule of «Оформленный текст»: a status (of the task's set) or a priority (a date
+  // opens the palette's calendar instead).
   // Written like the commands do; the caret does not move, so the line stays drawn.
   let { pick, path, onclose }: { pick: RichPick; path: string; onclose: () => void } = $props();
 
@@ -34,18 +34,7 @@
         { id: 'none', label: 'Без приоритета', sep: true, run: at((t, h) => setPriority(t, h, null)) },
       ];
     }
-    const kind = pick.date ?? 'SCHEDULED';
-    const day = (n: number) => {
-      const d = new Date();
-      return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-    };
-    const set = (d: Date | null) => at((t, h) => setPlanning(t, h, kind, d));
-    return [
-      { id: 'today', label: 'Сегодня', run: set(day(0)) },
-      { id: 'tomorrow', label: 'Завтра', run: set(day(1)) },
-      { id: 'week', label: 'Через неделю', run: set(day(7)) },
-      { id: 'clear', label: 'Убрать дату', sep: true, run: set(null) },
-    ];
+    return [];
   });
   let sel = $state(0);
   let box: HTMLDivElement | undefined = $state();
@@ -54,7 +43,6 @@
     await tick();
     box?.focus();
   });
-  const iso = (d?: Date) => (d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '');
   function key(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -70,7 +58,7 @@
   }
   const x = $derived(Math.min(pick.rect.left, window.innerWidth - 240));
   const y = $derived(pick.rect.bottom + 4);
-  const title = $derived(pick.kind === 'status' ? 'Статус' : pick.kind === 'priority' ? 'Приоритет' : pick.date === 'DEADLINE' ? 'Дедлайн' : 'Запланировано');
+  const title = $derived(pick.kind === 'status' ? 'Статус' : 'Приоритет');
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -86,9 +74,6 @@
       {#if it.hint}<span class="hint">{it.hint}</span>{/if}
     </div>
   {/each}
-  {#if pick.kind === 'date'}
-    <label class="cal">Дата <input type="date" value={iso(pick.value)} aria-label="Выбрать дату" onchange={(e) => { const v = e.currentTarget.value; if (v && f) { const [yy, mm, dd] = v.split('-').map(Number); store.patchAt(path, pick.line, (t, h) => setPlanning(t, h, pick.date ?? 'SCHEDULED', new Date(yy, mm - 1, dd))); onclose(); } }} /></label>
-  {/if}
   {#if pick.kind === 'status'}<div class="foot">⇧← ⇧→ — предыдущий / следующий статус</div>{/if}
 </div>
 
@@ -102,7 +87,5 @@
   .cap.prio { color: var(--wait); background: color-mix(in srgb, var(--wait) 15%, transparent); }
   .hint { margin-left: auto; font-size: 11.5px; color: var(--fg3); }
   .sep { height: 1px; margin: 4px 6px; background: var(--line); }
-  .cal { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; }
-  .cal input { height: 24px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12px; }
   .foot { margin: 5px 3px 2px; padding-top: 6px; border-top: 1px solid var(--line); font-size: 11px; color: var(--fg3); }
 </style>

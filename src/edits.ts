@@ -84,7 +84,8 @@ function withYear(d: number, mo: number, y: string | undefined, today: Date) {
 
 const PLANNING = /^\s*(SCHEDULED|DEADLINE|CLOSED):/;
 /** Weekday names as the file already writes them (English if it has an English timestamp), else Russian. */
-const weekdayNames = (text: string) => (/<\d{4}-\d{2}-\d{2} (Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/.test(text) ? WD_EN : WD_RU);
+/** The day names a file writes in its stamps (English if it already has an English one). */
+export const weekdayNames = (text: string) => (/<\d{4}-\d{2}-\d{2} (Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/.test(text) ? WD_EN : WD_RU);
 
 /** Set or remove SCHEDULED: / DEADLINE: of a heading. The time and repeater of an existing stamp are kept. */
 export function setPlanning(text: string, h: Heading, kind: 'SCHEDULED' | 'DEADLINE', date: Date | null): string {

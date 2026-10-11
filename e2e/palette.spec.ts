@@ -302,7 +302,7 @@ test.describe('steps', () => {
     await palette(page);
     await page.keyboard.type('дедлайн');
     await page.keyboard.press('Enter');
-    await expect(titles(page)).resolves.toEqual(['Сегодня', 'Завтра', 'Через неделю']);
+    await expect(titles(page)).resolves.toEqual(['Сегодня', 'Завтра', 'Через неделю', 'Выбрать дату…']);
     await field(page).fill('купить молоко');
     await expect(rows(page)).toHaveText(['Не похоже на дату']);
   });

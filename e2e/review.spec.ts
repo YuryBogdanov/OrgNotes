@@ -120,7 +120,7 @@ test.describe('the actions', () => {
     await start(page);
     await page.keyboard.press('Alt+Meta+4');
     const pop = page.getByRole('dialog', { name: 'Отложить до' });
-    await expect(pop.locator('.opt .ol')).toHaveText(['Завтра', 'Через 3 дня', 'На следующей неделе', 'Через месяц']);
+    await expect(pop.locator('.opt .ol')).toHaveText(['Завтра', 'Через 3 дня', 'На следующей неделе', 'Через месяц', 'Выбрать дату…']);
     await expect(pop.locator('.opt.on .ol')).toHaveText('Завтра');
     await page.keyboard.press('2');
     await expect(pop).toHaveCount(0);

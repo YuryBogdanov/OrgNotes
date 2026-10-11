@@ -8,6 +8,7 @@
   import { toneStyle } from './colors';
   import { ICONS } from './commands';
   import { ageDays, agePill, deferDates, short, withDay } from './review';
+  import { weekdayNames } from './edits';
   import type { Tab } from './layout';
 
   // «Разбор Inbox»: one task at a time on a card — a real editor narrowed to its subtree, quick buttons above it,
@@ -80,6 +81,14 @@
     defer = null;
     void store.reviewDefer(d);
   }
+  /** «Выбрать дату…»: the palette's calendar; the date it gives defers the task like the other choices. */
+  function deferCalendar() {
+    defer = null;
+    if (!f || !h) return;
+    const cur = h.scheduled ? new Date(h.scheduled.y, h.scheduled.m - 1, h.scheduled.d) : null;
+    const old = /SCHEDULED:\s*(<[^>]*>)/.exec(f.text.split('\n')[h.line + 1] ?? '')?.[1];
+    store.openCalendar({ kind: 'SCHEDULED', initial: options[0].date, current: cur, old, names: weekdayNames(f.text), pick: (d) => void store.reviewDefer(d), plate: { kind: 'heading', h, file: f } });
+  }
   function deferKey(e: KeyboardEvent) {
     if (!defer) return;
     if (e.key === 'Escape') {
@@ -87,10 +96,11 @@
       defer = null;
     } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
-      defer.sel = (defer.sel + (e.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
+      defer.sel = (defer.sel + (e.key === 'ArrowDown' ? 1 : -1) + options.length + 1) % (options.length + 1); // + «Выбрать дату…»
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      pickDefer(options[defer.sel].date);
+      if (defer.sel === options.length) deferCalendar();
+      else pickDefer(options[defer.sel].date);
     } else if (/^[1-4]$/.test(e.key)) {
       e.preventDefault();
       pickDefer(options[+e.key - 1].date);
@@ -252,9 +262,10 @@
                     <span class="ol">{o.label}</span><span class="od">{withDay(o.date)}</span><kbd>{i + 1}</kbd>
                   </div>
                 {/each}
-                <label class="opt pick">Выбрать дату…
-                  <input type="date" aria-label="Выбрать дату" onchange={(e) => { const v = e.currentTarget.value; if (v) { const [y, m, dd] = v.split('-').map(Number); pickDefer(new Date(y, m - 1, dd)); } }} />
-                </label>
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <div class="opt" class:on={d.sel === options.length} role="option" aria-selected={d.sel === options.length} tabindex="-1" onmousemove={() => (d.sel = options.length)} onclick={deferCalendar}>
+                  <span class="ol">Выбрать дату…</span><span class="od">календарь</span>
+                </div>
               </div>
               <span class="dn">Задача останется в Inbox с датой и вернётся в разбор, когда дата наступит. Дальше — следующая карточка.</span>
             </div>
@@ -343,7 +354,6 @@
   .opt.on { background: var(--acc); color: var(--onacc); }
   .ol { flex: 1; }
   .od { font-size: 12px; opacity: 0.8; }
-  .pick input { margin-left: auto; height: 24px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12px; }
   .dn { font-size: 11.5px; color: var(--fg2); line-height: 1.45; }
   .dscrim { position: fixed; inset: 0; z-index: 40; }
   .modal { position: fixed; inset: 0; z-index: 110; background: rgba(0, 0, 0, 0.28); display: flex; align-items: flex-start; justify-content: center; padding-top: 14vh; }

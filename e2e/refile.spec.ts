@@ -314,7 +314,8 @@ test.describe('nothing is lost', () => {
     await toFile(page, 'fin');
     await page.keyboard.press('Enter');
     await expect.poll(() => disk(page, F)).toContain('** Аудит 2026 срочно\n');
-    expect(await disk(page, F)).toContain('* TODO [#A] Подготовить бюджет 2027');
+    // the edits are saved first, the move is written after: wait for it
+    await expect.poll(() => disk(page, F)).toContain('* TODO [#A] Подготовить бюджет 2027');
     await expect(page.getByRole('dialog', { name: /изменился|Файл/ })).toHaveCount(0);
     expect((await log(page)).filter((e) => e[0] === 'conflict')).toEqual([]);
   });
