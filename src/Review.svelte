@@ -3,6 +3,7 @@
   import { fly } from 'svelte/transition';
   import { store } from './store.svelte';
   import Editor from './Editor.svelte';
+  import CalReview from './CalReview.svelte';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import { toneFor } from './org';
   import { toneStyle } from './colors';
@@ -34,6 +35,11 @@
   const stale = $derived(age !== null && age > store.inboxCfg.stale);
   const doneKw = $derived(item ? store.reviewStatus(item, 'done') : null);
   const cancelKw = $derived(item ? store.reviewStatus(item, 'cancel') : null);
+  /** The task's date for the calendar under the card: SCHEDULED, else DEADLINE. */
+  const taskDate = $derived.by(() => {
+    const o = h?.scheduled ?? h?.deadline;
+    return o ? new Date(o.y, o.m - 1, o.d) : null;
+  });
   const inInbox = $derived(!!item && item.path === store.inboxFile?.path);
 
   // a card change: the caret at the end of the task's text
@@ -144,6 +150,7 @@
     reviewMove: () => store.reviewMove(),
     reviewDefer: () => void openDefer(),
     reviewSkip: () => store.reviewSkip(),
+    reviewCalendar: () => (store.reviewCal = !store.reviewCal),
   };
   $effect(() => {
     const keys = {
@@ -219,6 +226,7 @@
           </div>
         </div>
       {/key}
+      <CalReview task={{ path: f.path, line: h.line, date: taskDate }} />
     {:else if review && review.cur < 0}
       <div class="done" in:fly={{ y: 8, duration: 150 }}>
         <span class="okc" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg></span>
@@ -313,8 +321,8 @@
 
 <style>
   .review { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .stage { flex: 1 1 0; min-height: 0; overflow: auto; background: var(--stage); padding: 28px 24px; display: flex; justify-content: center; align-items: flex-start; }
-  .card { width: 100%; max-width: 820px; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1); overflow: hidden; }
+  .stage { flex: 1 1 0; min-height: 0; overflow: auto; background: var(--stage); padding: 28px 24px; display: flex; flex-direction: column; align-items: center; }
+  .card { flex: 0 0 auto; width: 100%; max-width: 820px; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1); overflow: hidden; }
   .chead { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--line); font-size: 13px; }
   .k { font-weight: 600; }
   .where { color: var(--fg2); }

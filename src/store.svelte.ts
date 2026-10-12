@@ -475,6 +475,8 @@ class Store {
   goalReviewKeys: { active: () => boolean; run: (id: string) => boolean } | null = null;
   /** The review registers its keys while its tab is shown (⌘1…⌘5 there win over the window's). */
   reviewKeys: { active: () => boolean; run: (id: string) => boolean } | null = null;
+  /** «Показать календарь» under the review's card (ТЗ 24, part 3). */
+  reviewCal = $state(false);
 
   /** Persist the project config (Settings) and apply it right away. */
   async saveConfig(json: string): Promise<boolean> {
@@ -1656,6 +1658,7 @@ class Store {
   startReview(items: ReviewItem[] = this.reviewPending) {
     if (!items.length) return;
     this.reviewUndoLast = null;
+    this.reviewCal = false; // folded at every new review, kept from card to card
     this.review = { items, cur: 0, known: this.taskKeys() };
     const at = this.layout.panes.flatMap((p, pi) => p.tabs.map((t, ti) => ({ t, pi, ti }))).find((x) => x.t.kind === 'review');
     if (at) this.activateTab(at.pi, at.ti);

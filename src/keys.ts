@@ -130,6 +130,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('reviewDefer', 'Разбор: Отложить…', 'inbox', 'review', ['⌘4']),
   C('reviewSkip', 'Разбор: Пропустить', 'inbox', 'review', ['⌘5']),
   C('reviewBack', 'Разбор: Назад', 'inbox', 'review', ['⌘[']),
+  C('reviewCalendar', 'Разбор: Показать / скрыть календарь', 'inbox', 'review', ['⌘K'], { synonyms: ['календарь'] }),
 
   C('newGoal', 'Новая цель…', 'goals', 'window', [], { synonyms: ['цель', 'квартал'] }),
   C('goalsOverview', 'Цели: обзор квартала', 'goals', 'window', [], { synonyms: ['цели квартала'] }),
