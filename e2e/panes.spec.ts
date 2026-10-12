@@ -66,6 +66,17 @@ test.describe('toolbar group', () => {
 });
 
 test.describe('active pane', () => {
+  test('a single pane has no accent bar: it is always the active one', async ({ page }) => {
+    await open(page);
+    await expect(panes(page)).toHaveCount(1);
+    await expect(page.locator('section.pane .accent')).toHaveCount(0);
+    await btn(page, 'Второй редактор').click();
+    await expect(page.locator('section.pane .accent')).toHaveCount(2);
+    await btn(page, 'Второй редактор').click();
+    await expect(panes(page)).toHaveCount(1);
+    await expect(page.locator('section.pane .accent')).toHaveCount(0);
+  });
+
   test('exactly one pane is active, marked with the accent bar; a click anywhere in a pane makes it active', async ({ page }) => {
     await open(page);
     await btn(page, 'Второй редактор').click();

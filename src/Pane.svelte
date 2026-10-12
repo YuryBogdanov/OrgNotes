@@ -13,7 +13,7 @@
   import { targetOf, type Tab } from './layout';
   import { displayName, displayPath } from './names';
 
-  // One editor pane: an accent bar when active, its own tabs, and the content of the active tab.
+  // One editor pane: an accent bar when active (only with two panes: alone it is always the active one), its own tabs, and the content of the active tab.
   let { pi }: { pi: number } = $props();
 
   const pane = $derived(store.layout.panes[pi]);
@@ -269,7 +269,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <section class="pane" class:active aria-label={active ? 'Активная панель' : 'Панель'} data-pane={pi}
   onmousedowncapture={() => store.setActivePane(pi)} onfocusin={() => store.setActivePane(pi)}>
-  <div class="accent" aria-hidden="true"></div>
+  {#if two}<div class="accent" aria-hidden="true"></div>{/if}
   <div class="bar">
   <!-- svelte-ignore a11y_interactive_supports_focus -->
   <div class="strip" class:fl={fadeL} class:fr={fadeR} role="tablist" aria-label="Вкладки" bind:this={strip} ondblclick={stripDblClick} onscroll={() => { edges(); tipEnd(); }}>
