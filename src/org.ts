@@ -558,11 +558,14 @@ export const weekdayName = (d: Date) => WD_FULL[d.getDay()][0].toUpperCase() + W
 
 const DEFAULT_COLOR: Record<string, string> = { TODO: 'red', NEXT: 'blue', WAIT: 'orange', DONE: 'green', CANCELLED: 'gray' };
 
-/** Colour of a status in both themes: its own colour, else by well-known name, else by open/done. */
-export function toneFor(kw: string, wf: Workflow): Tone {
+/** The named colour of a status: its own colour, else by well-known name, else by open/done. */
+export function namedFor(kw: string, wf: Workflow): string {
   const st = wf.sequences?.flatMap((s) => s.states).find((x) => x.name === kw);
-  const t = toneOf(st?.color) ?? toneOf(DEFAULT_COLOR[kw]) ?? toneOf(wf.done.includes(kw) ? 'green' : 'red')!;
-  return t;
+  return asNamed(st?.color) ?? asNamed(DEFAULT_COLOR[kw]) ?? (wf.done.includes(kw) ? 'green' : 'red');
+}
+/** Colour of a status: the theme's shade of its named colour. */
+export function toneFor(kw: string, wf: Workflow): Tone {
+  return toneOf(namedFor(kw, wf))!;
 }
 
 export function repeaterLabel(r?: string): string {

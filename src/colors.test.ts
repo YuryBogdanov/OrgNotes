@@ -75,3 +75,32 @@ describe('own themes', async () => {
     expect(copyOf(own, ['Моя'])).toMatchObject({ name: 'Моя (2)', basedOn: 'Nord' });
   });
 });
+
+describe('the colour picker', async () => {
+  const { toHsv, fromHsv, parseHex } = await import('./colors');
+  it('hex → hsv → hex keeps the colour, the alpha only when below 1', () => {
+    for (const c of ['#88c0d0', '#bf616a', '#000000', '#ffffff', '#3b4252cc']) {
+      const v = toHsv(c);
+      expect(fromHsv(v.h, v.s, v.v, v.a)).toBe(c);
+    }
+    expect(toHsv('#ff0000')).toEqual({ h: 0, s: 1, v: 1, a: 1 });
+  });
+  it('typed colours', () => {
+    expect(parseHex('#ABC')).toBe('#aabbcc');
+    expect(parseHex('88c0d0')).toBe('#88c0d0');
+    expect(parseHex(' #3b4252CC ')).toBe('#3b4252cc');
+    expect(parseHex('#12')).toBeNull();
+    expect(parseHex('nope')).toBeNull();
+  });
+});
+
+describe('contrast in the theme editor', async () => {
+  const { lowContrast, ratioWords } = await import('./themes');
+  it('text below 4.5:1 and headings below 3:1 are marked; an inherited deep level is not', () => {
+    const c = { ...BUILTIN[0].colors, dim: '#bbbbbb', h2: '#888888', h3: '#cccccc' };
+    const low = lowContrast(c);
+    expect([...low.keys()]).toEqual(['dim', 'h3']);
+    expect(ratioWords(low.get('dim')!)).toBe('1,9:1');
+    expect(lowContrast({ ...c, h6: '#eeeeee' }).has('h6')).toBe(true);
+  });
+});

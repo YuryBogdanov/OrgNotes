@@ -21,7 +21,7 @@ import {
 } from './goals';
 import { byDay, entriesIn, hasDated, isoDay, type CalEntry, type Layer } from './calIndex';
 import { cachedTheme, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
-import { BUILTIN, DEFAULT_THEME, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
+import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
 import { DEFAULT_CAL, insertEntry, moveEntry, readCal, withCal, type CalSettings, type NewEntry } from './calEdit';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
@@ -421,8 +421,10 @@ class Store {
   closeSettings() {
     this.settingsOpen = false;
     this.keyRecording = false;
+    this.themeEditing = null;
   }
   showSection(section: SettingsSection) {
+    if (section !== this.settingsSection) this.themeEditing = null;
     this.settingsSection = section;
     lsSet('settings:section', section);
   }
@@ -1982,7 +1984,34 @@ class Store {
     if (themeFile(n) !== themeFile(t.name) && isTauri) await invoke('delete_theme', { file: themeFile(t.name) }).catch(() => {});
     this.putTheme(next, t.name);
     for (const a of ['light', 'dark'] as const) if (this.themeNames[a] === t.name) this.setThemeName(a, n);
+    if (this.themeEditing === t.name) this.themeEditing = n;
     return n;
+  }
+  /** The theme open in the theme editor (ТЗ 25 §2), inside «Настройки → Оформление»; null: the section itself. */
+  themeEditing = $state<string | null>(null);
+  /** «Редактировать»: a built-in theme gets an own copy («<тема> — моя») first; the theme is chosen and opened. */
+  async editTheme(t: Theme) {
+    const own = t.builtin ? await this.copyTheme(t) : t;
+    if (!own) return;
+    this.setThemeName(own.appearance, own.name);
+    this.themeEditing = own.name;
+  }
+  private themeTimer: ReturnType<typeof setTimeout> | undefined;
+  /** A colour changed in the editor: shown at once everywhere, written to its file a moment later. */
+  setThemeColors(name: string, colors: Theme['colors']) {
+    const t = this.ownThemes.find((x) => x.name === name);
+    if (!t) return;
+    const next = { ...t, colors };
+    this.putTheme(next);
+    clearTimeout(this.themeTimer);
+    this.themeTimer = setTimeout(() => void this.saveTheme(next), 300);
+  }
+  /** «Сбросить»: the colours of the theme it is based on (else of Panopticon of its appearance). */
+  resetTheme(name: string) {
+    const t = this.ownThemes.find((x) => x.name === name);
+    if (!t) return;
+    const base = this.themes.find((x) => x.name === t.basedOn && x.appearance === t.appearance && x.name !== t.name) ?? builtinFor(t.appearance);
+    this.setThemeColors(name, { ...base.colors, palette: { ...base.colors.palette } });
   }
   /** «Удалить» (own themes only): a chosen one gives way to the built-in Panopticon theme of its appearance. */
   async deleteTheme(t: Theme) {
@@ -1994,6 +2023,7 @@ class Store {
     }
     this.ownThemes = this.ownThemes.filter((x) => x.name !== t.name);
     for (const a of ['light', 'dark'] as const) if (this.themeNames[a] === t.name) this.setThemeName(a, DEFAULT_THEME[a]);
+    if (this.themeEditing === t.name) this.themeEditing = null;
   }
   /** «Экспорт…»: the theme's file where the system save panel says. */
   async exportTheme(t: Theme) {

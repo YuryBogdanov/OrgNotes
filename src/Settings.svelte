@@ -2,6 +2,7 @@
   import { store, SECTIONS, type SettingsSection } from './store.svelte';
   import KeysSettings from './KeysSettings.svelte';
   import AppearanceSettings from './AppearanceSettings.svelte';
+  import ThemeEditor from './ThemeEditor.svelte';
   import { toneFor, type Workflow } from './org';
   import { toneOf, toneStyle, colorName } from './colors';
   import ColorPicker from './ColorPicker.svelte';
@@ -361,7 +362,7 @@
 <div class="win" role="dialog" aria-modal="true" aria-label="Настройки">
     <header>
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="2.6" /><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6" /></svg>
-      <div class="ttl"><span class="t1">Настройки</span><span class="t2">{tab}</span></div>
+      <div class="ttl"><span class="t1">Настройки</span><span class="t2">{tab}{tab === 'Оформление' && store.themeEditing ? ' › Тема редактора' : ''}</span></div>
       <span class="live">Изменения применяются сразу</span>
       <button class="done-b" onclick={() => store.closeSettings()}>Готово</button>
     </header>
@@ -377,9 +378,11 @@
       <div class="sidehelp">{store.keyHint('settings') || '⌘,'} — открыть · ⎋ — закрыть<br />⌘[ ⌘] — предыдущий / следующий раздел</div>
     </div>
 
-    <div class="content" class:wide={tab === 'Статусы'} bind:this={contentEl}>
+    <div class="content" class:wide={tab === 'Статусы'} class:fill={tab === 'Оформление' && !!store.themeEditing} bind:this={contentEl}>
     {#if tab === 'Клавиши'}
       <div class="page"><KeysSettings /></div>
+    {:else if tab === 'Оформление' && store.themeEditing}
+      <ThemeEditor name={store.themeEditing} />
     {:else if tab === 'Оформление'}
       <div class="page"><AppearanceSettings /></div>
     {:else if tab === 'Inbox'}
@@ -950,6 +953,8 @@
   .content { flex: 1 1 0; min-width: 0; min-height: 0; overflow: auto; }
   .content:not(.wide) > :global(*) { max-width: 760px; margin: 0 auto; box-sizing: border-box; }
   .content.wide { display: flex; }
+  .content.fill { display: flex; flex-direction: column; overflow: hidden; }
+  .content.fill > :global(*) { max-width: none; flex: 1 1 0; min-height: 0; }
   .page { padding: 20px 28px 32px; }
   /* a narrow window: the sections go to a strip on top */
   @media (max-width: 820px) {
