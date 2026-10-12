@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { calendar } from './features/calendar.svelte';
   import { store, SECTIONS, type SettingsSection } from './store.svelte';
   import KeysSettings from './KeysSettings.svelte';
   import AppearanceSettings from './AppearanceSettings.svelte';
@@ -344,7 +345,7 @@
     return rel.split('/').join(' / ') + (store.files.some((f) => f.name === rel) ? '' : ' — не найден');
   };
   const allStates = $derived([...new Set(store.config.workflows.flatMap((sq) => sq.states.filter((x) => !x.done).map((x) => x.name)))]);
-  const eventStates = $derived(store.calCfg.eventStatus && !allStates.includes(store.calCfg.eventStatus) ? [store.calCfg.eventStatus, ...allStates] : allStates);
+  const eventStates = $derived(calendar.cfg.eventStatus && !allStates.includes(calendar.cfg.eventStatus) ? [calendar.cfg.eventStatus, ...allStates] : allStates);
   const LEN: [number, string][] = [[30, '30 минут'], [60, '1 час'], [90, '1,5 часа'], [120, '2 часа']];
   // ---- Агенды: «Мои агенды» -----------------------------------------------------------------------------
   let confirmAgenda = $state<{ id: string; name: string } | null>(null);
@@ -490,7 +491,7 @@
         </section>
       </div>
     {:else if tab === 'Календарь'}
-      {@const c = store.calCfg}
+      {@const c = calendar.cfg}
       <div class="body">
         <section class="general" aria-label="Календарь">
           <div class="cap">КУДА СОХРАНЯЮТСЯ НОВЫЕ ЗАПИСИ</div>
@@ -499,7 +500,7 @@
               <span class="olab"><span id="cal-pick">Выбор файла</span><small>Для кнопок «+ Задача» и «+ Событие» и двойного клика по дню</small></span>
               <div class="segs" role="radiogroup" aria-labelledby="cal-pick">
                 {#each [['default', 'По умолчанию'], ['ask', 'Спрашивать'], ['last', 'Как в прошлый раз']] as [v, t] (v)}
-                  <button role="radio" aria-checked={c.pick === v} class:on={c.pick === v} onclick={() => void store.setCal({ pick: v as typeof c.pick })}>{t}</button>
+                  <button role="radio" aria-checked={c.pick === v} class:on={c.pick === v} onclick={() => void calendar.setCfg({ pick: v as typeof c.pick })}>{t}</button>
                 {/each}
               </div>
             </div>
@@ -510,14 +511,14 @@
                 <span id="cal-{k}-file">Файл для {w}</span>
                 <span class="ibfile">
                   <span class="val" aria-labelledby="cal-{k}-file" data-testid="cal-{k}-file">{calPath(c[fileKey])}</span>
-                  {#if c[fileKey]}<button class="change" aria-label="Файл для {w}: как Inbox" title="Как Inbox" onclick={() => void store.setCal({ [fileKey]: null })}>×</button>{/if}
+                  {#if c[fileKey]}<button class="change" aria-label="Файл для {w}: как Inbox" title="Как Inbox" onclick={() => void calendar.setCfg({ [fileKey]: null })}>×</button>{/if}
                   <button class="change" aria-label="Выбрать файл для {w}" onclick={() => (pickCal = k as 'task' | 'event')}>Выбрать…</button>
                 </span>
               </div>
               <div class="opt">
                 <span class="olab"><label for="cal-{k}-head">Заголовок для {w}</label><small>{c[headKey] ? 'Запись добавляется в конец этого заголовка; если его нет, он будет создан' : 'Без заголовка — в начало или конец файла, как в Inbox'}</small></span>
                 <input id="cal-{k}-head" class="sel txt" value={c[headKey]} placeholder="Без заголовка" spellcheck="false"
-                  onchange={(e) => void store.setCal({ [headKey]: e.currentTarget.value.replace(/^\*+\s*/, '').trim() })} />
+                  onchange={(e) => void calendar.setCfg({ [headKey]: e.currentTarget.value.replace(/^\*+\s*/, '').trim() })} />
               </div>
             {/each}
           </div>
@@ -527,14 +528,14 @@
           <div class="opts">
             <div class="opt">
               <label for="cal-tstatus">Статус новой задачи</label>
-              <select id="cal-tstatus" class="sel" value={c.taskStatus ?? ''} onchange={(e) => void store.setCal({ taskStatus: e.currentTarget.value || null })}>
+              <select id="cal-tstatus" class="sel" value={c.taskStatus ?? ''} onchange={(e) => void calendar.setCfg({ taskStatus: e.currentTarget.value || null })}>
                 <option value="">Начальный статус набора</option>
                 {#each allStates as st (st)}<option value={st}>{st}</option>{/each}
               </select>
             </div>
             <div class="opt">
               <label for="cal-estatus">Статус нового события</label>
-              <select id="cal-estatus" class="sel" value={c.eventStatus} onchange={(e) => void store.setCal({ eventStatus: e.currentTarget.value })}>
+              <select id="cal-estatus" class="sel" value={c.eventStatus} onchange={(e) => void calendar.setCfg({ eventStatus: e.currentTarget.value })}>
                 <option value="">Без статуса</option>
                 {#each eventStates as st (st)}<option value={st}>{st}</option>{/each}
               </select>
@@ -543,13 +544,13 @@
               <span id="cal-dkind">Дата, если создаёте по дню</span>
               <div class="segs" role="radiogroup" aria-labelledby="cal-dkind">
                 {#each [['SCHEDULED', 'SCHEDULED'], ['DEADLINE', 'DEADLINE'], ['plain', 'Просто дата']] as [v, t] (v)}
-                  <button role="radio" aria-checked={c.dateKind === v} class:on={c.dateKind === v} onclick={() => void store.setCal({ dateKind: v as typeof c.dateKind })}>{t}</button>
+                  <button role="radio" aria-checked={c.dateKind === v} class:on={c.dateKind === v} onclick={() => void calendar.setCfg({ dateKind: v as typeof c.dateKind })}>{t}</button>
                 {/each}
               </div>
             </div>
             <div class="opt">
               <label for="cal-len">Длительность события</label>
-              <select id="cal-len" class="sel" value={String(c.minutes)} onchange={(e) => void store.setCal({ minutes: +e.currentTarget.value })}>
+              <select id="cal-len" class="sel" value={String(c.minutes)} onchange={(e) => void calendar.setCfg({ minutes: +e.currentTarget.value })}>
                 {#each LEN as [m, t] (m)}<option value={String(m)}>{t}</option>{/each}
               </select>
             </div>
@@ -561,18 +562,18 @@
             <div class="opt">
               <span id="cal-view">Вид по умолчанию</span>
               <div class="segs" role="radiogroup" aria-labelledby="cal-view">
-                <button role="radio" aria-checked={c.view === 'month'} class:on={c.view === 'month'} onclick={() => void store.setCal({ view: 'month' })}>Месяц</button>
-                <button role="radio" aria-checked={c.view === 'week'} class:on={c.view === 'week'} onclick={() => void store.setCal({ view: 'week' })}>Неделя</button>
+                <button role="radio" aria-checked={c.view === 'month'} class:on={c.view === 'month'} onclick={() => void calendar.setCfg({ view: 'month' })}>Месяц</button>
+                <button role="radio" aria-checked={c.view === 'week'} class:on={c.view === 'week'} onclick={() => void calendar.setCfg({ view: 'week' })}>Неделя</button>
               </div>
             </div>
             <div class="opt">
               <span id="cal-hours">Часы в недельном виде</span>
               <span class="hrs" role="group" aria-labelledby="cal-hours">
-                <select class="sel" aria-label="С" value={String(c.from)} onchange={(e) => void store.setCal({ from: +e.currentTarget.value })}>
+                <select class="sel" aria-label="С" value={String(c.from)} onchange={(e) => void calendar.setCfg({ from: +e.currentTarget.value })}>
                   {#each Array.from({ length: 13 }, (_, i) => i) as h (h)}<option value={String(h)} disabled={h >= c.to}>{h}:00</option>{/each}
                 </select>
                 –
-                <select class="sel" aria-label="До" value={String(c.to)} onchange={(e) => void store.setCal({ to: +e.currentTarget.value })}>
+                <select class="sel" aria-label="До" value={String(c.to)} onchange={(e) => void calendar.setCfg({ to: +e.currentTarget.value })}>
                   {#each Array.from({ length: 13 }, (_, i) => 12 + i) as h (h)}<option value={String(h)} disabled={h <= c.from}>{h}:00</option>{/each}
                 </select>
               </span>
@@ -581,7 +582,7 @@
               {@const key = k as 'weekNumbers' | 'weekends' | 'undated'}
               <div class="opt">
                 <label for="cal-{k}">{t}</label>
-                <button id="cal-{k}" class="switch" role="switch" aria-checked={c[key]} aria-label={t} onclick={() => void store.setCal({ [key]: !c[key] })}><span></span></button>
+                <button id="cal-{k}" class="switch" role="switch" aria-checked={c[key]} aria-label={t} onclick={() => void calendar.setCfg({ [key]: !c[key] })}><span></span></button>
               </div>
             {/each}
           </div>
@@ -590,11 +591,11 @@
           <div class="opts">
             <div class="opt">
               <span class="olab"><label for="cal-keepdl">Не менять дедлайн при переносе задачи</label><small>{c.keepDeadline ? 'Меняется только дата SCHEDULED' : 'DEADLINE сдвигается на столько же дней'}</small></span>
-              <button id="cal-keepdl" class="switch" role="switch" aria-checked={c.keepDeadline} aria-label="Не менять дедлайн при переносе задачи" onclick={() => void store.setCal({ keepDeadline: !c.keepDeadline })}><span></span></button>
+              <button id="cal-keepdl" class="switch" role="switch" aria-checked={c.keepDeadline} aria-label="Не менять дедлайн при переносе задачи" onclick={() => void calendar.setCfg({ keepDeadline: !c.keepDeadline })}><span></span></button>
             </div>
             <div class="opt">
               <span class="olab"><label for="cal-askrep">Спрашивать при переносе повторяющейся записи</label><small>Повтор переносится целиком: следующие пойдут от новой даты</small></span>
-              <button id="cal-askrep" class="switch" role="switch" aria-checked={c.askRepeat} aria-label="Спрашивать при переносе повторяющейся записи" onclick={() => void store.setCal({ askRepeat: !c.askRepeat })}><span></span></button>
+              <button id="cal-askrep" class="switch" role="switch" aria-checked={c.askRepeat} aria-label="Спрашивать при переносе повторяющейся записи" onclick={() => void calendar.setCfg({ askRepeat: !c.askRepeat })}><span></span></button>
             </div>
           </div>
           <p class="help">Перетащите плашку на другой день, в неделе — и на время. ⌘Z в календаре отменяет последний перенос.</p>
@@ -879,7 +880,7 @@
     {#if pickFile}<Picker onclose={() => (pickFile = false)} />{/if}
     {#if pickCal}
       {@const k = pickCal}
-      <Picker label={k === 'task' ? 'Файл для задач' : 'Файл для событий'} onclose={() => (pickCal = null)} onpick={(rel) => void store.setCal(k === 'task' ? { taskFile: rel } : { eventFile: rel })} />
+      <Picker label={k === 'task' ? 'Файл для задач' : 'Файл для событий'} onclose={() => (pickCal = null)} onpick={(rel) => void calendar.setCfg(k === 'task' ? { taskFile: rel } : { eventFile: rel })} />
     {/if}
 
     {#if confirmAgenda}

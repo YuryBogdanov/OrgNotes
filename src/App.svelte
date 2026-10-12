@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { calendar } from './features/calendar.svelte';
   import { onMount, untrack } from 'svelte';
   import { store } from './store.svelte';
   import Inspector from './Inspector.svelte';
@@ -120,7 +121,7 @@
     outline: () => store.showOutline(),
     captureHere: () => store.openCapture(),
     navCollapse: () => store.navTree('collapse'),
-    calendar: () => store.showCalendarHere(),
+    calendar: () => calendar.showHere(),
     navCalendar: () => {
       store.showNav = true;
       store.setNavMode('calendar');
@@ -308,10 +309,10 @@
       {/key}
     </div>
   {/if}
-  {#if store.calNew}
+  {#if calendar.newEntry}
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="capscrim" onmousedown={(e) => { if (e.target === e.currentTarget) store.calNew = null; }}>
-      {#key store.calNew.n}<CalNew kind={store.calNew.kind} date={store.calNew.date} onclose={() => (store.calNew = null)} />{/key}
+    <div class="capscrim" onmousedown={(e) => { if (e.target === e.currentTarget) calendar.newEntry = null; }}>
+      {#key calendar.newEntry.n}<CalNew kind={calendar.newEntry.kind} date={calendar.newEntry.date} onclose={() => (calendar.newEntry = null)} />{/key}
     </div>
   {/if}
   {#if store.pickInbox}{#key store.pickInbox}<Picker onclose={() => (store.pickInbox = 0)} />{/key}{/if}

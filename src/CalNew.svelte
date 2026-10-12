@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { calendar } from './features/calendar.svelte';
   import { onMount } from 'svelte';
   import { store } from './store.svelte';
   import { dayShort, fromIso } from './calIndex';
@@ -9,8 +10,8 @@
   // be chosen here.
   let { kind, date, onclose }: { kind: 'task' | 'event'; date: string; onclose: () => void } = $props();
 
-  const cfg = store.calCfg;
-  const target = store.calTarget(kind);
+  const cfg = calendar.cfg;
+  const target = calendar.target(kind);
   let title = $state('');
   let day = $state(date);
   let time = $state('');
@@ -34,7 +35,7 @@
       return;
     }
     busy = true;
-    const ok = await store.calCreate({ kind, title, date: fromIso(day), time: /^\d{2}:\d{2}$/.test(time) ? time : null }, file);
+    const ok = await calendar.create({ kind, title, date: fromIso(day), time: /^\d{2}:\d{2}$/.test(time) ? time : null }, file);
     busy = false;
     if (!ok) return;
     store.note(`${kind === 'task' ? 'Задача добавлена' : 'Событие добавлено'} в «${displayName(file)}»`, [{ label: 'Отменить', run: () => void store.undo(ok) }]);

@@ -3,6 +3,7 @@
 // the current state and a shortcut. A command either runs at once or returns the next step, shown in the same
 // palette window (a list to pick from, or a text to type).
 import { store, type NoteFile } from './store.svelte';
+import { calendar } from './features/calendar.svelte';
 import { fuzzy, better, type Match } from './fuzzy';
 import { displayName } from './names';
 import { parseDate, weekdayNames } from './edits';
@@ -230,7 +231,7 @@ register({
 });
 register({
   id: 'calendar', title: 'Календарь', icon: 'cal', group: 'general', synonyms: ['месяц', 'неделя', 'события'],
-  when: () => true, run: () => store.showCalendarHere(),
+  when: () => true, run: () => calendar.showHere(),
 });
 register({
   id: 'settings', title: 'Настройки…', icon: 'gear', group: 'general', synonyms: ['параметры', 'клавиши', 'сочетания', 'preferences'],

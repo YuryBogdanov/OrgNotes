@@ -1,7 +1,7 @@
 import {
   activeTab, addPane, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
   openFile, openFromAgenda, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
-  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, openGoals, openCalendar,
+  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, openGoals,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { displayName, noteName, withOrg } from './names';
@@ -19,11 +19,9 @@ import {
   carryOver, readGoalSettings, withGoalSettings, isSilent, deadlineSoon, isDone, DEFAULT_GOAL_SETTINGS, type GoalSettings, type Goal,
   type GoalSource, type NewGoal, type Quarter, type SourceGoals,
 } from './goals';
-import { byDay, entriesIn, hasDated, isoDay, type CalEntry, type Layer } from './calIndex';
 import { cachedTheme, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
 import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
 import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
-import { DEFAULT_CAL, insertEntry, moveEntry, readCal, withCal, type CalSettings, type NewEntry } from './calEdit';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
@@ -55,15 +53,6 @@ function build(name: string, path: string, text: string, disk: string, diskRaw: 
 export type PaletteStart = 'newFile' | 'newFolder' | 'goto' | 'status' | 'priority' | 'schedule' | 'deadline' | 'tags' | 'calendar';
 const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
-function readLayers(): Layer[] {
-  try {
-    const v = JSON.parse(lsGet('cal:layers') ?? 'null');
-    if (Array.isArray(v)) return v.filter((x): x is Layer => ['task', 'deadline', 'event', 'wait', 'done'].includes(x));
-  } catch {
-    /* the default */
-  }
-  return ['task', 'deadline', 'event', 'done']; // «Ожидания» off, as on the mockup
-}
 function readLevels(): LevelView {
   try {
     const v = JSON.parse(lsGet('editor:levels') ?? 'null');
@@ -348,6 +337,14 @@ class Store {
     return Object.values(bundledConfig)[0] ?? null;
   }
 
+  /** The project config as parsed last, for the features' own keys (`onConfig`). */
+  private parsedConfig: any = null;
+  private configHooks: ((parsed: any) => void)[] = [];
+  /** A feature reads its keys of config.json: now, and every time it is read again. */
+  onConfig(fn: (parsed: any) => void) {
+    this.configHooks.push(fn);
+    fn(this.parsedConfig);
+  }
   /** Parse the project config text; reports problems. Returns true when the effective config changed. */
   private takeConfig(raw: string | null): boolean {
     if (raw === this.configRaw) return false;
@@ -363,7 +360,8 @@ class Store {
     this.inboxCfg = readInbox(parsed?.inbox);
     this.goalSources = readGoals(parsed?.goals);
     this.goalSettings = readGoalSettings(parsed?.goalSettings);
-    this.calCfg = readCal(parsed?.calendar);
+    this.parsedConfig = parsed;
+    for (const fn of this.configHooks) fn(parsed);
     // only the statuses make the notes be read again; agendas alone do not
     const same = JSON.stringify(config) === JSON.stringify(this.config);
     this.config = config;
@@ -1965,11 +1963,6 @@ class Store {
   showAgendaHere() {
     openAgenda(this.layout, this.layout.active);
   }
-  /** ⌘3: the calendar in the active pane; the navigator shows its layers and files. */
-  showCalendarHere() {
-    openCalendar(this.layout, this.layout.active, this.calCfg.view);
-    this.setNavMode('calendar');
-  }
   // ---- «Настройки → Оформление» (ТЗ 25): the appearance of the app and the editor theme of each, on this Mac ------
   appearanceChoice = $state<AppearanceChoice>(readChoice());
   /** macOS is dark (for «Системное»); followed while the app runs. */
@@ -2114,107 +2107,6 @@ class Store {
   setThemeName(a: Appearance, name: string) {
     this.themeNames = { ...this.themeNames, [a]: name };
     saveThemeName(a, name);
-  }
-  // ---- «Настройки → Календарь» (`calendar` in config.json), moving and making entries -----------------------------
-  calCfg = $state.raw<CalSettings>(DEFAULT_CAL);
-  async setCal(c: Partial<CalSettings>) {
-    const next = { ...this.calCfg, ...c };
-    this.calCfg = next;
-    return this.updateConfig((raw) => withCal(raw, next));
-  }
-  /** An entry dropped on a day (and a time in the week): its date is changed in the file, on disk at once. */
-  async calMove(e: { path: string; line: number; layer: Layer | 'undated' }, to: Date, time?: string | null): Promise<boolean> {
-    const f = this.files.find((x) => x.path === e.path);
-    if (!f) return false;
-    const text = moveEntry(f.text, e.line, e.layer, to, weekdayNames(f.text), { time, keepDeadline: this.calCfg.keepDeadline });
-    if (text === f.text) return false;
-    const done = await this.writeAll(`Дата изменена: ${bareTitle(f.headings.find((h) => h.line === e.line)?.title ?? '')}`, [{ path: f.path, text }]);
-    if (!done) return false;
-    this.note('Дата изменена', [{ label: 'Отменить', run: () => void this.undo(done) }]);
-    return true;
-  }
-  /** Where a new task or event goes: the file as set (or the last one / the Inbox) and the heading. */
-  calTarget(kind: 'task' | 'event'): { file: NoteFile | undefined; heading: string } {
-    const c = this.calCfg;
-    const set = kind === 'task' ? c.taskFile : c.eventFile;
-    const last = c.pick === 'last' ? c.last[kind] : null;
-    const byName = (n: string | null) => (n ? this.files.find((x) => x.name === n) : undefined);
-    return { file: byName(last) ?? byName(set) ?? this.inboxFile, heading: kind === 'task' ? c.taskHeading : c.eventHeading };
-  }
-  /** What is being dragged in the calendar (a chip, an event, a task of «Без даты»); the grab's offset in an event. */
-  calDrag = $state<{ path: string; line: number; layer: Layer | 'undated'; repeat: boolean; title: string; dy: number } | null>(null);
-  /** «+ Задача» / «+ Событие»: the quick entry of the calendar (null: closed). */
-  calNew = $state<{ kind: 'task' | 'event'; date: string; n: number } | null>(null);
-  openCalNew(kind: 'task' | 'event', date: string) {
-    this.calNew = { kind, date, n: Date.now() };
-  }
-  /** A new entry written into `file` (relative) as the settings say; on disk at once, ⌘Z in the calendar undoes it. */
-  async calCreate(e: Omit<NewEntry, 'status' | 'dateKind' | 'minutes'>, file: string): Promise<Step | null> {
-    const f = this.files.find((x) => x.name === file);
-    if (!f || !e.title.trim()) return null;
-    const c = this.calCfg;
-    const open = f.wf.sequences.flatMap((s) => s.states.map((x) => x.name));
-    const status =
-      e.kind === 'task'
-        ? c.taskStatus && f.wf.open.includes(c.taskStatus) ? c.taskStatus : startOf(sequenceFor(f.wf, null))
-        : c.eventStatus && open.includes(c.eventStatus) ? c.eventStatus : null;
-    const heading = e.kind === 'task' ? c.taskHeading : c.eventHeading;
-    const add = f === this.inboxFile ? this.inboxCfg.add : 'end';
-    const r = insertEntry(f.text, heading || null, { ...e, status, dateKind: c.dateKind, minutes: c.minutes }, weekdayNames(f.text), add);
-    const done = await this.writeAll(`${e.kind === 'task' ? 'Новая задача' : 'Новое событие'}: ${e.title.trim()}`, [{ path: f.path, text: r.text }]);
-    if (!done) return null;
-    if (c.last[e.kind] !== file) await this.setCal({ last: { ...c.last, [e.kind]: file } });
-    return done;
-  }
-  // ---- the calendar (ТЗ 24): layers and files shown, on this Mac -------------------------------------------------
-  calLayers = $state<Layer[]>(readLayers());
-  setCalLayer(l: Layer, on: boolean) {
-    this.calLayers = on ? [...new Set([...this.calLayers, l])] : this.calLayers.filter((x) => x !== l);
-    lsSet('cal:layers', JSON.stringify(this.calLayers));
-  }
-  /** Files left out of the calendar, per notes folder. */
-  calHiddenAll = $state<Record<string, string[]>>((() => {
-    try {
-      const v = JSON.parse(lsGet('cal:hidden') ?? '{}');
-      return v && typeof v === 'object' ? v : {};
-    } catch {
-      return {};
-    }
-  })());
-  get calHiddenNow(): string[] {
-    return this.calHiddenAll[this.dir ?? ''] ?? [];
-  }
-  setCalFile(name: string, on: boolean) {
-    const h = this.calHiddenNow.filter((x) => x !== name);
-    this.calHiddenAll = { ...this.calHiddenAll, [this.dir ?? '']: on ? h : [...h, name] };
-    lsSet('cal:hidden', JSON.stringify(this.calHiddenAll));
-  }
-  /** Files with something dated: the «ФАЙЛЫ» of the calendar. */
-  get calFiles(): NoteFile[] {
-    return this.files.filter((f) => hasDated(f));
-  }
-  /** The entries between two days in the layers and files shown, by day and in order. */
-  calDays(from: Date, to: Date): Map<string, CalEntry[]> {
-    const hidden = new Set(this.calHiddenNow);
-    const layers = new Set(this.calLayers);
-    const files = this.files.filter((f) => !hidden.has(f.name));
-    const open = [...new Set(this.files.flatMap((f) => f.wf.open))];
-    return byDay(entriesIn(files, from, to).filter((e) => layers.has(e.layer)), open);
-  }
-  /** Change the calendar state of a tab (the view, the chosen day). */
-  setCalendar(t: Tab, c: Partial<{ view: 'month' | 'week'; date: string }>) {
-    t.calendar = { ...(t.calendar ?? { view: 'month', date: isoDay(new Date()) }), ...c };
-  }
-  /** An entry picked in the calendar: its file in a new tab of this pane, or (⌘) in the neighbour pane. */
-  openCalEntry(e: { path: string; line: number }, neighbour = false) {
-    const pi = this.layout.active;
-    if (neighbour) {
-      const t = openFromAgenda(this.layout, pi, e.path, e.line, '', 'neighbor');
-      t.fromAgenda = null;
-    } else {
-      openFile(this.layout, pi, e.path, e.line, { focus: true });
-      this.layout.active = pi;
-    }
   }
   showNotesHere() {
     const p = this.layout.panes[this.layout.active];

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { calendar } from './features/calendar.svelte';
   import { store } from './store.svelte';
   import { toneFor } from './org';
   import { toneStyle } from './colors';
@@ -9,12 +10,12 @@
   // ahead of it.
   const c = $derived(store.tab?.calendar);
   const day = $derived(c ? fromIso(c.date) : new Date());
-  const list = $derived(c ? (store.calDays(day, day).get(c.date) ?? []) : []);
+  const list = $derived(c ? (calendar.days(day, day).get(c.date) ?? []) : []);
   const ahead = $derived.by(() => {
     if (!c) return [] as CalEntry[];
     const from = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
     const to = new Date(day.getFullYear(), day.getMonth() + 3, day.getDate());
-    const hidden = new Set(store.calHiddenNow);
+    const hidden = new Set(calendar.hiddenNow);
     return sortDay(entriesIn(store.files.filter((f) => !hidden.has(f.name)), from, to).filter((e) => e.layer === 'deadline'))
       .sort((a, b) => a.day.localeCompare(b.day))
       .slice(0, 3);
@@ -24,7 +25,7 @@
   const WD = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
   /** «work › Календарь»: where a new entry goes. */
   const place = (kind: 'task' | 'event') => {
-    const t = store.calTarget(kind);
+    const t = calendar.target(kind);
     if (!t.file) return null;
     return [t.file.name.replace(/\.org$/, '').split('/').join(' › '), t.heading].filter(Boolean).join(' › ');
   };
@@ -42,7 +43,7 @@
   <div class="rel">{relWords(day)}</div>
   <div class="cards">
     {#each list as e (e.path + e.line + e.layer + (e.time ?? ''))}
-      <button class="card" class:done={e.layer === 'done'} onclick={(ev) => store.openCalEntry(e, ev.metaKey)}>
+      <button class="card" class:done={e.layer === 'done'} onclick={(ev) => calendar.openEntry(e, ev.metaKey)}>
         {#if e.layer === 'event'}
           <span class="tm">{e.time ?? 'весь день'}</span>
         {:else if e.layer === 'deadline'}
@@ -57,13 +58,13 @@
     {/each}
   </div>
   <div class="add">
-    <button onclick={() => c && store.openCalNew('task', c.date)}><b>+</b> Задача</button>
-    <button onclick={() => c && store.openCalNew('event', c.date)}><b>+</b> Событие</button>
+    <button onclick={() => c && calendar.openNew('task', c.date)}><b>+</b> Задача</button>
+    <button onclick={() => c && calendar.openNew('event', c.date)}><b>+</b> Событие</button>
   </div>
   <div class="where">
     {#if !tPlace && !ePlace}
       Файл для новых записей не выбран
-    {:else if tPlace === ePlace || store.calCfg.pick === 'ask'}
+    {:else if tPlace === ePlace || calendar.cfg.pick === 'ask'}
       Создаётся в {tPlace ?? ePlace}
     {:else}
       Задачи — в {tPlace ?? 'Inbox'}, события — в {ePlace ?? 'Inbox'}
@@ -74,7 +75,7 @@
     <div class="sep"></div>
     <div class="cap">ВПЕРЕДИ</div>
     {#each ahead as e (e.path + e.line + e.day)}
-      <button class="ah" onclick={() => store.openCalEntry(e)}><span>Дедлайн: {e.title}</span><span class="w">{when(e.day)}</span></button>
+      <button class="ah" onclick={() => calendar.openEntry(e)}><span>Дедлайн: {e.title}</span><span class="w">{when(e.day)}</span></button>
     {/each}
   {/if}
 </section>
