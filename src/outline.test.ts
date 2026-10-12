@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changeStatusAt, cyclePriority, foldTargets, insertHeading, moveSubtree, nextCycleState, rotateStatus, rotateWorkflow, shiftSubtree, type Result } from './outline';
+import { changeStatusAt, cyclePriority, foldTargets, insertHeading, moveSubtree, nextCycleState, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree, type Result } from './outline';
 import { DEFAULT_WORKFLOW, resolveWorkflow } from './org';
 
 const apply = (text: string, r: Result | null) => {
@@ -61,7 +61,25 @@ describe('insertHeading (M-RET)', () => {
   });
 });
 
-describe('shiftSubtree (M-left / M-right)', () => {
+describe('shiftHeading (M-left / M-right)', () => {
+  it('demotes only the heading: the headings below stay where they are and become its siblings', () => {
+    // the case from the bug: a new heading after «1-1 meetings», then ⌥→
+    const { text, caret } = at('* Employee\n** 1-1 meetings\n** |\n*** Second 1-1 meeting\n*** First 1-1 meeting\n');
+    expect(show(apply(text, shiftHeading(text, caret, 1)))).toBe('* Employee\n** 1-1 meetings\n*** |\n*** Second 1-1 meeting\n*** First 1-1 meeting\n');
+  });
+  it('promotes only the heading; a level-1 heading cannot be promoted', () => {
+    const { text, caret } = at('* A\n** B|\n*** C\n');
+    expect(show(apply(text, shiftHeading(text, caret, -1)))).toBe('* A\n* B|\n*** C\n');
+    const one = at('* A|\n');
+    expect(shiftHeading(one.text, one.caret, -1)).toBeNull();
+  });
+  it('not on a heading line: nothing', () => {
+    const { text, caret } = at('* A\nbo|dy\n');
+    expect(shiftHeading(text, caret, 1)).toBeNull();
+  });
+});
+
+describe('shiftSubtree (M-S-left / M-S-right)', () => {
   const doc = '* A\n** B|\nbody\n*** C\n** D\n* E\n';
   it('demotes the heading with everything below it, not its siblings', () => {
     const { text, caret } = at(doc);

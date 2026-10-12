@@ -7,7 +7,7 @@
   import { drawerRanges, headingLines, toneFor, type DrawerRange, type Workflow } from './org';
   import { toneStyle } from './colors';
   import { extractLinks, type OrgLink } from './links';
-  import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftSubtree, type Result } from './outline';
+  import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree, type Result } from './outline';
   import type { Text } from '@codemirror/state';
   import { DEFAULT_LEVELS, orgIndent, type LevelView } from './orgIndent';
   import { orgRich, type RichPick } from './orgRich';
@@ -348,15 +348,16 @@
   });
   const docText = (v: EditorView) => v.state.doc.toString();
   const status = (v: EditorView, f: (w: Workflow, k: string | null) => string | null) => onHeading(v) && run(v, changeStatusAt(docText(v), sel(v).head, f, curWords));
-  const shift = (v: EditorView, d: -1 | 1) => onHeading(v) && run(v, shiftSubtree(docText(v), sel(v).head, d));
+  const shift = (v: EditorView, d: -1 | 1) => onHeading(v) && run(v, shiftHeading(docText(v), sel(v).head, d));
+  const shiftTree = (v: EditorView, d: -1 | 1) => onHeading(v) && run(v, shiftSubtree(docText(v), sel(v).head, d));
   const commands: Record<string, (v: EditorView) => boolean> = {
     newHeading: (v) => newHeading(v, false, curWords),
     newTask: (v) => newHeading(v, true, curWords),
     // heading lines only, so Option+arrows keep moving by word inside text (as in Org on a Mac)
     promote: (v) => shift(v, -1),
     demote: (v) => shift(v, 1),
-    promoteTree: (v) => shift(v, -1),
-    demoteTree: (v) => shift(v, 1),
+    promoteTree: (v) => shiftTree(v, -1),
+    demoteTree: (v) => shiftTree(v, 1),
     subtreeUp: (v) => onHeading(v) && run(v, moveSubtree(docText(v), sel(v).head, -1)),
     subtreeDown: (v) => onHeading(v) && run(v, moveSubtree(docText(v), sel(v).head, 1)),
     prioUp: (v) => onHeading(v) && run(v, cyclePriority(docText(v), sel(v).head, 'up', curWords)),
