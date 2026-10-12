@@ -95,10 +95,6 @@
     } else if (e.key === 'Enter' && it) {
       e.preventDefault();
       store.openInboxItem(it);
-    } else if (e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'z') {
-      e.preventDefault();
-      e.stopPropagation();
-      void store.undoInbox();
     }
   }
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
