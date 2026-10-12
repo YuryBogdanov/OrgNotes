@@ -1,4 +1,5 @@
-import { isColor, toneOf, type Tone } from './colors';
+import { toneOf, type Tone } from './colors';
+import { asNamed } from './themes';
 // Minimal Org parsing + text patching. The file text stays the source of truth:
 // every edit is a targeted string patch, nothing is re-serialised from a tree.
 
@@ -54,7 +55,7 @@ export interface WorkflowState {
   name: string;
   done: boolean;
   key?: string; // quick-select letter, like TODO(t) (kept if a hand-written config has it)
-  color?: string; // a palette id (gray red orange green teal blue purple pink) or a #rrggbb hex
+  color?: string; // a named colour (themes.ts NAMED); an old pink or hex is read as the nearest
 }
 
 /** One status sequence, e.g. "Задачи": NEW TODO IN-PROGRESS | DONE. The first state is where new items start. */
@@ -199,7 +200,7 @@ export function parseProjectConfig(json: string): { config: ProjectConfig; warni
         name: n,
         done: st.done === true,
         key: typeof st.key === 'string' && st.key.length === 1 ? st.key : undefined,
-        color: isColor(st.color) ? st.color : undefined,
+        color: asNamed(st.color),
       });
     }
     if (!states.length) {

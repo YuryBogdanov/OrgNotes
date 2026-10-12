@@ -216,15 +216,15 @@ describe('whole-draft validation and output', () => {
     const d = base();
     expect(orgLine(d.workflows[0])).toBe('#+TODO: NEW(n) TODO(t) NEXT(e) | DONE(d)');
   });
-  it('serialises colours (named or hex) and a non-default initial status, and reads them back', () => {
+  it('serialises colours (an old hex is read as the nearest named one) and a non-default initial status', () => {
     const d = base();
     d.workflows[0].states[1].color = 'teal';
-    d.workflows[0].states[2].color = '#a1b2c3';
+    d.workflows[0].states[2].color = '#0a58c2';
     d.workflows[0].initialId = d.workflows[0].states[1].id;
     const json = toJson(null, d);
     const back = parseProjectConfig(json);
     expect(back.warnings).toEqual([]);
-    expect(back.config.workflows[0].states.map((s) => s.color)).toEqual([undefined, 'teal', '#a1b2c3', undefined]);
+    expect(back.config.workflows[0].states.map((s) => s.color)).toEqual([undefined, 'teal', 'blue', undefined]);
     expect(back.config.workflows[0].initial).toBe('TODO');
     // the default initial status is not written at all
     d.workflows[0].initialId = d.workflows[0].states[0].id;

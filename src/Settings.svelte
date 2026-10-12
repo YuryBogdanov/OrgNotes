@@ -1,6 +1,7 @@
 <script lang="ts">
   import { store, SECTIONS, type SettingsSection } from './store.svelte';
   import KeysSettings from './KeysSettings.svelte';
+  import AppearanceSettings from './AppearanceSettings.svelte';
   import { toneFor, type Workflow } from './org';
   import { toneOf, toneStyle, colorName } from './colors';
   import ColorPicker from './ColorPicker.svelte';
@@ -299,9 +300,10 @@
       step(e.key === 'ArrowUp' ? -1 : 1, true);
     }
   }
-  const READY: SettingsSection[] = ['Основные', 'Статусы', 'Агенды', 'Календарь', 'Inbox', 'Клавиши'];
+  const READY: SettingsSection[] = ['Основные', 'Оформление', 'Статусы', 'Агенды', 'Календарь', 'Inbox', 'Клавиши'];
   const ICON: Record<SettingsSection, string> = {
     Основные: 'M10 7.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2zM10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2',
+    Оформление: 'M10 3a7 7 0 1 0 0 14c1 0 1.5-.6 1.5-1.3 0-1.1-1-1.4-1-2.4 0-.8.7-1.3 1.5-1.3H14a3 3 0 0 0 3-3C17 5.6 13.9 3 10 3zM6.5 9.5h.01M8.5 6.5h.01M12 6.5h.01',
     Статусы: 'M3 10h14M12.5 6l4 4-4 4',
     Теги: 'M3 3h6.5l7.5 7.5-6 6L3.5 9.5zM6.8 6.8h.01',
     Агенды: 'M7.5 5h9M7.5 10h9M7.5 15h9M3.5 5h.01M3.5 10h.01M3.5 15h.01',
@@ -378,6 +380,8 @@
     <div class="content" class:wide={tab === 'Статусы'} bind:this={contentEl}>
     {#if tab === 'Клавиши'}
       <div class="page"><KeysSettings /></div>
+    {:else if tab === 'Оформление'}
+      <div class="page"><AppearanceSettings /></div>
     {:else if tab === 'Inbox'}
       <div class="body">
         <section class="general" aria-label="Inbox">

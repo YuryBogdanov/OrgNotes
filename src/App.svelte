@@ -29,6 +29,25 @@
   import GoalCarry from './GoalCarry.svelte';
   import { displayName as nameOf } from './names';
   import { toAccelerator } from './keys';
+  import { applyAppearance, readChoice, readThemeNames } from './appearance';
+
+  // the appearance and the editor theme (ТЗ 25): applied on every change; «Системное» follows macOS, and another
+  // window of the app (the quick entry) takes a change made in this one
+  $effect(() => applyAppearance(store.appearanceChoice, store.appearance, store.theme));
+  onMount(() => {
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    const sys = () => (store.systemDark = mq.matches);
+    mq.addEventListener('change', sys);
+    const other = (e: StorageEvent) => {
+      if (e.key === 'appearance') store.appearanceChoice = readChoice();
+      else if (e.key?.startsWith('theme:')) store.themeNames = readThemeNames();
+    };
+    window.addEventListener('storage', other);
+    return () => {
+      mq.removeEventListener('change', sys);
+      window.removeEventListener('storage', other);
+    };
+  });
   import { keyHandler, menuMayRun } from './keyDispatch';
   import { fromIso, monthTitle, weekNumber } from './calIndex';
   const calCrumb = (c: { view: 'month' | 'week'; date: string }) => (c.view === 'week' ? `Неделя ${weekNumber(fromIso(c.date))}` : monthTitle(fromIso(c.date)));

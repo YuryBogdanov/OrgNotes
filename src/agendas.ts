@@ -3,7 +3,7 @@
 // "agendas", next to the statuses.
 
 import { dayDiff, sequenceFor, toJs, type Heading, type OrgDate, type Workflow } from './org';
-import { isColor } from './colors';
+import { asNamed } from './themes';
 import { displayName } from './names';
 
 export type Field = 'status' | 'scheduled' | 'deadline' | 'tag' | 'priority' | 'path' | 'title' | 'done';
@@ -177,7 +177,7 @@ export function readAgendas(raw: unknown): Agenda[] {
       blocks.push({
         id: uid('b'),
         name: str(b?.name).trim() || 'Без названия',
-        color: isColor(b?.color) ? b.color : 'blue',
+        color: asNamed(b?.color) ?? 'blue',
         conds: (Array.isArray(b?.conds) ? b.conds : []).map(readCond).filter((c: Cond | null): c is Cond => !!c),
         group: GROUPS.some((g) => g.id === b?.group) ? b.group : 'none',
         sort: SORTS.some((s) => s.id === b?.sort) ? b.sort : 'prio',

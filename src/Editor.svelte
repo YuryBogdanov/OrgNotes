@@ -253,7 +253,7 @@
         const t = line.text;
         const hm = heads.has(line.number - 1) ? HEAD.exec(t) : null;
         if (hm) {
-          const lvl = Math.min(hm[1].length, 3);
+          const lvl = Math.min(hm[1].length, 9); // deeper than 9: as 9
           items.push(Decoration.line({ class: 'cm-h' + lvl }).range(line.from));
           let i = hm[0].length;
           const w = /^(\S+)/.exec(t.slice(i));

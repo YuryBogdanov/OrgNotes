@@ -332,7 +332,6 @@
   .num.today, .wn.today { background: var(--acc); color: var(--onacc); font-weight: 700; }
   .cell.sel .num { font-weight: 700; }
   .ch { --tc: var(--tl, var(--next)); flex: 0 0 20px; height: 20px; width: 100%; display: flex; align-items: center; gap: 5px; padding: 0 6px; border: 0; border-radius: 5px; background: color-mix(in srgb, var(--tc) 14%, transparent); color: var(--fg); font-size: 11.5px; overflow: hidden; white-space: nowrap; text-align: left; }
-  @media (prefers-color-scheme: dark) { .ch { --tc: var(--td, var(--next)); } }
   .ch .dot { flex: 0 0 6px; width: 6px; height: 6px; border-radius: 3px; background: var(--tc); }
   .ch.deadline { --tc: var(--todo); color: var(--fg); }
   .ch.deadline svg { flex: 0 0 10px; color: var(--todo); }

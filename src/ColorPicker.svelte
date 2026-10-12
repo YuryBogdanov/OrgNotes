@@ -1,10 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { PALETTE, colorName, toneOf, toneStyle, type Tone } from './colors';
+  import { asNamed } from './themes';
+  import { store } from './store.svelte';
 
-  // Popover with a pointer: eight named colours (4 x 2), a live preview on both themes, and "Другой цвет…".
+  // Popover with a pointer: eight named colours (4 x 2) and a preview in the editor themes of both appearances —
+  // each theme gives its own shade of a named colour.
   let { value, keyword, fallback, anchor, onpick, onclose, title = 'Цвет статуса' }: {
-    value: string; // palette id, #rrggbb or '' (automatic)
+    value: string; // a named colour or '' (automatic)
     keyword: string;
     title?: string; // «Цвет блока» in the agenda builder
     fallback: Tone; // the colour in effect when `value` is empty
@@ -14,14 +17,16 @@
   } = $props();
 
   const WIDTH = 268;
-  const isCustom = $derived(/^#/.test(value));
   const tone = $derived(toneOf(value) ?? fallback);
   const label = $derived(value ? colorName(value) : 'Авто');
-  const named = PALETTE.map((p) => ({ id: p.id, name: p.name, style: toneStyle({ light: p.light, dark: p.dark }) }));
-  const swatches = $derived(isCustom ? [...named, { id: value, name: 'Другой цвет', style: toneStyle(toneOf(value)!) }] : named);
+  const swatches = PALETTE.map((p) => ({ id: p.id, name: p.name, style: toneStyle(toneOf(p.id)!) }));
+  // the shade of the colour in effect in each appearance's theme: `var(--p-red)` → the theme's hex
+  const light = $derived(store.themeFor('light').colors);
+  const dark = $derived(store.themeFor('dark').colors);
+  const shade = (pal: Record<string, string>, t: string) => pal[/--p-(\w+)/.exec(t)?.[1] ?? ''] ?? t;
+  const sel = $derived(asNamed(value) ?? '');
 
   let el: HTMLDivElement | undefined = $state();
-  let colorInput: HTMLInputElement | undefined = $state();
   let focused = $state(0);
 
   // placed under the swatch, kept inside the window; the arrow follows the swatch
@@ -36,7 +41,7 @@
 
   // focus the current colour once, when the popover opens (not on every later change of `focused`)
   onMount(() => {
-    const i = swatches.findIndex((s) => s.id === value);
+    const i = swatches.findIndex((s) => s.id === sel);
     focused = i >= 0 ? i : 0;
     queueMicrotask(() => el?.querySelectorAll<HTMLElement>('[data-sw]')[focused]?.focus());
   });
@@ -72,9 +77,9 @@
 
   <div class="grid" role="radiogroup" aria-label="Цвета">
     {#each swatches as s, i (s.id)}
-      <button class="cell" data-sw role="radio" aria-checked={s.id === value} aria-label={s.name} tabindex={i === focused ? 0 : -1} onclick={() => onpick(s.id)}>
-        <span class="dot tone-bg" class:sel={s.id === value} style={s.style}>
-          {#if s.id === value}<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg>{/if}
+      <button class="cell" data-sw role="radio" aria-checked={s.id === sel} aria-label={s.name} tabindex={i === focused ? 0 : -1} onclick={() => onpick(s.id)}>
+        <span class="dot tone-bg" class:sel={s.id === sel} style={s.style}>
+          {#if s.id === sel}<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg>{/if}
         </span>
         <span class="nm">{s.name}</span>
       </button>
@@ -84,18 +89,13 @@
   <div class="prev">
     <div class="cap">Так будет выглядеть</div>
     <div class="plates">
-      <div class="plate light"><span class="chip" style="color:{tone.light};background:color-mix(in srgb, {tone.light} 14%, transparent)">{keyword || '…'}</span></div>
-      <div class="plate dark"><span class="chip" style="color:{tone.dark};background:color-mix(in srgb, {tone.dark} 15%, transparent)">{keyword || '…'}</span></div>
+      {#each [light, dark] as c, i (i)}
+        {@const x = shade(c.palette, tone.light)}
+        <div class="plate" style="background:{c.bg}"><span class="chip" style="color:{x};background:color-mix(in srgb, {x} 15%, transparent)">{keyword || '…'}</span></div>
+      {/each}
     </div>
   </div>
-
-  <!-- the colour input lies exactly over the button, so the system picker points at the button, not at the popover's corner -->
-  <div class="otherwrap">
-    <button class="other" onclick={() => (colorInput?.showPicker ? colorInput.showPicker() : colorInput?.click())}>Другой цвет…</button>
-    <input bind:this={colorInput} class="hidden" type="color" value={isCustom ? value : tone.light} aria-label="Другой цвет" tabindex="-1"
-      oninput={(e) => onpick(e.currentTarget.value.toLowerCase())} />
-  </div>
-  <div class="note">Цвета подбираются отдельно для светлой и тёмной темы</div>
+  <div class="note">Оттенок цвета задаёт тема редактора: слева — светлая, справа — тёмная</div>
 </div>
 
 <style>
@@ -118,11 +118,6 @@
   .cap { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--fg2); margin-bottom: 6px; }
   .plates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .plate { height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); }
-  .plate.light { background: #ffffff; }
-  .plate.dark { background: #1e1e22; }
   .chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 5px; letter-spacing: 0.02em; }
-  .otherwrap { position: relative; }
-  .other { width: 100%; height: 28px; border: 0; border-radius: 6px; background: var(--field); }
-  .hidden { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; border: 0; padding: 0; }
   .note { font-size: 11.5px; color: var(--fg2); line-height: 1.4; }
 </style>
