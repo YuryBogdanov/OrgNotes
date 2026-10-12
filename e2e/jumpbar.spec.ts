@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, expandTree } from './tauriMock';
 
 // ТЗ «Строка пути и переход с клавиатуры».
 const R = '/mock/Работа/Планирование/2026/';
@@ -17,6 +17,7 @@ const open = async (page: Page) => {
   await installTauriMock(page, FILES());
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
+  await expandTree(page); // folded by default (ТЗ 02)
   await page.locator(`.nav .row[data-key="${R}work.org"]`).click();
   await page.locator('section.pane .cm-line', { hasText: 'Бюджет' }).click();
 };
@@ -135,6 +136,7 @@ test.describe('the menus', () => {
     });
     await page.goto('/');
     await expect(page.locator('.cm-content').first()).toBeVisible();
+    await expandTree(page);
     await page.locator('.nav .row[data-key="/mock/Работа/Планирование/план.org"]').click();
     await page.locator('section.pane .cm-line', { hasText: 'Бюджет' }).click();
     await enter(page);

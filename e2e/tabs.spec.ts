@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, expandTree } from './tauriMock';
 
 const FILES = () => ({
   '/mock/work.org': '#+TITLE: Work\n\n* Q4 2026\n** TODO Бюджет\nтекст\n',
@@ -16,6 +16,7 @@ const open = async (page: Page, files: Record<string, string> = FILES()) => {
   await installTauriMock(page, files);
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
+  await expandTree(page); // folded by default (ТЗ 02)
   await navRow(page, 'work').click();
   await expect(page.locator('.cm-content').first()).toContainText('Q4 2026');
 };

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { installTauriMock, openSettingsSheet, expandTree } from './tauriMock';
 
 // ТЗ «Навигатор, структура файла и переход к заголовку».
 const WORK = '#+TITLE: Работа\n\n* Q4 2026\n** TODO Подготовить бюджет 2027\nтекст\n*** DONE Собрать заявки\n*** TODO Согласовать с финансами\n** NEXT План найма\n* Тимлиды\nзаметки\n';
@@ -29,6 +29,7 @@ const toOutline = async (page: Page) => page.locator('.insp').getByRole('tab', {
 test.describe('navigator', () => {
   test('a chevron only on folders; files and folders of one level line up', async ({ page }) => {
     await open(page);
+    await expandTree(page);
     const folder = navRow(page, 'Работа/');
     const file = navRow(page, '/mock/work.org');
     await expect(folder.locator('.chev')).toBeVisible();
@@ -56,7 +57,7 @@ test.describe('navigator', () => {
 
   test('with the setting off (the default) no headings appear in the navigator, whatever happens', async ({ page }) => {
     await open(page);
-    await expect(page.locator('.nav .row')).toHaveText(['Работа', '2026', 'plan', 'empty', 'journal', 'work'].map((t) => new RegExp(t)));
+    await expect(page.locator('.nav .row')).toHaveText(['Работа', 'empty', 'journal', 'work'].map((t) => new RegExp(t))); // folded (ТЗ 02)
     await page.locator('.cm-line', { hasText: 'План найма' }).click();
     await navRow(page, '/mock/work.org').locator('.chev').click({ force: true });
     await page.keyboard.press('Shift+Meta+j'); // «Показать в навигаторе»
@@ -74,6 +75,7 @@ test.describe('navigator', () => {
     await journal.hover();
     await expect(journal.locator('.chev')).toHaveCSS('opacity', '1');
     await expect(navRow(page, '/mock/empty.org').locator('.chev')).toHaveCSS('visibility', 'hidden'); // no headings
+    await expandTree(page);
     // heading rows: one level deeper, keyword as a chip; a click puts the caret on it
     const h = page.locator('.nav .row', { hasText: 'План найма' });
     await expect(h.locator('.kw')).toHaveText('NEXT');
@@ -111,12 +113,16 @@ test.describe('navigator', () => {
 
   test('←/→ fold and open folders as in Finder; ↑↓ move', async ({ page }) => {
     await open(page);
-    await navRow(page, 'Работа/').locator('.label').click(); // also folds it
+    await navRow(page, 'Работа/').locator('.label').click(); // folded by default: the click opens it
+    await expect(navRow(page, 'Работа/2026/')).toBeVisible();
+    await page.keyboard.press('ArrowLeft');
     await expect(navRow(page, 'Работа/2026/')).toHaveCount(0);
     await page.keyboard.press('ArrowRight');
     await expect(navRow(page, 'Работа/2026/')).toBeVisible();
     await page.keyboard.press('ArrowRight'); // into the folder
     await expect(navRow(page, 'Работа/2026/')).toBeFocused();
+    await page.keyboard.press('ArrowRight'); // open 2026
+    await expect(navRow(page, '/mock/Работа/2026/plan.org')).toBeVisible();
     await page.keyboard.press('ArrowLeft'); // fold 2026
     await expect(navRow(page, '/mock/Работа/2026/plan.org')).toHaveCount(0);
     await page.keyboard.press('ArrowLeft'); // up to Работа

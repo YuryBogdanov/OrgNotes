@@ -1,17 +1,36 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { store } from './store.svelte';
   import { subtreeProgress, toneFor } from './org';
   import { toneStyle } from './colors';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
+  import { buttons, expandAll, folderKey, headingKey, pathKeys, readOpen, subtreeKeys, treeNodes, writeOpen } from './navTree';
 
   type Row = {
     key: string; kind: 'folder' | 'file' | 'heading' | 'new'; depth: number; label: string;
     open: boolean; hasKids: boolean; rel: string; file?: number; line?: number;
     kw?: string | null; tone?: string; cnt?: string; selected?: boolean; done?: boolean;
   };
-  const toggled = new SvelteSet<string>();
-  const isOpen = (key: string, def: boolean) => def !== toggled.has(key);
+  // ТЗ 02: the open nodes, kept per notes folder; everything else is folded
+  const open = new SvelteSet<string>();
+  let openDir: string | null = null; // the folder whose state `open` holds
+  $effect.pre(() => {
+    const dir = store.dir;
+    if (dir === openDir) return;
+    open.clear();
+    for (const k of readOpen(dir) ?? []) open.add(k);
+    openDir = dir;
+  });
+  $effect(() => {
+    const keys = [...open];
+    if (openDir && openDir === store.dir) writeOpen(openDir, new Set(keys));
+  });
+  const nodes = $derived(treeNodes(store.folders, store.files, store.navHeadings));
+  /** The path to the current file and heading: opened when it changes, kept by «Свернуть всё». */
+  const path = $derived(pathKeys(store.file, store.selected, store.navHeadings));
+  const can = $derived(buttons(nodes, open, path));
+  let capped = $state(false); // «Развернуть всё» left the headings closed
   const base = (n: string) => n.split('/').pop()!;
   const parentOf = (rel: string) => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
   const noExt = (n: string) => n.replace(/\.org$/, '');
@@ -41,18 +60,18 @@
       newRow(n.rel, depth);
       const kids = [...n.children.values()].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
       for (const c of kids) {
-        const key = c.rel + '/';
-        const open = isOpen(key, true);
+        const key = folderKey(c.rel);
+        const isOpen = open.has(key);
         // an empty folder has no chevron (its column stays, so the names line up)
         const full = c.children.size + c.files.length > 0 || store.creating?.dir === c.rel;
-        out.push({ key, kind: 'folder', depth, label: c.name, open: open && full, hasKids: full, rel: c.rel });
-        if (open) walk(c, depth + 1);
+        out.push({ key, kind: 'folder', depth, label: c.name, open: isOpen && full, hasKids: full, rel: c.rel });
+        if (isOpen) walk(c, depth + 1);
       }
       for (const i of n.files) {
         const f = store.files[i];
         // headings show only with "Показывать заголовки в навигаторе"; the outline lives in the inspector
         const kids = store.navHeadings && f.headings.length > 0;
-        const fopen = kids && isOpen(f.path, i === store.cur);
+        const fopen = kids && open.has(f.path);
         out.push({
           key: f.path, kind: 'file', depth, label: noExt(base(f.name)), open: fopen, hasKids: kids,
           rel: f.name, file: i, selected: i === store.cur && (!fopen || store.selected < 0),
@@ -62,12 +81,12 @@
         f.headings.forEach((h, hi) => {
           if (h.line < hiddenUntil) return;
           const hasKids = f.headings[hi + 1]?.parent === hi;
-          const key = f.path + '#' + h.line;
-          const open = hasKids && isOpen(key, h.level <= 1);
-          if (hasKids && !open) hiddenUntil = h.end;
+          const key = headingKey(f, hi);
+          const isOpen = hasKids && open.has(key);
+          if (hasKids && !isOpen) hiddenUntil = h.end;
           const p = hasKids ? subtreeProgress(f.headings, hi, f.wf) : { done: 0, total: 0 };
           out.push({
-            key, kind: 'heading', depth: depth + h.level, label: h.title, open, hasKids, rel: f.name,
+            key, kind: 'heading', depth: depth + h.level, label: h.title, open: isOpen, hasKids, rel: f.name,
             file: i, line: h.line, kw: h.keyword, tone: h.keyword ? toneStyle(toneFor(h.keyword, f.wf)) : undefined,
             cnt: p.total ? `${p.done}/${p.total}` : '',
             selected: i === store.cur && hi === store.selected,
@@ -80,7 +99,44 @@
     return out;
   });
 
-  const toggle = (r: Row) => (toggled.has(r.key) ? toggled.delete(r.key) : toggled.add(r.key));
+  const toggle = (r: Row) => (open.has(r.key) ? open.delete(r.key) : open.add(r.key));
+  /** ⌥-click, ⌥→ ⌥←: the node with everything under it. */
+  function toggleSubtree(r: Row, to = !r.open) {
+    for (const k of subtreeKeys(nodes, r.key)) {
+      if (to) open.add(k);
+      else open.delete(k);
+    }
+  }
+  /** Bring the current row into view (after the tree has drawn). */
+  const showCurrent = () => queueMicrotask(() => listEl?.querySelector<HTMLElement>('.row.sel')?.scrollIntoView({ block: 'nearest' }));
+
+  // the current file changes (a tab, the palette, a link): the path to it opens; nothing else is folded
+  $effect(() => {
+    const keys = path;
+    if (openDir !== store.dir) return;
+    untrack(() => {
+      for (const k of keys) open.add(k);
+    });
+    showCurrent();
+  });
+  function collapseAll() {
+    open.clear();
+    for (const k of path) open.add(k);
+    capped = false;
+    showCurrent();
+  }
+  function expandEverything() {
+    const r = expandAll(nodes);
+    for (const k of r.keys) open.add(k);
+    capped = r.capped;
+  }
+  // the palette and the keys («Навигатор: свернуть всё / развернуть всё»)
+  $effect(() => {
+    const q = store.navTreeReq;
+    if (!q || !store.loaded) return;
+    untrack(() => (q.kind === 'collapse' ? collapseAll() : expandEverything()));
+    store.navTreeReq = null;
+  });
   function click(r: Row) {
     if (r.kind === 'new') return;
     focusKey = r.key;
@@ -91,7 +147,8 @@
   function chev(e: MouseEvent, r: Row) {
     e.stopPropagation();
     focusKey = r.key;
-    toggle(r);
+    if (e.altKey) toggleSubtree(r);
+    else toggle(r);
   }
 
   // ---- keyboard, as in Finder: ↑↓ move, → opens (then goes in), ← closes (then goes to the parent), ↩ opens a file
@@ -109,6 +166,9 @@
       e.preventDefault();
       const next = list[Math.max(0, Math.min(list.length - 1, i < 0 ? 0 : i + (e.key === 'ArrowDown' ? 1 : -1)))];
       if (next) setFocus(next.key);
+    } else if (e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft') && r) {
+      e.preventDefault();
+      if (r.hasKids) toggleSubtree(r, e.key === 'ArrowRight');
     } else if (e.key === 'ArrowRight' && r) {
       e.preventDefault();
       if (r.hasKids && !r.open) toggle(r);
@@ -134,7 +194,7 @@
     const f = store.files.find((x) => x.path === r.path);
     if (!f) return;
     const parts = f.name.split('/').slice(0, -1);
-    parts.forEach((_, i) => toggled.delete(parts.slice(0, i + 1).join('/') + '/')); // expand every folder above it
+    parts.forEach((_, i) => open.add(folderKey(parts.slice(0, i + 1).join('/')))); // expand every folder above it
     flash = r.path;
     const t = setTimeout(() => (flash = null), 1600);
     queueMicrotask(() => listEl?.querySelector<HTMLElement>(`[data-key="${CSS.escape(r.path)}"]`)?.scrollIntoView({ block: 'nearest' }));
@@ -145,8 +205,7 @@
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
 
   const startCreate = (dir: string, kind: 'file' | 'folder') => {
-    const key = dir + '/';
-    if (dir && toggled.has(key)) toggled.delete(key); // make sure the folder is expanded
+    if (dir) open.add(folderKey(dir)); // make sure the folder is expanded
     store.creating = { dir, kind };
   };
   const createItems = (dir: string): MenuItem[] => [
@@ -228,7 +287,14 @@
       <button class="open" aria-label="Создать папку" title="Создать папку" onclick={() => startCreate(store.file ? parentOf(store.file.name) : '', 'folder')}>
         <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" /></svg>
       </button>
+      <span class="vsep" aria-hidden="true"></span>
     {/if}
+    <button class="tb" aria-label="Свернуть всё" title={store.titled('Свернуть всё', 'navCollapse')} disabled={!can.collapse} onclick={collapseAll}>
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3.5l5 4 5-4M5 16.5l5-4 5 4" /></svg>
+    </button>
+    <button class="tb" aria-label="Развернуть всё" title={store.titled('Развернуть всё', 'navExpand')} disabled={!can.expand} onclick={expandEverything}>
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7.5l5-4 5 4M5 12.5l5 4 5-4" /></svg>
+    </button>
   </div>
   {#if store.folderGone}
     <!-- the notes folder went away while working: the tabs keep their text -->
@@ -289,6 +355,7 @@
         </div>
       {/if}
     {/each}
+    {#if capped && !can.expand}<p class="capped">Заголовки не раскрыты: их слишком много</p>{/if}
   </div>
 </div>
 
@@ -298,8 +365,15 @@
 
 <style>
   .nav { height: 100%; display: flex; flex-direction: column; min-width: 0; }
-  .head { display: flex; align-items: center; gap: 2px; padding: 8px 8px 4px 14px; }
-  .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; color: var(--fg2); letter-spacing: 0.02em; text-transform: uppercase; }
+  /* the line over the tree (ТЗ 02): the folder, «create», and «Свернуть всё» / «Развернуть всё» */
+  .head { flex: 0 0 28px; display: flex; align-items: center; gap: 2px; padding: 4px 8px 0 14px; }
+  .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; color: var(--fg3); letter-spacing: 0.05em; text-transform: uppercase; }
+  .tb { width: 26px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); display: flex; align-items: center; justify-content: center; }
+  .tb:hover:not(:disabled) { background: var(--field); }
+  .tb:disabled { opacity: 0.35; }
+  .tb:focus-visible, .open:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+  .vsep { width: 1px; height: 14px; margin: 0 4px; background: var(--line); }
+  .capped { margin: 8px 8px 0; font-size: 11.5px; color: var(--fg2); }
   .open { width: 26px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); display: flex; align-items: center; justify-content: center; }
   .open:hover { background: var(--field); }
   .gone { margin: 4px 10px 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; border-radius: 8px; background: color-mix(in srgb, var(--wait) 14%, transparent); font-size: 12px; color: var(--fg2); }
