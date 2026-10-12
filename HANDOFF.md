@@ -166,6 +166,8 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 
 ## 9. Open items / known issues
 
+- **Core and plugins roadmap:** `docs/roadmap-yadro-i-plaginy.md` (from `docs/brief-yadro-i-plaginy.md`). Every PR of the roadmap updates its task's status there. Stage 0 (core preparation) changes no behaviour except one ⌘Z everywhere.
+
 1. **Full-screen traffic lights** (PR #27, merged anyway): the lights drawn in the toolbar in full screen do not take
    clicks.
    - Hypothesis A: the invisible NSToolbarFullScreenWindow strip still eats mouse events, and `setIgnoresMouseEvents`
