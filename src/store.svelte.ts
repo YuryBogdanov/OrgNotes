@@ -1,7 +1,7 @@
 import {
   activeTab, addPane, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
   openFile, openFromAgenda, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
-  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, openGoals,
+  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, openGoals, openCalendar,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { displayName, noteName, withOrg } from './names';
@@ -19,6 +19,7 @@ import {
   carryOver, readGoalSettings, withGoalSettings, isSilent, deadlineSoon, isDone, DEFAULT_GOAL_SETTINGS, type GoalSettings, type Goal,
   type GoalSource, type NewGoal, type Quarter, type SourceGoals,
 } from './goals';
+import { byDay, entriesIn, hasDated, isoDay, type CalEntry, type Layer } from './calIndex';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
@@ -50,6 +51,15 @@ function build(name: string, path: string, text: string, disk: string, diskRaw: 
 export type PaletteStart = 'newFile' | 'newFolder' | 'goto' | 'status' | 'priority' | 'schedule' | 'deadline' | 'tags' | 'calendar';
 const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
+function readLayers(): Layer[] {
+  try {
+    const v = JSON.parse(lsGet('cal:layers') ?? 'null');
+    if (Array.isArray(v)) return v.filter((x): x is Layer => ['task', 'deadline', 'event', 'wait', 'done'].includes(x));
+  } catch {
+    /* the default */
+  }
+  return ['task', 'deadline', 'event', 'done']; // «Ожидания» off, as on the mockup
+}
 function readLevels(): LevelView {
   try {
     const v = JSON.parse(lsGet('editor:levels') ?? 'null');
@@ -501,7 +511,7 @@ class Store {
     return t?.kind === 'agenda' && t.agenda ? this.agendas.find((a) => a.id === t.agenda) : undefined;
   }
   /** The left navigator: the files, or the list of agendas. A setting of the window: switching tabs or panes keeps it. */
-  navMode = $state<NavMode>((['files', 'inbox', 'agendas', 'goals', 'search'] as const).find((m) => m === lsGet('nav:mode')) ?? 'files');
+  navMode = $state<NavMode>((['files', 'inbox', 'agendas', 'goals', 'calendar', 'search'] as const).find((m) => m === lsGet('nav:mode')) ?? 'files');
   setNavMode(m: NavMode) {
     this.navMode = m;
     this.showNav = true;
@@ -1872,7 +1882,7 @@ class Store {
     }
   }
   /** Toolbar: "Второй редактор" / "Агенда" in the second pane. */
-  toggleSecond(kind: 'file' | 'agenda') {
+  toggleSecond(kind: 'file' | 'agenda' | 'calendar') {
     toggleSecond(this.layout, kind, () => {
       const t = this.tab;
       if (t?.kind === 'file') return copyTab(t);
@@ -1906,6 +1916,61 @@ class Store {
   /** ⌘2: the agenda in the active pane; ⌘1: back to the last file tab of that pane. */
   showAgendaHere() {
     openAgenda(this.layout, this.layout.active);
+  }
+  /** ⌘3: the calendar in the active pane; the navigator shows its layers and files. */
+  showCalendarHere() {
+    openCalendar(this.layout, this.layout.active);
+    this.setNavMode('calendar');
+  }
+  // ---- the calendar (ТЗ 24): layers and files shown, on this Mac -------------------------------------------------
+  calLayers = $state<Layer[]>(readLayers());
+  setCalLayer(l: Layer, on: boolean) {
+    this.calLayers = on ? [...new Set([...this.calLayers, l])] : this.calLayers.filter((x) => x !== l);
+    lsSet('cal:layers', JSON.stringify(this.calLayers));
+  }
+  /** Files left out of the calendar, per notes folder. */
+  calHiddenAll = $state<Record<string, string[]>>((() => {
+    try {
+      const v = JSON.parse(lsGet('cal:hidden') ?? '{}');
+      return v && typeof v === 'object' ? v : {};
+    } catch {
+      return {};
+    }
+  })());
+  get calHiddenNow(): string[] {
+    return this.calHiddenAll[this.dir ?? ''] ?? [];
+  }
+  setCalFile(name: string, on: boolean) {
+    const h = this.calHiddenNow.filter((x) => x !== name);
+    this.calHiddenAll = { ...this.calHiddenAll, [this.dir ?? '']: on ? h : [...h, name] };
+    lsSet('cal:hidden', JSON.stringify(this.calHiddenAll));
+  }
+  /** Files with something dated: the «ФАЙЛЫ» of the calendar. */
+  get calFiles(): NoteFile[] {
+    return this.files.filter((f) => hasDated(f));
+  }
+  /** The entries between two days in the layers and files shown, by day and in order. */
+  calDays(from: Date, to: Date): Map<string, CalEntry[]> {
+    const hidden = new Set(this.calHiddenNow);
+    const layers = new Set(this.calLayers);
+    const files = this.files.filter((f) => !hidden.has(f.name));
+    const open = [...new Set(this.files.flatMap((f) => f.wf.open))];
+    return byDay(entriesIn(files, from, to).filter((e) => layers.has(e.layer)), open);
+  }
+  /** Change the calendar state of a tab (the view, the chosen day). */
+  setCalendar(t: Tab, c: Partial<{ view: 'month' | 'week'; date: string }>) {
+    t.calendar = { ...(t.calendar ?? { view: 'month', date: isoDay(new Date()) }), ...c };
+  }
+  /** An entry picked in the calendar: its file in a new tab of this pane, or (⌘) in the neighbour pane. */
+  openCalEntry(e: { path: string; line: number }, neighbour = false) {
+    const pi = this.layout.active;
+    if (neighbour) {
+      const t = openFromAgenda(this.layout, pi, e.path, e.line, '', 'neighbor');
+      t.fromAgenda = null;
+    } else {
+      openFile(this.layout, pi, e.path, e.line, { focus: true });
+      this.layout.active = pi;
+    }
   }
   showNotesHere() {
     const p = this.layout.panes[this.layout.active];
@@ -2403,7 +2468,7 @@ export interface GoalPerson {
 }
 export const SECTIONS = ['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши'] as const;
 export type SettingsSection = (typeof SECTIONS)[number];
-export type NavMode = 'files' | 'inbox' | 'agendas' | 'goals' | 'search';
+export type NavMode = 'files' | 'inbox' | 'agendas' | 'goals' | 'calendar' | 'search';
 /** The search in every file: up to this many matches are listed. */
 export const SEARCH_CAP = 1000;
 export interface SearchGroup {

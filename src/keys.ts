@@ -88,6 +88,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('navInbox', 'Навигатор: Inbox', 'view', 'window', ['⌃⌘2']),
   C('navAgendas', 'Навигатор: агенды', 'view', 'window', ['⌃⌘3']),
   C('navGoals', 'Навигатор: цели', 'view', 'window', ['⌃⌘4'], { synonyms: ['цели'] }),
+  C('navCalendar', 'Навигатор: календарь', 'view', 'window', ['⌃⌘5'], { synonyms: ['слои'] }),
   C('navSearch', 'Навигатор: поиск', 'view', 'window', ['⌃⌘6']),
   C('navCollapse', 'Навигатор: свернуть всё', 'view', 'window', [], { synonyms: ['дерево', 'папки'] }),
   C('navExpand', 'Навигатор: развернуть всё', 'view', 'window', [], { synonyms: ['дерево', 'папки'] }),
@@ -95,6 +96,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
 
   C('notes', 'Заметки', 'go', 'window', ['⌘1']),
   C('agenda', 'Агенда', 'go', 'window', ['⌘2']),
+  C('calendar', 'Календарь', 'go', 'window', ['⌘3'], { synonyms: ['месяц', 'неделя'] }),
   C('back', 'Назад', 'go', 'window', ['⌘[']),
   C('followLink', 'Открыть ссылку под курсором', 'go', 'editor', ['⌘↩'], { synonyms: ['ссылка'] }),
 

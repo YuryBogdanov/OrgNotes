@@ -29,6 +29,8 @@
   import { displayName as nameOf } from './names';
   import { toAccelerator } from './keys';
   import { keyHandler, menuMayRun } from './keyDispatch';
+  import { fromIso, monthTitle, weekNumber } from './calIndex';
+  const calCrumb = (c: { view: 'month' | 'week'; date: string }) => (c.view === 'week' ? `Неделя ${weekNumber(fromIso(c.date))}` : monthTitle(fromIso(c.date)));
 
   // the quick entry from another program: a panel of its own with only the entry (the main window does the writing)
   const isCaptureWindow = location.hash === '#capture';
@@ -94,6 +96,11 @@
     outline: () => store.showOutline(),
     captureHere: () => store.openCapture(),
     navCollapse: () => store.navTree('collapse'),
+    calendar: () => store.showCalendarHere(),
+    navCalendar: () => {
+      store.showNav = true;
+      store.setNavMode('calendar');
+    },
     navGoals: () => {
       store.showNav = true;
       store.setNavMode('goals');
@@ -305,6 +312,9 @@
     <div class="path">
       {#if store.mode === 'agenda'}
         {#if store.agenda}<span>Агенда</span><span class="sep">›</span><span class="last">{store.agenda.name}</span>{:else}<span class="last">Агенда</span>{/if}
+      {:else if store.tab?.kind === 'calendar'}
+        {@const c = store.tab.calendar}
+        <span>Календарь</span><span class="sep">›</span><span class="last">{c ? calCrumb(c) : ''}</span>
       {:else if store.tab?.kind === 'goalReview'}
         {@const gk = store.tab.goals}
         <span>Цели</span><span class="sep">›</span><span class="last">Разбор · {store.goalPeople.find((p) => p.key === gk)?.name ?? ''}</span>
@@ -327,7 +337,7 @@
         <button aria-label="Агенда" title="Агенда" aria-pressed={pressed === 'agenda'} class:on={pressed === 'agenda'} onclick={() => store.toggleSecond('agenda')}>
           <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5h9M8 10h9M8 14.5h9" /><circle cx="4" cy="5.5" r="1" /><circle cx="4" cy="10" r="1" /><circle cx="4" cy="14.5" r="1" /></svg>
         </button>
-        <button aria-label="Календарь" title="Календарь (пока нет)" aria-pressed="false" disabled>
+        <button aria-label="Календарь" title="Календарь" aria-pressed={pressed === 'calendar'} class:on={pressed === 'calendar'} onclick={() => { store.toggleSecond('calendar'); if (secondKind(store.layout) === 'calendar') store.setNavMode('calendar'); }}>
           <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2.5v3M13 2.5v3" /><circle cx="10" cy="12.5" r="2" /></svg>
         </button>
       </div>

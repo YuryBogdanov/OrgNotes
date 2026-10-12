@@ -5,6 +5,7 @@
   import { toneStyle } from './colors';
   import { displayName } from './names';
   import Outline from './Outline.svelte';
+  import CalendarDay from './CalendarDay.svelte';
 
   const f = $derived(store.file);
   const h = $derived(f && store.selected >= 0 ? f.headings[store.selected] : undefined);
@@ -40,6 +41,9 @@
 </script>
 
 <div class="insp">
+  {#if store.tab?.kind === 'calendar'}
+  <CalendarDay />
+  {:else}
   <div class="tabs" role="tablist" aria-label="Инспектор">
     <button role="tab" aria-label="Задача" title="Задача" aria-selected={store.inspectorTab === 'task'} class:on={store.inspectorTab === 'task'} onclick={() => store.setInspectorTab('task')}>
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 5.5l1.5 1.5 3-3M3.5 12.5l1.5 1.5 3-3M11 5.5h6M11 12.5h6" /></svg>
@@ -153,6 +157,7 @@
     {/if}
   {:else}
     <div class="empty">Поставьте курсор внутрь заголовка, чтобы увидеть его свойства</div>
+  {/if}
   {/if}
 </div>
 
