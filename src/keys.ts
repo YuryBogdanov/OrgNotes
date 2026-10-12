@@ -134,6 +134,18 @@ export function registerKeys(list: KeyCommand[]) {
     commandById.set(c.id, c);
   }
 }
+/** Take a plugin's commands back (turned off); its group goes when nothing is left in it. */
+export function unregisterKeys(ids: string[], group?: GroupId) {
+  for (const id of ids) {
+    const i = KEY_COMMANDS.findIndex((c) => c.id === id);
+    if (i >= 0) KEY_COMMANDS.splice(i, 1);
+    commandById.delete(id);
+  }
+  if (group && !KEY_COMMANDS.some((c) => c.group === group)) {
+    const g = GROUPS.findIndex((x) => x.id === group);
+    if (g >= 0) GROUPS.splice(g, 1);
+  }
+}
 /** A group of «Клавиши» of a feature (at the end). */
 export function registerGroup(g: { id: GroupId; title: string; note?: string }) {
   if (!GROUPS.some((x) => x.id === g.id)) GROUPS.push(g);
@@ -312,7 +324,8 @@ export function parseState(raw: string | null): KeyState {
     const preset: Preset = v?.preset === 'mac' ? 'mac' : 'emacs';
     const overrides: Record<string, string[]> = {};
     for (const [id, keys] of Object.entries(v?.overrides ?? {}))
-      if (commandById.has(id) && Array.isArray(keys)) overrides[id] = keys.filter((k): k is string => typeof k === 'string').map((k) => pressesOf(k).map(normPress).join(' '));
+      // a plugin's command («hello.greet») is kept while the plugin is off: its keys come back with it
+      if ((commandById.has(id) || id.includes('.')) && Array.isArray(keys)) overrides[id] = keys.filter((k): k is string => typeof k === 'string').map((k) => pressesOf(k).map(normPress).join(' '));
     return { preset, overrides };
   } catch {
     return { ...DEFAULT_STATE };

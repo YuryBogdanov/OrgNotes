@@ -441,6 +441,16 @@ class Store {
       });
     return true;
   }
+  /** One feature's file read now (a plugin turned on after the folder was read). */
+  async readFeatureFile(id: string) {
+    if (!isTauri || id in this.featureFiles) return;
+    try {
+      const t = await invoke<string | null>('read_feature_file', { id });
+      if (t !== null) this.featureFiles = { ...this.featureFiles, [id]: JSON.parse(t) };
+    } catch {
+      /* unreadable: as if there were none */
+    }
+  }
   private async readFeatureFiles() {
     const out: Record<string, unknown> = {};
     if (isTauri)
@@ -535,7 +545,10 @@ class Store {
   // ---- keyboard shortcuts (ТЗ «раздел „Клавиши“»): a set of defaults and the changes on top, on this Mac ----------
   keyState = $state<KeyState>(parseState(lsGet('keys')));
   /** Every command's shortcuts now; the quick entry's is its own setting (it is registered with the system). */
+  /** The registry of commands changed (a plugin turned on or off): the shortcuts again. */
+  keysVersion = $state(0);
   bindings = $derived.by(() => {
+    void this.keysVersion;
     const b = bindingsOf(this.keyState);
     b.set('capture', this.captureKey ? [fromAccelerator(this.captureKey)] : []);
     return b;

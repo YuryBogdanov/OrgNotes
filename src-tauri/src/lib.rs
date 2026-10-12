@@ -976,6 +976,70 @@ fn theme_file(dir: &Path, file: &str) -> Result<PathBuf, String> {
     Ok(dir.join(file))
 }
 
+// ---- plugins (ТЗ 26 §4, roadmap 1.2): `plugins/<id>/` in the app's settings folder, next to `themes/` ------------
+
+fn plugins_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?.join("plugins");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+/// A plugin's folder name as a manifest's id: `[a-z0-9-]`, up to 64.
+fn plugin_dir_ok(dir: &str) -> bool {
+    !dir.is_empty() && dir.len() <= 64 && dir.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+#[derive(serde::Serialize)]
+struct ListedPlugin {
+    dir: String,
+    /// The text of `manifest.json`; none when there is no readable one.
+    manifest: Option<String>,
+}
+
+/// The folders of the installed plugins with their manifests.
+#[tauri::command]
+fn list_plugins(app: AppHandle) -> Vec<ListedPlugin> {
+    let Ok(dir) = plugins_dir(&app) else { return vec![] };
+    let Ok(rd) = fs::read_dir(dir) else { return vec![] };
+    let mut out: Vec<ListedPlugin> = rd
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if name.starts_with('.') {
+                return None;
+            }
+            Some(ListedPlugin { manifest: fs::read_to_string(e.path().join("manifest.json")).ok(), dir: name })
+        })
+        .collect();
+    out.sort_by(|a, b| a.dir.cmp(&b.dir));
+    out
+}
+
+/// A file of a plugin (its `main.js`, `styles.css`): only inside its own folder.
+#[tauri::command]
+fn read_plugin_file(app: AppHandle, dir: String, file: String) -> Result<String, String> {
+    if !plugin_dir_ok(&dir) {
+        return Err("bad plugin folder".into());
+    }
+    let ok_part = |p: &str| !p.is_empty() && p != "." && p != ".." && p.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c));
+    if file.starts_with('/') || !file.split('/').all(ok_part) {
+        return Err("bad plugin file".into());
+    }
+    let base = plugins_dir(&app)?.join(&dir).canonicalize().map_err(|e| e.to_string())?;
+    let p = base.join(&file).canonicalize().map_err(|e| e.to_string())?;
+    if !p.starts_with(&base) {
+        return Err("a plugin reads only its own folder".into());
+    }
+    fs::read_to_string(p).map_err(|e| e.to_string())
+}
+
+/// «Открыть папку плагинов»: the folder in Finder.
+#[tauri::command]
+fn open_plugins_folder(app: AppHandle) -> Result<(), String> {
+    let dir = plugins_dir(&app)?;
+    std::process::Command::new("open").arg(dir).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
 /// The text of every own theme.
 #[tauri::command]
 fn list_themes(app: AppHandle) -> Vec<String> {
@@ -1147,7 +1211,10 @@ pub fn run() {
             export_text,
             import_text,
             read_feature_file,
-            write_feature_file
+            write_feature_file,
+            list_plugins,
+            read_plugin_file,
+            open_plugins_folder
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

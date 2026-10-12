@@ -2,7 +2,7 @@
 // to the registry of keys here — before the store reads the saved shortcuts, so their changes are kept (imported by
 // main.ts right after the built-in features' keys). Nothing of the store here.
 
-import { C, registerGroup, registerKeys, registerScope } from '../keys';
+import { C, registerGroup, registerKeys, registerScope, unregisterKeys } from '../keys';
 import { API_VERSION } from './index';
 import { incompatible, parseManifest, type Manifest } from './manifest';
 import pkg from '../../package.json';
@@ -55,10 +55,55 @@ export function entryOf(dir: string, raw: unknown, builtin: boolean, choices: Re
   return { dir, builtin, manifest: m, problems, enabled: on && !problems.length };
 }
 
+/** An installed plugin as Rust lists it: its folder and the text of its manifest. */
+export interface Listed {
+  dir: string;
+  manifest: string | null;
+}
+const INSTALLED_KEY = 'plugins:installed';
+/** The installed plugins as last listed: their commands' keys are declared at once, before the store reads the
+ *  saved shortcuts; the list is read anew when the window is up. */
+export function readInstalled(): Listed[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(INSTALLED_KEY) ?? '[]');
+    return Array.isArray(v) ? v.filter((x) => x && typeof x.dir === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+export function saveInstalled(list: Listed[]) {
+  try {
+    localStorage.setItem(INSTALLED_KEY, JSON.stringify(list));
+  } catch {
+    /* no storage: listed again next time */
+  }
+}
+const byName = (a: Entry, b: Entry) => (a.manifest?.name ?? a.dir).localeCompare(b.manifest?.name ?? b.dir, 'ru');
+
+/** The entries of the installed plugins (a built-in one's id is taken). */
+export function installedEntries(list: Listed[], builtin: Entry[], choices = readChoices()): Entry[] {
+  const taken = new Set(builtin.map((e) => e.manifest?.id).filter(Boolean));
+  return list
+    .map((l) => {
+      let raw: unknown;
+      if (l.manifest === null) return { dir: l.dir, builtin: false, manifest: null, problems: ['в папке нет manifest.json'], enabled: false };
+      try {
+        raw = JSON.parse(l.manifest);
+      } catch {
+        return { dir: l.dir, builtin: false, manifest: null, problems: ['manifest.json — не JSON'], enabled: false };
+      }
+      const e = entryOf(l.dir, raw, false, choices);
+      if (e.manifest && taken.has(e.manifest.id)) return { ...e, problems: [...e.problems, `id «${e.manifest.id}» занят встроенным плагином`], enabled: false };
+      return e;
+    })
+    .sort(byName);
+}
+
 const choices = readChoices();
-export const entries: Entry[] = Object.entries(BUILTIN)
+export const builtinEntries: Entry[] = Object.entries(BUILTIN)
   .map(([path, raw]) => entryOf(path.split('/').at(-2)!, raw, true, choices))
-  .sort((a, b) => (a.manifest?.name ?? a.dir).localeCompare(b.manifest?.name ?? b.dir, 'ru'));
+  .sort(byName);
+export const entries: Entry[] = [...builtinEntries, ...installedEntries(readInstalled(), builtinEntries, choices)];
 
 /** The group of «Клавиши» of a plugin. */
 export const groupOf = (id: string) => 'plugin:' + id;
@@ -67,9 +112,14 @@ export const groupOf = (id: string) => 'plugin:' + id;
 export const REVIEW_SCOPE = 'pluginReview';
 registerScope({ id: REVIEW_SCOPE, name: 'в разборе плагина', over: ['window', 'editor', 'heading'], outside: { scopes: ['window', 'editor'], word: 'Вне разбора' }, rank: 30 });
 
-for (const e of entries) {
-  const m = e.manifest;
-  if (!e.enabled || !m || !m.contributes.commands.length) continue;
+/** A plugin's commands in the registry of keys (and its group of «Клавиши»). */
+export function declareKeys(m: Manifest) {
+  if (!m.contributes.commands.length) return;
   registerGroup({ id: groupOf(m.id), title: m.name.toUpperCase(), note: 'плагин' });
   registerKeys(m.contributes.commands.map((c) => C(c.id, c.title, groupOf(m.id), c.scope === 'review' ? REVIEW_SCOPE : 'window', c.keys ?? [], { synonyms: c.synonyms })));
 }
+export function undeclareKeys(m: Manifest) {
+  unregisterKeys(m.contributes.commands.map((c) => c.id), groupOf(m.id));
+}
+
+for (const e of entries) if (e.enabled && e.manifest) declareKeys(e.manifest);

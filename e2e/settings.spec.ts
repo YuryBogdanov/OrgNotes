@@ -185,7 +185,7 @@ test.describe('table', () => {
 
   test('sections are in the order of the mockup, including Оформление, Календарь and Клавиши', async ({ page }) => {
     await openSettings(page);
-    expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши']);
+    expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши', 'Плагины']);
   });
 });
 
@@ -540,7 +540,7 @@ test.describe('sheet', () => {
     await openSettings(page);
     const sheet = page.getByRole('dialog', { name: 'Настройки' });
     const on = sheet.getByRole('tab', { selected: true });
-    await expect(sheet.getByRole('tab')).toHaveText(['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши']);
+    await expect(sheet.getByRole('tab')).toHaveText(['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши', 'Плагины']);
     await expect(on).toHaveText('Статусы');
     await page.keyboard.press('Meta+BracketRight');
     await expect(on).toHaveText('Агенды'); // «Теги» is not made yet
@@ -552,7 +552,7 @@ test.describe('sheet', () => {
     await expect(sheet.locator('.t2')).toHaveText('Основные');
     await on.focus();
     await page.keyboard.press('ArrowUp');
-    await expect(on).toHaveText('Клавиши');
+    await expect(on).toHaveText('Плагины'); // round to the last
     await expect(on).toBeFocused();
     await page.keyboard.press('ArrowDown');
     await expect(on).toHaveText('Основные');

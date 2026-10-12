@@ -14,13 +14,16 @@ import { DEFAULT_SEQUENCE, type Heading, type WorkflowDef } from '../org';
 import { displayName } from '../names';
 import type { Tx as CoreTx } from '../journal';
 import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSchema';
-import { entries, saveChoice, REVIEW_SCOPE, type Entry } from './declare';
+import { builtinEntries, declareKeys, entries, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, REVIEW_SCOPE, type Entry, type Listed } from './declare';
+import PluginsSettings from '../PluginsSettings.svelte';
 import type { Manifest, ManifestSettings } from './manifest';
 import type { Ctx, Dispose, EventName, FormSpec, HeadingInfo, HeadingRef, Place, Plugin, Query, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
 import PluginNav from '../PluginNav.svelte';
 import PluginReview from '../PluginReview.svelte';
 
+const isTauri = '__TAURI_INTERNALS__' in window;
+const invoke = async <T,>(cmd: string, args?: Record<string, unknown>) => (await import('@tauri-apps/api/core')).invoke<T>(cmd, args);
 const MAINS = import.meta.glob('../plugins/*/main.ts') as Record<string, () => Promise<{ default: Plugin }>>;
 const PLUG = 'M8 2.5v4M12 2.5v4M5.5 6.5h9v3a4.5 4.5 0 0 1-9 0zM10 14v3.5';
 
@@ -55,7 +58,12 @@ export interface ViewEntry {
 }
 
 class Host {
-  readonly entries: Entry[] = entries;
+  /** Every plugin known: the built-in ones, then the installed ones (as last listed). */
+  entries = $state<Entry[]>(entries);
+  /** What is registered now (declared, maybe running). */
+  private declared = new Set<string>();
+  /** The palette keeps its commands; one that has no action now is not offered. */
+  private inPalette = new Set<string>();
   /** Turned off after an error (until the restart): the reason. */
   failed = new SvelteMap<string, string>();
   /** Activated. */
@@ -84,13 +92,36 @@ class Host {
   live(id: string) {
     return this.entries.some((e) => e.enabled && e.manifest?.id === id) && !this.failed.has(id);
   }
-  setEnabled(id: string, on: boolean) {
-    saveChoice(id, on); // the loader (roadmap 1.2) turns it on and off at once; until then, after a restart
+  entry(id: string) {
+    return this.entries.find((e) => e.manifest?.id === id);
+  }
+  /** The plugin whose manifest declares this kind of tab (a tab of a plugin that is off). */
+  pluginOfView(kind: string) {
+    return this.entries.find((e) => e.manifest?.contributes.views.some((v) => v.id === kind));
+  }
+  /** On or off at once (roadmap 1.2): kept on this Mac. */
+  async setEnabled(id: string, on: boolean) {
+    const e = this.entry(id);
+    if (!e?.manifest || (on && e.problems.length)) return;
+    saveChoice(id, on);
+    e.enabled = on;
+    if (!on) return this.teardown(id);
+    this.failed.delete(id);
+    this.declareAll();
+    await this.activate(e);
+  }
+  /** «Перезагрузить плагины»: everything off, the folder read again, the plugins that are on started anew. */
+  async reload() {
+    for (const id of [...this.declared]) this.teardown(id);
+    this.failed.clear();
+    this.started = false;
+    await this.start();
   }
 
   // ---- what the manifests declare, before any code ---------------------------------------------------------------
   declare() {
-    for (const e of this.entries) if (e.enabled && e.manifest) this.declareOne(e.manifest);
+    this.declareAll(true);
+    registerSettings({ id: 'Плагины', icon: PLUG, order: 85, component: PluginsSettings });
     // the core's tab of a plugin's review; its sheets wait the window's keys
     registerView({
       kind: REVIEW_KIND, icon: 'M4 4h12v12H4zM7 8h6M7 11h4', component: PluginReview, transient: true, single: true,
@@ -156,14 +187,29 @@ class Host {
     if (!this.disposers.has(id)) this.disposers.set(id, []);
     this.disposers.get(id)!.push(d);
   }
+  /** Register what the plugins that are on declare and are not registered yet; `keysDone`: their keys already are. */
+  private declareAll(keysDone = false) {
+    let keys = false;
+    for (const e of this.entries) {
+      const m = e.manifest;
+      if (!e.enabled || !m || this.declared.has(m.id) || this.failed.has(m.id)) continue;
+      if (!keysDone) (declareKeys(m), (keys = true));
+      this.declareOne(m);
+    }
+    if (keys) store.keysVersion++;
+  }
   private declareOne(m: Manifest) {
     const id = m.id;
+    this.declared.add(id);
     store.registerStorage(id);
-    for (const c of m.contributes.commands.filter((x) => x.scope !== 'review'))
+    if (store.loaded) void store.readFeatureFile(id); // declared after the folder was read (installed, turned on)
+    for (const c of m.contributes.commands.filter((x) => x.scope !== 'review' && !this.inPalette.has(x.id))) {
+      this.inPalette.add(c.id);
       registerPalette({
         id: c.id, title: c.title, icon: 'plug', group: 'general', synonyms: c.synonyms,
         when: () => !!actionOf(c.id), run: () => void setTimeout(() => actionOf(c.id)?.()), // once the palette is closed
       });
+    }
     m.contributes.navSections.forEach((n, i) => {
       this.keep(id, registerNav({ id: n.id, label: n.title, icon: n.icon, key: n.key, order: 100 + i, component: PluginNav }));
       if (n.key) this.keep(id, registerAction(n.key, () => this.showNav(n.id)));
@@ -201,19 +247,69 @@ class Host {
   async start() {
     if (this.started) return;
     this.started = true;
-    for (const e of this.entries) {
-      const m = e.manifest;
-      if (!e.enabled || !m) continue;
-      const load = e.builtin ? MAINS[`../plugins/${e.dir}/main.ts`] : undefined;
-      if (!load) continue; // a plugin of data only (themes, roadmap 1.4)
-      try {
-        const p = (await load()).default;
-        this.plugins.set(m.id, p);
-        await p.activate(this.ctxOf(m));
-        this.active.set(m.id, true);
-      } catch (err) {
-        this.fail(m.id, err);
-      }
+    if (isTauri) await this.listInstalled();
+    for (const e of this.entries) if (e.enabled) await this.activate(e);
+  }
+  /** The installed plugins read anew: a plugin gone or changed is taken back, a new one comes in off. */
+  private async listInstalled() {
+    let list: Listed[];
+    try {
+      list = await invoke<Listed[]>('list_plugins');
+    } catch {
+      return;
+    }
+    saveInstalled(list);
+    const next = installedEntries(list, builtinEntries, readChoices());
+    for (const old of this.entries.filter((e) => !e.builtin)) {
+      const now = next.find((e) => e.dir === old.dir);
+      if (old.manifest && this.declared.has(old.manifest.id) && (!now || JSON.stringify(now.manifest) !== JSON.stringify(old.manifest) || !now.enabled)) this.teardown(old.manifest.id);
+    }
+    this.entries = [...this.entries.filter((e) => e.builtin), ...next];
+    this.declareAll();
+  }
+  /** Load the plugin's code and give it its ctx. */
+  private async activate(e: Entry) {
+    const m = e.manifest;
+    if (!m || !e.enabled || this.active.has(m.id) || this.failed.has(m.id)) return;
+    try {
+      const p = e.builtin ? await this.builtinCode(e) : await this.installedCode(e, m);
+      if (!p) return; // a plugin of data only (themes, roadmap 1.4)
+      if (typeof p.activate !== 'function') throw new Error('main.js не экспортирует плагин: export default { activate(ctx) { … } }');
+      this.plugins.set(m.id, p);
+      await p.activate(this.ctxOf(m));
+      if (this.declared.has(m.id)) this.active.set(m.id, true);
+    } catch (err) {
+      this.fail(m.id, err);
+    }
+  }
+  private async builtinCode(e: Entry): Promise<Plugin | null> {
+    const load = MAINS[`../plugins/${e.dir}/main.ts`];
+    return load ? (await load()).default : null;
+  }
+  /** An installed plugin's main.js (one module, everything bundled in) and its styles.css, read by Rust from its own folder. */
+  private async installedCode(e: Entry, m: Manifest): Promise<Plugin | null> {
+    if (m.styles) {
+      const css = await invoke<string>('read_plugin_file', { dir: e.dir, file: m.styles });
+      const el = document.createElement('style');
+      el.dataset.plugin = m.id;
+      el.textContent = css;
+      document.head.append(el);
+      this.keep(m.id, () => el.remove());
+    }
+    const file = m.main ?? 'main.js';
+    let code: string;
+    try {
+      code = await invoke<string>('read_plugin_file', { dir: e.dir, file });
+    } catch {
+      if (!m.main && !m.contributes.commands.length && !m.contributes.views.length && !m.contributes.navSections.length) return null; // data only
+      throw new Error(`не прочитать ${file}`);
+    }
+    const url = URL.createObjectURL(new Blob([code + `\n//# sourceURL=plugin://${m.id}/${file}`], { type: 'text/javascript' }));
+    try {
+      const mod = await import(/* @vite-ignore */ url);
+      return (mod.default ?? mod.plugin) as Plugin;
+    } finally {
+      URL.revokeObjectURL(url);
     }
   }
   /** Run a plugin's code; an error turns the plugin off. */
@@ -233,6 +329,17 @@ class Host {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`plugin ${id}:`, err);
     this.failed.set(id, msg);
+    this.stack.set(id, err instanceof Error && err.stack ? (err.stack.includes(msg) ? err.stack : msg + '\n' + err.stack) : msg);
+    this.teardown(id);
+    store.note(`Плагин «${this.name(id)}» выключен: ${msg}`, undefined, 8000);
+  }
+  /** Why it was turned off, in full (the list of plugins' «Подробнее»). */
+  stack = new SvelteMap<string, string>();
+  /** Everything the plugin registered taken back; its code told to stop. */
+  private teardown(id: string) {
+    const m = this.manifest(id);
+    this.declared.delete(id);
+    this.active.delete(id);
     untrack(() => {
       if (this.form?.plugin === id) (this.form.resolve(null), (this.form = null));
       if (this.place?.plugin === id) (this.place.resolve(null), (this.place = null));
@@ -250,12 +357,16 @@ class Host {
       store.refreshStatusSets();
       if (this.manifest(id)?.contributes.navSections.some((n) => n.id === store.navMode)) store.setNavMode('files');
       try {
-        void this.plugins.get(id)?.deactivate?.();
+        void Promise.resolve(this.plugins.get(id)?.deactivate?.()).catch(() => {});
       } catch {
         /* off anyway */
       }
+      this.plugins.delete(id);
+      if (m) {
+        undeclareKeys(m);
+        store.keysVersion++;
+      }
     });
-    store.note(`Плагин «${this.name(id)}» выключен: ${msg}`, undefined, 8000);
   }
 
   // ---- ctx ----------------------------------------------------------------------------------------------------
