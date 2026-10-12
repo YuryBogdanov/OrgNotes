@@ -211,3 +211,27 @@ export function copyOf(t: Theme, taken: string[]): Theme {
   const name = uniqueName(t.builtin ? `${t.name} — моя` : t.name, taken);
   return { name, appearance: t.appearance, builtin: false, basedOn: t.builtin ? t.name : (t.basedOn ?? t.name), colors: { ...t.colors, palette: { ...t.colors.palette } } };
 }
+
+// ---- the theme editor (ТЗ 25 §2.5): colours that read badly on the theme's background -------------------------------
+
+const ratio = (a: string, b: string) => {
+  const [x, y] = [lum(a), lum(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+};
+export type ColorKey = Exclude<keyof ThemeColors, 'palette'> | `palette.${Named}`;
+/** Text colours whose contrast with the background is below the norm: 4.5:1 for text, 3:1 for headings. The deep
+ *  levels count only when set (an inherited one is level 4). */
+export function lowContrast(c: ThemeColors): Map<ColorKey, number> {
+  const out = new Map<ColorKey, number>();
+  const check = (k: ColorKey, v: string | undefined, min: number) => {
+    if (!v) return;
+    const r = ratio(v, c.bg);
+    if (r < min) out.set(k, r);
+  };
+  for (const k of ['fg', 'dim', 'date', 'tag', 'link', 'meta', 'code'] as const) check(k, c[k], 4.5);
+  for (const k of ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9'] as const) check(k, c[k], 3);
+  for (const n of NAMED) check(`palette.${n}`, c.palette[n], 4.5);
+  return out;
+}
+/** «3,1:1» */
+export const ratioWords = (r: number) => `${(Math.floor(r * 10) / 10).toFixed(1).replace('.', ',')}:1`;

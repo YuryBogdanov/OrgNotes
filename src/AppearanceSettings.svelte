@@ -54,9 +54,10 @@
     renaming = null;
     if (t) await store.renameTheme(t, draft);
   }
+  /** «+ Новая тема»: a copy of the chosen theme, opened in the theme editor. */
   async function newTheme(a: Appearance) {
     const c = await store.copyTheme(store.themeFor(a));
-    if (c) await rename(c);
+    if (c) store.themeEditing = c.name;
   }
   async function duplicate(t: Theme) {
     const c = await store.copyTheme(t);
@@ -67,6 +68,7 @@
     menu = {
       x: e.clientX, y: e.clientY,
       items: [
+        { label: 'Редактировать', action: () => void store.editTheme(t) },
         { label: 'Дублировать', action: () => void duplicate(t) },
         { label: 'Переименовать', action: () => void rename(t), disabled: t.builtin },
         { label: 'Экспорт…', action: () => void store.exportTheme(t) },
@@ -148,11 +150,12 @@
             {/if}
           </div>
         {/each}
-        <button class="new" onclick={() => void newTheme(s.a)} title="Копия «{cur}» — её можно переименовать и изменить"><span class="plus">+</span><span>Новая тема</span></button>
+        <button class="new" onclick={() => void newTheme(s.a)} title="Копия «{cur}» откроется в редакторе темы"><span class="plus">+</span><span>Новая тема</span></button>
       </div>
       <div class="acts">
-        <button class="ghost" onclick={() => void store.importTheme()}>Импорт…</button>
-        <span class="hint">Правый клик по теме — дублировать, переименовать, экспорт, удалить</span>
+        <button class="ghost" onclick={() => void store.editTheme(store.themeFor(s.a))}>Редактировать «{store.themeFor(s.a).name}»…</button>
+        <button class="ghost plain" onclick={() => void store.importTheme()}>Импорт…</button>
+        <span class="hint">Правый клик по теме — другие действия</span>
       </div>
     </div>
   {/each}
@@ -202,6 +205,7 @@
   .new:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
   .acts { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
   .ghost { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
+  .ghost.plain { border: 0; background: transparent; color: var(--fg2); }
   .hint { font-size: 11.5px; color: var(--fg3); }
   .modal { position: fixed; inset: 0; z-index: 110; background: rgba(0, 0, 0, 0.28); display: flex; align-items: flex-start; justify-content: center; padding-top: 14vh; }
   .dlg { width: 420px; max-width: calc(100% - 32px); padding: 18px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); outline: none; }

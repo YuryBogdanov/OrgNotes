@@ -31,21 +31,19 @@ test('own themes from the themes folder are listed after the built-in ones, mark
   expect(await edBg(page)).toBe('rgb(16, 24, 32)');
 });
 
-test('«+ Новая тема»: a copy of the chosen theme, chosen, its name edited in place; written as a file', async ({ page }) => {
+test('«+ Новая тема»: a copy of the chosen theme, chosen and opened in the theme editor; written as a file', async ({ page }) => {
   await open(page);
   await dark(page).getByRole('radio', { name: 'Nord' }).click();
   await dark(page).getByRole('button', { name: 'Новая тема' }).click();
-  const input = page.getByRole('textbox', { name: 'Название темы' });
-  await expect(input).toBeFocused();
-  await expect(input).toHaveValue('Nord — моя');
-  await page.keyboard.type('Полярная');
-  await page.keyboard.press('Enter');
-  await expect(dark(page).getByRole('radio', { name: 'Полярная' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('region', { name: 'Редактор темы' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Название темы' })).toHaveValue('Nord — моя');
+  await expect(page.getByRole('dialog', { name: 'Настройки' }).locator('.t2')).toHaveText('Оформление › Тема редактора');
+  await page.getByRole('button', { name: '‹ Оформление' }).click();
+  await expect(dark(page).getByRole('radio', { name: 'Nord — моя' })).toHaveAttribute('aria-checked', 'true');
   const files = await disk(page);
-  expect(Object.keys(files).filter((k) => k.startsWith('/config/themes/'))).toEqual(['/config/themes/Полярная.json']);
-  const t = JSON.parse(files['/config/themes/Полярная.json']);
-  expect(t).toMatchObject({ format: 'panopticon-theme', version: 1, name: 'Полярная', appearance: 'dark', basedOn: 'Nord' });
-  expect(t.colors.bg).toBe('#2e3440');
+  expect(Object.keys(files).filter((k) => k.startsWith('/config/themes/'))).toEqual(['/config/themes/Nord — моя.json']);
+  const t = JSON.parse(files['/config/themes/Nord — моя.json']);
+  expect(t).toMatchObject({ format: 'panopticon-theme', version: 1, name: 'Nord — моя', appearance: 'dark', basedOn: 'Nord' });
   expect(await edBg(page)).toBe('rgb(46, 52, 64)');
 });
 
