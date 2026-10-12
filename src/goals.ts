@@ -237,9 +237,9 @@ export function isSilent(g: Goal, now = new Date(), threshold = SILENT_DAYS): bo
 export const deadlineSoon = (g: Goal, done: string[], now = new Date(), weeks = SOON_WEEKS) =>
   !isDone(g, done) && !!g.deadline && daysBetween(now, g.deadline) < weeks * 7;
 /** The note on the right of a row: «закрыта 8 окт», «20 дней без отметок», «отметка 3 дня назад», «нет отметок». */
-export function goalNote(g: Goal, done: string[], now = new Date()): string {
+export function goalNote(g: Goal, done: string[], now = new Date(), threshold = SILENT_DAYS): string {
   if (isDone(g, done)) return g.closed ? `закрыта ${shortDay(g.closed)}` : 'закрыта';
-  if (isSilent(g, now)) return `${days(quietDays(g, now)!)} без отметок`;
+  if (isSilent(g, now, threshold)) return `${days(quietDays(g, now)!)} без отметок`;
   const m = lastMark(g);
   if (!m) return 'нет отметок';
   const n = daysBetween(m, now);
@@ -331,11 +331,11 @@ export const GOAL_ICON = 'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5a3.5 3.5 0 
 export const findGoal = (s: SourceGoals, q: Quarter, title: string) => goalsIn(s, q).find((g) => g.title === title) ?? null;
 
 /** The cards of a review: open goals, the silent first (longest silence first), then by deadline. */
-export function reviewQueue(goals: Goal[], done: string[], now = new Date()): Goal[] {
+export function reviewQueue(goals: Goal[], done: string[], now = new Date(), threshold = SILENT_DAYS): Goal[] {
   const open = goals.filter((g) => !isDone(g, done));
   const far = 1e15;
   return open
-    .map((g, i) => ({ g, i, s: isSilent(g, now) ? (quietDays(g, now) ?? 0) : -1, d: g.deadline ? +g.deadline : far }))
+    .map((g, i) => ({ g, i, s: isSilent(g, now, threshold) ? (quietDays(g, now) ?? 0) : -1, d: g.deadline ? +g.deadline : far }))
     .sort((a, b) => b.s - a.s || a.d - b.d || a.i - b.i)
     .map((x) => x.g);
 }
@@ -410,4 +410,112 @@ export function moveGoal(text: string, hs: Heading[], heading: string, from: Qua
   const at = older ? older.line : before(out, h[head].end, h[head].line);
   out.splice(at, 0, `** ${quarterTitle(to)}`, ...cut);
   return { text: out.join('\n'), line: at + 1 };
+}
+
+// ---- part 3: the settings, the report of a quarter, the carry-over ------------------------------------------------
+
+/** «Настройки → Агенды → Цели квартала» (`goalSettings` in config.json). */
+export interface GoalSettings {
+  silent: number; // days without a mark: 7, 14, 21, 30
+  soon: number; // weeks before a deadline: 2, 4, 6, 8
+}
+export const DEFAULT_GOAL_SETTINGS: GoalSettings = { silent: SILENT_DAYS, soon: SOON_WEEKS };
+export function readGoalSettings(raw: unknown): GoalSettings {
+  const v = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  return {
+    silent: [7, 14, 21, 30].includes(v.silent as number) ? (v.silent as number) : SILENT_DAYS,
+    soon: [2, 4, 6, 8].includes(v.soon as number) ? (v.soon as number) : SOON_WEEKS,
+  };
+}
+export function withGoalSettings(raw: string | null, c: GoalSettings): string {
+  let base: Record<string, unknown> = {};
+  try {
+    const p = raw ? JSON.parse(raw) : null;
+    if (p && typeof p === 'object' && !Array.isArray(p)) base = p;
+  } catch {
+    /* replaced */
+  }
+  const out: Record<string, unknown> = { version: base.version ?? 1, ...base };
+  const keep: Record<string, number> = {};
+  if (c.silent !== SILENT_DAYS) keep.silent = c.silent;
+  if (c.soon !== SOON_WEEKS) keep.soon = c.soon;
+  if (Object.keys(keep).length) out.goalSettings = keep;
+  else delete out.goalSettings;
+  return JSON.stringify(out, null, 2) + '\n';
+}
+
+const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const longDay = (d: Date) => `${d.getDate()} ${MONTHS_GEN[d.getMonth()]} ${d.getFullYear()}`;
+/** The words of a status for the platform. */
+export function statusWords(g: Goal, done: string[]): string {
+  if (isDone(g, done)) return 'Выполнена';
+  if (g.keyword === GOAL_STATES.active) return 'В работе';
+  if (g.keyword === GOAL_STATES.backlog) return 'В бэклоге';
+  return g.keyword ?? '—';
+}
+/** The last mark that sums the goal up («Итог: …»), if any. */
+export const finalMark = (g: Goal) => [...g.marks].reverse().find((m) => /^итог\s*:/i.test(m.text.trim())) ?? null;
+/** The newest marks first, without the final one. */
+export const lastMarks = (g: Goal, n = 3) => {
+  const fin = finalMark(g);
+  return [...g.marks].filter((m) => m !== fin).sort((a, b) => +b.date - +a.date).slice(0, n);
+};
+
+export interface ReportPerson {
+  name: string;
+  goals: Goal[];
+  done: string[];
+}
+/**
+ * The report of a quarter to paste on the platform: per person, per goal «Название / Что делал / Результат / Срок /
+ * Статус»; «Что делал» is «Что буду делать» and the marks (oldest first). As plain text or Markdown.
+ */
+export function reportText(people: ReportPerson[], q: Quarter, format: 'text' | 'md'): string {
+  const md = format === 'md';
+  const out: string[] = [md ? `# Цели ${quarterLabel(q)}` : `Цели ${quarterLabel(q)}`, ''];
+  for (const p of people) {
+    if (!p.goals.length) continue;
+    out.push(md ? `## ${p.name}` : p.name.toUpperCase(), '');
+    p.goals.forEach((g, i) => {
+      const did = [g.plan.trim(), ...[...g.marks].sort((a, b) => +a.date - +b.date).map((m) => `${shortDay(m.date)}: ${m.text.trim()}`)].filter(Boolean).join('\n');
+      const field = (k: string, v: string) => (md ? `**${k}:** ${v.includes('\n') ? '\n' + v : v}` : `${k}: ${v}`);
+      out.push(md ? `### ${g.title}` : `${i + 1}. ${g.title}`);
+      out.push(field('Что делал', did || '—'));
+      out.push(field('Результат', g.result.trim() || '—'));
+      out.push(field('Срок', g.deadline ? longDay(g.deadline) : '—'));
+      out.push(field('Статус', statusWords(g, p.done)));
+      out.push('');
+    });
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+}
+
+/**
+ * «Перенести незакрытые»: each goal (by title) goes under the next quarter; a deadline inside the old quarter becomes
+ * the last day of the new one; a mark «Перенесена из Q4 2026». `parse` reads headings of a text. The goals not found
+ * are left out of `moved`.
+ */
+export function carryOver(text: string, heading: string, from: Quarter, to: Quarter, titles: string[], names: string[], parse: (t: string) => Heading[], now = new Date()): { text: string; moved: string[] } {
+  let t = text;
+  const moved: string[] = [];
+  for (const title of titles) {
+    const r = moveGoal(t, parse(t), heading, from, title, to, parse);
+    if (!r) continue;
+    t = r.text;
+    let hs = parse(t);
+    const g = findGoal(readSource(t, hs, heading), to, title);
+    if (!g) continue;
+    if (g.deadline && cmpQuarter(quarterOf(g.deadline), from) === 0) {
+      const lines = t.split('\n');
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const e = qEnd(to);
+      const stamp = `<${e.getFullYear()}-${pad(e.getMonth() + 1)}-${pad(e.getDate())} ${names[e.getDay()]}>`;
+      lines[g.line + 1] = lines[g.line + 1].replace(/DEADLINE:\s*<[^>]*>/, `DEADLINE: ${stamp}`);
+      t = lines.join('\n');
+      hs = parse(t);
+    }
+    t = addMark(t, hs, heading, to, title, now, `Перенесена из ${quarterLabel(from)}`, names) ?? t;
+    moved.push(title);
+  }
+  return { text: t, moved };
 }

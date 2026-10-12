@@ -493,6 +493,22 @@
           {/if}
           <div><button class="primary-b" onclick={newAgenda}>Новая агенда в конструкторе…</button></div>
           <p class="help">Изменить агенду можно в навигаторе в режиме «Агенда» (⌃⌘2): правый клик по названию → «Редактировать…».</p>
+          <div class="cap">ЦЕЛИ КВАРТАЛА</div>
+          <div class="opts">
+            <div class="opt">
+              <label for="g-silent">Цель «молчит» через</label>
+              <select id="g-silent" class="sel" value={String(store.goalSettings.silent)} onchange={(e) => void store.setGoalSettings({ silent: +e.currentTarget.value })}>
+                {#each [7, 14, 21, 30] as d (d)}<option value={String(d)}>{days(d)}</option>{/each}
+              </select>
+            </div>
+            <div class="opt">
+              <label for="g-soon">Предупреждать о сроке за</label>
+              <select id="g-soon" class="sel" value={String(store.goalSettings.soon)} onchange={(e) => void store.setGoalSettings({ soon: +e.currentTarget.value })}>
+                {#each [2, 4, 6, 8] as w (w)}<option value={String(w)}>{w} {w < 5 ? 'недели' : 'недель'}</option>{/each}
+              </select>
+            </div>
+          </div>
+          <p class="help">Цель ACTIVE без отметок дольше этого срока подсвечивается в разделе «Цели» и первой попадает в разбор. Срок цели подсвечивается, когда до него остаётся меньше выбранного. Источники целей и их файлы задаются в навигаторе «Цели», статусы — набор «Цели на квартал».</p>
         </section>
       </div>
     {:else if tab === 'Основные'}

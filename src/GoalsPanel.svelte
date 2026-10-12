@@ -1,7 +1,7 @@
 <script lang="ts">
   import { store, type GoalPerson } from './store.svelte';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
-  import { GOAL_STATES, goalsIn, isSilent, quarterLabel, activeWord } from './goals';
+  import { GOAL_STATES, goalsIn, quarterLabel, activeWord } from './goals';
 
   // The navigator in the «Цели» mode (ТЗ 23): «Мои цели» pinned on top, «Обзор квартала», the team, «Добавить ещё
   // цели». A click shows the goals in the active pane; a double click opens the file at the heading.
@@ -11,7 +11,7 @@
   const shown = $derived(store.tab?.kind === 'goals' ? store.tab.goals : null);
   const stat = (p: GoalPerson) => {
     const gs = goalsIn(p.data, q);
-    return { n: gs.length, active: gs.filter((g) => g.keyword === GOAL_STATES.active).length, silent: gs.some((g) => isSilent(g)) };
+    return { n: gs.length, active: gs.filter((g) => g.keyword === GOAL_STATES.active).length, silent: gs.some((g) => store.goalSilent(g)) };
   };
   const total = $derived(store.goalPeople.reduce((s, p) => s + goalsIn(p.data, q).length, 0));
 
