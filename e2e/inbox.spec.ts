@@ -62,7 +62,7 @@ test.describe('the navigator', () => {
     await panel(page).getByRole('button', { name: 'Выбрать файл…' }).click();
     await expect(picker(page)).toContainText('Файл Inbox');
     await page.keyboard.type('inb');
-    await expect(picker(page).locator('.r .l')).toHaveText(['inbox']);
+    await expect(picker(page).locator('.row .t')).toHaveText(['inbox']);
     await page.keyboard.press('Enter');
     await expect.poll(async () => (await config(page)).inbox.file).toBe('inbox.org');
     await expect(titles(page)).toHaveCount(4);
