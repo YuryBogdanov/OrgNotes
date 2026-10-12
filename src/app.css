@@ -158,6 +158,7 @@ button { cursor: default; }
 .cm-find-cur * { color: var(--hlCurFg) !important; }
 /* a match inside the selection: the yellow paints over the selection layer, so the selection shows as a frame */
 .cm-find.cm-find-sel { box-shadow: inset 0 0 0 100px color-mix(in srgb, var(--sel-text) 50%, transparent), 0 0 0 1.5px var(--acc); } /* the yellow still shows */
+.cm-line-note { margin-left: 10px; color: var(--fg3); font: 12px var(--ui); }
 .cm-find-folded { display: inline-flex; align-items: center; height: 17px; margin-left: 8px; padding: 0 7px; border-radius: 9px; background: var(--hl); color: var(--fg); font: 11px var(--ui); vertical-align: middle; }
 .cm-find-ticks { position: absolute; top: 0; right: 0; bottom: 0; width: 8px; pointer-events: none; z-index: 5; }
 .cm-find-ticks span { position: absolute; right: 1px; width: 6px; height: 2px; border-radius: 1px; background: var(--hlCur); opacity: 0.8; }

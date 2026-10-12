@@ -15,6 +15,7 @@ import { DEFAULT_INBOX, append, entry, inboxItems, prepend, readInbox, remove, w
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
 import {
   GOALS_WORKFLOW, addSourceHeading, avatarColor, initials, insertGoal, quarterOf, readGoals, readSource, sourceKey, withGoals,
+  addMark, findGoal, goalsIn, moveGoal, reviewQueue as goalQueue, shortDay, GOAL_STATES, quarterLabel,
   type GoalSource, type NewGoal, type Quarter, type SourceGoals,
 } from './goals';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
@@ -282,7 +283,7 @@ class Store {
   }
   get cur(): number {
     const t = this.tab;
-    const path = t?.kind === 'review' ? (t.path ?? '') : this.curPath; // a review: the card's file
+    const path = t?.kind === 'review' || t?.kind === 'goalReview' ? (t.path ?? '') : this.curPath; // a review: the card's file
     return this.files.findIndex((f) => f.path === path);
   }
   get file(): NoteFile | undefined {
@@ -456,6 +457,8 @@ class Store {
   private saveKeys() {
     lsSet('keys', JSON.stringify(this.keyState));
   }
+  /** The review of goals registers its keys while its tab is shown. */
+  goalReviewKeys: { active: () => boolean; run: (id: string) => boolean } | null = null;
   /** The review registers its keys while its tab is shown (⌘1…⌘5 there win over the window's). */
   reviewKeys: { active: () => boolean; run: (id: string) => boolean } | null = null;
 
@@ -736,6 +739,130 @@ class Store {
   openGoalAdd(o: { me?: boolean; replace?: string; file?: string } = {}) {
     if (this.sheetOpen) return;
     this.goalAdd = { ...o, n: Date.now() };
+  }
+
+  // ---- the review of goals on 1-1 (ТЗ 23, part 2) -------------------------------------------------------------
+  /**
+   * The cards (a goal is known by its quarter and title: lines move with every edit), the card shown (−1: the
+   * summary), what was done, and the new mark being written (it is saved when the card changes).
+   */
+  goalReview = $state<GoalReviewState | null>(null);
+  /** The person and the goal of the card shown, read from the file now. */
+  get goalCard() {
+    const r = this.goalReview;
+    if (!r || r.cur < 0) return null;
+    const p = this.goalPeople.find((x) => x.key === r.key);
+    const it = r.items[r.cur];
+    const goal = p && it ? findGoal(p.data, it.q, it.title) : null;
+    return p && it ? { p, it, goal } : null;
+  }
+  /** «Разобрать цели»: the open goals of the quarter, the silent first; `title`: start at that goal (⌥-click). */
+  startGoalReview(key: string, title?: string) {
+    const p = this.goalPeople.find((x) => x.key === key);
+    if (!p?.file) return;
+    const q = this.goalsQuarter;
+    const queue = goalQueue(goalsIn(p.data, q), p.file.wf.done);
+    if (!queue.length) {
+      this.note(`Открытых целей в ${quarterLabel(q)} нет`);
+      return;
+    }
+    const at = title ? Math.max(0, queue.findIndex((g) => g.title === title)) : 0;
+    this.goalReview = { key, items: queue.map((g) => ({ title: g.title, q })), cur: at, marks: 0, closed: 0, moved: 0, draft: '', date: null };
+    // one tab of the review: shown in the active pane
+    const found = this.layout.panes.flatMap((pn, pi) => pn.tabs.map((t, ti) => ({ t, pi, ti }))).find((x) => x.t.kind === 'goalReview');
+    if (found) {
+      found.t.path = p.file.path;
+      found.t.goals = key;
+      this.activateTab(found.pi, found.ti);
+    } else {
+      const pn = this.layout.panes[this.layout.active];
+      const at = pn.tabs.length ? pn.active + 1 : 0;
+      pn.tabs.splice(at, 0, { ...newTab('goalReview', p.file.path), goals: key });
+      pn.active = at;
+    }
+  }
+  endGoalReview() {
+    this.goalReview = null;
+    for (const [pi, p] of this.layout.panes.entries())
+      for (let ti = p.tabs.length - 1; ti >= 0; ti--) if (p.tabs[ti].kind === 'goalReview') closeTab(this.layout, pi, ti);
+  }
+  /** Write a step of the review to the person's file. */
+  private async goalWrite(make: (text: string, hs: Heading[], names: string[]) => string | null): Promise<boolean> {
+    const c = this.goalCard;
+    const f = c?.p.file && this.files.find((x) => x.path === c.p.file!.path);
+    if (!c || !f) return false;
+    const next = make(f.text, f.headings, weekdayNames(f.text));
+    return !!next && next !== f.text && !!(await this.writeSteps([{ path: f.path, text: next }]));
+  }
+  /** «Добавить отметку»: the text of the field under the chosen day (today by default), in date order. */
+  async goalAddMark(): Promise<boolean> {
+    const r = this.goalReview;
+    const c = this.goalCard;
+    if (!r || !c || !r.draft.trim()) return false;
+    const date = r.date ?? new Date();
+    const ok = await this.goalWrite((t, hs, names) => addMark(t, hs, c.p.src.heading, c.it.q, c.it.title, date, r.draft, names));
+    if (ok) {
+      r.marks++;
+      r.draft = '';
+      r.date = null;
+    }
+    return ok;
+  }
+  /** «Цель достигнута»: COMPLETED with CLOSED; the field is ready for «Итог:». */
+  async goalComplete(): Promise<boolean> {
+    const r = this.goalReview;
+    const c = this.goalCard;
+    if (!r || !c?.goal) return false;
+    const done = c.p.file!.wf.done.includes(GOAL_STATES.done) ? GOAL_STATES.done : c.p.file!.wf.done[0];
+    if (!done || c.goal.keyword === done) return false;
+    const g = c.goal;
+    const ok = await this.goalWrite((t, hs) => {
+      const h = hs.find((x) => x.line === g.line);
+      return h ? setKeyword(t, h, done, this.files.find((x) => x.path === c.p.file!.path)!.wf) : null;
+    });
+    if (ok) {
+      r.closed++;
+      if (!r.draft.trim()) r.draft = 'Итог: ';
+    }
+    return ok;
+  }
+  /** «Сдвинуть срок…»: the new DEADLINE and a mark «Срок перенесён: 30 ноя → 15 дек». */
+  async goalShiftDeadline(to: Date): Promise<boolean> {
+    const r = this.goalReview;
+    const c = this.goalCard;
+    if (!r || !c?.goal) return false;
+    const g = c.goal;
+    const from = g.deadline;
+    const mark = from ? `Срок перенесён: ${shortDay(from)} → ${shortDay(to)}` : `Срок: ${shortDay(to)}`;
+    const ok = await this.goalWrite((t, hs, names) => {
+      const h = hs.find((x) => x.line === g.line);
+      if (!h) return null;
+      const t1 = setPlanning(t, h, 'DEADLINE', to);
+      const f = this.files.find((x) => x.path === c.p.file!.path)!;
+      return addMark(t1, parseHeadings(t1, f.wf), c.p.src.heading, c.it.q, c.it.title, new Date(), mark, names);
+    });
+    if (ok) r.moved++;
+    return ok;
+  }
+  /** «Квартал»: the goal goes under another quarter; the card follows it. */
+  async goalMoveQuarter(to: Quarter): Promise<boolean> {
+    const r = this.goalReview;
+    const c = this.goalCard;
+    if (!r || !c?.goal) return false;
+    const f = this.files.find((x) => x.path === c.p.file!.path)!;
+    const ok = await this.goalWrite((t, hs) => moveGoal(t, hs, c.p.src.heading, c.it.q, c.it.title, to, (x) => parseHeadings(x, f.wf))?.text ?? null);
+    if (ok) r.items[r.cur] = { ...c.it, q: to };
+    return ok;
+  }
+  /** «Следующая» / «Назад»: a mark being written is saved first, without asking. */
+  async goalStep(d: 1 | -1) {
+    const r = this.goalReview;
+    if (!r) return;
+    if (r.draft.trim() && r.cur >= 0) await this.goalAddMark();
+    r.draft = '';
+    r.date = null;
+    if (r.cur < 0) r.cur = d < 0 ? r.items.length - 1 : -1;
+    else r.cur = r.cur + d >= r.items.length ? -1 : Math.max(0, r.cur + d);
   }
 
   /** The quick entry's shortcut and whether it works from any program (a preference of this Mac). */
@@ -2202,6 +2329,16 @@ class Store {
 }
 
 export const DEFAULT_CAPTURE_KEY = 'Shift+CmdOrCtrl+KeyI';
+export interface GoalReviewState {
+  key: string;
+  items: { title: string; q: Quarter }[];
+  cur: number; // −1: «Разбор закончен»
+  marks: number;
+  closed: number;
+  moved: number;
+  draft: string; // the new mark
+  date: Date | null; // its day; null = today
+}
 /** A source of goals as the views use it. */
 export interface GoalPerson {
   src: GoalSource;

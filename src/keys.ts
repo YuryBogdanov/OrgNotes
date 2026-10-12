@@ -3,7 +3,7 @@
 // what clashes with what. A shortcut is kept as it is shown: «⇧⌘O», a chord as two presses «⌃C S».
 // The menu bar, the keys of the window, of the editor and of the review all take their shortcuts from here.
 
-export type Scope = 'global' | 'window' | 'editor' | 'heading' | 'review';
+export type Scope = 'global' | 'window' | 'editor' | 'heading' | 'review' | 'goalReview';
 export type Preset = 'emacs' | 'mac';
 export type GroupId = 'global' | 'app' | 'file' | 'search' | 'view' | 'go' | 'heading' | 'inbox' | 'goals';
 
@@ -37,6 +37,7 @@ export const SCOPE_NAMES: Record<Scope, string> = {
   editor: 'в редакторе',
   heading: 'на заголовке',
   review: 'в разборе Inbox',
+  goalReview: 'в разборе целей',
 };
 
 const C = (id: string, title: string, group: GroupId, scope: Scope, keys: string[] = [], more: Partial<KeyCommand> = {}): KeyCommand => ({ id, title, group, scope, keys, ...more });
@@ -130,6 +131,11 @@ export const KEY_COMMANDS: KeyCommand[] = [
 
   C('newGoal', 'Новая цель…', 'goals', 'window', [], { synonyms: ['цель', 'квартал'] }),
   C('goalsOverview', 'Цели: обзор квартала', 'goals', 'window', [], { synonyms: ['цели квартала'] }),
+  C('goalMark', 'Разбор целей: Добавить отметку', 'goals', 'goalReview', ['⌘↩']),
+  C('goalDone', 'Разбор целей: Цель достигнута', 'goals', 'goalReview', ['⌘1']),
+  C('goalShift', 'Разбор целей: Сдвинуть срок…', 'goals', 'goalReview', ['⌘2']),
+  C('goalBack', 'Разбор целей: Назад', 'goals', 'goalReview', ['⌘[']),
+  C('goalNext', 'Разбор целей: Следующая', 'goals', 'goalReview', ['⌘]']),
 ];
 export const commandById = new Map(KEY_COMMANDS.map((c) => [c.id, c]));
 
@@ -298,7 +304,8 @@ export function parseState(raw: string | null): KeyState {
 // ---- clashes ----------------------------------------------------------------------------------------------------
 
 /** Scopes where one is inside the other: the inner one wins there, the outer one works elsewhere. */
-const NESTED = [['review', 'window'], ['heading', 'editor']];
+// the review of goals is a tab of its own: its keys win over the window's and the editor's (its card has one)
+const NESTED = [['review', 'window'], ['heading', 'editor'], ['goalReview', 'window'], ['goalReview', 'editor'], ['goalReview', 'heading'], ['goalReview', 'review']];
 export const nested = (a: Scope, b: Scope) => NESTED.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
 /** The same shortcut, or one is the first press of the other's chord. */
 export const clash = (a: string, b: string) => a === b || b.startsWith(a + ' ') || a.startsWith(b + ' ');
@@ -321,7 +328,14 @@ export function conflictsOf(bindings: Map<string, string[]>, id: string, key: st
 /** «Вне разбора ⌘1 — „Заметки“»: the same key in the outer scope of a nested pair. */
 export function outerNote(bindings: Map<string, string[]>, id: string): string {
   const me = commandById.get(id);
-  if (!me || (me.scope !== 'review' && me.scope !== 'heading')) return '';
+  if (!me || (me.scope !== 'review' && me.scope !== 'heading' && me.scope !== 'goalReview')) return '';
+  if (me.scope === 'goalReview') {
+    for (const k of bindings.get(id) ?? []) {
+      const other = KEY_COMMANDS.find((c) => (c.scope === 'window' || c.scope === 'editor') && (bindings.get(c.id) ?? []).includes(k));
+      if (other) return `Вне разбора ${k} — «${other.title}»`;
+    }
+    return '';
+  }
   const outer: Scope = me.scope === 'review' ? 'window' : 'editor';
   for (const k of bindings.get(id) ?? []) {
     const other = KEY_COMMANDS.find((c) => c.scope === outer && (bindings.get(c.id) ?? []).includes(k));

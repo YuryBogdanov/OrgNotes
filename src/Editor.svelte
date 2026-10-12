@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Compartment, EditorState, MapMode, RangeSetBuilder, StateField, Transaction, type Range, type StateEffect } from '@codemirror/state';
-  import { Decoration, EditorView, ViewPlugin, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+  import { Decoration, EditorView, ViewPlugin, WidgetType, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
   import { codeFolding, foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
   import { drawerRanges, headingLines, toneFor, type DrawerRange, type Workflow } from './org';
@@ -14,7 +14,7 @@
   import { findExtension, findField, foundInfo, moveFind, setFind, type FindQuery } from './findView';
   import { registerEditor } from './editorKeys';
 
-  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, rich = false, richNumbers = false, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
+  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
     levels?: LevelView; // «Структурный вид»: one star per level, text moved by level
     drawers?: boolean; // drawers folded when a file opens and when the app adds one (:PROPERTIES:, :LOGBOOK:)
     rich?: boolean; // «Оформленный текст»: drawn like org-modern (implies the structural view)
@@ -25,6 +25,8 @@
     onapi?: (api: { selection: () => string }) => void; // what the pane asks of the editor (⌘F, ⌘E take the selection)
     // «Разбор Inbox»: only these lines of the file are shown and edited (as org-narrow-to-subtree); `end` exclusive
     narrow?: { line: number; end: number } | null;
+    folded?: number[]; // heading lines folded when the editor opens («Отметки» on a card of goals)
+    lineNote?: { line: number; text: string } | null; // a grey note at the end of a line («2 — справа»)
     onnarrow?: (line: number, last: number) => void; // where the shown lines are now (they move with edits)
     hint?: string; // grey placeholder in an empty document
     resetOn?: number; // bumped when the text was silently reloaded from disk: the undo history starts over
@@ -45,6 +47,25 @@
   const structure = new Compartment(); // switching the view is not an edit: no undo step, no unsaved mark
   let lastLevels = '';
   const numbers = new Compartment(); // line numbers: off while drawn, unless asked for
+  const note = new Compartment();
+  class NoteWidget extends WidgetType {
+    text: string;
+    constructor(text: string) {
+      super();
+      this.text = text;
+    }
+    eq(o: NoteWidget) {
+      return o.text === this.text;
+    }
+    toDOM() {
+      const s = document.createElement('span');
+      s.className = 'cm-line-note';
+      s.textContent = this.text;
+      return s;
+    }
+  }
+  const noteExt = (n: { line: number; text: string } | null) =>
+    n ? EditorView.decorations.compute([], (st) => (n.line + 1 > st.doc.lines ? Decoration.none : Decoration.set([Decoration.widget({ widget: new NoteWidget(n.text), side: 1 }).range(st.doc.line(n.line + 1).to)]))) : [];
 
   const HEAD = /^(\*+)\s/;
   // heading lines per document version; ignores `* x` inside #+BEGIN_…/#+END_… blocks
@@ -67,6 +88,20 @@
   let drawersOn = true; // read by the editor's extensions, which outlive a render
   $effect.pre(() => {
     drawersOn = drawers;
+  });
+  /** Fold these heading lines (a card of goals: «Отметки», shown on the right). */
+  function foldLines(v: EditorView, lines: number[]) {
+    const effects = lines.flatMap((l) => {
+      if (l + 1 > v.state.doc.lines) return [];
+      const ln = v.state.doc.line(l + 1);
+      const r = foldable(v.state, ln.from, ln.to);
+      return r ? [foldEffect.of(r)] : [];
+    });
+    if (effects.length) v.dispatch({ effects });
+  }
+  $effect(() => {
+    const n = lineNote;
+    view?.dispatch({ effects: note.reconfigure(noteExt(n)) });
   });
   /** Fold every drawer of the document (a file just opened). */
   function foldAllDrawers(v: EditorView) {
@@ -426,7 +461,7 @@
             return el;
           },
         }),
-        foldGutter(), plugin, selectionClass, structure.of(structureExt(words)),
+        foldGutter(), plugin, selectionClass, note.of(noteExt(lineNote)), structure.of(structureExt(words)),
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         EditorView.domEventHandlers({
@@ -473,6 +508,7 @@
   onMount(() => {
     view = new EditorView({ state: makeState(text, wf), parent: host });
     foldAllDrawers(view);
+    foldLines(view, folded);
     lastKey = fileKey;
     lastLevels = viewKey();
     lastReset = resetOn;

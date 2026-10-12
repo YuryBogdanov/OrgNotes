@@ -64,7 +64,7 @@ export type Plate =
   | { kind: 'text'; text: string; right?: string };
 /** «Выбрать дату…»: the calendar of three months (ТЗ «выбор даты в календаре»). */
 export interface CalSpec {
-  kind: 'SCHEDULED' | 'DEADLINE';
+  kind: 'SCHEDULED' | 'DEADLINE' | 'MARK'; // MARK: the day of a mark of a goal (ТЗ 23)
   initial: Date; // chosen when it opens
   current: Date | null; // the task's date of this kind now (a dashed frame)
   old?: string; // its stamp, whose time and repeat are kept
@@ -205,6 +205,22 @@ register({
   run: () => void setTimeout(() => store.openGoalForm(store.goalKeyOfFile())), // once the palette is closed
 });
 register({
+  id: 'goalReview', title: 'Разобрать цели…', icon: 'goal', group: 'general', keyId: '', synonyms: ['разбор', '1-1', 'цели', 'отметки'],
+  when: () => store.goalPeople.some((p) => p.found),
+  run: () => ({
+    placeholder: 'Чьи цели разобрать',
+    plate: () => ({ kind: 'text', text: 'Разбор целей квартала на 1-1' }),
+    rows: (q) => {
+      const rows: Row[] = store.goalPeople
+        .filter((p) => p.found)
+        .map((p) => ({ p, m: q.trim() ? fuzzy(q, p.name) : null }))
+        .filter((x) => !q.trim() || x.m)
+        .map(({ p, m }) => ({ id: 'goal:' + p.key, group: 'ЛЮДИ', title: p.name, at: m?.at, icon: 'goal' as Icon, hint: p.src.file.split('/').pop(), run: () => store.startGoalReview(p.key) }));
+      return rows.length ? rows : [NOTHING];
+    },
+  }),
+});
+register({
   id: 'goalsOverview', title: 'Цели: обзор квартала', icon: 'goal', group: 'general', synonyms: ['цели', 'квартал'],
   when: () => store.goalSources.length > 0, run: () => store.openGoals('*'),
 });
@@ -330,7 +346,7 @@ function statusStep(c: Ctx): Step {
 
 const DATE_FOOT: [string, string][] = [['↑ ↓', 'выбрать'], ['⇧ + стрелки', 'календарь'], ['↩', 'выполнить'], ['⎋', 'закрыть']];
 const CAL_FOOT: [string, string][] = [['⇧ ← →', 'день'], ['⇧ ↑ ↓', 'неделя'], ['⌥⇧ ← →', 'месяц'], ['⌥⇧ ↑ ↓', 'год'], ['.', 'сегодня'], ['↩', 'выбрать'], ['⌫', 'к вариантам'], ['⎋', 'закрыть']];
-const dateToken = (kind: 'SCHEDULED' | 'DEADLINE') => ({ icon: (kind === 'SCHEDULED' ? 'sched' : 'dead') as Icon, text: kind === 'SCHEDULED' ? 'Запланировать' : 'Дедлайн' });
+const dateToken = (kind: 'SCHEDULED' | 'DEADLINE' | 'MARK') => ({ icon: (kind === 'DEADLINE' ? 'dead' : 'sched') as Icon, text: kind === 'SCHEDULED' ? 'Запланировать' : kind === 'MARK' ? 'День отметки' : 'Дедлайн' });
 const jsDate = (d: OrgDate) => new Date(d.y, d.m - 1, d.d);
 
 function dateStep(c: Ctx, kind: 'SCHEDULED' | 'DEADLINE'): Step {

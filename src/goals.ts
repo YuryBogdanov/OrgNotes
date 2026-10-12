@@ -324,3 +324,90 @@ export const activeWord = (n: number) => `${n} ${plural(n, 'активная', '
 /** The goals of one quarter in a source (none if it has no such quarter). */
 export const goalsIn = (s: SourceGoals, q: Quarter) => s.quarters.find((x) => cmpQuarter(x.q, q) === 0)?.goals ?? [];
 export const GOAL_ICON = 'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z';
+
+// ---- the review on 1-1 (part 2): the queue, the marks, another quarter -------------------------------------------
+
+/** The goal of a quarter by its title (lines move with every edit; the title does not). */
+export const findGoal = (s: SourceGoals, q: Quarter, title: string) => goalsIn(s, q).find((g) => g.title === title) ?? null;
+
+/** The cards of a review: open goals, the silent first (longest silence first), then by deadline. */
+export function reviewQueue(goals: Goal[], done: string[], now = new Date()): Goal[] {
+  const open = goals.filter((g) => !isDone(g, done));
+  const far = 1e15;
+  return open
+    .map((g, i) => ({ g, i, s: isSilent(g, now) ? (quietDays(g, now) ?? 0) : -1, d: g.deadline ? +g.deadline : far }))
+    .sort((a, b) => b.s - a.s || a.d - b.d || a.i - b.i)
+    .map((x) => x.g);
+}
+
+const WD = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+/** «Вт, 22 сен». */
+export const dayLabel = (d: Date) => `${WD[d.getDay()]}, ${shortDay(d)}`;
+/** «Сегодня, Пн 12 окт», «Вчера, Вс 11 окт», «Пт 9 окт». */
+export function markDayLabel(d: Date, now = new Date()): string {
+  const n = daysBetween(d, now);
+  const s = `${WD[d.getDay()]} ${shortDay(d)}`;
+  return n === 0 ? `Сегодня, ${s}` : n === 1 ? `Вчера, ${s}` : s;
+}
+
+/** `- [2026-10-12 Пн] first line`, the other lines under it (a «- » line becomes a nested item). */
+export function markLines(date: Date, body: string, names: string[]): string[] {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const lines = body.replace(/\r\n?/g, '\n').replace(/\s+$/, '').split('\n');
+  const stamp = `[${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${names[date.getDay()]}]`;
+  return [`- ${stamp} ${lines[0].trim()}`.replace(/\s+$/, ''), ...lines.slice(1).map((l) => (l.trim() ? '  ' + l.replace(/^,?(\*)/, ',$1') : ''))];
+}
+
+/**
+ * The text with a mark added to «Отметки» of the goal (made at the end of the goal if it is not there), in the
+ * order of dates: a mark of a past day goes to its place. Null if the goal is not found.
+ */
+export function addMark(text: string, hs: Heading[], heading: string, q: Quarter, title: string, date: Date, body: string, names: string[]): string | null {
+  if (!body.trim()) return null;
+  const src = readSource(text, hs, heading);
+  const g = findGoal(src, q, title);
+  if (!g) return null;
+  const lines = text.split('\n');
+  const gi = hs.findIndex((h) => h.line === g.line);
+  const field = kids(hs, gi).find((fi) => same(hs[fi].title, FIELDS.marks));
+  const add = markLines(date, body, names);
+  if (field === undefined) {
+    const at = before(lines, g.end, g.line);
+    lines.splice(at, 0, `${'*'.repeat(hs[gi].level + 1)} ${FIELDS.marks}`, ...add);
+    return lines.join('\n');
+  }
+  const later = g.marks.find((m) => +m.date > +date);
+  const at = later ? later.line : before(lines, hs[field].end, hs[field].line);
+  // the marks of the field keep its indent
+  const indent = later ? /^\s*/.exec(lines[later.line])![0] : g.marks.length ? /^\s*/.exec(lines[g.marks[0].line])![0] : '';
+  lines.splice(at, 0, ...add.map((l) => (l ? indent + l : l)));
+  return lines.join('\n');
+}
+
+/**
+ * «Квартал»: the goal moved under another quarter of its source (made in its place if needed), at its end.
+ * `parse` reads the headings of a text (the statuses of the file). Null if the goal is not found.
+ */
+export function moveGoal(text: string, hs: Heading[], heading: string, from: Quarter, title: string, to: Quarter, parse: (t: string) => Heading[]): { text: string; line: number } | null {
+  if (cmpQuarter(from, to) === 0) return null;
+  const g = findGoal(readSource(text, hs, heading), from, title);
+  if (!g) return null;
+  const lines = text.split('\n');
+  const end = before(lines, g.end, g.line);
+  const cut = lines.splice(g.line, end - g.line);
+  const t = lines.join('\n');
+  const h = parse(t);
+  const src = readSource(t, h, heading);
+  const have = src.quarters.find((x) => cmpQuarter(x.q, to) === 0);
+  const out = t.split('\n');
+  if (have) {
+    const at = before(out, have.end, have.line);
+    out.splice(at, 0, ...cut);
+    return { text: out.join('\n'), line: at };
+  }
+  const head = findSource(h, heading);
+  const older = src.quarters.find((x) => cmpQuarter(x.q, to) < 0);
+  const at = older ? older.line : before(out, h[head].end, h[head].line);
+  out.splice(at, 0, `** ${quarterTitle(to)}`, ...cut);
+  return { text: out.join('\n'), line: at + 1 };
+}

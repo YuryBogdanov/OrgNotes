@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SEQUENCE, fromSequences, parseHeadings } from './org';
 import {
   GOALS_WORKFLOW, addSourceHeading, avatarColor, defaultQuarter, goalNote, initials, insertGoal, isSilent, parseQuarter, quarterSub,
-  readGoals, readSource, resultLine, shiftQuarter, sourceSummary, withGoals, deadlineSoon,
+  readGoals, readSource, resultLine, shiftQuarter, sourceSummary, withGoals, deadlineSoon, reviewQueue, markLines, markDayLabel, dayLabel, addMark, moveGoal,
 } from './goals';
 
 const WF = fromSequences([DEFAULT_SEQUENCE, GOALS_WORKFLOW as never], 0, 'project');
@@ -167,5 +167,49 @@ describe('writing a goal', () => {
     expect(t).toBe('* A\n\n* Квартальные задачи\n');
     const r = insertGoal(t, hs(t), 'Квартальные задачи', { y: 2026, q: 4 }, g, RU, NOW)!;
     expect(r.text.startsWith('* A\n\n* Квартальные задачи\n** Квартал Q4 2026\n*** ACTIVE')).toBe(true);
+  });
+});
+
+describe('the review: queue, marks, another quarter', () => {
+  const s = readSource(FILE, hs(FILE), 'Квартальные задачи');
+  it('open goals only, the silent first, then by deadline', () => {
+    const q = reviewQueue(s.quarters[0].goals, ['COMPLETED'], NOW);
+    expect(q.map((g) => g.title)).toEqual(['Сократить время сборки CI до 10 минут', 'Наставничество']);
+  });
+  it('a mark: the date as the file writes it, the other lines under it, «- » lines nested', () => {
+    expect(markLines(new Date(2026, 9, 12), 'Кэш включили, p90 = 17 мин.\n- e2e делим на 4 потока;\n- раннеры до пятницы.', RU)).toEqual([
+      '- [2026-10-12 Пн] Кэш включили, p90 = 17 мин.',
+      '  - e2e делим на 4 потока;',
+      '  - раннеры до пятницы.',
+    ]);
+    expect(markDayLabel(new Date(2026, 9, 12), NOW)).toBe('Сегодня, Пн 12 окт');
+    expect(dayLabel(new Date(2026, 8, 22))).toBe('Вт, 22 сен');
+  });
+  it('added at the end of «Отметки», with its indent; a past day goes to its place', () => {
+    const t = addMark(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Сократить время сборки CI до 10 минут', new Date(2026, 9, 12), 'Кэш включили.', RU)!;
+    expect(t).toContain('       - кэш Docker даст ещё 3–4 мин.\n     - [2026-10-12 Пн] Кэш включили.\n*** BACKLOG Наставничество');
+    const p = addMark(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Сократить время сборки CI до 10 минут', new Date(2026, 8, 20), 'Между.', RU)!;
+    expect(p).toContain('Поставили цель на 1-1.\n     - [2026-09-20 Вс] Между.\n     - [2026-09-22 Вт] Замерили');
+    const back = readSource(p, hs(p), 'Квартальные задачи').quarters[0].goals[0].marks.map((m) => m.text.split('\n')[0]);
+    expect(back).toEqual(['Поставили цель на 1-1.', 'Между.', 'Замерили: p90 = 23 мин.']);
+  });
+  it('no «Отметки» under the goal: made at its end', () => {
+    const t = addMark(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Наставничество', new Date(2026, 9, 12), 'Первая.', RU)!;
+    expect(t).toContain('*** BACKLOG Наставничество\n**** Отметки\n- [2026-10-12 Пн] Первая.\n*** COMPLETED Дизайн-система');
+    expect(addMark(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Нет такой', new Date(), 'x', RU)).toBeNull();
+  });
+  it('another quarter: the goal moves under it, the quarter made in its place', () => {
+    const r = moveGoal(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Наставничество', { y: 2027, q: 1 }, hs)!;
+    const lines = r.text.split('\n');
+    expect(lines[r.line]).toBe('*** BACKLOG Наставничество');
+    expect(lines[r.line - 1]).toBe('** Квартал Q1 2027');
+    const src = readSource(r.text, hs(r.text), 'Квартальные задачи');
+    expect(src.quarters.map((x) => [x.q.q, x.goals.map((g) => g.title)])).toEqual([
+      [1, ['Наставничество']],
+      [4, ['Сократить время сборки CI до 10 минут', 'Дизайн-система']],
+      [3, ['Старое']],
+    ]);
+    const r2 = moveGoal(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Наставничество', { y: 2026, q: 3 }, hs)!;
+    expect(readSource(r2.text, hs(r2.text), 'Квартальные задачи').quarters[1].goals.map((g) => g.title)).toEqual(['Старое', 'Наставничество']);
   });
 });
