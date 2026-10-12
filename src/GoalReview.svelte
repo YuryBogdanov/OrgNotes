@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goals } from './features/goals.svelte';
   import { tick } from 'svelte';
   import { fly } from 'svelte/transition';
   import { store } from './store.svelte';
@@ -17,8 +18,8 @@
   // below. The queue and the actions live in the store (`goalReview`).
   let { tab }: { tab: Tab } = $props();
 
-  const r = $derived(store.goalReview);
-  const card = $derived(store.goalCard);
+  const r = $derived(goals.goalReview);
+  const card = $derived(goals.goalCard);
   const p = $derived(card?.p);
   const g = $derived(card?.goal ?? null);
   const f = $derived(p?.file ? store.files.find((x) => x.path === p.file!.path) : undefined);
@@ -33,7 +34,7 @@
   });
   let showMarks = $state(false); // a double click on a mark: «Отметки» open on the left, the caret on it
   let rev = $state<{ line: number; n: number; focus: boolean } | null>(null);
-  const pill = (x: Goal) => goalNote(x, f?.wf.done ?? [], new Date(), store.goalSettings.silent);
+  const pill = (x: Goal) => goalNote(x, f?.wf.done ?? [], new Date(), goals.goalSettings.silent);
   const chip = (kw: string | null) =>
     !kw ? '' : GOAL_TONES[kw] ? `color:${GOAL_TONES[kw]};background:color-mix(in srgb, ${GOAL_TONES[kw]} 15%, transparent)` : f ? toneStyle(toneFor(kw, f.wf)) : '';
 
@@ -59,14 +60,14 @@
   const names = $derived(weekdayNames(f?.text ?? ''));
   function shiftDeadline() {
     if (!g) return;
-    store.openCalendar({ kind: 'DEADLINE', initial: g.deadline ?? new Date(), current: g.deadline, names, pick: (d) => void store.goalShiftDeadline(d) });
+    store.openCalendar({ kind: 'DEADLINE', initial: g.deadline ?? new Date(), current: g.deadline, names, pick: (d) => void goals.goalShiftDeadline(d) });
   }
   function markDay() {
     if (!r) return;
-    store.openCalendar({ kind: 'MARK', initial: r.date ?? new Date(), current: null, names, pick: (d) => { if (store.goalReview) store.goalReview.date = d; } });
+    store.openCalendar({ kind: 'MARK', initial: r.date ?? new Date(), current: null, names, pick: (d) => { if (goals.goalReview) goals.goalReview.date = d; } });
   }
   async function complete() {
-    if (await store.goalComplete()) {
+    if (await goals.goalComplete()) {
       await tick();
       field?.focus();
       if (field) field.selectionStart = field.selectionEnd = field.value.length;
@@ -89,18 +90,18 @@
 
   // ---- the keys of the review: ⌘↩ ⌘1 ⌘2 ⌘[ ⌘] (as set in «Клавиши») ------------------------------------------------
   const RUN: Record<string, () => void> = {
-    goalMark: () => void store.goalAddMark(),
+    goalMark: () => void goals.goalAddMark(),
     goalDone: () => void complete(),
     goalShift: () => shiftDeadline(),
-    goalBack: () => void store.goalStep(-1),
-    goalNext: () => void store.goalStep(1),
+    goalBack: () => void goals.goalStep(-1),
+    goalNext: () => void goals.goalStep(1),
   };
   $effect(() => {
     const keys = {
-      active: () => store.tab === tab && !!store.goalReview && !store.palette && !store.sheetOpen,
+      active: () => store.tab === tab && !!goals.goalReview && !store.palette && !store.sheetOpen,
       run: (id: string) => {
         if (!RUN[id]) return false;
-        if (store.goalReview!.cur < 0 && id !== 'goalBack') return false;
+        if (goals.goalReview!.cur < 0 && id !== 'goalBack') return false;
         RUN[id]();
         return true;
       },
@@ -122,7 +123,7 @@
             <span class="av" style="background:{p.color}" aria-hidden="true">{p.ini}</span>
             <b>{p.name} · цель {r.cur + 1} из {total}</b>
             <span class="file">{p.src.file.split('/').pop()}</span>
-            <span class="pill" class:silent={store.goalSilent(g)}>{pill(g)}</span>
+            <span class="pill" class:silent={goals.goalSilent(g)}>{pill(g)}</span>
           </div>
           <div class="quick" role="toolbar" aria-label="Быстрые действия">
             <button onclick={status}><span>Статус</span><span class="qv st" style={chip(g.keyword)}>{g.keyword ?? '—'}</span></button>
@@ -133,7 +134,7 @@
                 <div class="qmenu" role="menu">
                   {#each [-1, 0, 1] as d (d)}
                     {@const qq = shiftQuarter(card.it.q, d)}
-                    <button role="menuitemradio" aria-checked={cmpQuarter(qq, card.it.q) === 0} onclick={() => { qMenu = false; void store.goalMoveQuarter(qq); }}>{quarterLabel(qq)}</button>
+                    <button role="menuitemradio" aria-checked={cmpQuarter(qq, card.it.q) === 0} onclick={() => { qMenu = false; void goals.goalMoveQuarter(qq); }}>{quarterLabel(qq)}</button>
                   {/each}
                 </div>
               {/if}
@@ -174,13 +175,13 @@
           <div class="stat"><span class="n" style:color="var(--wait)">{r.moved}</span><span>{r.moved === 1 ? 'срок сдвинут' : 'сроков сдвинуто'}</span></div>
         </div>
         <div class="btns">
-          <button onclick={() => { const k = r.key; store.endGoalReview(); store.openGoalFile(k); }}>Открыть файл человека</button>
-          <button class="pri" onclick={() => store.endGoalReview()}>Закончить</button>
+          <button onclick={() => { const k = r.key; goals.endGoalReview(); goals.openGoalFile(k); }}>Открыть файл человека</button>
+          <button class="pri" onclick={() => goals.endGoalReview()}>Закончить</button>
         </div>
         <span class="fine">Всё уже записано в файл.</span>
       </div>
     {:else if r && card && !g}
-      <div class="none">Цель «{card.it.title}» не найдена в файле: её переименовали или перенесли. <button onclick={() => store.goalStep(1)}>Следующая</button></div>
+      <div class="none">Цель «{card.it.title}» не найдена в файле: её переименовали или перенесли. <button onclick={() => goals.goalStep(1)}>Следующая</button></div>
     {:else}
       <div class="none">Разбор не идёт. Начать — «Разобрать цели» в разделе «Цели».</div>
     {/if}
@@ -188,12 +189,12 @@
 
   {#if r && card && g}
     <div class="bar">
-      <button class="back" disabled={r.cur <= 0} onclick={() => store.goalStep(-1)}>‹ Назад{#if kbd('goalBack')}<kbd>{kbd('goalBack')}</kbd>{/if}</button>
+      <button class="back" disabled={r.cur <= 0} onclick={() => goals.goalStep(-1)}>‹ Назад{#if kbd('goalBack')}<kbd>{kbd('goalBack')}</kbd>{/if}</button>
       <div class="acts">
-        <button class="a pri" disabled={!r.draft.trim()} onclick={() => store.goalAddMark()}>Добавить отметку{#if kbd('goalMark')}<kbd>{kbd('goalMark')}</kbd>{/if}</button>
+        <button class="a pri" disabled={!r.draft.trim()} onclick={() => goals.goalAddMark()}>Добавить отметку{#if kbd('goalMark')}<kbd>{kbd('goalMark')}</kbd>{/if}</button>
         <button class="a ok" disabled={!!g.keyword && (f?.wf.done ?? []).includes(g.keyword)} onclick={complete}>Цель достигнута<span class="h">COMPLETED</span>{#if kbd('goalDone')}<kbd>{kbd('goalDone')}</kbd>{/if}</button>
         <button class="a" onclick={shiftDeadline}>Сдвинуть срок…{#if kbd('goalShift')}<kbd>{kbd('goalShift')}</kbd>{/if}</button>
-        <button class="a" onclick={() => store.goalStep(1)}>Следующая{#if kbd('goalNext')}<kbd>{kbd('goalNext')}</kbd>{/if}</button>
+        <button class="a" onclick={() => goals.goalStep(1)}>Следующая{#if kbd('goalNext')}<kbd>{kbd('goalNext')}</kbd>{/if}</button>
       </div>
     </div>
   {/if}

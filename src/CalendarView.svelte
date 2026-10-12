@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { calendar } from './features/calendar.svelte';
   import { onMount } from 'svelte';
   import { store } from './store.svelte';
   import { toneFor } from './org';
@@ -16,23 +17,23 @@
   const cal = $derived(tab.calendar ?? { view: 'month' as const, date: isoDay(new Date()) });
   const sel = $derived(fromIso(cal.date));
   const today = $derived(isoDay(new Date()));
-  const cfg = $derived(store.calCfg);
+  const cfg = $derived(calendar.cfg);
   const weeks = $derived(monthWeeks(sel.getFullYear(), sel.getMonth()));
   const allWeek = $derived(weekDays(sel));
   const range = $derived(cal.view === 'month' ? [weeks[0][0], weeks[weeks.length - 1][6]] : [allWeek[0], allWeek[6]]);
   // «Показывать выходные» off: Saturday and Sunday are left out of the grid
   const shownDays = (w: Date[]) => (cfg.weekends ? w : w.filter((d) => d.getDay() !== 0 && d.getDay() !== 6));
   const week = $derived(shownDays(allWeek));
-  const days = $derived(store.calDays(range[0], range[1]));
+  const days = $derived(calendar.days(range[0], range[1]));
   const at = (d: Date) => days.get(isoDay(d)) ?? [];
 
-  const set = (c: Partial<{ view: 'month' | 'week'; date: string }>) => store.setCalendar(tab, c);
+  const set = (c: Partial<{ view: 'month' | 'week'; date: string }>) => calendar.setTab(tab, c);
   const pick = (d: Date) => set({ date: isoDay(d) });
   /** A double click on a day (not on an entry): «+ Задача» on it. */
   function dbl(ev: MouseEvent, d: Date) {
     if ((ev.target as Element).closest('.ch, .more, .evb')) return;
     pick(d);
-    store.openCalNew('task', isoDay(d));
+    calendar.openNew('task', isoDay(d));
   }
   function step(n: number) {
     const d = new Date(sel);
@@ -95,12 +96,12 @@
       pick(new Date());
     } else if ((e.key === 'n' || e.key === 'N' || e.code === 'KeyN') && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
-      store.openCalNew('task', cal.date);
+      calendar.openNew('task', cal.date);
     } else if (e.key === 'Enter' && !e.metaKey) {
       const first = at(sel)[0];
       if (first) {
         e.preventDefault();
-        store.openCalEntry(first);
+        calendar.openEntry(first);
       }
     }
   }
@@ -121,38 +122,38 @@
 
   // ---- moving by the mouse (ТЗ 24, 2.6): a chip onto a day, an event onto a time; a repeat asks first ---------------
   let over = $state<string | null>(null); // the day (or «day time») under the drag
-  let ask = $state<{ e: NonNullable<typeof store.calDrag>; to: Date; time?: string } | null>(null);
+  let ask = $state<{ e: NonNullable<typeof calendar.drag>; to: Date; time?: string } | null>(null);
   const canDrag = (e: CalEntry) => e.layer !== 'done';
   function dragStart(ev: DragEvent, e: CalEntry) {
     const r = (ev.currentTarget as HTMLElement).getBoundingClientRect();
-    store.calDrag = { path: e.path, line: e.line, layer: e.layer, repeat: e.repeat, title: e.title, dy: e.layer === 'event' && e.time ? ev.clientY - r.top : 0 };
+    calendar.drag = { path: e.path, line: e.line, layer: e.layer, repeat: e.repeat, title: e.title, dy: e.layer === 'event' && e.time ? ev.clientY - r.top : 0 };
     ev.dataTransfer?.setData('text/plain', e.title);
     if (ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move';
     pop = null;
   }
   const dragEnd = () => {
-    store.calDrag = null;
+    calendar.drag = null;
     over = null;
   };
   function dragOver(ev: DragEvent, key: string) {
-    if (!store.calDrag) return;
+    if (!calendar.drag) return;
     ev.preventDefault();
     if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
     over = key;
   }
   /** The time under the pointer in a day's column, by quarters of an hour (the grab's offset taken off). */
   function timeAt(ev: DragEvent, col: HTMLElement) {
-    const y = ev.clientY - col.getBoundingClientRect().top - (store.calDrag?.dy ?? 0);
+    const y = ev.clientY - col.getBoundingClientRect().top - (calendar.drag?.dy ?? 0);
     const m = Math.min((cfg.to * 60) - 15, Math.max(cfg.from * 60, cfg.from * 60 + Math.round((y / HOUR) * 4) * 15));
     return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   }
   function drop(ev: DragEvent, d: Date, time?: string) {
-    const e = store.calDrag;
+    const e = calendar.drag;
     dragEnd();
     if (!e) return;
     ev.preventDefault();
     if (e.repeat && cfg.askRepeat) ask = { e, to: d, time };
-    else void store.calMove(e, d, time);
+    else void calendar.move(e, d, time);
   }
   const hoverTime = (ev: DragEvent, d: Date) => dragOver(ev, `${isoDay(d)} ${timeAt(ev, ev.currentTarget as HTMLElement)}`);
 </script>
@@ -160,7 +161,7 @@
 {#snippet chip(e: CalEntry)}
   <button class="ch {e.layer}" class:past={past(e) && e.layer === 'event'} style={e.layer === 'task' || e.layer === 'wait' || e.layer === 'done' ? toneOf(e) : ''}
     draggable={canDrag(e)} ondragstart={(ev) => dragStart(ev, e)} ondragend={dragEnd}
-    title="{title(e)} — {e.where}" onclick={(ev) => { ev.stopPropagation(); store.openCalEntry(e, ev.metaKey); }}>
+    title="{title(e)} — {e.where}" onclick={(ev) => { ev.stopPropagation(); calendar.openEntry(e, ev.metaKey); }}>
     {#if e.layer === 'deadline'}
       <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17V3M5 4h10l-2 3 2 3H5" /></svg>
     {:else if e.layer !== 'event'}
@@ -244,7 +245,7 @@
               {#each layoutEvents(at(d)) as x (x.e.path + x.e.line + x.e.time)}
                 {@const top = Math.min(hours.length * HOUR - 18, Math.max(0, (x.start - cfg.from * 60) * (HOUR / 60)))}
                 <button class="evb" class:past={past(x.e)} draggable="true" ondragstart={(ev) => dragStart(ev, x.e)} ondragend={dragEnd} style="top:{top}px;height:{Math.max(18, (x.end - x.start) * (HOUR / 60) - 2)}px;left:calc({(x.col / x.cols) * 100}% + 3px);width:calc({100 / x.cols}% - 6px)"
-                  title="{x.e.title} — {x.e.where}" onclick={(ev) => { ev.stopPropagation(); store.openCalEntry(x.e, ev.metaKey); }}>
+                  title="{x.e.title} — {x.e.where}" onclick={(ev) => { ev.stopPropagation(); calendar.openEntry(x.e, ev.metaKey); }}>
                   <b>{x.e.time}{x.e.end ? ` – ${x.e.end}` : ` – ${String(Math.floor(x.end / 60)).padStart(2, '0')}:${String(x.end % 60).padStart(2, '0')}`}</b>
                   <span>{x.e.title}</span>
                 </button>
@@ -288,7 +289,7 @@
       <div class="btns">
         <button onclick={() => { ask = null; root?.focus(); }}>Отмена</button>
         <!-- svelte-ignore a11y_autofocus -->
-        <button class="primary-b" autofocus onclick={() => { const x = a; ask = null; void store.calMove(x.e, x.to, x.time); root?.focus(); }}>Перенести серию</button>
+        <button class="primary-b" autofocus onclick={() => { const x = a; ask = null; void calendar.move(x.e, x.to, x.time); root?.focus(); }}>Перенести серию</button>
       </div>
     </div>
   </div>

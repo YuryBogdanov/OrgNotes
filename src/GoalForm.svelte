@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goals } from './features/goals.svelte';
   import { tick } from 'svelte';
   import { store } from './store.svelte';
   import Calendar from './Calendar.svelte';
@@ -15,13 +16,13 @@
   const ls = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
   const lsSet = (k: string, v: string | null) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* none */ } };
 
-  const req = store.goalForm!;
+  const req = goals.goalForm!;
   // the team by name, «Мои цели» at the end (as the people in the overview)
-  const people = $derived([...store.goalPeople.filter((p) => p.found)].sort((a, b) => Number(!!a.src.me) - Number(!!b.src.me) || a.name.localeCompare(b.name, 'ru')));
+  const people = $derived([...goals.goalPeople.filter((p) => p.found)].sort((a, b) => Number(!!a.src.me) - Number(!!b.src.me) || a.name.localeCompare(b.name, 'ru')));
   const draft = (() => { try { return JSON.parse(ls(DRAFT) ?? 'null'); } catch { return null; } })();
 
   let who = $state<string>(req.key ?? draft?.who ?? ls(LAST) ?? '');
-  if (!store.goalPeople.some((p) => p.key === who && p.found)) who = people[0]?.key ?? '';
+  if (!goals.goalPeople.some((p) => p.key === who && p.found)) who = people[0]?.key ?? '';
   let title = $state<string>(draft?.title ?? '');
   let plan = $state<string>(draft?.plan ?? '');
   let result = $state<string>(draft?.result ?? '');
@@ -35,7 +36,7 @@
   let qMenu = $state(false);
   let busy = $state(false);
 
-  const person = $derived(store.goalPeople.find((p) => p.key === who));
+  const person = $derived(goals.goalPeople.find((p) => p.key === who));
   const exists = $derived(!!person?.data.quarters.some((x) => cmpQuarter(x.q, quarter) === 0));
   const ready = $derived(!!person && !!title.trim() && !bad);
   const names = $derived(weekdayNames(person?.file?.text ?? ''));
@@ -115,18 +116,18 @@
   async function create() {
     if (!ready || busy) return;
     busy = true;
-    const ok = await store.addGoal(who, quarter, { title, plan, result, deadline: date, status: GOAL_STATES.active });
+    const ok = await goals.addGoal(who, quarter, { title, plan, result, deadline: date, status: GOAL_STATES.active });
     busy = false;
     if (!ok) return;
     lsSet(LAST, who);
     lsSet(DRAFT, null);
-    store.goalsQuarter = quarter;
-    store.goalForm = null;
+    goals.goalsQuarter = quarter;
+    goals.goalForm = null;
   }
   function cancel() {
     // something typed: kept until the next time, as the quick entry of the Inbox
     lsSet(DRAFT, title.trim() || plan.trim() || result.trim() ? JSON.stringify({ who, title, plan, result }) : null);
-    store.goalForm = null;
+    goals.goalForm = null;
   }
 
   // ⌃⇥ / ⌃⇧⇥ between the fields (⇥ in the long ones is for lists), ⌘↩ creates, ⎋ closes

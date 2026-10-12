@@ -1,7 +1,7 @@
 import {
   activeTab, addPane, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
   openFile, openFromAgenda, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
-  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, openGoals, openCalendar,
+  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, openGoals,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { displayName, noteName, withOrg } from './names';
@@ -13,17 +13,9 @@ import { closingStatus, locate, nextOpen, reviewQueue, short, type Result, type 
 import { DEFAULT_LEVELS, type LevelView } from './orgIndent';
 import { DEFAULT_INBOX, append, entry, inboxItems, prepend, readInbox, remove, withInbox, type InboxConfig, type InboxItem } from './inbox';
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
-import {
-  GOALS_WORKFLOW, addSourceHeading, avatarColor, initials, insertGoal, quarterOf, readGoals, readSource, sourceKey, withGoals,
-  addMark, findGoal, shiftQuarter, goalsIn, moveGoal, reviewQueue as goalQueue, shortDay, GOAL_STATES, quarterLabel,
-  carryOver, readGoalSettings, withGoalSettings, isSilent, deadlineSoon, isDone, DEFAULT_GOAL_SETTINGS, type GoalSettings, type Goal,
-  type GoalSource, type NewGoal, type Quarter, type SourceGoals,
-} from './goals';
-import { byDay, entriesIn, hasDated, isoDay, type CalEntry, type Layer } from './calIndex';
 import { cachedTheme, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
 import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
 import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
-import { DEFAULT_CAL, insertEntry, moveEntry, readCal, withCal, type CalSettings, type NewEntry } from './calEdit';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
@@ -55,15 +47,6 @@ function build(name: string, path: string, text: string, disk: string, diskRaw: 
 export type PaletteStart = 'newFile' | 'newFolder' | 'goto' | 'status' | 'priority' | 'schedule' | 'deadline' | 'tags' | 'calendar';
 const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
-function readLayers(): Layer[] {
-  try {
-    const v = JSON.parse(lsGet('cal:layers') ?? 'null');
-    if (Array.isArray(v)) return v.filter((x): x is Layer => ['task', 'deadline', 'event', 'wait', 'done'].includes(x));
-  } catch {
-    /* the default */
-  }
-  return ['task', 'deadline', 'event', 'done']; // «Ожидания» off, as on the mockup
-}
 function readLevels(): LevelView {
   try {
     const v = JSON.parse(lsGet('editor:levels') ?? 'null');
@@ -151,8 +134,13 @@ class Store {
   /** A write failed while closing: the reason, with a single "ОК". */
   errorReq = $state<{ title: string; text: string; resolve: () => void } | null>(null);
   /** While a sheet is up the rest of the window does not react: no shortcuts, no menu commands. */
+  /** Sheets of the features (registered by them): while one is open, the window's other sheets and keys wait. */
+  private sheetChecks = $state.raw<(() => boolean)[]>([]);
+  addSheet(open: () => boolean) {
+    this.sheetChecks = [...this.sheetChecks, open];
+  }
   get sheetOpen() {
-    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refile || this.pickInbox || this.settingsOpen || this.goalForm || this.goalAdd || this.goalReport || this.goalCarry);
+    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refile || this.pickInbox || this.settingsOpen || this.sheetChecks.some((f) => f()));
   }
   /** The command palette; `start` opens it right at a step ("Создать файл…" ⇧⌘N, "Перейти к файлу…" ⇧⌘O). */
   palette = $state<{ start?: PaletteStart; n: number } | null>(null);
@@ -348,6 +336,14 @@ class Store {
     return Object.values(bundledConfig)[0] ?? null;
   }
 
+  /** The project config as parsed last, for the features' own keys (`onConfig`). */
+  private parsedConfig: any = null;
+  private configHooks: ((parsed: any) => void)[] = [];
+  /** A feature reads its keys of config.json: now, and every time it is read again. */
+  onConfig(fn: (parsed: any) => void) {
+    this.configHooks.push(fn);
+    fn(this.parsedConfig);
+  }
   /** Parse the project config text; reports problems. Returns true when the effective config changed. */
   private takeConfig(raw: string | null): boolean {
     if (raw === this.configRaw) return false;
@@ -361,9 +357,8 @@ class Store {
     }
     this.agendas = readAgendas(parsed?.agendas); // a tab of a deleted agenda shows the built-in one
     this.inboxCfg = readInbox(parsed?.inbox);
-    this.goalSources = readGoals(parsed?.goals);
-    this.goalSettings = readGoalSettings(parsed?.goalSettings);
-    this.calCfg = readCal(parsed?.calendar);
+    this.parsedConfig = parsed;
+    for (const fn of this.configHooks) fn(parsed);
     // only the statuses make the notes be read again; agendas alone do not
     const same = JSON.stringify(config) === JSON.stringify(this.config);
     this.config = config;
@@ -691,278 +686,6 @@ class Store {
     const i = f ? this.files.indexOf(f) : -1;
     if (i >= 0) this.open(i, item.line);
   }
-  // ---- goals of the quarter (ТЗ 23) ----------------------------------------------------------------------------
-  /** Where the goals are: a file and its level-1 heading (`goals` in config.json). */
-  goalSources = $state.raw<GoalSource[]>([]);
-  /** «Цели квартала» in «Настройки → Агенды»: when a goal «молчит», how early a deadline is lit. */
-  goalSettings = $state.raw<GoalSettings>(DEFAULT_GOAL_SETTINGS);
-  async setGoalSettings(c: Partial<GoalSettings>) {
-    const next = { ...this.goalSettings, ...c };
-    this.goalSettings = next;
-    return this.updateConfig((raw) => withGoalSettings(raw, next));
-  }
-  goalSilent = (g: Goal) => isSilent(g, new Date(), this.goalSettings.silent);
-  goalSoon = (g: Goal, done: string[]) => deadlineSoon(g, done, new Date(), this.goalSettings.soon);
-  /** «Отчёт за квартал»: `key` the person shown first ('*' = everybody). */
-  goalReport = $state<{ key: string; n: number } | null>(null);
-  openGoalReport(key = '*') {
-    if (this.sheetOpen) return;
-    this.goalReport = { key, n: Date.now() };
-  }
-  /** «Перенести незакрытые»: the list to confirm, from `goalsQuarter` to the next one. */
-  goalCarry = $state<{ key: string; n: number } | null>(null);
-  openGoalCarry(key = '*') {
-    if (this.sheetOpen && !this.goalReport) return;
-    this.goalReport = null;
-    this.goalCarry = { key, n: Date.now() };
-  }
-  /** The open goals of the shown quarter: what «Перенести незакрытые» offers. */
-  openGoalsOf(p: GoalPerson): Goal[] {
-    const done = p.file?.wf.done ?? [];
-    return goalsIn(p.data, this.goalsQuarter).filter((g) => !isDone(g, done));
-  }
-  /** Move the chosen open goals (titles per source) under the next quarter, one write per file. */
-  async carryGoals(chosen: Map<string, string[]>): Promise<number> {
-    const from = this.goalsQuarter;
-    const to = shiftQuarter(from, 1);
-    const steps: { path: string; text: string }[] = [];
-    let n = 0;
-    for (const [key, titles] of chosen) {
-      const p = this.goalPeople.find((x) => x.key === key);
-      const f = p?.file && this.files.find((x) => x.path === p.file!.path);
-      if (!p || !f || !titles.length) continue;
-      const r = carryOver(f.text, p.src.heading, from, to, titles, weekdayNames(f.text), (t) => parseHeadings(t, f.wf));
-      if (r.moved.length) {
-        steps.push({ path: f.path, text: r.text });
-        n += r.moved.length;
-      }
-    }
-    if (steps.length && !(await this.writeAll(`Перенос целей в ${quarterLabel(to)}`, steps))) return 0;
-    this.goalCarry = null;
-    this.goalsQuarter = to;
-    this.note(`Перенесено в ${quarterLabel(to)}: ${n}`);
-    return n;
-  }
-  /** The quarter the goals views show (the same in the navigator, the overview and a person's view). */
-  goalsQuarter = $state<Quarter>(quarterOf(new Date()));
-  /** Each source with its file and what is under its heading now; «Мои цели» first. */
-  goalPeople = $derived.by((): GoalPerson[] =>
-    this.goalSources
-      .map((src) => {
-        const file = this.files.find((f) => f.name === src.file);
-        const data: SourceGoals = file ? readSource(file.text, file.headings, src.heading) : { head: -1, quarters: [] };
-        return { src, key: sourceKey(src), file, data, found: !!file && data.head >= 0, ini: initials(src.title, src.me), color: avatarColor(src.file), name: src.me ? 'Мои цели' : src.title };
-      })
-      .sort((a, b) => Number(!!b.src.me) - Number(!!a.src.me) || a.name.localeCompare(b.name, 'ru')),
-  );
-  /** «Цели»: the overview (`*`) or one person, in the goals tab of the active pane. */
-  openGoals(key = '*') {
-    openGoals(this.layout, this.layout.active, key);
-  }
-  /** Open the file of a source at its heading (a double click in the navigator). */
-  openGoalFile(key: string, line?: number) {
-    const p = this.goalPeople.find((x) => x.key === key);
-    if (!p?.file) return;
-    const i = this.files.indexOf(p.file);
-    this.open(i, line ?? (p.data.head >= 0 ? p.file.headings[p.data.head].line : 0));
-  }
-  /** «Цели на квартал» in the project's statuses, if no set knows ACTIVE (with «Задачи» if there were none). */
-  private withGoalsWorkflow(raw: string | null): string {
-    let base: Record<string, any> = {};
-    try {
-      const p = raw ? JSON.parse(raw) : null;
-      if (p && typeof p === 'object' && !Array.isArray(p)) base = p;
-    } catch {
-      /* replaced */
-    }
-    const wfs: any[] = Array.isArray(base.workflows) ? base.workflows : [];
-    if (wfs.some((w) => Array.isArray(w?.states) && w.states.some((x: any) => x?.name === 'ACTIVE'))) return raw ?? JSON.stringify(base);
-    const def = { name: DEFAULT_SEQUENCE.name, states: DEFAULT_SEQUENCE.states.map((x) => (x.done ? { name: x.name, done: true } : { name: x.name })) };
-    return JSON.stringify({ version: base.version ?? 1, ...base, workflows: [...(wfs.length ? wfs : [def]), GOALS_WORKFLOW] }, null, 2) + '\n';
-  }
-  /** «Добавить цели»: a source (made in the file first if asked); «мои» moves to it; `replace`: «Сменить заголовок…». */
-  async addGoalSource(src: GoalSource, opts: { create?: boolean; replace?: string } = {}): Promise<boolean> {
-    if (opts.create) {
-      const f = this.files.find((x) => x.name === src.file);
-      if (!f || !(await this.transaction(`Заголовок «${src.heading}»`, (tx) => tx.update(f.path, (t) => addSourceHeading(t, src.heading))))) return false;
-    }
-    const list = this.goalSources
-      .filter((x) => sourceKey(x) !== sourceKey(src) && sourceKey(x) !== opts.replace)
-      .map((x) => (src.me ? { ...x, me: undefined } : x));
-    list.push(src);
-    return this.updateConfig((raw) => withGoals(this.withGoalsWorkflow(raw), list));
-  }
-  async removeGoalSource(key: string) {
-    return this.updateConfig((raw) => withGoals(raw, this.goalSources.filter((x) => sourceKey(x) !== key)));
-  }
-  async renameGoalSource(key: string, title: string) {
-    const t = title.trim();
-    if (!t) return false;
-    return this.updateConfig((raw) => withGoals(raw, this.goalSources.map((x) => (sourceKey(x) === key ? { ...x, title: t } : x))));
-  }
-  /** «Новая цель»: written at once, at the end of its quarter (made if needed); a toast with «Открыть». */
-  async addGoal(key: string, q: Quarter, g: NewGoal): Promise<boolean> {
-    const p = this.goalPeople.find((x) => x.key === key);
-    if (!p?.file || !g.title.trim()) return false;
-    if (!(await this.updateConfig((raw) => this.withGoalsWorkflow(raw)))) return false;
-    const f = this.files.find((x) => x.path === p.file!.path)!; // read again: the statuses may have changed
-    const r = insertGoal(f.text, f.headings, p.src.heading, q, g, weekdayNames(f.text));
-    if (!r || !(await this.writeAll(`Новая цель: ${g.title.trim()}`, [{ path: f.path, text: r.text }]))) return false;
-    const path = f.path;
-    this.note(`Цель добавлена — ${p.name}`, [{ label: 'Открыть', run: () => this.open(this.files.findIndex((x) => x.path === path), r.line) }]);
-    return true;
-  }
-  /** The source whose file is in the editor (the goal form picks this person), if any. */
-  goalKeyOfFile(): string | null {
-    const name = this.file?.name;
-    return (name && this.goalPeople.find((p) => p.src.file === name)?.key) || null;
-  }
-  /** The goal form: open, with a person chosen beforehand (the «+» of a group, the file in the editor). */
-  goalForm = $state<{ key: string | null; n: number } | null>(null);
-  openGoalForm(key: string | null = null) {
-    if (this.sheetOpen) return;
-    this.goalForm = { key, n: Date.now() };
-  }
-  /** «Добавить цели» / «Сменить заголовок…»: the dialog of sources. */
-  goalAdd = $state<{ me?: boolean; replace?: string; file?: string; n: number } | null>(null);
-  openGoalAdd(o: { me?: boolean; replace?: string; file?: string } = {}) {
-    if (this.sheetOpen) return;
-    this.goalAdd = { ...o, n: Date.now() };
-  }
-
-  // ---- the review of goals on 1-1 (ТЗ 23, part 2) -------------------------------------------------------------
-  /**
-   * The cards (a goal is known by its quarter and title: lines move with every edit), the card shown (−1: the
-   * summary), what was done, and the new mark being written (it is saved when the card changes).
-   */
-  goalReview = $state<GoalReviewState | null>(null);
-  /** The person and the goal of the card shown, read from the file now. */
-  get goalCard() {
-    const r = this.goalReview;
-    if (!r || r.cur < 0) return null;
-    const p = this.goalPeople.find((x) => x.key === r.key);
-    const it = r.items[r.cur];
-    const goal = p && it ? findGoal(p.data, it.q, it.title) : null;
-    return p && it ? { p, it, goal } : null;
-  }
-  /** «Разобрать цели»: the open goals of the quarter, the silent first; `title`: start at that goal (⌥-click). */
-  startGoalReview(key: string, title?: string) {
-    const p = this.goalPeople.find((x) => x.key === key);
-    if (!p?.file) return;
-    const q = this.goalsQuarter;
-    const queue = goalQueue(goalsIn(p.data, q), p.file.wf.done, new Date(), this.goalSettings.silent);
-    if (!queue.length) {
-      this.note(`Открытых целей в ${quarterLabel(q)} нет`);
-      return;
-    }
-    const at = title ? Math.max(0, queue.findIndex((g) => g.title === title)) : 0;
-    this.goalReview = { key, items: queue.map((g) => ({ title: g.title, q })), cur: at, marks: 0, closed: 0, moved: 0, draft: '', date: null };
-    // one tab of the review: shown in the active pane
-    const found = this.layout.panes.flatMap((pn, pi) => pn.tabs.map((t, ti) => ({ t, pi, ti }))).find((x) => x.t.kind === 'goalReview');
-    if (found) {
-      found.t.path = p.file.path;
-      found.t.goals = key;
-      this.activateTab(found.pi, found.ti);
-    } else {
-      const pn = this.layout.panes[this.layout.active];
-      const at = pn.tabs.length ? pn.active + 1 : 0;
-      pn.tabs.splice(at, 0, { ...newTab('goalReview', p.file.path), goals: key });
-      pn.active = at;
-    }
-  }
-  endGoalReview() {
-    this.goalReview = null;
-    for (const [pi, p] of this.layout.panes.entries())
-      for (let ti = p.tabs.length - 1; ti >= 0; ti--) if (p.tabs[ti].kind === 'goalReview') closeTab(this.layout, pi, ti);
-  }
-  /** Write a step of the review to the person's file; `onUndo` puts the review's counters back. */
-  private async goalWrite(label: string, make: (text: string, hs: Heading[], names: string[]) => string | null, onUndo?: () => void): Promise<boolean> {
-    const c = this.goalCard;
-    const f = c?.p.file && this.files.find((x) => x.path === c.p.file!.path);
-    if (!c || !f) return false;
-    const next = make(f.text, f.headings, weekdayNames(f.text));
-    return !!next && next !== f.text && !!(await this.writeAll(`${label}: ${c.it.title}`, [{ path: f.path, text: next }], onUndo));
-  }
-  /** «Добавить отметку»: the text of the field under the chosen day (today by default), in date order. */
-  async goalAddMark(): Promise<boolean> {
-    const r = this.goalReview;
-    const c = this.goalCard;
-    if (!r || !c || !r.draft.trim()) return false;
-    const date = r.date ?? new Date();
-    const ok = await this.goalWrite('Отметка', (t, hs, names) => addMark(t, hs, c.p.src.heading, c.it.q, c.it.title, date, r.draft, names), () => {
-      if (this.goalReview === r) r.marks = Math.max(0, r.marks - 1);
-    });
-    if (ok) {
-      r.marks++;
-      r.draft = '';
-      r.date = null;
-    }
-    return ok;
-  }
-  /** «Цель достигнута»: COMPLETED with CLOSED; the field is ready for «Итог:». */
-  async goalComplete(): Promise<boolean> {
-    const r = this.goalReview;
-    const c = this.goalCard;
-    if (!r || !c?.goal) return false;
-    const done = c.p.file!.wf.done.includes(GOAL_STATES.done) ? GOAL_STATES.done : c.p.file!.wf.done[0];
-    if (!done || c.goal.keyword === done) return false;
-    const g = c.goal;
-    const ok = await this.goalWrite('Цель достигнута', (t, hs) => {
-      const h = hs.find((x) => x.line === g.line);
-      return h ? setKeyword(t, h, done, this.files.find((x) => x.path === c.p.file!.path)!.wf) : null;
-    }, () => {
-      if (this.goalReview === r) r.closed = Math.max(0, r.closed - 1);
-    });
-    if (ok) {
-      r.closed++;
-      if (!r.draft.trim()) r.draft = 'Итог: ';
-    }
-    return ok;
-  }
-  /** «Сдвинуть срок…»: the new DEADLINE and a mark «Срок перенесён: 30 ноя → 15 дек». */
-  async goalShiftDeadline(to: Date): Promise<boolean> {
-    const r = this.goalReview;
-    const c = this.goalCard;
-    if (!r || !c?.goal) return false;
-    const g = c.goal;
-    const from = g.deadline;
-    const mark = from ? `Срок перенесён: ${shortDay(from)} → ${shortDay(to)}` : `Срок: ${shortDay(to)}`;
-    const ok = await this.goalWrite('Срок перенесён', (t, hs, names) => {
-      const h = hs.find((x) => x.line === g.line);
-      if (!h) return null;
-      const t1 = setPlanning(t, h, 'DEADLINE', to);
-      const f = this.files.find((x) => x.path === c.p.file!.path)!;
-      return addMark(t1, parseHeadings(t1, f.wf), c.p.src.heading, c.it.q, c.it.title, new Date(), mark, names);
-    }, () => {
-      if (this.goalReview === r) r.moved = Math.max(0, r.moved - 1);
-    });
-    if (ok) r.moved++;
-    return ok;
-  }
-  /** «Квартал»: the goal goes under another quarter; the card follows it. */
-  async goalMoveQuarter(to: Quarter): Promise<boolean> {
-    const r = this.goalReview;
-    const c = this.goalCard;
-    if (!r || !c?.goal) return false;
-    const f = this.files.find((x) => x.path === c.p.file!.path)!;
-    const at = r.cur;
-    const ok = await this.goalWrite('Квартал', (t, hs) => moveGoal(t, hs, c.p.src.heading, c.it.q, c.it.title, to, (x) => parseHeadings(x, f.wf))?.text ?? null, () => {
-      if (this.goalReview === r && r.items[at]) r.items[at] = { ...r.items[at], q: c.it.q }; // the card follows the goal back
-    });
-    if (ok) r.items[r.cur] = { ...c.it, q: to };
-    return ok;
-  }
-  /** «Следующая» / «Назад»: a mark being written is saved first, without asking. */
-  async goalStep(d: 1 | -1) {
-    const r = this.goalReview;
-    if (!r) return;
-    if (r.draft.trim() && r.cur >= 0) await this.goalAddMark();
-    r.draft = '';
-    r.date = null;
-    if (r.cur < 0) r.cur = d < 0 ? r.items.length - 1 : -1;
-    else r.cur = r.cur + d >= r.items.length ? -1 : Math.max(0, r.cur + d);
-  }
-
   /** The quick entry's shortcut and whether it works from any program (a preference of this Mac). */
   captureKey = $state(lsGet('capture:key') || DEFAULT_CAPTURE_KEY);
   captureGlobal = $state(lsGet('capture:global') !== '0');
@@ -1965,11 +1688,6 @@ class Store {
   showAgendaHere() {
     openAgenda(this.layout, this.layout.active);
   }
-  /** ⌘3: the calendar in the active pane; the navigator shows its layers and files. */
-  showCalendarHere() {
-    openCalendar(this.layout, this.layout.active, this.calCfg.view);
-    this.setNavMode('calendar');
-  }
   // ---- «Настройки → Оформление» (ТЗ 25): the appearance of the app and the editor theme of each, on this Mac ------
   appearanceChoice = $state<AppearanceChoice>(readChoice());
   /** macOS is dark (for «Системное»); followed while the app runs. */
@@ -2114,107 +1832,6 @@ class Store {
   setThemeName(a: Appearance, name: string) {
     this.themeNames = { ...this.themeNames, [a]: name };
     saveThemeName(a, name);
-  }
-  // ---- «Настройки → Календарь» (`calendar` in config.json), moving and making entries -----------------------------
-  calCfg = $state.raw<CalSettings>(DEFAULT_CAL);
-  async setCal(c: Partial<CalSettings>) {
-    const next = { ...this.calCfg, ...c };
-    this.calCfg = next;
-    return this.updateConfig((raw) => withCal(raw, next));
-  }
-  /** An entry dropped on a day (and a time in the week): its date is changed in the file, on disk at once. */
-  async calMove(e: { path: string; line: number; layer: Layer | 'undated' }, to: Date, time?: string | null): Promise<boolean> {
-    const f = this.files.find((x) => x.path === e.path);
-    if (!f) return false;
-    const text = moveEntry(f.text, e.line, e.layer, to, weekdayNames(f.text), { time, keepDeadline: this.calCfg.keepDeadline });
-    if (text === f.text) return false;
-    const done = await this.writeAll(`Дата изменена: ${bareTitle(f.headings.find((h) => h.line === e.line)?.title ?? '')}`, [{ path: f.path, text }]);
-    if (!done) return false;
-    this.note('Дата изменена', [{ label: 'Отменить', run: () => void this.undo(done) }]);
-    return true;
-  }
-  /** Where a new task or event goes: the file as set (or the last one / the Inbox) and the heading. */
-  calTarget(kind: 'task' | 'event'): { file: NoteFile | undefined; heading: string } {
-    const c = this.calCfg;
-    const set = kind === 'task' ? c.taskFile : c.eventFile;
-    const last = c.pick === 'last' ? c.last[kind] : null;
-    const byName = (n: string | null) => (n ? this.files.find((x) => x.name === n) : undefined);
-    return { file: byName(last) ?? byName(set) ?? this.inboxFile, heading: kind === 'task' ? c.taskHeading : c.eventHeading };
-  }
-  /** What is being dragged in the calendar (a chip, an event, a task of «Без даты»); the grab's offset in an event. */
-  calDrag = $state<{ path: string; line: number; layer: Layer | 'undated'; repeat: boolean; title: string; dy: number } | null>(null);
-  /** «+ Задача» / «+ Событие»: the quick entry of the calendar (null: closed). */
-  calNew = $state<{ kind: 'task' | 'event'; date: string; n: number } | null>(null);
-  openCalNew(kind: 'task' | 'event', date: string) {
-    this.calNew = { kind, date, n: Date.now() };
-  }
-  /** A new entry written into `file` (relative) as the settings say; on disk at once, ⌘Z in the calendar undoes it. */
-  async calCreate(e: Omit<NewEntry, 'status' | 'dateKind' | 'minutes'>, file: string): Promise<Step | null> {
-    const f = this.files.find((x) => x.name === file);
-    if (!f || !e.title.trim()) return null;
-    const c = this.calCfg;
-    const open = f.wf.sequences.flatMap((s) => s.states.map((x) => x.name));
-    const status =
-      e.kind === 'task'
-        ? c.taskStatus && f.wf.open.includes(c.taskStatus) ? c.taskStatus : startOf(sequenceFor(f.wf, null))
-        : c.eventStatus && open.includes(c.eventStatus) ? c.eventStatus : null;
-    const heading = e.kind === 'task' ? c.taskHeading : c.eventHeading;
-    const add = f === this.inboxFile ? this.inboxCfg.add : 'end';
-    const r = insertEntry(f.text, heading || null, { ...e, status, dateKind: c.dateKind, minutes: c.minutes }, weekdayNames(f.text), add);
-    const done = await this.writeAll(`${e.kind === 'task' ? 'Новая задача' : 'Новое событие'}: ${e.title.trim()}`, [{ path: f.path, text: r.text }]);
-    if (!done) return null;
-    if (c.last[e.kind] !== file) await this.setCal({ last: { ...c.last, [e.kind]: file } });
-    return done;
-  }
-  // ---- the calendar (ТЗ 24): layers and files shown, on this Mac -------------------------------------------------
-  calLayers = $state<Layer[]>(readLayers());
-  setCalLayer(l: Layer, on: boolean) {
-    this.calLayers = on ? [...new Set([...this.calLayers, l])] : this.calLayers.filter((x) => x !== l);
-    lsSet('cal:layers', JSON.stringify(this.calLayers));
-  }
-  /** Files left out of the calendar, per notes folder. */
-  calHiddenAll = $state<Record<string, string[]>>((() => {
-    try {
-      const v = JSON.parse(lsGet('cal:hidden') ?? '{}');
-      return v && typeof v === 'object' ? v : {};
-    } catch {
-      return {};
-    }
-  })());
-  get calHiddenNow(): string[] {
-    return this.calHiddenAll[this.dir ?? ''] ?? [];
-  }
-  setCalFile(name: string, on: boolean) {
-    const h = this.calHiddenNow.filter((x) => x !== name);
-    this.calHiddenAll = { ...this.calHiddenAll, [this.dir ?? '']: on ? h : [...h, name] };
-    lsSet('cal:hidden', JSON.stringify(this.calHiddenAll));
-  }
-  /** Files with something dated: the «ФАЙЛЫ» of the calendar. */
-  get calFiles(): NoteFile[] {
-    return this.files.filter((f) => hasDated(f));
-  }
-  /** The entries between two days in the layers and files shown, by day and in order. */
-  calDays(from: Date, to: Date): Map<string, CalEntry[]> {
-    const hidden = new Set(this.calHiddenNow);
-    const layers = new Set(this.calLayers);
-    const files = this.files.filter((f) => !hidden.has(f.name));
-    const open = [...new Set(this.files.flatMap((f) => f.wf.open))];
-    return byDay(entriesIn(files, from, to).filter((e) => layers.has(e.layer)), open);
-  }
-  /** Change the calendar state of a tab (the view, the chosen day). */
-  setCalendar(t: Tab, c: Partial<{ view: 'month' | 'week'; date: string }>) {
-    t.calendar = { ...(t.calendar ?? { view: 'month', date: isoDay(new Date()) }), ...c };
-  }
-  /** An entry picked in the calendar: its file in a new tab of this pane, or (⌘) in the neighbour pane. */
-  openCalEntry(e: { path: string; line: number }, neighbour = false) {
-    const pi = this.layout.active;
-    if (neighbour) {
-      const t = openFromAgenda(this.layout, pi, e.path, e.line, '', 'neighbor');
-      t.fromAgenda = null;
-    } else {
-      openFile(this.layout, pi, e.path, e.line, { focus: true });
-      this.layout.active = pi;
-    }
   }
   showNotesHere() {
     const p = this.layout.panes[this.layout.active];
@@ -2689,27 +2306,6 @@ class Store {
 }
 
 export const DEFAULT_CAPTURE_KEY = 'Shift+CmdOrCtrl+KeyI';
-export interface GoalReviewState {
-  key: string;
-  items: { title: string; q: Quarter }[];
-  cur: number; // −1: «Разбор закончен»
-  marks: number;
-  closed: number;
-  moved: number;
-  draft: string; // the new mark
-  date: Date | null; // its day; null = today
-}
-/** A source of goals as the views use it. */
-export interface GoalPerson {
-  src: GoalSource;
-  key: string;
-  file: NoteFile | undefined;
-  data: SourceGoals;
-  found: boolean; // the file and its heading are there
-  ini: string;
-  color: string;
-  name: string; // «Мои цели» for mine
-}
 export const SECTIONS = ['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши'] as const;
 export type SettingsSection = (typeof SECTIONS)[number];
 export type NavMode = 'files' | 'inbox' | 'agendas' | 'goals' | 'calendar' | 'search';

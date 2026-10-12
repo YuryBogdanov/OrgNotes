@@ -1,15 +1,16 @@
 <script lang="ts">
+  import { goals } from './features/goals.svelte';
   import { store } from './store.svelte';
   import { GOAL_TONES, dayLabel, finalMark, goalsIn, lastMarks, quarterLabel, reportText, shiftQuarter, shortDay, statusWords, cmpQuarter, quarterOf } from './goals';
 
   // «Отчёт за квартал» (ТЗ 23, 6.1): every person or one; for each goal the status, the deadline, the expected result
   // in full, the last three marks and the final one. Copied as text or Markdown, «Название / Что делал / Результат /
   // Срок / Статус», to paste on the platform.
-  const req = store.goalReport!;
-  const q = store.goalsQuarter;
+  const req = goals.goalReport!;
+  const q = goals.goalsQuarter;
   let who = $state(req.key);
   const people = $derived(
-    store.goalPeople.filter((p) => p.found && (who === '*' || p.key === who)).sort((a, b) => Number(!!a.src.me) - Number(!!b.src.me) || a.name.localeCompare(b.name, 'ru')),
+    goals.goalPeople.filter((p) => p.found && (who === '*' || p.key === who)).sort((a, b) => Number(!!a.src.me) - Number(!!b.src.me) || a.name.localeCompare(b.name, 'ru')),
   );
   const rows = $derived(people.map((p) => ({ p, goals: goalsIn(p.data, q), done: p.file?.wf.done ?? [] })));
   const past = cmpQuarter(q, quarterOf(new Date())) < 0;
@@ -27,7 +28,7 @@
   function key(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       e.preventDefault();
-      store.goalReport = null;
+      goals.goalReport = null;
     }
   }
 </script>
@@ -39,7 +40,7 @@
     <b>Отчёт за квартал · {quarterLabel(q)}</b>
     <select bind:value={who} aria-label="Чей отчёт">
       <option value="*">Все люди</option>
-      {#each store.goalPeople.filter((p) => p.found) as p (p.key)}<option value={p.key}>{p.name}</option>{/each}
+      {#each goals.goalPeople.filter((p) => p.found) as p (p.key)}<option value={p.key}>{p.name}</option>{/each}
     </select>
     <span class="sp"></span>
     <button onclick={() => copy('text')}>Скопировать как текст</button>
@@ -68,9 +69,9 @@
     {/each}
   </div>
   <footer>
-    {#if past && openLeft}<button onclick={() => store.openGoalCarry(who)}>Перенести незакрытые в {quarterLabel(shiftQuarter(q, 1))}</button>{/if}
+    {#if past && openLeft}<button onclick={() => goals.openGoalCarry(who)}>Перенести незакрытые в {quarterLabel(shiftQuarter(q, 1))}</button>{/if}
     <span class="sp"></span>
-    <button class="pri" onclick={() => (store.goalReport = null)}>Готово</button>
+    <button class="pri" onclick={() => (goals.goalReport = null)}>Готово</button>
   </footer>
 </div>
 

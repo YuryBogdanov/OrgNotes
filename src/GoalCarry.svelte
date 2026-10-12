@@ -1,16 +1,17 @@
 <script lang="ts">
+  import { goals } from './features/goals.svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { store } from './store.svelte';
   import { quarterLabel, shiftQuarter, shortDay, cmpQuarter, quarterOf } from './goals';
 
   // «Перенести незакрытые» (ТЗ 23, 6.2): the open goals of the quarter, all ticked; the ticked ones go under the next
   // quarter, a deadline of the old quarter becomes the last day of the new one, and each gets a mark «Перенесена из …».
-  const req = store.goalCarry!;
-  const q = store.goalsQuarter;
+  const req = goals.goalCarry!;
+  const q = goals.goalsQuarter;
   const to = shiftQuarter(q, 1);
-  const people = store.goalPeople
+  const people = goals.goalPeople
     .filter((p) => p.found && (req.key === '*' || p.key === req.key))
-    .map((p) => ({ p, goals: store.openGoalsOf(p) }))
+    .map((p) => ({ p, goals: goals.openGoalsOf(p) }))
     .filter((x) => x.goals.length);
   const ticked = new SvelteMap<string, boolean>(people.flatMap((x) => x.goals.map((g) => [x.p.key + '|' + g.title, true] as const)));
   const count = $derived([...ticked.values()].filter(Boolean).length);
@@ -18,14 +19,14 @@
   async function go() {
     busy = true;
     const chosen = new Map(people.map((x) => [x.p.key, x.goals.filter((g) => ticked.get(x.p.key + '|' + g.title)).map((g) => g.title)]));
-    await store.carryGoals(chosen);
+    await goals.carryGoals(chosen);
     busy = false;
   }
   const word = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? 'цель' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'цели' : 'целей');
   function key(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       e.preventDefault();
-      store.goalCarry = null;
+      goals.goalCarry = null;
     }
   }
 </script>
@@ -56,7 +57,7 @@
     {/each}
   </div>
   <footer>
-    <button onclick={() => (store.goalCarry = null)}>Отмена</button>
+    <button onclick={() => (goals.goalCarry = null)}>Отмена</button>
     <button class="pri" disabled={!count || busy} onclick={go}>Перенести {count} {word(count)}</button>
   </footer>
 </div>

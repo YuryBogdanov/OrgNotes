@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { calendar } from './features/calendar.svelte';
   import { store } from './store.svelte';
   import { toneFor } from './org';
   import { toneStyle } from './colors';
@@ -6,8 +7,8 @@
 
   // The navigator in the «Календарь» mode (ТЗ 24): the layers shown, the files with dated entries, the open tasks
   // without a date. Both choices are kept on this Mac (the files per notes folder).
-  const hidden = $derived(new Set(store.calHiddenNow));
-  const files = $derived(store.calFiles);
+  const hidden = $derived(new Set(calendar.hiddenNow));
+  const files = $derived(calendar.files);
   const tasks = $derived(undated(store.files.filter((f) => !hidden.has(f.name))));
   const base = (n: string) => n.split('/').pop()!.replace(/\.org$/, '');
   const wfOf = (path: string) => store.files.find((f) => f.path === path)?.wf;
@@ -17,7 +18,7 @@
   <div class="cap">ПОКАЗЫВАТЬ</div>
   {#each LAYERS as l (l.id)}
     <label class="ck">
-      <input type="checkbox" checked={store.calLayers.includes(l.id)} onchange={(e) => store.setCalLayer(l.id, e.currentTarget.checked)} />
+      <input type="checkbox" checked={calendar.layers.includes(l.id)} onchange={(e) => calendar.setLayer(l.id, e.currentTarget.checked)} />
       <span class="nm">{l.name}</span>
       <span class="dot" style="background:{l.color}" aria-hidden="true"></span>
     </label>
@@ -25,18 +26,18 @@
   <div class="cap">ФАЙЛЫ</div>
   {#each files as f (f.path)}
     <label class="ck" title={f.name}>
-      <input type="checkbox" checked={!hidden.has(f.name)} onchange={(e) => store.setCalFile(f.name, e.currentTarget.checked)} />
+      <input type="checkbox" checked={!hidden.has(f.name)} onchange={(e) => calendar.setFile(f.name, e.currentTarget.checked)} />
       <span class="nm">{base(f.name)}</span>
     </label>
   {:else}
     <p class="hint">Дат в файлах пока нет.</p>
   {/each}
-  {#if store.calCfg.undated}
+  {#if calendar.cfg.undated}
   <div class="cap">БЕЗ ДАТЫ</div>
   {#each tasks as t (t.path + t.line)}
-    <button class="ud" title="{t.title} — {base(t.file)}" onclick={() => store.openCalEntry(t)} draggable="true"
-      ondragstart={(e) => { store.calDrag = { path: t.path, line: t.line, layer: 'undated', repeat: false, title: t.title, dy: 0 }; e.dataTransfer?.setData('text/plain', t.title); }}
-      ondragend={() => (store.calDrag = null)}>
+    <button class="ud" title="{t.title} — {base(t.file)}" onclick={() => calendar.openEntry(t)} draggable="true"
+      ondragstart={(e) => { calendar.drag = { path: t.path, line: t.line, layer: 'undated', repeat: false, title: t.title, dy: 0 }; e.dataTransfer?.setData('text/plain', t.title); }}
+      ondragend={() => (calendar.drag = null)}>
       <span class="kw tone-chip" style={wfOf(t.path) ? toneStyle(toneFor(t.keyword, wfOf(t.path)!)) : ''}>{t.keyword}</span>
       <span class="t">{t.priority ? `[#${t.priority}] ` : ''}{t.title}</span>
     </button>

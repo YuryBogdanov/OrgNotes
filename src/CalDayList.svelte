@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { calendar } from './features/calendar.svelte';
   import { onMount, tick } from 'svelte';
   import { dayShort, entriesWord, fromIso, type CalEntry } from './calIndex';
   import { store } from './store.svelte';
@@ -31,7 +32,7 @@
   });
   const open = (e: CalEntry, neighbour: boolean) => {
     onclose();
-    store.openCalEntry(e, neighbour);
+    calendar.openEntry(e, neighbour);
   };
   function key(e: KeyboardEvent) {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
