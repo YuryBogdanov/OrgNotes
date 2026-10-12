@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.0.0';
+export const API_VERSION = '1.1.0';
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;

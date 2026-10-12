@@ -378,7 +378,12 @@ class Host {
   }
   private async builtinCode(e: Entry): Promise<Plugin | null> {
     const load = MAINS[`../plugins/${e.dir}/main.ts`];
-    return load ? (await load()).default : null;
+    if (!load) return null;
+    try {
+      return (await load()).default;
+    } catch {
+      return (await load()).default; // once more: a module cut off by a reload of the page (dev) is fetched again
+    }
   }
   /** An installed plugin's main.js (one module, everything bundled in) and its styles.css, read by Rust from its own folder. */
   private async installedCode(e: Entry, m: Manifest): Promise<Plugin | null> {

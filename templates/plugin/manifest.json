@@ -1,0 +1,30 @@
+{
+  "id": "example",
+  "name": "Пример",
+  "version": "0.1.0",
+  "description": "Шаблон плагина: команда, раздел навигатора на Svelte, настройка.",
+  "author": "Вы",
+  "api": "^1.1",
+  "minAppVersion": "1.0.0",
+  "main": "main.js",
+  "permissions": ["index.read"],
+  "contributes": {
+    "commands": [
+      { "id": "example.count", "title": "Пример: сколько открытых задач", "keys": ["⌃⌥⌘E"] },
+      { "id": "example.show", "title": "Навигатор: пример" }
+    ],
+    "navSections": [{ "id": "example", "title": "Пример", "icon": "M4 4h12v12H4zM4 9h12", "key": "example.show" }],
+    "settings": [
+      {
+        "section": "Пример",
+        "groups": [
+          {
+            "caption": "ПРИМЕР",
+            "fields": [{ "key": "word", "type": "text", "label": "Слово в разделе", "where": "local", "default": "задач" }],
+            "help": "Поля описаны в manifest.json, лист рисует приложение."
+          }
+        ]
+      }
+    ]
+  }
+}

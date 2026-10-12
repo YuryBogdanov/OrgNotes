@@ -306,8 +306,9 @@
   }
   // the core's sections, in the order of the mockup; the features' (Календарь) come from the registry (views.ts)
   const CORE: [SettingsSection, number][] = [['Основные', 0], ['Оформление', 10], ['Статусы', 20], ['Теги', 30], ['Агенды', 40], ['Inbox', 60], ['Файлы', 70], ['Клавиши', 80]];
-  const sections = [...CORE, ...allSettings().map((x): [SettingsSection, number] => [x.id, x.order])].sort((a, b) => a[1] - b[1]).map(([id]) => id);
-  const READY: SettingsSection[] = ['Основные', 'Оформление', 'Статусы', 'Агенды', 'Inbox', 'Клавиши', ...allSettings().map((x) => x.id)];
+  // a plugin turned on while the sheet is open brings its section at once (the registry is reactive)
+  const sections = $derived([...CORE, ...allSettings().map((x): [SettingsSection, number] => [x.id, x.order])].sort((a, b) => a[1] - b[1]).map(([id]) => id));
+  const READY = $derived<SettingsSection[]>(['Основные', 'Оформление', 'Статусы', 'Агенды', 'Inbox', 'Клавиши', ...allSettings().map((x) => x.id)]);
   const ICON: Record<SettingsSection, string> = {
     Основные: 'M10 7.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2zM10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2',
     Оформление: 'M10 3a7 7 0 1 0 0 14c1 0 1.5-.6 1.5-1.3 0-1.1-1-1.4-1-2.4 0-.8.7-1.3 1.5-1.3H14a3 3 0 0 0 3-3C17 5.6 13.9 3 10 3zM6.5 9.5h.01M8.5 6.5h.01M12 6.5h.01',
