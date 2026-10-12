@@ -5,8 +5,9 @@
 import { store, type NoteFile } from '../store.svelte';
 import { closeTab, newTab, openView, type Tab } from '../layout';
 import { setPlanning, weekdayNames } from '../edits';
-import { readGoals, readGoalSettings, sourcesJson, GOALS_WORKFLOW, addSourceHeading, avatarColor, initials, insertGoal, quarterOf, readSource, sourceKey, withGoals, addMark, findGoal, shiftQuarter, goalsIn, moveGoal, reviewQueue as goalQueue, shortDay, GOAL_STATES, quarterLabel, carryOver, withGoalSettings, isSilent, deadlineSoon, isDone, DEFAULT_GOAL_SETTINGS, type GoalSettings, type Goal, type GoalSource, type NewGoal, type Quarter, type SourceGoals } from '../goals';
+import { days, readGoals, readGoalSettings, sourcesJson, GOALS_WORKFLOW, addSourceHeading, avatarColor, initials, insertGoal, quarterOf, readSource, sourceKey, withGoals, addMark, findGoal, shiftQuarter, goalsIn, moveGoal, reviewQueue as goalQueue, shortDay, GOAL_STATES, quarterLabel, carryOver, withGoalSettings, isSilent, deadlineSoon, isDone, DEFAULT_GOAL_SETTINGS, type GoalSettings, type Goal, type GoalSource, type NewGoal, type Quarter, type SourceGoals } from '../goals';
 import { DEFAULT_SEQUENCE, parseHeadings, setKeyword, type Heading } from '../org';
+import type { Schema, Values } from '../settingsSchema';
 
 export interface GoalReviewState {
   key: string;
@@ -317,3 +318,22 @@ store.registerStatusSet(
 );
 // its sheets: while one is open, the window's other sheets and keys wait
 store.addSheet(() => !!(goals.goalForm || goals.goalAdd || goals.goalReport || goals.goalCarry));
+
+// «Настройки → Агенды → Цели квартала» as a schema (roadmap 0.6), drawn by the core inside the «Агенды» section.
+export const goalsSchema: Schema = {
+  id: 'g',
+  label: 'Цели квартала',
+  values: () => goals.goalSettings as unknown as Values,
+  set: (patch) => goals.setGoalSettings(patch as Partial<GoalSettings>),
+  groups: [
+    {
+      caption: 'ЦЕЛИ КВАРТАЛА',
+      fields: [
+        { key: 'silent', type: 'choice', look: 'menu', where: 'local', label: 'Цель «молчит» через', options: [7, 14, 21, 30].map((d) => ({ value: d, label: days(d) })) },
+        { key: 'soon', type: 'choice', look: 'menu', where: 'local', label: 'Предупреждать о сроке за',
+          options: [2, 4, 6, 8].map((w) => ({ value: w, label: `${w} ${w < 5 ? 'недели' : 'недель'}` })) },
+      ],
+      help: 'Цель ACTIVE без отметок дольше этого срока подсвечивается в разделе «Цели» и первой попадает в разбор. Срок цели подсвечивается, когда до него остаётся меньше выбранного. Источники целей и их файлы задаются в навигаторе «Цели».',
+    },
+  ],
+};

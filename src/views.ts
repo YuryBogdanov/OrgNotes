@@ -4,6 +4,7 @@
 
 import type { Component } from 'svelte';
 import type { Tab } from './layout';
+import type { Schema } from './settingsSchema';
 
 /** A kind of tab a feature shows (the calendar, the goals, a review). Its state lives in `tab.data`. */
 export interface ViewSpec {
@@ -62,7 +63,9 @@ export interface SettingsSpec {
   icon: string;
   /** The place in the column: Основные 0, Оформление 10, Статусы 20, Теги 30, Агенды 40, Календарь 50, Inbox 60, Файлы 70, Клавиши 80. */
   order: number;
-  component: Component;
+  /** Its own component, or a schema the core draws (roadmap 0.6). */
+  component?: Component;
+  schema?: Schema;
 }
 const sections = new Map<string, SettingsSpec>();
 export function registerSettings(s: SettingsSpec) {
@@ -70,3 +73,17 @@ export function registerSettings(s: SettingsSpec) {
 }
 export const settingsOf = (id: string) => sections.get(id);
 export const allSettings = () => [...sections.values()];
+
+/** A block a feature adds to another section of the settings, drawn from its schema («Цели квартала» in «Агенды»). */
+export interface SettingsBlockSpec {
+  section: string;
+  order: number;
+  schema: Schema;
+}
+const blocks: SettingsBlockSpec[] = [];
+export function registerSettingsBlock(b: SettingsBlockSpec) {
+  const i = blocks.findIndex((x) => x.schema.id === b.schema.id);
+  if (i >= 0) blocks.splice(i, 1);
+  blocks.push(b);
+}
+export const blocksOf = (section: string) => blocks.filter((b) => b.section === section).sort((a, b) => a.order - b.order);

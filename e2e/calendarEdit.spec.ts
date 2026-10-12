@@ -144,7 +144,7 @@ test('«Настройки → Календарь»: what new entries go to in t
   await page.keyboard.press('Meta+,');
   await page.getByRole('tab', { name: 'Календарь' }).last().click();
   const s = page.getByRole('dialog', { name: 'Настройки' });
-  await expect(s.getByTestId('cal-task-file')).toHaveText('Inbox — inbox.org');
+  await expect(s.getByTestId('cal-taskFile')).toHaveText('Inbox — inbox.org');
   await s.getByRole('radio', { name: 'Неделя' }).click();
   await s.getByLabel('С', { exact: true }).selectOption('9');
   await s.getByRole('switch', { name: 'Номера недель' }).click();
@@ -155,7 +155,7 @@ test('«Настройки → Календарь»: what new entries go to in t
   await s.getByRole('button', { name: 'Выбрать файл для событий' }).click();
   await page.getByRole('dialog', { name: 'Файл для событий' }).getByPlaceholder('Найти файл').fill('journal');
   await page.keyboard.press('Enter');
-  await expect(s.getByTestId('cal-event-file')).toHaveText('journal.org');
+  await expect(s.getByTestId('cal-eventFile')).toHaveText('journal.org');
   await expect.poll(async () => calFolder(page)).toEqual({ taskHeading: 'Календарь', eventFile: 'journal.org' });
   expect(await calLocal(page)).toEqual({ view: 'week', from: 9, weekNumbers: false, weekends: false, undated: false });
   expect((await config(page)).calendar).toBeUndefined(); // moved out of config.json

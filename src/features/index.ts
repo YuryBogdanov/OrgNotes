@@ -3,9 +3,9 @@
 // these become the manifests of the built-in plugins.
 
 import './keys';
-import { registerNav, registerSettings, registerView } from '../views';
+import { registerNav, registerSettings, registerSettingsBlock, registerView } from '../views';
 import { calendar } from './calendar.svelte';
-import { goals, goalsLabel, goalReviewLabel } from './goals.svelte';
+import { goals, goalsLabel, goalReviewLabel, goalsSchema } from './goals.svelte';
 import { inboxReview } from './review.svelte';
 import { inbox } from './inbox.svelte';
 import { store } from '../store.svelte';
@@ -14,7 +14,7 @@ import { GOAL_ICON } from '../goals';
 import CalendarView from '../CalendarView.svelte';
 import CalendarDay from '../CalendarDay.svelte';
 import CalendarPanel from '../CalendarPanel.svelte';
-import CalendarSettings from '../CalendarSettings.svelte';
+import { calendarSchema } from './calendarSettings';
 import Goals from '../Goals.svelte';
 import GoalReview from '../GoalReview.svelte';
 import GoalsPanel from '../GoalsPanel.svelte';
@@ -51,4 +51,5 @@ registerView({
   crumbs: (t) => ['Календарь', t.data ? calCrumb(t.data) : ''],
   restore: (d: any) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? { view: d.view === 'week' ? 'week' : 'month', date: d.date } : calendar.fresh()),
 });
-registerSettings({ id: 'Календарь', icon: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3', order: 50, component: CalendarSettings });
+registerSettings({ id: 'Календарь', icon: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3', order: 50, schema: calendarSchema });
+registerSettingsBlock({ section: 'Агенды', order: 10, schema: goalsSchema });
