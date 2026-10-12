@@ -32,7 +32,6 @@ test.describe('toolbar group', () => {
   test('three mutually exclusive buttons: none pressed with one pane', async ({ page }) => {
     await open(page);
     for (const n of ['Второй редактор', 'Агенда', 'Календарь']) await expect(btn(page, n)).toHaveAttribute('aria-pressed', 'false');
-    await expect(btn(page, 'Календарь')).toBeDisabled();
   });
 
   test('"Агенда" opens the agenda in a second pane on the right and is pressed; pressing again closes it', async ({ page }) => {

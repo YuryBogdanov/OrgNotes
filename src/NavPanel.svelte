@@ -5,6 +5,7 @@
   import InboxPanel from './InboxPanel.svelte';
   import SearchPanel from './SearchPanel.svelte';
   import GoalsPanel from './GoalsPanel.svelte';
+  import CalendarPanel from './CalendarPanel.svelte';
   import { GOAL_ICON } from './goals';
   import type { NavMode } from './store.svelte';
 
@@ -17,6 +18,7 @@
     { id: 'tasks', label: 'Задачи', icon: 'M3.5 5.5l1.5 1.5 3-3M3.5 12.5l1.5 1.5 3-3M11 5.5h6M11 12.5h6' },
     { id: 'agendas', label: 'Агенда', icon: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3', on: 'agendas', key: 'navAgendas' },
     { id: 'goals', label: 'Цели', icon: GOAL_ICON, on: 'goals', key: 'navGoals' },
+    { id: 'calendar', label: 'Календарь', icon: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3M7 12h.01M10 12h.01M13 12h.01', on: 'calendar', key: 'navCalendar' },
     { id: 'tags', label: 'Теги', icon: 'M3 3h6.5l7.5 7.5-6 6L3.5 9.5zM6.8 6.8h.01' },
     { id: 'search', label: 'Поиск по заметкам', icon: 'M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM13.5 13.5L17 17', on: 'search', key: 'navSearch' },
   ];
@@ -35,7 +37,7 @@
     {/each}
   </div>
   <div class="body">
-    {#if store.navMode === 'agendas'}<AgendaList />{:else if store.navMode === 'inbox'}<InboxPanel />{:else if store.navMode === 'search'}<SearchPanel />{:else if store.navMode === 'goals'}<GoalsPanel />{:else}<Navigator />{/if}
+    {#if store.navMode === 'agendas'}<AgendaList />{:else if store.navMode === 'inbox'}<InboxPanel />{:else if store.navMode === 'search'}<SearchPanel />{:else if store.navMode === 'goals'}<GoalsPanel />{:else if store.navMode === 'calendar'}<CalendarPanel />{:else}<Navigator />{/if}
   </div>
 </div>
 

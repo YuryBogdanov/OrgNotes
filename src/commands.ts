@@ -229,6 +229,10 @@ register({
   when: () => store.files.length > 0, run: () => void setTimeout(() => store.openGoalAdd()),
 });
 register({
+  id: 'calendar', title: 'Календарь', icon: 'cal', group: 'general', synonyms: ['месяц', 'неделя', 'события'],
+  when: () => true, run: () => store.showCalendarHere(),
+});
+register({
   id: 'settings', title: 'Настройки…', icon: 'gear', group: 'general', synonyms: ['параметры', 'клавиши', 'сочетания', 'preferences'],
   when: () => true, run: () => void setTimeout(() => store.openSettings()), // once the palette is closed
 });

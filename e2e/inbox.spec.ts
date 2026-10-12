@@ -29,7 +29,7 @@ test.describe('the navigator', () => {
     await page.goto('/');
     await expect(page.locator('.cm-content').first()).toBeVisible();
     const tabs = modes(page).getByRole('tab');
-    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Задачи', 'Агенда', 'Цели', 'Теги', 'Поиск по заметкам']);
+    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Задачи', 'Агенда', 'Цели', 'Календарь', 'Теги', 'Поиск по заметкам']);
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
     await expect(tabs.nth(1)).toHaveAttribute('title', /^Inbox/);
     await expect(tabs.nth(2)).toBeDisabled();
