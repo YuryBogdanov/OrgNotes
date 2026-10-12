@@ -56,7 +56,7 @@ test('the built-in themes; by default the look is as before; a theme recolours t
   expect(await light.getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Panopticon светлая', 'Leuven', 'Solarized Light', 'Modus Operandi']);
   expect(await dark.getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Panopticon тёмная', 'Nord', 'Gruvbox Dark', 'Dracula', 'Modus Vivendi']);
   await expect(light.getByRole('radio', { name: 'Panopticon светлая' })).toHaveAttribute('aria-checked', 'true');
-  await expect(light.getByRole('radio', { name: 'Leuven' })).toContainText('встроенная');
+  await expect(light.getByRole('radio', { name: 'Leuven' }).locator('..')).toContainText('встроенная');
   await light.getByRole('radio', { name: 'Solarized Light' }).click();
   await expect(light.getByRole('radio', { name: 'Solarized Light' })).toHaveAttribute('aria-checked', 'true');
   expect(await color(page, '.cm-editor', 'background-color')).toBe('rgb(253, 246, 227)');

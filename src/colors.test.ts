@@ -46,3 +46,32 @@ describe('built-in themes', () => {
     expect(v).toContain('--p-red:#c4262e;');
   });
 });
+
+describe('own themes', async () => {
+  const { parseTheme, themeJson, uniqueName, copyOf, themeFile } = await import('./themes');
+  it('a file is read back as it was written', () => {
+    const t = copyOf(BUILTIN.find((x) => x.name === 'Nord')!, []);
+    expect(t.name).toBe('Nord — моя');
+    expect(t.basedOn).toBe('Nord');
+    expect(parseTheme(themeJson(t))).toEqual(t);
+  });
+  it('unknown keys ignored, missing ones from Panopticon of the appearance, #rgb expanded; not a theme → null', () => {
+    const t = parseTheme(JSON.stringify({ format: 'panopticon-theme', version: 1, name: ' Моя ', appearance: 'dark', extra: 1, colors: { bg: '#123', h5: '#ABCDEF', palette: { red: '#f00' }, nope: '#fff' } }))!;
+    expect(t.name).toBe('Моя');
+    expect(t.colors.bg).toBe('#112233');
+    expect(t.colors.h5).toBe('#abcdef');
+    expect(t.colors.fg).toBe(BUILTIN.find((x) => x.name === 'Panopticon тёмная')!.colors.fg);
+    expect(t.colors.palette.red).toBe('#ff0000');
+    expect(parseTheme('{"name":"x"}')).toBeNull();
+    expect(parseTheme('nope')).toBeNull();
+    // no appearance: by the background
+    expect(parseTheme(JSON.stringify({ format: 'panopticon-theme', name: 'Т', colors: { bg: '#101010' } }))!.appearance).toBe('dark');
+  });
+  it('names: «(2)» on a clash (as files, any case), a copy of an own theme keeps its base', () => {
+    expect(uniqueName('Nord', ['Nord', 'nord (2)'])).toBe('Nord (3)');
+    expect(uniqueName('Своя', ['Nord'])).toBe('Своя');
+    expect(themeFile('a/b:c')).toBe('a-b-c.json');
+    const own = { ...copyOf(BUILTIN[5], []), name: 'Моя' };
+    expect(copyOf(own, ['Моя'])).toMatchObject({ name: 'Моя (2)', basedOn: 'Nord' });
+  });
+});

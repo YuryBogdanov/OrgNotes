@@ -3,7 +3,7 @@
 // (App.svelte): `data-appearance` on the root switches the tokens of app.css, a <style> holds the theme's variables,
 // and the native window takes the same appearance (its vibrancy and title bar).
 
-import { BUILTIN, DEFAULT_THEME, builtinFor, themeVars, type Appearance, type AppearanceChoice, type Theme } from './themes';
+import { BUILTIN, DEFAULT_THEME, builtinFor, parseTheme, themeJson, themeVars, type Appearance, type AppearanceChoice, type Theme } from './themes';
 
 const get = (k: string) => {
   try {
@@ -57,7 +57,11 @@ export function applyAppearance(choice: AppearanceChoice, a: Appearance, theme: 
     document.head.appendChild(styleEl);
   }
   const css = `:root{${themeVars(theme.colors)}}`;
-  if (styleEl.textContent !== css) styleEl.textContent = css;
+  if (styleEl.textContent !== css) {
+    styleEl.textContent = css;
+    // an own theme is read from disk after the first paint: kept here, it shows from the start next time
+    if (!theme.builtin) set('theme:last:' + a, themeJson(theme));
+  }
   if (windowChoice !== choice && '__TAURI_INTERNALS__' in window) {
     windowChoice = choice;
     void import('@tauri-apps/api/window')
@@ -66,9 +70,16 @@ export function applyAppearance(choice: AppearanceChoice, a: Appearance, theme: 
   }
 }
 
+/** The own theme last applied for an appearance, if it is `name` (until the own themes are read from disk). */
+export function cachedTheme(a: Appearance, name: string): Theme | null {
+  const t = parseTheme(get('theme:last:' + a) ?? '');
+  return t && t.name === name && t.appearance === a ? t : null;
+}
+
 /** Before the first paint: the stored choice with the built-in themes (own themes come with the store). */
 export function applyStored() {
   const c = readChoice();
   const a = effective(c);
-  applyAppearance(c, a, themeNamed(readThemeNames()[a], a));
+  const name = readThemeNames()[a];
+  applyAppearance(c, a, cachedTheme(a, name) ?? themeNamed(name, a));
 }
