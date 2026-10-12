@@ -2,7 +2,7 @@
 // active and receives keyboard input and commands. Plain data + functions that mutate it in place, so the
 // store can keep it in $state and tests can use plain objects.
 
-export type TabKind = 'file' | 'agenda' | 'untitled' | 'review'; // review: «Разбор Inbox», its `path` is the card's file
+export type TabKind = 'file' | 'agenda' | 'untitled' | 'review' | 'goals'; // review: «Разбор Inbox», its `path` is the card's file; goals: ТЗ 23
 export interface Cursor {
   line: number;
   col: number;
@@ -17,6 +17,7 @@ export interface Tab {
   title?: string; // untitled tabs: "Без названия", "Без названия 2", …
   text?: string; // untitled tabs: the text, not on disk until "Сохранить как…"
   agenda?: string; // agenda tabs: the id of a custom agenda («Мои агенды»); none = the built-in one
+  goals?: string; // goals tabs: the source shown (file#heading), '*' = «Обзор квартала»
 }
 export interface Pane {
   id: string;
@@ -40,7 +41,7 @@ const reveal = (line: number, focus = false) => ({ line, n: ++revealSeq, focus }
 export function newTab(kind: TabKind, path?: string, line = 0, focus = false): Tab {
   return { id: uid('t'), kind, path, cursor: { line, col: 0 }, reveal: kind === 'file' ? reveal(line, focus) : null, fromAgenda: null };
 }
-export const copyTab = (t: Tab): Tab => ({ ...newTab(t.kind, t.path, t.cursor.line), cursor: { ...t.cursor }, reveal: t.kind === 'file' ? reveal(t.cursor.line) : null, agenda: t.agenda });
+export const copyTab = (t: Tab): Tab => ({ ...newTab(t.kind, t.path, t.cursor.line), cursor: { ...t.cursor }, reveal: t.kind === 'file' ? reveal(t.cursor.line) : null, agenda: t.agenda, goals: t.goals });
 const newPane = (tabs: Tab[]): Pane => ({ id: uid('p'), tabs, active: 0 });
 
 export const emptyLayout = (first?: Tab): Layout => ({ panes: [newPane(first ? [first] : [])], active: 0, ratio: 0.5 });
@@ -109,6 +110,20 @@ export function openAgenda(L: Layout, pi: number): Tab {
     return p.tabs[i];
   }
   const t = newTab('agenda');
+  insertAfterActive(p, t);
+  return t;
+}
+
+/** «Цели»: the goals tab of the pane shows `key` (made if there is none). */
+export function openGoals(L: Layout, pi: number, key: string): Tab {
+  const p = L.panes[pi];
+  const i = p.tabs.findIndex((t) => t.kind === 'goals');
+  if (i >= 0) {
+    p.active = i;
+    p.tabs[i].goals = key;
+    return p.tabs[i];
+  }
+  const t = { ...newTab('goals'), goals: key };
   insertAfterActive(p, t);
   return t;
 }
@@ -306,7 +321,7 @@ export function serialize(L: Layout): string {
     panes: L.panes.map((p) => {
       const tabs = p.tabs.filter((t) => t.kind !== 'untitled' && t.kind !== 'review');
       const act = p.tabs[p.active];
-      return { active: Math.max(0, tabs.indexOf(act)), tabs: tabs.map((t) => ({ kind: t.kind, path: t.path, cursor: t.cursor, ...(t.agenda ? { agenda: t.agenda } : {}) })) };
+      return { active: Math.max(0, tabs.indexOf(act)), tabs: tabs.map((t) => ({ kind: t.kind, path: t.path, cursor: t.cursor, ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.goals ? { goals: t.goals } : {}) })) };
     }),
   });
 }
@@ -322,6 +337,7 @@ export function restore(raw: string | null, exists: (path: string) => boolean): 
       let active = 0;
       (Array.isArray(sp.tabs) ? sp.tabs : []).forEach((st: any, i: number) => {
         if (st?.kind === 'agenda') tabs.push({ ...newTab('agenda'), ...(typeof st.agenda === 'string' && st.agenda ? { agenda: st.agenda } : {}) });
+        else if (st?.kind === 'goals') tabs.push({ ...newTab('goals'), goals: typeof st.goals === 'string' && st.goals ? st.goals : '*' });
         else if (st?.kind === 'file' && typeof st.path === 'string' && exists(st.path)) {
           const t = newTab('file', st.path, st.cursor?.line ?? 0);
           t.cursor = { line: st.cursor?.line ?? 0, col: st.cursor?.col ?? 0 };

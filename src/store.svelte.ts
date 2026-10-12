@@ -1,11 +1,11 @@
 import {
   activeTab, addPane, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
   openFile, openFromAgenda, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
-  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED,
+  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, openGoals,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { displayName, noteName, withOrg } from './names';
-import { appendTask, setPlanning, setTags } from './edits';
+import { appendTask, setPlanning, setTags, weekdayNames } from './edits';
 import { bareTitle, caretAfter, keyOf, moveTo, moveWithin } from './refile';
 import type { CalSpec, Plate } from './commands';
 import { searchFile, type Hit, type Scope } from './search';
@@ -13,8 +13,12 @@ import { closingStatus, locate, nextOpen, reviewQueue, short, type Result, type 
 import { DEFAULT_LEVELS, type LevelView } from './orgIndent';
 import { DEFAULT_INBOX, append, entry, inboxItems, prepend, readInbox, remove, withInbox, type InboxConfig, type InboxItem } from './inbox';
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
+import {
+  GOALS_WORKFLOW, addSourceHeading, avatarColor, initials, insertGoal, quarterOf, readGoals, readSource, sourceKey, withGoals,
+  type GoalSource, type NewGoal, type Quarter, type SourceGoals,
+} from './goals';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
-import { EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
+import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
 export interface NoteFile {
   name: string; // relative path inside the notes folder
@@ -132,7 +136,7 @@ class Store {
   errorReq = $state<{ title: string; text: string; resolve: () => void } | null>(null);
   /** While a sheet is up the rest of the window does not react: no shortcuts, no menu commands. */
   get sheetOpen() {
-    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refile || this.pickInbox || this.settingsOpen);
+    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refile || this.pickInbox || this.settingsOpen || this.goalForm || this.goalAdd);
   }
   /** The command palette; `start` opens it right at a step ("Создать файл…" ⇧⌘N, "Перейти к файлу…" ⇧⌘O). */
   palette = $state<{ start?: PaletteStart; n: number } | null>(null);
@@ -341,6 +345,7 @@ class Store {
     }
     this.agendas = readAgendas(parsed?.agendas); // a tab of a deleted agenda shows the built-in one
     this.inboxCfg = readInbox(parsed?.inbox);
+    this.goalSources = readGoals(parsed?.goals);
     // only the statuses make the notes be read again; agendas alone do not
     const same = JSON.stringify(config) === JSON.stringify(this.config);
     this.config = config;
@@ -491,7 +496,7 @@ class Store {
     return t?.kind === 'agenda' && t.agenda ? this.agendas.find((a) => a.id === t.agenda) : undefined;
   }
   /** The left navigator: the files, or the list of agendas. A setting of the window: switching tabs or panes keeps it. */
-  navMode = $state<NavMode>((['files', 'inbox', 'agendas', 'search'] as const).find((m) => m === lsGet('nav:mode')) ?? 'files');
+  navMode = $state<NavMode>((['files', 'inbox', 'agendas', 'goals', 'search'] as const).find((m) => m === lsGet('nav:mode')) ?? 'files');
   setNavMode(m: NavMode) {
     this.navMode = m;
     this.showNav = true;
@@ -643,6 +648,96 @@ class Store {
     const i = f ? this.files.indexOf(f) : -1;
     if (i >= 0) this.open(i, item.line);
   }
+  // ---- goals of the quarter (ТЗ 23) ----------------------------------------------------------------------------
+  /** Where the goals are: a file and its level-1 heading (`goals` in config.json). */
+  goalSources = $state.raw<GoalSource[]>([]);
+  /** The quarter the goals views show (the same in the navigator, the overview and a person's view). */
+  goalsQuarter = $state<Quarter>(quarterOf(new Date()));
+  /** Each source with its file and what is under its heading now; «Мои цели» first. */
+  goalPeople = $derived.by((): GoalPerson[] =>
+    this.goalSources
+      .map((src) => {
+        const file = this.files.find((f) => f.name === src.file);
+        const data: SourceGoals = file ? readSource(file.text, file.headings, src.heading) : { head: -1, quarters: [] };
+        return { src, key: sourceKey(src), file, data, found: !!file && data.head >= 0, ini: initials(src.title, src.me), color: avatarColor(src.file), name: src.me ? 'Мои цели' : src.title };
+      })
+      .sort((a, b) => Number(!!b.src.me) - Number(!!a.src.me) || a.name.localeCompare(b.name, 'ru')),
+  );
+  /** «Цели»: the overview (`*`) or one person, in the goals tab of the active pane. */
+  openGoals(key = '*') {
+    openGoals(this.layout, this.layout.active, key);
+  }
+  /** Open the file of a source at its heading (a double click in the navigator). */
+  openGoalFile(key: string, line?: number) {
+    const p = this.goalPeople.find((x) => x.key === key);
+    if (!p?.file) return;
+    const i = this.files.indexOf(p.file);
+    this.open(i, line ?? (p.data.head >= 0 ? p.file.headings[p.data.head].line : 0));
+  }
+  /** «Цели на квартал» in the project's statuses, if no set knows ACTIVE (with «Задачи» if there were none). */
+  private withGoalsWorkflow(raw: string | null): string {
+    let base: Record<string, any> = {};
+    try {
+      const p = raw ? JSON.parse(raw) : null;
+      if (p && typeof p === 'object' && !Array.isArray(p)) base = p;
+    } catch {
+      /* replaced */
+    }
+    const wfs: any[] = Array.isArray(base.workflows) ? base.workflows : [];
+    if (wfs.some((w) => Array.isArray(w?.states) && w.states.some((x: any) => x?.name === 'ACTIVE'))) return raw ?? JSON.stringify(base);
+    const def = { name: DEFAULT_SEQUENCE.name, states: DEFAULT_SEQUENCE.states.map((x) => (x.done ? { name: x.name, done: true } : { name: x.name })) };
+    return JSON.stringify({ version: base.version ?? 1, ...base, workflows: [...(wfs.length ? wfs : [def]), GOALS_WORKFLOW] }, null, 2) + '\n';
+  }
+  /** «Добавить цели»: a source (made in the file first if asked); «мои» moves to it; `replace`: «Сменить заголовок…». */
+  async addGoalSource(src: GoalSource, opts: { create?: boolean; replace?: string } = {}): Promise<boolean> {
+    if (opts.create) {
+      const f = this.files.find((x) => x.name === src.file);
+      if (!f || !(await this.writeSteps([{ path: f.path, text: addSourceHeading(f.text, src.heading) }]))) return false;
+    }
+    const list = this.goalSources
+      .filter((x) => sourceKey(x) !== sourceKey(src) && sourceKey(x) !== opts.replace)
+      .map((x) => (src.me ? { ...x, me: undefined } : x));
+    list.push(src);
+    return this.updateConfig((raw) => withGoals(this.withGoalsWorkflow(raw), list));
+  }
+  async removeGoalSource(key: string) {
+    return this.updateConfig((raw) => withGoals(raw, this.goalSources.filter((x) => sourceKey(x) !== key)));
+  }
+  async renameGoalSource(key: string, title: string) {
+    const t = title.trim();
+    if (!t) return false;
+    return this.updateConfig((raw) => withGoals(raw, this.goalSources.map((x) => (sourceKey(x) === key ? { ...x, title: t } : x))));
+  }
+  /** «Новая цель»: written at once, at the end of its quarter (made if needed); a toast with «Открыть». */
+  async addGoal(key: string, q: Quarter, g: NewGoal): Promise<boolean> {
+    const p = this.goalPeople.find((x) => x.key === key);
+    if (!p?.file || !g.title.trim()) return false;
+    if (!(await this.updateConfig((raw) => this.withGoalsWorkflow(raw)))) return false;
+    const f = this.files.find((x) => x.path === p.file!.path)!; // read again: the statuses may have changed
+    const r = insertGoal(f.text, f.headings, p.src.heading, q, g, weekdayNames(f.text));
+    if (!r || !(await this.writeSteps([{ path: f.path, text: r.text }]))) return false;
+    const path = f.path;
+    this.note(`Цель добавлена — ${p.name}`, [{ label: 'Открыть', run: () => this.open(this.files.findIndex((x) => x.path === path), r.line) }]);
+    return true;
+  }
+  /** The source whose file is in the editor (the goal form picks this person), if any. */
+  goalKeyOfFile(): string | null {
+    const name = this.file?.name;
+    return (name && this.goalPeople.find((p) => p.src.file === name)?.key) || null;
+  }
+  /** The goal form: open, with a person chosen beforehand (the «+» of a group, the file in the editor). */
+  goalForm = $state<{ key: string | null; n: number } | null>(null);
+  openGoalForm(key: string | null = null) {
+    if (this.sheetOpen) return;
+    this.goalForm = { key, n: Date.now() };
+  }
+  /** «Добавить цели» / «Сменить заголовок…»: the dialog of sources. */
+  goalAdd = $state<{ me?: boolean; replace?: string; file?: string; n: number } | null>(null);
+  openGoalAdd(o: { me?: boolean; replace?: string; file?: string } = {}) {
+    if (this.sheetOpen) return;
+    this.goalAdd = { ...o, n: Date.now() };
+  }
+
   /** The quick entry's shortcut and whether it works from any program (a preference of this Mac). */
   captureKey = $state(lsGet('capture:key') || DEFAULT_CAPTURE_KEY);
   captureGlobal = $state(lsGet('capture:global') !== '0');
@@ -2107,9 +2202,20 @@ class Store {
 }
 
 export const DEFAULT_CAPTURE_KEY = 'Shift+CmdOrCtrl+KeyI';
+/** A source of goals as the views use it. */
+export interface GoalPerson {
+  src: GoalSource;
+  key: string;
+  file: NoteFile | undefined;
+  data: SourceGoals;
+  found: boolean; // the file and its heading are there
+  ini: string;
+  color: string;
+  name: string; // «Мои цели» for mine
+}
 export const SECTIONS = ['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши'] as const;
 export type SettingsSection = (typeof SECTIONS)[number];
-export type NavMode = 'files' | 'inbox' | 'agendas' | 'search';
+export type NavMode = 'files' | 'inbox' | 'agendas' | 'goals' | 'search';
 /** The search in every file: up to this many matches are listed. */
 export const SEARCH_CAP = 1000;
 export interface SearchGroup {

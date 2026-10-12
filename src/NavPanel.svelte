@@ -4,16 +4,19 @@
   import AgendaList from './AgendaList.svelte';
   import InboxPanel from './InboxPanel.svelte';
   import SearchPanel from './SearchPanel.svelte';
+  import GoalsPanel from './GoalsPanel.svelte';
+  import { GOAL_ICON } from './goals';
   import type { NavMode } from './store.svelte';
 
   // The left panel: a bar of modes (as in Xcode) over the navigator of that mode. The mode belongs to the window:
-  // it changes only by the bar or «Вид» (⌃⌘1…⌃⌘3), never by itself when another tab or pane becomes active.
+  // it changes only by the bar or «Вид» (⌃⌘1…⌃⌘4, ⌃⌘6), never by itself when another tab or pane becomes active.
   type Mode = { id: string; label: string; icon: string; on?: NavMode; key?: string }; // key: the command of keys.ts
   const MODES: Mode[] = [
     { id: 'files', label: 'Файлы', icon: 'M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4M7 10h6M7 13h4', on: 'files', key: 'navFiles' },
     { id: 'inbox', label: 'Inbox', icon: 'M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4', on: 'inbox', key: 'navInbox' },
     { id: 'tasks', label: 'Задачи', icon: 'M3.5 5.5l1.5 1.5 3-3M3.5 12.5l1.5 1.5 3-3M11 5.5h6M11 12.5h6' },
     { id: 'agendas', label: 'Агенда', icon: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3', on: 'agendas', key: 'navAgendas' },
+    { id: 'goals', label: 'Цели', icon: GOAL_ICON, on: 'goals', key: 'navGoals' },
     { id: 'tags', label: 'Теги', icon: 'M3 3h6.5l7.5 7.5-6 6L3.5 9.5zM6.8 6.8h.01' },
     { id: 'search', label: 'Поиск по заметкам', icon: 'M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM13.5 13.5L17 17', on: 'search', key: 'navSearch' },
   ];
@@ -32,7 +35,7 @@
     {/each}
   </div>
   <div class="body">
-    {#if store.navMode === 'agendas'}<AgendaList />{:else if store.navMode === 'inbox'}<InboxPanel />{:else if store.navMode === 'search'}<SearchPanel />{:else}<Navigator />{/if}
+    {#if store.navMode === 'agendas'}<AgendaList />{:else if store.navMode === 'inbox'}<InboxPanel />{:else if store.navMode === 'search'}<SearchPanel />{:else if store.navMode === 'goals'}<GoalsPanel />{:else}<Navigator />{/if}
   </div>
 </div>
 
