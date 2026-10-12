@@ -3,6 +3,7 @@
 // the current state and a shortcut. A command either runs at once or returns the next step, shown in the same
 // palette window (a list to pick from, or a text to type).
 import { store, type NoteFile } from './store.svelte';
+import { inboxReview } from './features/review.svelte';
 import { goals } from './features/goals.svelte';
 import { calendar } from './features/calendar.svelte';
 import { fuzzy, better, type Match } from './fuzzy';
@@ -158,11 +159,11 @@ register({
 });
 register({
   id: 'refile', title: 'Перенести в другой файл…', icon: 'refile', group: 'heading', synonyms: ['переместить', 'refile'],
-  when: onHeading, run: () => store.startRefile('palette'),
+  when: onHeading, run: () => store.startRefile(),
 });
 register({
   id: 'review', title: 'Разобрать Inbox', icon: 'inbox', group: 'general', synonyms: ['разбор', 'inbox', 'карточки'],
-  when: () => store.reviewPending.length > 0, hint: () => `${store.reviewPending.length} в очереди`, run: () => store.startReview(),
+  when: () => inboxReview.reviewPending.length > 0, hint: () => `${inboxReview.reviewPending.length} в очереди`, run: () => inboxReview.startReview(),
 });
 register({
   id: 'newFile', title: 'Создать файл…', icon: 'newfile', group: 'general', keyId: 'paletteNewFile', synonyms: ['новый файл', 'заметка'],

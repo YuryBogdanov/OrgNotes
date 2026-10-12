@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { inboxReview } from './features/review.svelte';
   import { tick } from 'svelte';
   import { fly } from 'svelte/transition';
   import { store } from './store.svelte';
@@ -16,9 +17,9 @@
   // the actions below; the summary when the queue is through. The queue and the actions live in the store.
   let { tab }: { tab: Tab } = $props();
 
-  const review = $derived(store.review);
-  const item = $derived(store.reviewItem);
-  const found = $derived(item ? store.reviewHeading(item) : null);
+  const review = $derived(inboxReview.review);
+  const item = $derived(inboxReview.reviewItem);
+  const found = $derived(item ? inboxReview.reviewHeading(item) : null);
   const h = $derived(found?.h);
   const f = $derived(found?.f);
   const total = $derived(review?.items.length ?? 0);
@@ -33,8 +34,8 @@
   });
   const age = $derived(item ? ageDays(item.created) : null);
   const stale = $derived(age !== null && age > store.inboxCfg.stale);
-  const doneKw = $derived(item ? store.reviewStatus(item, 'done') : null);
-  const cancelKw = $derived(item ? store.reviewStatus(item, 'cancel') : null);
+  const doneKw = $derived(item ? inboxReview.reviewStatus(item, 'done') : null);
+  const cancelKw = $derived(item ? inboxReview.reviewStatus(item, 'cancel') : null);
   /** The task's date for the calendar under the card: SCHEDULED, else DEADLINE. */
   const taskDate = $derived.by(() => {
     const o = h?.scheduled ?? h?.deadline;
@@ -54,7 +55,7 @@
   // a change on disk: tasks gone from their file leave the queue
   $effect(() => {
     void store.files;
-    store.reviewSync();
+    inboxReview.reviewSync();
   });
 
   // ---- the quick buttons: the same choices as the palette's heading commands ----------------------------------
@@ -85,7 +86,7 @@
   }
   function pickDefer(d: Date) {
     defer = null;
-    void store.reviewDefer(d);
+    void inboxReview.reviewDefer(d);
   }
   /** «Выбрать дату…»: the palette's calendar; the date it gives defers the task like the other choices. */
   function deferCalendar() {
@@ -93,7 +94,7 @@
     if (!f || !h) return;
     const cur = h.scheduled ? new Date(h.scheduled.y, h.scheduled.m - 1, h.scheduled.d) : null;
     const old = /SCHEDULED:\s*(<[^>]*>)/.exec(f.text.split('\n')[h.line + 1] ?? '')?.[1];
-    store.openCalendar({ kind: 'SCHEDULED', initial: options[0].date, current: cur, old, names: weekdayNames(f.text), pick: (d) => void store.reviewDefer(d), plate: { kind: 'heading', h, file: f } });
+    store.openCalendar({ kind: 'SCHEDULED', initial: options[0].date, current: cur, old, names: weekdayNames(f.text), pick: (d) => void inboxReview.reviewDefer(d), plate: { kind: 'heading', h, file: f } });
   }
   function deferKey(e: KeyboardEvent) {
     if (!defer) return;
@@ -122,14 +123,14 @@
       return;
     }
     confirmDel = false;
-    void store.reviewDelete();
+    void inboxReview.reviewDelete();
   }
   function moreMenu(e: MouseEvent) {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     more = {
       x: r.right - 220, y: r.top - 76,
       items: [
-        { label: 'Открыть в файле', action: () => store.reviewOpenInFile() },
+        { label: 'Открыть в файле', action: () => inboxReview.reviewOpenInFile() },
         'sep',
         { label: 'Удалить…', danger: true, action: del },
       ],
@@ -137,22 +138,22 @@
   }
   // ⌘1…⌘5 the actions, ⌘[ the card before (as set in «Клавиши»): while this tab is shown they win over the window's
   const RUN: Record<string, () => void> = {
-    reviewDone: () => void store.reviewClose('done'),
-    reviewCancel: () => void store.reviewClose('cancel'),
-    reviewMove: () => store.reviewMove(),
+    reviewDone: () => void inboxReview.reviewClose('done'),
+    reviewCancel: () => void inboxReview.reviewClose('cancel'),
+    reviewMove: () => inboxReview.reviewMove(),
     reviewDefer: () => void openDefer(),
-    reviewSkip: () => store.reviewSkip(),
-    reviewCalendar: () => (store.reviewCal = !store.reviewCal),
+    reviewSkip: () => inboxReview.reviewSkip(),
+    reviewCalendar: () => (inboxReview.reviewCal = !inboxReview.reviewCal),
   };
   $effect(() => {
     const keys = {
-      active: () => store.tab === tab && !!store.review && !store.palette && !store.refile && !defer && !confirmDel,
+      active: () => store.tab === tab && !!inboxReview.review && !store.palette && !store.refile && !defer && !confirmDel,
       run: (id: string) => {
         if (id === 'reviewBack') {
-          store.reviewBack();
+          inboxReview.reviewBack();
           return true;
         }
-        if (!store.reviewItem || !RUN[id]) return false;
+        if (!inboxReview.reviewItem || !RUN[id]) return false;
         RUN[id]();
         return true;
       },
@@ -174,7 +175,7 @@
     { n: count('skip'), t: 'пропущено', c: 'var(--wait)' },
   ]);
   const skipped = $derived(review?.items.filter((x) => x.result === 'skip') ?? []);
-  const added = $derived(review && review.cur < 0 ? store.reviewAdded : []);
+  const added = $derived(review && review.cur < 0 ? inboxReview.reviewAdded : []);
   /** «Осталась 1 пропущенная задача», «Осталось 3 пропущенные задачи», «Осталось 5 пропущенных задач». */
   function skippedText(n: number) {
     const one = n % 10 === 1 && n % 100 !== 11;
@@ -183,7 +184,7 @@
     return `${one ? 'Осталась' : 'Осталось'} ${n} ${words}. ${one ? 'Её' : 'Их'} можно разобрать сейчас или в следующий раз.`;
   }
   function again(list: typeof skipped) {
-    store.startReview(list.map((x) => ({ ...x, result: null, note: undefined })));
+    inboxReview.startReview(list.map((x) => ({ ...x, result: null, note: undefined })));
   }
 </script>
 
@@ -213,7 +214,7 @@
           <div class="ed">
             <Editor text={f.text} fileKey={'review|' + item.id + '|' + f.path} wf={f.wf} reveal={rev} narrow={{ line: h.line, end: h.end }} drawers={false} levels={store.levels}
               onchange={(t) => store.setText(t, f.path)} oncursor={(line, col) => store.setTabCursor(tab, line, col)}
-              onnarrow={(line) => store.reviewAt(item, line)} onfollow={(l) => store.follow(l)} />
+              onnarrow={(line) => inboxReview.reviewAt(item, line)} onfollow={(l) => store.follow(l)} />
           </div>
         </div>
       {/key}
@@ -227,11 +228,11 @@
           {#each stats as s (s.t)}<div class="stat"><span class="n" style:color={s.c}>{s.n}</span><span>{s.t}</span></div>{/each}
         </div>
         {#if added.length}
-          <div class="added">Добавлено во время разбора: {added.length} <button class="lnk" onclick={() => store.startReview(added)}>Разобрать и их</button></div>
+          <div class="added">Добавлено во время разбора: {added.length} <button class="lnk" onclick={() => inboxReview.startReview(added)}>Разобрать и их</button></div>
         {/if}
         <div class="btns">
           {#if skipped.length}<button class="pri" onclick={() => again(skipped)}>Разобрать {skipped.length === 1 ? 'пропущенную' : 'пропущенные'}</button>{/if}
-          <button onclick={() => store.endReview()}>Закончить</button>
+          <button onclick={() => inboxReview.endReview()}>Закончить</button>
         </div>
         <span class="fine">Все изменения уже записаны в файлы. ⌘Z отменяет последнее действие разбора.</span>
       </div>
@@ -242,17 +243,17 @@
 
   {#if review && item}
     <div class="bar">
-      <button class="back" disabled={review.cur <= 0} onclick={() => store.reviewBack()}>
+      <button class="back" disabled={review.cur <= 0} onclick={() => inboxReview.reviewBack()}>
         <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l-6 6 6 6" /></svg>Назад{#if kbd('reviewBack')}<kbd>{kbd('reviewBack')}</kbd>{/if}
       </button>
       <div class="acts">
-        <button class="a done-b" disabled={!doneKw} onclick={() => store.reviewClose('done')}>
+        <button class="a done-b" disabled={!doneKw} onclick={() => inboxReview.reviewClose('done')}>
           <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg>Выполнено<span class="hint">{doneKw}</span>{#if kbd('reviewDone')}<kbd>{kbd('reviewDone')}</kbd>{/if}
         </button>
-        <button class="a" disabled={!cancelKw} title={cancelKw ? '' : 'В наборе нет статуса для отмены'} onclick={() => store.reviewClose('cancel')}>
+        <button class="a" disabled={!cancelKw} title={cancelKw ? '' : 'В наборе нет статуса для отмены'} onclick={() => inboxReview.reviewClose('cancel')}>
           <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" /></svg>Отменить<span class="hint">{cancelKw ?? ''}</span>{#if kbd('reviewCancel')}<kbd>{kbd('reviewCancel')}</kbd>{/if}
         </button>
-        <button class="a move-b" onclick={() => store.reviewMove()}>
+        <button class="a move-b" onclick={() => inboxReview.reviewMove()}>
           <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICONS.refile} /></svg>Перенести…{#if kbd('reviewMove')}<kbd>{kbd('reviewMove')}</kbd>{/if}
         </button>
         <div class="dwrap">
@@ -280,7 +281,7 @@
             </div>
           {/if}
         </div>
-        <button class="a" onclick={() => store.reviewSkip()}>
+        <button class="a" onclick={() => inboxReview.reviewSkip()}>
           <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5l6 5-6 5M13 5v10" /></svg>Пропустить{#if kbd('reviewSkip')}<kbd>{kbd('reviewSkip')}</kbd>{/if}
         </button>
       </div>

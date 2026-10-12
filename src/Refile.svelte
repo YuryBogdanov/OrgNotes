@@ -17,7 +17,7 @@
   // heading in it (a tree) or the file's 1st level. Opened by the palette's «Перенести в другой файл…» (looks like
   // the palette, ⌫ goes back to it) and by «Перенести» of an Inbox task.
   const req = store.refile!;
-  const fromPalette = req.from === 'palette';
+  const fromPalette = req.self;
   const TOP = 'M4 3.5h12M10 17V8M6.5 11.5L10 8l3.5 3.5';
 
   let step = $state<1 | 2>(1);

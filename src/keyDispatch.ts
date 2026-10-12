@@ -36,7 +36,7 @@ function runOne(id: string, scope: Scope, c: Ctx): boolean {
   if (scope === 'goalReview') return c.goals!.run(id);
   if (scope === 'heading' && (PALETTE.has(id) || id === 'refile')) {
     if (!contextOf().heading || store.sheetOpen) return false;
-    if (id === 'refile') store.startRefile('palette');
+    if (id === 'refile') store.startRefile();
     else store.openPalette(id as 'status');
     return true;
   }
