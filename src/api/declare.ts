@@ -2,7 +2,7 @@
 // to the registry of keys here — before the store reads the saved shortcuts, so their changes are kept (imported by
 // main.ts right after the built-in features' keys). Nothing of the store here.
 
-import { C, registerGroup, registerKeys } from '../keys';
+import { C, registerGroup, registerKeys, registerScope } from '../keys';
 import { API_VERSION } from './index';
 import { incompatible, parseManifest, type Manifest } from './manifest';
 import pkg from '../../package.json';
@@ -63,9 +63,13 @@ export const entries: Entry[] = Object.entries(BUILTIN)
 /** The group of «Клавиши» of a plugin. */
 export const groupOf = (id: string) => 'plugin:' + id;
 
+/** The scope of the keys of a plugin's review (its tab): over the window and the editor, as the goals' review. */
+export const REVIEW_SCOPE = 'pluginReview';
+registerScope({ id: REVIEW_SCOPE, name: 'в разборе плагина', over: ['window', 'editor', 'heading'], outside: { scopes: ['window', 'editor'], word: 'Вне разбора' }, rank: 30 });
+
 for (const e of entries) {
   const m = e.manifest;
   if (!e.enabled || !m || !m.contributes.commands.length) continue;
   registerGroup({ id: groupOf(m.id), title: m.name.toUpperCase(), note: 'плагин' });
-  registerKeys(m.contributes.commands.map((c) => C(c.id, c.title, groupOf(m.id), 'window', c.keys ?? [], { synonyms: c.synonyms })));
+  registerKeys(m.contributes.commands.map((c) => C(c.id, c.title, groupOf(m.id), c.scope === 'review' ? REVIEW_SCOPE : 'window', c.keys ?? [], { synonyms: c.synonyms })));
 }

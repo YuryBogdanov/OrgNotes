@@ -1,0 +1,107 @@
+<script lang="ts">
+  import { tick } from 'svelte';
+  import { plugins, type FormReq, type PlaceReq } from './api/host.svelte';
+  import { store } from './store.svelte';
+  import PlacePicker from './PlacePicker.svelte';
+  import SchemaSettings from './SchemaSettings.svelte';
+  import type { Field, Group, Schema, Values } from './settingsSchema';
+
+  // The core's sheets a plugin asks for (ТЗ 26 §5.2): a form with the fields of the settings by schema, and the
+  // choice of a place. Each answers the plugin's promise: the values / the place, or null when cancelled.
+
+  // ---- the form -------------------------------------------------------------------------------------------------
+  let values = $state<Values>({});
+  let problem = $state('');
+  let sheet: HTMLDivElement | undefined = $state();
+  let formOf: FormReq | null = null;
+  const schema = $derived.by((): Schema | null => {
+    const r = plugins.form;
+    if (!r) return null;
+    const groups: Group[] = r.spec.groups.map((g) => ({
+      caption: g.caption ?? '', help: g.help,
+      fields: g.fields.map((f) => ({ ...f, where: 'local', ...(f.type === 'file' ? { show: (rel: string | null) => rel ?? 'Не выбран' } : {}), ...(f.type === 'pair' ? { options: () => f.options } : {}) }) as Field),
+    }));
+    return { id: 'pf', label: r.spec.title, groups, values: () => values, set: (patch) => void (values = { ...values, ...patch }) };
+  });
+  $effect(() => {
+    const r = plugins.form;
+    if (r === formOf) return;
+    formOf = r;
+    if (!r) return;
+    const v: Values = {};
+    for (const g of r.spec.groups) for (const f of g.fields) for (const k of f.type === 'pair' ? [f.key, f.key2] : [f.key]) v[k] = r.spec.initial?.[k] ?? (f.type === 'switch' ? false : f.type === 'text' ? '' : null);
+    values = v;
+    problem = '';
+    void tick().then(() => (sheet?.querySelector('input, select, button.switch') as HTMLElement | null)?.focus());
+  });
+  function answer(v: Values | null) {
+    const r = plugins.form;
+    if (!r) return;
+    plugins.form = null;
+    r.resolve(v);
+  }
+  function submit() {
+    const r = plugins.form;
+    if (!r) return;
+    const why = r.spec.validate ? plugins.guard(r.plugin, () => r.spec.validate!(values), null) : null;
+    if (why) problem = why;
+    else answer(JSON.parse(JSON.stringify(values)));
+  }
+  function key(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      answer(null);
+    } else if (e.key === 'Enter' && (e.metaKey || (e.target as HTMLElement).tagName === 'INPUT')) {
+      e.preventDefault();
+      (e.target as HTMLElement).blur?.(); // a text field gives its value first
+      void tick().then(submit);
+    }
+  }
+
+  // ---- the place ------------------------------------------------------------------------------------------------
+  function picked(p: PlaceReq, x: { path: string; heading: { line: number; title: string } | null }) {
+    const rel = store.files.find((f) => f.path === x.path)?.name;
+    if (!rel) return 'Файл не найден';
+    plugins.place = null;
+    p.resolve(x.heading ? { path: rel, line: x.heading.line, title: x.heading.title } : { path: rel });
+  }
+  function closed(p: PlaceReq) {
+    if (plugins.place !== p) return;
+    plugins.place = null;
+    p.resolve(null);
+  }
+</script>
+
+{#if plugins.form && schema}
+  {@const r = plugins.form}
+  <div class="scrim" aria-hidden="true"></div>
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div class="pform" role="dialog" aria-modal="true" aria-label={r.spec.title} tabindex="-1" bind:this={sheet} onkeydown={key}>
+    <header><b>{r.spec.title}</b><span class="who">{plugins.name(r.plugin)}</span></header>
+    <div class="body"><SchemaSettings {schema} embedded where={false} /></div>
+    <footer>
+      {#if problem}<span class="bad" role="alert">{problem}</span>{:else}<span class="kh">↩ — {r.spec.submit.toLowerCase()} · ⎋ — отмена</span>{/if}
+      <button onclick={() => answer(null)}>Отмена</button>
+      <button class="pri" onclick={submit}>{r.spec.submit}</button>
+    </footer>
+  </div>
+{/if}
+{#each plugins.place ? [plugins.place] : [] as p (p)}
+  <PlacePicker kind={p.kind} title={p.title} token={p.title} placeholder="Найти файл" levels={p.levels} recent={store.refileRecentFiles('')}
+    onpick={(x) => picked(p, x)} onclose={() => closed(p)} />
+{/each}
+
+<style>
+  .scrim { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.42); }
+  .pform { position: fixed; z-index: 71; left: 50%; top: 64px; max-height: calc(100% - 128px); transform: translateX(-50%); width: min(620px, calc(100% - 48px)); display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5); overflow: hidden; outline: none; }
+  header { flex: 0 0 52px; display: flex; align-items: center; gap: 10px; padding: 0 20px; background: var(--bar); border-bottom: 1px solid var(--line); }
+  header b { font-size: 15px; }
+  .who { margin-left: auto; font-size: 11.5px; color: var(--fg3); }
+  .body { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; }
+  footer { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--line); background: var(--side); }
+  .kh { font-size: 11.5px; color: var(--fg3); margin-right: auto; }
+  .bad { font-size: 12px; color: var(--todo); margin-right: auto; }
+  footer button { height: 30px; padding: 0 14px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); }
+  footer .pri { border: 0; background: var(--acc); color: var(--onacc); font-weight: 600; }
+</style>

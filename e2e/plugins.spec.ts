@@ -79,3 +79,73 @@ test('the settings by the manifest: the folder\'s in its file, this Mac\'s local
   await page.keyboard.press('Enter');
   await expect(toast(page).locator('span').first()).toHaveText('Здравствуйте!'); // no count: switched off
 });
+
+// ---- the core's sheets and the review through the API (roadmap 1.1, part B) ----------------------------------------
+const iso = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const palette = async (page: Page, q: string) => {
+  await page.keyboard.press('Shift+Meta+p');
+  await page.keyboard.type(q);
+  await page.keyboard.press('Enter');
+};
+
+test('a form (checked by the plugin, ⎋ cancels), the choice of a place and of a date, one transaction', async ({ page }) => {
+  await open(page, true);
+  await palette(page, 'привет: новая');
+  const form = page.getByRole('dialog', { name: 'Новая задача' });
+  await expect(form).toBeVisible();
+  await expect(form.locator('.who')).toHaveText('Привет');
+  await form.getByRole('button', { name: 'Дальше' }).click();
+  await expect(form.getByRole('alert')).toHaveText('Напишите, что сделать'); // its own check: the sheet stays
+  await page.keyboard.press('Escape');
+  await expect(form).toHaveCount(0);
+  await palette(page, 'привет: новая');
+  await form.getByLabel('Задача').fill('Купить краску');
+  await form.getByRole('radio', { name: 'NEXT' }).click();
+  await form.getByRole('switch', { name: 'Запланировать на день' }).click();
+  await form.getByRole('button', { name: 'Дальше' }).click();
+  const place = page.getByRole('dialog', { name: 'Куда добавить' });
+  await expect(place).toBeVisible();
+  await page.keyboard.type('Дом');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('Покупки');
+  await page.keyboard.press('Enter');
+  await expect(place).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Командная палитра' }).locator('.res')).toBeVisible(); // the calendar
+  await page.keyboard.type('+3');
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await disk(page))['/mock/Дом.org']).toContain('** NEXT Купить краску');
+  expect((await disk(page))['/mock/Дом.org']).toMatch(new RegExp(`^\\* Покупки\\n\\*\\* NEXT Купить краску\\nSCHEDULED: <${iso(3)} [A-Z][a-z]{2}>\\n$`));
+  await expect(toast(page)).toContainText('Добавлено: Купить краску');
+  // ⌘Z: the whole addition at once
+  await page.keyboard.press('Meta+z');
+  await expect.poll(async () => (await disk(page))['/mock/Дом.org']).toBe('* Покупки\n');
+});
+
+test('the review by cards: the plugin\'s actions on their keys, «Пропустить», the summary answers the plugin', async ({ page }) => {
+  await open(page, true);
+  await palette(page, 'привет: разобрать');
+  const tab = page.locator('section.pane.active .tab.on');
+  await expect(tab).toContainText('Разбор «Привет»');
+  const card = page.locator('.preview .card');
+  await expect(card.locator('.chead')).toContainText('Разбор «Привет» · 1 из 2');
+  await expect(card.locator('.chead')).toContainText('без даты');
+  await expect(card.locator('.cm-content')).toContainText('Подготовить бюджет');
+  await expect(page.locator('.hello-below')).toHaveText('Строка 1 в Work.org');
+  await expect(page.locator('.preview .bar')).toContainText('Выполнено⌘1');
+  await page.keyboard.press('Meta+1');
+  await expect.poll(async () => (await disk(page))[WORK]).toContain('* DONE Подготовить бюджет');
+  await expect(card.locator('.chead')).toContainText('2 из 2');
+  await page.keyboard.press('Meta+2'); // «Запланировать…»: the calendar, ⎋ — the card stays
+  await expect(page.getByRole('dialog', { name: 'Командная палитра' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(card.locator('.chead')).toContainText('2 из 2');
+  await page.locator('.preview .bar').getByRole('button', { name: 'Пропустить' }).click();
+  await expect(page.locator('.preview .done')).toContainText('Разобрано 1 из 2');
+  await expect(toast(page)).toContainText('Разбор «Привет»: 1 из 2');
+  await page.locator('.preview .done').getByRole('button', { name: 'Закончить' }).click();
+  await expect(page.locator('.preview')).toHaveCount(0);
+});
