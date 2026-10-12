@@ -3,9 +3,9 @@
   import { store } from './store.svelte';
   import { displayName, displayPath } from './names';
 
-  // «Выбрать файл…» for the Inbox: a palette of folders and files. Typing searches both; → goes into a folder,
-  // ← back.
-  let { onclose }: { onclose: () => void } = $props();
+  // «Выбрать файл…» for the Inbox (or, with `onpick`, any setting of a file): a palette of folders and files.
+  // Typing searches both; → goes into a folder, ← back.
+  let { onclose, onpick, label = 'Файл Inbox' }: { onclose: () => void; onpick?: (rel: string) => void; label?: string } = $props();
 
   type Row = { kind: 'folder'; rel: string; label: string; sub: string } | { kind: 'file'; path: string; rel: string; label: string; sub: string };
 
@@ -51,7 +51,8 @@
       return;
     }
     onclose();
-    await store.setInbox({ file: r.rel });
+    if (onpick) onpick(r.rel);
+    else await store.setInbox({ file: r.rel });
   }
   function back() {
     if (dir) dir = parentOf(dir);
@@ -82,9 +83,9 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div class="scrim" onmousedown={onclose}>
-  <div class="pal" role="dialog" aria-label="Файл Inbox" onmousedown={(e) => e.stopPropagation()}>
+  <div class="pal" role="dialog" aria-label={label} onmousedown={(e) => e.stopPropagation()}>
     <div class="crumb">
-      <span>Файл Inbox</span>
+      <span>{label}</span>
       {#each crumbs as c}<span aria-hidden="true">›</span><span class="it">{c}</span>{/each}
     </div>
     <div class="qrow">

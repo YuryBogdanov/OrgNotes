@@ -19,6 +19,7 @@
   import AgendaBuilder from './AgendaBuilder.svelte';
   import NavPanel from './NavPanel.svelte';
   import Capture from './Capture.svelte';
+  import CalNew from './CalNew.svelte';
   import Picker from './Picker.svelte';
   import Refile from './Refile.svelte';
   import CaptureWindow from './CaptureWindow.svelte';
@@ -270,6 +271,12 @@
           onpick={() => { store.capture = null; store.pickInbox = Date.now(); }}
           onclose={(added) => { store.capture = null; if (added && store.inboxCfg.confirm) store.note('Добавлено в Inbox', undefined, 1600); }} />
       {/key}
+    </div>
+  {/if}
+  {#if store.calNew}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="capscrim" onmousedown={(e) => { if (e.target === e.currentTarget) store.calNew = null; }}>
+      {#key store.calNew.n}<CalNew kind={store.calNew.kind} date={store.calNew.date} onclose={() => (store.calNew = null)} />{/key}
     </div>
   {/if}
   {#if store.pickInbox}{#key store.pickInbox}<Picker onclose={() => (store.pickInbox = 0)} />{/key}{/if}
