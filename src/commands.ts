@@ -27,6 +27,7 @@ export const ICONS = {
   inbox: 'M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4',
   prio: 'M10 3v10M10 16.5v.01',
   clear: 'M5 5l10 10M15 5L5 15',
+  gear: 'M10 7.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2zM10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6',
 };
 export type Icon = keyof typeof ICONS;
 
@@ -88,7 +89,7 @@ export interface Command {
   icon: Icon;
   group: 'heading' | 'general';
   synonyms?: string[];
-  key?: string;
+  keyId?: string; // its shortcut is the one of this command of keys.ts (by default the same id); '' none
   when: (c: Ctx) => boolean;
   hint?: (c: Ctx) => string;
   run: (c: Ctx) => Step | void;
@@ -157,11 +158,11 @@ register({
   when: onHeading, run: () => store.startRefile('palette'),
 });
 register({
-  id: 'review', title: 'Разобрать Inbox', icon: 'inbox', group: 'general', key: '⇧⌘R', synonyms: ['разбор', 'inbox', 'карточки'],
+  id: 'review', title: 'Разобрать Inbox', icon: 'inbox', group: 'general', synonyms: ['разбор', 'inbox', 'карточки'],
   when: () => store.reviewPending.length > 0, hint: () => `${store.reviewPending.length} в очереди`, run: () => store.startReview(),
 });
 register({
-  id: 'newFile', title: 'Создать файл…', icon: 'newfile', group: 'general', key: '⇧⌘N', synonyms: ['новый файл', 'заметка'],
+  id: 'newFile', title: 'Создать файл…', icon: 'newfile', group: 'general', keyId: 'paletteNewFile', synonyms: ['новый файл', 'заметка'],
   when: (c) => c.canFiles, hint: (c) => `в ${folderName(c)}`, run: (c) => nameStep(c, 'file'),
 });
 register({
@@ -169,11 +170,11 @@ register({
   when: (c) => c.canFiles, hint: (c) => `в ${folderName(c)}`, run: (c) => nameStep(c, 'folder'),
 });
 register({
-  id: 'newTask', title: 'Новая задача', icon: 'task', group: 'general', synonyms: ['создать задачу', 'задача', 'todo'],
+  id: 'newTask', title: 'Новая задача', icon: 'task', group: 'general', keyId: '', synonyms: ['создать задачу', 'задача', 'todo'],
   when: (c) => !!c.file, hint: (c) => `в ${displayName(c.file!.name)}`, run: () => store.newTask(),
 });
 register({
-  id: 'goto', title: 'Перейти к файлу…', icon: 'goto', group: 'general', key: '⇧⌘O', synonyms: ['открыть файл', 'файл'],
+  id: 'goto', title: 'Перейти к файлу…', icon: 'goto', group: 'general', keyId: 'paletteGoto', synonyms: ['открыть файл', 'файл'],
   when: () => store.files.length > 0, run: () => gotoStep(),
 });
 register({
@@ -181,13 +182,17 @@ register({
   when: (c) => !!c.file, run: () => store.showOutline(),
 });
 register({
-  id: 'chooseFolder', title: 'Выбрать рабочую папку…', icon: 'folder', group: 'general', synonyms: ['открыть папку'],
+  id: 'chooseFolder', title: 'Выбрать рабочую папку…', icon: 'folder', group: 'general', keyId: '', synonyms: ['открыть папку'],
   when: (c) => c.noFolder, run: () => void store.chooseFolder(),
 });
 
 register({
   id: 'rich', title: 'Оформленный текст', icon: 'head', group: 'general', synonyms: ['оформление', 'вид', 'org-modern', 'красиво'],
   when: () => true, hint: () => (store.rich ? 'включён' : 'выключен'), run: () => store.setRich(!store.rich),
+});
+register({
+  id: 'settings', title: 'Настройки…', icon: 'gear', group: 'general', synonyms: ['параметры', 'клавиши', 'сочетания', 'preferences'],
+  when: () => true, run: () => void setTimeout(() => store.openSettings()), // once the palette is closed
 });
 
 // ---- matching -------------------------------------------------------------------------------------------------
@@ -251,7 +256,7 @@ export function mainStep(c: Ctx): Step {
         if (q.trim()) found.sort(rank);
         for (const { cmd, hit } of found)
           rows.push({
-            id: cmd.id, group: GROUPS[g], title: cmd.title, at: hit!.at, icon: cmd.icon, hint: cmd.hint?.(c) || undefined, key: cmd.key,
+            id: cmd.id, group: GROUPS[g], title: cmd.title, at: hit!.at, icon: cmd.icon, hint: cmd.hint?.(c) || undefined, key: store.keyHint(cmd.keyId ?? cmd.id) || undefined,
             run: () => {
               remember(cmd.id);
               return cmd.run(c);

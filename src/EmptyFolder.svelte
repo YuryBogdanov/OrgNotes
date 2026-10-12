@@ -11,7 +11,7 @@
   <p class="lead">Начните с нового файла или положите в эту папку существующие: они появятся в навигаторе сами.</p>
   <div class="btns">
     <button onclick={() => store.revealFolder()}>Показать в Finder</button>
-    <button class="primary" onclick={() => store.openPalette('newFile')}>Создать файл<span class="kb">⇧⌘N</span></button>
+    <button class="primary" onclick={() => store.openPalette('newFile')}>Создать файл{#if store.keyHint('paletteNewFile')}<span class="kb">{store.keyHint('paletteNewFile')}</span>{/if}</button>
   </div>
   <button class="link" onclick={() => store.changeFolder()}>Выбрать другую папку…</button>
 </div>

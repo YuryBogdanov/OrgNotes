@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, openSettingsSheet } from './tauriMock';
 
 const CONFIG = {
   version: 1,
@@ -23,11 +23,11 @@ const config = (page: Page) =>
 const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
 const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 
-/** The settings as their own window: the app loaded at #settings. */
+/** The settings: a sheet over the main window (⌘,), at «Статусы». */
 const openSettings = async (page: Page, files: Record<string, string> = { '/mock/Work.org': NOTES, '/mock/.orgnotes/config.json': JSON.stringify(CONFIG) }) => {
   await installTauriMock(page, files);
-  await page.goto('/#settings');
-  await expect(page.getByRole('tablist', { name: 'Разделы настроек' })).toBeVisible();
+  await page.goto('/');
+  await openSettingsSheet(page, 'Статусы');
   await expect(page.locator('.srow').first()).toBeVisible();
 };
 const rows = (page: Page) => page.locator('.srow');
@@ -183,9 +183,9 @@ test.describe('table', () => {
     await expect(rows(page).last().locator('input.kw')).toBeFocused();
   });
 
-  test('tabs are in the order of the mockup, including Календарь', async ({ page }) => {
+  test('sections are in the order of the mockup, including Календарь and Клавиши', async ({ page }) => {
     await openSettings(page);
-    expect(await page.getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы']);
+    expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши']);
   });
 });
 
@@ -233,13 +233,13 @@ test.describe('new state', () => {
     // losing focus with an empty field removes the row
     await page.getByRole('button', { name: '+ Состояние' }).click();
     await expect(rows(page)).toHaveCount(before + 1);
-    await page.locator('.head').click({ position: { x: 5, y: 5 } });
+    await page.getByRole('dialog', { name: 'Настройки' }).locator('.head').click({ position: { x: 5, y: 5 } });
     await expect(rows(page)).toHaveCount(before);
 
     // a correct word is confirmed on blur
     await page.getByRole('button', { name: '+ Состояние' }).click();
     await page.keyboard.type('check');
-    await page.locator('.head').click({ position: { x: 5, y: 5 } });
+    await page.getByRole('dialog', { name: 'Настройки' }).locator('.head').click({ position: { x: 5, y: 5 } });
     await expect(rows(page)).toHaveCount(before + 1);
     await expect.poll(async () => (await config(page)).workflows[0].states.map((s: any) => s.name)).toContain('CHECK');
   });
@@ -425,7 +425,7 @@ test.describe('colour picker', () => {
     await page.keyboard.press('Escape');
     await expect(pop(page)).toHaveCount(0);
     await sw.click();
-    await page.locator('.head').click({ position: { x: 5, y: 5 } });
+    await page.getByRole('dialog', { name: 'Настройки' }).locator('.head').click({ position: { x: 5, y: 5 } });
     await expect(pop(page)).toHaveCount(0);
     await sw.click();
     await sw.click();
@@ -520,30 +520,75 @@ test.describe('set level', () => {
   });
 });
 
-test.describe('window', () => {
-  test('⌘, in the main window opens a separate Settings window (not a sheet), once', async ({ page }) => {
+test.describe('sheet', () => {
+  test('⌘, opens a sheet over the main window, no window of its own; ⌘, again, ⎋ and «Готово» close it', async ({ page }) => {
     await installTauriMock(page, { '/mock/Work.org': NOTES, '/mock/.orgnotes/config.json': JSON.stringify(CONFIG) });
     await page.goto('/');
     await expect(page.locator('.cm-content')).toContainText('Планёрка');
+    const sheet = page.getByRole('dialog', { name: 'Настройки' });
     await page.keyboard.press('Meta+Comma');
-    await expect.poll(async () => (await log(page)).filter((e) => e[0] === 'window').length).toBe(1);
-    const opts = ((await log(page)).find((e) => e[0] === 'window') as any)[1];
-    expect(opts).toMatchObject({ label: 'settings', title: 'Настройки', url: 'index.html#settings' });
-    await expect(page.getByRole('dialog', { name: 'Настройки' })).toHaveCount(0); // not an overlay
-    // already open: it is focused, not created again
+    await expect(sheet).toBeVisible();
+    expect((await log(page)).filter((e) => e[0] === 'window')).toEqual([]);
+    await expect(sheet.locator('header')).toContainText('Изменения применяются сразу');
     await page.keyboard.press('Meta+Comma');
-    await page.waitForTimeout(300);
-    expect((await log(page)).filter((e) => e[0] === 'window').length).toBe(1);
+    await expect(sheet).toHaveCount(0);
+    await page.keyboard.press('Meta+Comma');
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    await page.getByRole('button', { name: 'Настройки (⌘,)' }).click();
+    await sheet.getByRole('button', { name: 'Готово' }).click();
+    await expect(sheet).toHaveCount(0);
   });
 
-  test('a status added in the settings window is understood by the main window after it re-reads the config', async ({ browser }) => {
-    const ctx = await browser.newContext();
-    const page = await ctx.newPage();
+  test('the window under it takes no clicks or keys; the sheet keeps its geometry', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openSettings(page);
+    const box = (await page.getByRole('dialog', { name: 'Настройки' }).boundingBox())!;
+    expect(box).toMatchObject({ y: 36, width: 1100, height: 900 - 72 });
+    expect(box.x).toBe((1440 - 1100) / 2);
+    await page.mouse.click(20, 20); // the dimmed window
+    await expect(page.getByRole('dialog', { name: 'Настройки' })).toBeVisible();
+    await page.keyboard.press('Meta+t'); // no new tab while the sheet is up
+    await page.keyboard.press('Escape');
+    await expect(page.locator('section.pane .tab')).toHaveCount(1);
+  });
+
+  test('sections: a click, ⌘[ / ⌘], ↑↓ in the column; the last one is shown next time', async ({ page }) => {
+    await openSettings(page);
+    const sheet = page.getByRole('dialog', { name: 'Настройки' });
+    const on = sheet.getByRole('tab', { selected: true });
+    await expect(sheet.getByRole('tab')).toHaveText(['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши']);
+    await expect(on).toHaveText('Статусы');
+    await page.keyboard.press('Meta+BracketRight');
+    await expect(on).toHaveText('Агенды'); // «Теги» is not made yet
+    await page.keyboard.press('Meta+BracketLeft');
+    await page.keyboard.press('Meta+BracketLeft');
+    await expect(on).toHaveText('Основные');
+    await expect(sheet.locator('.t2')).toHaveText('Основные');
+    await on.focus();
+    await page.keyboard.press('ArrowUp');
+    await expect(on).toHaveText('Клавиши');
+    await expect(on).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(on).toHaveText('Основные');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Meta+Comma');
+    await expect(on).toHaveText('Статусы');
+  });
+
+  test('«Основные» leads to «Клавиши»; a status added is understood by the window at once', async ({ page }) => {
     await openSettings(page);
     await page.getByRole('button', { name: '+ Состояние' }).click();
     await page.keyboard.type('blocked');
     await page.keyboard.press('Enter');
     await expect.poll(async () => (await config(page)).workflows[0].states.map((s: any) => s.name)).toContain('BLOCKED');
-    await ctx.close();
+    await page.getByRole('tab', { name: 'Основные' }).click();
+    await page.getByText('Сочетания клавиш перенесены в раздел «Клавиши»').locator('../..').getByRole('button', { name: 'Открыть…' }).click();
+    await expect(page.getByRole('dialog', { name: 'Настройки' }).locator('.t2')).toHaveText('Клавиши');
+    await page.getByRole('button', { name: 'Готово' }).click();
+    await page.locator('.cm-line', { hasText: 'Позвонить' }).click();
+    await page.keyboard.press('Shift+ArrowRight'); // after NEXT now comes the new open status
+    await expect(page.locator('.cm-line', { hasText: 'Позвонить' })).toHaveText('* BLOCKED Позвонить');
   });
 });

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, openSettingsSheet } from './tauriMock';
 
 // ТЗ «Навигатор, структура файла и переход к заголовку».
 const WORK = '#+TITLE: Работа\n\n* Q4 2026\n** TODO Подготовить бюджет 2027\nтекст\n*** DONE Собрать заявки\n*** TODO Согласовать с финансами\n** NEXT План найма\n* Тимлиды\nзаметки\n';
@@ -81,12 +81,10 @@ test.describe('navigator', () => {
     await expect.poll(() => status(page)).toContain('Стр. 8');
   });
 
-  test('the setting in Настройки → Основные reaches the open window at once', async ({ page, context }) => {
+  test('the setting in Настройки → Основные reaches the open window at once', async ({ page }) => {
     await open(page);
-    const settings = await context.newPage();
-    await installTauriMock(settings, FILES());
-    await settings.goto('/#settings');
-    await settings.getByRole('tab', { name: 'Основные' }).click();
+    await openSettingsSheet(page, 'Основные');
+    const settings = page;
     const sw = settings.getByRole('switch', { name: 'Показывать заголовки в навигаторе' });
     await expect(sw).toHaveAttribute('aria-checked', 'false');
     await sw.click();

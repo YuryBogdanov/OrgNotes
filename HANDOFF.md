@@ -93,15 +93,16 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 | `orgRich.ts`, `rich.ts`, `RichMenu.svelte` | «Оформленный текст» (ТЗ 19, like org-modern): replaces the structural view in the `structure` compartment when `store.rich`; line decorations + widgets per visible line; lines touched by a user-placed caret (`userCaret` field) show raw text. Clicks on status/priority/date open `RichMenu` (writes via `store.patchAt`). Stage 2 (proportional font) and 3 (blocks) not built. |
 | `orgIndent.ts` | «Структурный вид»: one star per level (marker widget; hidden stars stay in DOM with `display:none`), indents, atomic ranges, Backspace = level up. |
 | `links.ts` | Link extraction line by line (uniorg per candidate line, cached by line text; a whole-file parse was ~9 s on 50k lines), resolution, backlinks, rewrite on rename. |
-| `App.svelte` | Window shell: toolbar (grid, centred path), `NavPanel`, panes, inspector, sheets/overlays, menu actions, browser-shortcut fallback. `#settings` and `#capture` hash = other windows. |
+| `App.svelte` | Window shell: toolbar (grid, centred path), `NavPanel`, panes, inspector, sheets/overlays, menu actions (the menu is rebuilt from the shortcuts), the window's key handler. `#capture` hash = the quick-entry panel. |
 | `NavPanel.svelte` | Navigator mode bar (Файлы, Inbox, Задачи*, Агенда, Теги*, Поиск*; * = disabled) → `Navigator` / `InboxPanel` / `AgendaList`. ⌃⌘1/2/3. |
 | `JumpBar.svelte` | Toolbar path, Xcode style; ⌃⌘J keyboard; segment menu = everything in the segment's folder (folders, separator, files); filter. |
 | `Palette.svelte` + `commands.ts` + `fuzzy.ts` | Command palette (⇧⌘P), goto file (⇧⌘O), new file (⇧⌘N), `#` headings. |
 | `Agenda.svelte`, `AgendaList.svelte`, `AgendaBuilder.svelte`, `agendas.ts` | Built-in agenda + custom agendas (blocks of conditions, stored in config.json); the builder is a modal sheet. `agendas.ts` is the pure engine. |
 | `InboxPanel.svelte`, `Picker.svelte`, `Capture.svelte`, `CaptureWindow.svelte`, `inbox.ts` | Inbox section, where-to palette (choose file / refile), quick entry (in-window overlay and the `#capture` panel window), pure Inbox logic. |
-| `Review.svelte`, `review.ts` | «Разбор Inbox» (ТЗ 18): a tab of kind `review` whose `path` follows the card's file (so `store.file`/`selected`, the palette and the inspector work on the card); the card is an `Editor` with `narrow` (hidden lines outside the subtree, a change filter for user edits). Queue/actions in the store (`review*`). Action keys ⌥⌘1–5, ⌥⌘[ (⌘1/⌘2/⌘[ belong to the menu). |
+| `Review.svelte`, `review.ts` | «Разбор Inbox» (ТЗ 18): a tab of kind `review` whose `path` follows the card's file (so `store.file`/`selected`, the palette and the inspector work on the card); the card is an `Editor` with `narrow` (hidden lines outside the subtree, a change filter for user edits). Queue/actions in the store (`review*`). Action keys ⌘1–5, ⌘[ (scope «Разбор Inbox» of `keys.ts`: they win over the window's ⌘1/⌘2/⌘[ while the tab is shown; registered as `store.reviewKeys`). |
 | `Refile.svelte`, `refile.ts` | Move a heading: file → place in a tree (ТЗ 16); `from` palette / inbox / review. |
-| `Settings.svelte` + `workflowEditor.ts` | Settings (own window, or a sheet in the browser). Ready tabs: Основные, Статусы, Агенды, Inbox. Теги/Календарь/Файлы are disabled. |
+| `Settings.svelte` + `workflowEditor.ts` | Settings: a sheet over the main window (ТЗ 22), sections in a column on the left (`store.settingsSection`, remembered). Ready: Основные, Статусы, Агенды, Inbox, Клавиши. Теги/Календарь/Файлы are disabled. ⌘, toggles, ⎋/«Готово» close, ⌘[ ⌘] switch. |
+| `keys.ts`, `keyDispatch.ts`, `editorKeys.ts`, `KeysSettings.svelte` | Shortcuts (ТЗ 22). `keys.ts`: the registry (id, title, group, scope, defaults of «Как в Emacs» / «Как в macOS»), presses as shown («⇧⌘O», chords «⌃C S»), accelerators, recording rules, clashes (nested scopes review⊃window, heading⊃editor don't clash). `keyDispatch.ts`: one window keydown handler (capture phase) runs everything by scope: review → editor/heading (the focused editor's commands, `editorKeys.ts`) → window; chords wait 1.5 s. The menu shows the same accelerators; WebKit gives keys to the page first, and `menuMayRun` keeps one key from running twice. New commands go into `KEY_COMMANDS` and, if in the menu, `src-tauri/tests/menu_accelerators.rs` (a vitest checks the list). |
 | `Inspector.svelte`, `Outline.svelte` | Right panel: task properties / file structure. |
 | `CloseSheet`, `SaveAsSheet`, `DiskSheet`, `Dialogs`, `StartScreen`, `EmptyFolder`, `ColorPicker`, `ContextMenu`, `Splitter`, `Pane` | As named. `DiskSheet` = file changed on disk (diff in `diff.ts`). |
 | `menu.ts` | Native menu (Tauri). Every accelerator must also be listed in `src-tauri/tests/menu_accelerators.rs` (regenerate it with a regex over `it('…','…','ACC')`). |
@@ -127,15 +128,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   - `workflows` (status sets), `behavior` (closedTimestamp, logbook);
   - `agendas` (custom agendas);
   - `inbox` {file, status, created, add (top|end, default top), order, counter, details, confirm, reviewDone, reviewCancel, reviewOrder, stale}; defaults are omitted.
-  Both windows write it via `store.updateConfig(raw => …)`, which re-reads the newest text first.
+  Written via `store.updateConfig(raw => …)`, which re-reads the newest text first.
 - **App config (Rust):** the notes dir and its bookmark, in the app config dir. Identifier `dev.local.panopticon`.
 - **localStorage (per Mac):**
   - `layout:<dir>`, `lastFile:<dir>`, `saveAsDir:…`;
   - `nav:mode`, `nav:headings`, `inspector:tab`, `editor:levels`, `editor:drawers` ('0' = drawers open on open), `editor:rich`, `editor:richNumbers`, `find:cs`, `find:word`, `search:recent`;
   - `capture:key`, `capture:global`, `capture:draft`, `capture:file`;
-  - one-shot commands from the settings window: `cmd:changeFolder`, `cmd:newAgenda`.
-
-  The settings window talks to main through `storage` events.
+  - `keys` {preset: emacs|mac, overrides: {commandId: [shortcuts]}}, `settings:section`.
 
 ## 8. Testing notes
 
@@ -182,7 +181,9 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
    - the «Структурный вид» shortcut (decide after a week of use);
    - circles instead of stars (the architecture is ready: `Marker` widget in `orgIndent.ts`).
 5. **Small known deviations:**
-   - The menu item «Новая задача в Inbox…» always shows ⇧⌘I, even after the shortcut is changed.
     - «Создать inbox.org» writes `#+TITLE: inbox`.
+    - Shortcuts (ТЗ 22): not checked in the built app yet — that WebKit gives ⌘1 in the review tab to the page before
+      the menu's «Заметки» (the design relies on it), and that the menu is rebuilt without flicker. ⌥← and ⌥⇧← both
+      move the heading with its subtree, as before.
 6. **`sample_notes_dir`** is compiled from `CARGO_MANIFEST_DIR`. It only works on the build machine; elsewhere the
    button is hidden, which is fine.

@@ -78,7 +78,7 @@ test.describe('modes', () => {
     await expect(plate).toContainText('[#A] Подготовить бюджет 2027');
     await expect(plate.locator('.right')).toHaveText('work · строка 4');
     expect(await groups(page)).toEqual(['К ЗАГОЛОВКУ', 'ОБЩИЕ']);
-    expect(await titles(page)).toEqual(['Сменить статус…', 'Запланировать…', 'Поставить дедлайн…', 'Изменить теги…', 'Перенести в другой файл…', 'Создать файл…', 'Создать папку…', 'Новая задача', 'Перейти к файлу…', 'Показать структуру файла', 'Оформленный текст']);
+    expect(await titles(page)).toEqual(['Сменить статус…', 'Запланировать…', 'Поставить дедлайн…', 'Изменить теги…', 'Перенести в другой файл…', 'Создать файл…', 'Создать папку…', 'Новая задача', 'Перейти к файлу…', 'Показать структуру файла', 'Оформленный текст', 'Настройки…']);
     await expect(selected(page)).toHaveText('Сменить статус…');
   });
 
@@ -95,7 +95,8 @@ test.describe('modes', () => {
     await expect(row('Перейти к файлу').locator('.key')).toHaveText('⇧⌘O');
     await expect(row('Новая задача').locator('.hint')).toHaveText('в work');
     await expect(row('Перенести в другой файл').locator('.hint')).toHaveCount(0);
-    await expect(row('Перенести в другой файл').locator('.key')).toHaveCount(0);
+    await expect(row('Перенести в другой файл').locator('.key')).toHaveText('⌃C ⌃W'); // «Как в Emacs»
+    await expect(row('Новая задача').locator('.key')).toHaveCount(0);
   });
 
   test('off a heading: the general plate and no heading group at all', async ({ page }) => {
@@ -157,7 +158,7 @@ test.describe('modes', () => {
     await page.keyboard.press('Meta+w');
     await palette(page);
     await expect(pal(page).locator('.plate')).toHaveCount(0);
-    expect(await titles(page)).toEqual(['Создать файл…', 'Создать папку…', 'Перейти к файлу…', 'Оформленный текст']);
+    expect(await titles(page)).toEqual(['Создать файл…', 'Создать папку…', 'Перейти к файлу…', 'Оформленный текст', 'Настройки…']);
   });
 });
 
@@ -220,7 +221,7 @@ test.describe('keyboard and mouse', () => {
     await at(page, 'Подготовить бюджет');
     await palette(page);
     await page.keyboard.press('ArrowUp'); // round to the last
-    await expect(selected(page)).toHaveText('Оформленный текст');
+    await expect(selected(page)).toHaveText('Настройки…');
     await page.keyboard.press('ArrowDown');
     await expect(selected(page)).toHaveText('Сменить статус…');
     for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowDown');

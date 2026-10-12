@@ -8,14 +8,14 @@
 
   // The left panel: a bar of modes (as in Xcode) over the navigator of that mode. The mode belongs to the window:
   // it changes only by the bar or «Вид» (⌃⌘1…⌃⌘3), never by itself when another tab or pane becomes active.
-  type Mode = { id: string; label: string; icon: string; on?: NavMode; key?: string };
+  type Mode = { id: string; label: string; icon: string; on?: NavMode; key?: string }; // key: the command of keys.ts
   const MODES: Mode[] = [
-    { id: 'files', label: 'Файлы', icon: 'M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4M7 10h6M7 13h4', on: 'files', key: '⌃⌘1' },
-    { id: 'inbox', label: 'Inbox', icon: 'M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4', on: 'inbox', key: '⌃⌘2' },
+    { id: 'files', label: 'Файлы', icon: 'M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4M7 10h6M7 13h4', on: 'files', key: 'navFiles' },
+    { id: 'inbox', label: 'Inbox', icon: 'M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4', on: 'inbox', key: 'navInbox' },
     { id: 'tasks', label: 'Задачи', icon: 'M3.5 5.5l1.5 1.5 3-3M3.5 12.5l1.5 1.5 3-3M11 5.5h6M11 12.5h6' },
-    { id: 'agendas', label: 'Агенда', icon: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3', on: 'agendas', key: '⌃⌘3' },
+    { id: 'agendas', label: 'Агенда', icon: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3', on: 'agendas', key: 'navAgendas' },
     { id: 'tags', label: 'Теги', icon: 'M3 3h6.5l7.5 7.5-6 6L3.5 9.5zM6.8 6.8h.01' },
-    { id: 'search', label: 'Поиск по заметкам', icon: 'M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM13.5 13.5L17 17', on: 'search', key: '⌃⌘6' },
+    { id: 'search', label: 'Поиск по заметкам', icon: 'M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM13.5 13.5L17 17', on: 'search', key: 'navSearch' },
   ];
   // the number of unsorted Inbox tasks on its button (0: none; more than 99: «99+»)
   const count = $derived(store.inboxCfg.counter ? store.inboxList.length : 0);
@@ -24,7 +24,7 @@
 <div class="panel">
   <div class="modes" role="tablist" aria-label="Режимы навигатора">
     {#each MODES as m (m.id)}
-      <button role="tab" aria-label={m.label} title={m.on ? `${m.label} (${m.key})` : `${m.label} — пока нет`} disabled={!m.on}
+      <button role="tab" aria-label={m.label} title={m.on ? store.titled(m.label, m.key ?? '') : `${m.label} — пока нет`} disabled={!m.on}
         aria-selected={store.navMode === m.on} class:on={store.navMode === m.on} onclick={() => m.on && store.setNavMode(m.on)}>
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={m.icon} /></svg>
         {#if m.id === 'inbox' && count}<span class="badge" aria-label="Задач в Inbox: {count}">{count > 99 ? '99+' : count}</span>{/if}

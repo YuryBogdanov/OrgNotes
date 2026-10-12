@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, openSettingsSheet } from './tauriMock';
 import { FILES, WORK } from './richFixture';
 
 // ТЗ «Оформленный текст в редакторе», этап 1.
@@ -39,10 +39,9 @@ test.describe('switching', () => {
   test('line numbers are hidden while drawn; the setting brings them back', async ({ page }) => {
     await open(page);
     await expect(ed(page).locator('.cm-lineNumbers')).toHaveCount(0);
-    await page.evaluate(() => {
-      localStorage.setItem('editor:richNumbers', '1');
-      window.dispatchEvent(new StorageEvent('storage', { key: 'editor:richNumbers' }));
-    });
+    await openSettingsSheet(page, 'Основные');
+    await page.getByRole('switch', { name: 'Номера строк в оформленном виде' }).click();
+    await page.keyboard.press('Escape');
     await expect(ed(page).locator('.cm-lineNumbers')).toHaveCount(1);
   });
 });

@@ -67,8 +67,8 @@
     {#if count}<span class="cnt" class:no={none} aria-live="polite">{count}</span>{/if}
   </div>
   <div class="nav" role="group" aria-label="Переход по результатам">
-    <button title="Предыдущее (⇧⌘G, ⇧↩)" aria-label="Предыдущее" onclick={onprev}><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.5L6 4l3.5 3.5" /></svg></button>
-    <button title="Следующее (⌘G, ↩)" aria-label="Следующее" onclick={onnext}><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" /></svg></button>
+    <button title="Предыдущее ({[store.keyHint('findPrev'), '⇧↩'].filter(Boolean).join(', ')})" aria-label="Предыдущее" onclick={onprev}><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.5L6 4l3.5 3.5" /></svg></button>
+    <button title="Следующее ({[store.keyHint('findNext'), '↩'].filter(Boolean).join(', ')})" aria-label="Следующее" onclick={onnext}><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" /></svg></button>
   </div>
   <button class="tg" title="Учитывать регистр" aria-pressed={store.findCase} class:on={store.findCase} onclick={() => store.setFindOpts({ cs: !store.findCase })}>Aa</button>
   <button class="tg" title="Слово целиком" aria-pressed={store.findWord} class:on={store.findWord} onclick={() => store.setFindOpts({ word: !store.findWord })}>Слово</button>

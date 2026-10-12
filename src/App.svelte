@@ -23,9 +23,9 @@
   import Refile from './Refile.svelte';
   import CaptureWindow from './CaptureWindow.svelte';
   import { displayName as nameOf } from './names';
+  import { toAccelerator } from './keys';
+  import { keyHandler, menuMayRun } from './keyDispatch';
 
-  // the Settings window is this same app loaded with #settings: it shows only the settings
-  const isSettingsWindow = location.hash === '#settings';
   // the quick entry from another program: a panel of its own with only the entry (the main window does the writing)
   const isCaptureWindow = location.hash === '#capture';
   const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -72,20 +72,23 @@
 
   // ---- the layout survives a restart ----------------------------------------------------------------------
   $effect(() => {
-    if (store.loaded && !isSettingsWindow) store.persistLayout();
+    if (store.loaded) store.persistLayout();
   });
   // a file changed or vanished on disk under edits: ask when the window is in front, no sheet is up and its tab
   // is shown — one question at a time
   $effect(() => {
     void [store.conflicts, store.orphans, store.sheetOpen, store.appActive, store.layout.active];
     for (const p of store.layout.panes) void p.tabs[p.active]?.path;
-    if (!isSettingsWindow) untrack(() => store.pumpDisk());
+    untrack(() => store.pumpDisk());
   });
 
   // ---- menu bar and shortcuts -------------------------------------------------------------------------------
-  let menu: AppMenu | null = null;
+  let menu = $state<AppMenu | null>(null);
   const actions: Record<string, () => void> = {
     settings: () => store.openSettings(),
+    newFolder: () => store.canManageFiles && store.openPalette('newFolder'),
+    outline: () => store.showOutline(),
+    captureHere: () => store.openCapture(),
     newFile: () => {
       if (!store.canManageFiles) return;
       const dir = store.file && store.file.name.includes('/') ? store.file.name.slice(0, store.file.name.lastIndexOf('/')) : '';
@@ -154,42 +157,6 @@
     menu.setEnabled('copyPath', t?.kind === 'file');
     menu.setChecked('rich', store.rich);
   });
-  /** The same shortcuts when there is no native menu (plain browser, tests). */
-  function shortcut(e: KeyboardEvent): string | null {
-    if (!e.metaKey) return null;
-    const k = e.key;
-    if (e.ctrlKey && e.shiftKey && (k === 'ArrowRight' || k === 'ArrowLeft')) return 'swap';
-    // tabs to the neighbour pane (⌃⌘ / ⌥⌃⌘ + arrow), focus between panes (⌥⌘ + arrow)
-    if (e.ctrlKey && k === 'ArrowLeft') return e.altKey ? 'dupLeft' : 'moveLeft';
-    if (e.ctrlKey && k === 'ArrowRight') return e.altKey ? 'dupRight' : 'moveRight';
-    if (e.altKey && k === 'ArrowLeft') return 'paneLeft';
-    if (e.altKey && k === 'ArrowRight') return 'paneRight';
-    if (e.altKey && e.code === 'KeyW') return 'closeOthers';
-    if (e.ctrlKey && e.code === 'KeyW') return 'closePane';
-    if (e.ctrlKey && e.code === 'KeyJ') return 'jumpBar';
-    if (e.ctrlKey && e.code === 'Digit1') return 'navFiles';
-    if (e.ctrlKey && e.code === 'Digit2') return 'navInbox';
-    if (e.ctrlKey && e.code === 'Digit3') return 'navAgendas';
-    if (e.shiftKey && e.code === 'KeyI') return 'capture';
-    if (e.shiftKey && e.code === 'KeyR') return 'review';
-    if (e.ctrlKey && e.code === 'Digit6') return 'navSearch';
-    if (e.code === 'KeyF') return e.shiftKey ? 'findAll' : e.altKey || e.ctrlKey ? null : 'find';
-    if (e.code === 'KeyG' && e.altKey) return e.shiftKey ? 'searchPrev' : 'searchNext';
-    if (e.code === 'KeyG' && !e.ctrlKey) return e.shiftKey ? 'findPrev' : 'findNext';
-    if (e.code === 'KeyE' && !e.shiftKey && !e.altKey && !e.ctrlKey) return 'useSelection';
-    if (e.shiftKey && e.code === 'KeyW') return 'closeWindow';
-    if (e.shiftKey && e.code === 'KeyP') return 'palette';
-    if (e.shiftKey && e.code === 'KeyN') return 'paletteNewFile';
-    if (e.shiftKey && e.code === 'KeyO') return 'paletteGoto';
-    if (e.altKey && e.code === 'KeyC') return 'copyPath';
-    if (e.shiftKey && e.code === 'KeyJ') return 'revealInNav';
-    if (e.code === 'Backslash' || k === '\\') return e.shiftKey ? 'keepOne' : e.altKey ? null : 'splitRight';
-    if (e.ctrlKey || e.shiftKey) return null;
-    if (k === '0') return e.altKey ? 'insp' : 'nav';
-    if (e.altKey) return null;
-    return ({ '[': 'back', n: 'newFile', ',': 'settings', t: 'newTab', w: 'closeTab', s: 'save', q: 'quit', '1': 'notes', '2': 'agenda' } as Record<string, string>)[k] ?? null;
-  }
-
   // closing the «Разбор Inbox» tab ends the review (everything is on disk already)
   $effect(() => {
     if (store.review && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'review'))) store.review = null;
@@ -198,7 +165,7 @@
   // the panel of the quick entry knows the Inbox file's name from here
   $effect(() => {
     const f = store.inboxFile;
-    if (isSettingsWindow || isCaptureWindow) return;
+    if (isCaptureWindow) return;
     try {
       if (f) localStorage.setItem('capture:file', nameOf(f.name) + '.org');
       else localStorage.removeItem('capture:file');
@@ -207,32 +174,45 @@
     }
   });
 
+  // while a sheet is up, commands do nothing; ⇧⌘P closes the palette, ⌘, the settings, and ⌘S in the agenda
+  // builder saves the agenda
+  const allowed = (id: string) =>
+    !store.sheetOpen || (id === 'palette' && store.palette) || (id === 'settings' && store.settingsOpen) ||
+    (id === 'save' && store.builder && !store.unsavedReq && !store.saveAsReq && !store.errorReq && !store.diskReq);
+  /** A command of the window run by its key; false if it may not run now (the key then goes on). */
+  const runWindow = (id: string) => {
+    if (!actions[id] || !allowed(id)) return false;
+    actions[id]();
+    return true;
+  };
+  // the menu bar with the shortcuts as set now, built again when one changes
+  const menuActions = Object.fromEntries(
+    Object.keys(actions).map((id) => [id, () => {
+      if (menuMayRun(toAccelerator(store.keyHint(id)) ? store.keyHint(id) : undefined) && allowed(id)) actions[id]();
+    }]),
+  );
+  $effect(() => {
+    if (isCaptureWindow) return;
+    const b = store.bindings;
+    let stale = false;
+    void installMenu(menuActions, (id) => toAccelerator(b.get(id)?.[0] ?? '')).then((m) => {
+      if (stale) return m?.close();
+      menu?.close();
+      menu = m;
+    });
+    return () => {
+      stale = true;
+    };
+  });
+
   onMount(() => {
     if (isCaptureWindow) return; // a thin panel: no files, no menu
     store.load();
     store.listen();
-    if (isSettingsWindow) return;
-    // while a sheet is up, menu commands do nothing
-    // ⌘S in the agenda builder saves the agenda
-    const allowed = (id: string) => !store.sheetOpen || (id === 'palette' && store.palette) || (id === 'save' && store.builder && !store.unsavedReq && !store.saveAsReq && !store.errorReq && !store.diskReq);
-    const guarded = Object.fromEntries(Object.entries(actions).map(([id, run]) => [id, () => { if (allowed(id)) run(); }]));
-    installMenu(guarded).then((m) => (menu = m));
     // closing the window only hides it (Rust side): the text stays in memory, so nothing to ask; quitting asks
-    const key = (e: KeyboardEvent) => {
-      if (menu) return; // the menu bar owns the shortcuts
-      const id = shortcut(e);
-      if (!id) return;
-      if (!allowed(id)) return; // the sheet has the keyboard; ⇧⌘P closes the palette
-      if (id === 'settings' && store.settingsOpen) {
-        e.preventDefault();
-        store.settingsOpen = false;
-        return;
-      }
-      e.preventDefault();
-      actions[id]();
-    };
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
+    const key = keyHandler(runWindow);
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
   });
 
   // The toolbar doubles as the window's title bar.
@@ -247,18 +227,16 @@
 
 {#if isCaptureWindow}
   <CaptureWindow />
-{:else if isSettingsWindow}
-  {#if store.loaded}<Settings standalone />{/if}
 {:else}
 <!-- the agenda builder is a sheet over the whole window: the window stays visible under it but takes no input -->
 <!-- full screen with the menu bar shown: the toolbar grows by it (its buttons stay just below it), the traffic lights
      come into the toolbar -->
-<div class="win" inert={!!store.builder} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
+<div class="win" inert={!!store.builder || store.settingsOpen} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
   <Dialogs />
   <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
   {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
-  {#if store.start && !isSettingsWindow}<StartScreen />{/if}
+  {#if store.start}<StartScreen />{/if}
   {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
   {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
   {#if store.capture}
@@ -282,7 +260,6 @@
     </div>
   {/if}
   {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
-  {#if store.settingsOpen}<Settings />{/if}
   <!-- a start screen comes instead of the window (no toolbar, no navigator) -->
   {#if !store.start}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -306,7 +283,7 @@
     <button class="ibtn" aria-label="Показать или скрыть навигатор" onclick={() => (store.showNav = !store.showNav)}>
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5" /><path d="M8 3.5v13" /></svg>
     </button>
-    <button class="ibtn" aria-label="Назад (⌘[)" title="Назад (⌘[)" disabled={store.history.length === 0} onclick={() => store.back()}>
+    <button class="ibtn" aria-label={store.titled('Назад', 'back')} title={store.titled('Назад', 'back')} disabled={store.history.length === 0} onclick={() => store.back()}>
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l-6 6 6 6" /></svg>
     </button>
     </div>
@@ -333,7 +310,7 @@
           <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2.5v3M13 2.5v3" /><circle cx="10" cy="12.5" r="2" /></svg>
         </button>
       </div>
-      <button class="ibtn" aria-label="Настройки (⌘,)" title="Настройки (⌘,)" onclick={() => store.openSettings()}>
+      <button class="ibtn" aria-label={store.titled('Настройки', 'settings')} title={store.titled('Настройки', 'settings')} onclick={() => store.openSettings()}>
         <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5" /><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" /></svg>
       </button>
       <button class="ibtn" aria-label="Показать или скрыть инспектор" onclick={() => (store.showInspector = !store.showInspector)}>
@@ -375,6 +352,7 @@
   {/if}
 </div>
 {#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
+{#if store.settingsOpen && store.loaded}<Settings />{/if}
 {/if}
 
 <style>
