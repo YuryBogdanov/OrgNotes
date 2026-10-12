@@ -93,9 +93,6 @@
     } else if (e.key === '.' && !e.metaKey) {
       e.preventDefault();
       pick(new Date());
-    } else if (e.metaKey && !e.shiftKey && !e.altKey && e.code === 'KeyZ') {
-      e.preventDefault();
-      void store.undoCal();
     } else if ((e.key === 'n' || e.key === 'N' || e.code === 'KeyN') && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       store.openCalNew('task', cal.date);

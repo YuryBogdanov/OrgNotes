@@ -135,14 +135,6 @@
       ],
     };
   }
-  /** The summary has no editor: ⌘Z takes the last action of the review back. */
-  function keys(e: KeyboardEvent) {
-    if (store.tab !== tab || !review || store.palette || store.refile || defer || confirmDel) return;
-    if (review.cur < 0 && e.metaKey && !e.altKey && !e.shiftKey && e.code === 'KeyZ' && store.reviewUndoLast) {
-      e.preventDefault();
-      store.reviewUndoLast();
-    }
-  }
   // ⌘1…⌘5 the actions, ⌘[ the card before (as set in «Клавиши»): while this tab is shown they win over the window's
   const RUN: Record<string, () => void> = {
     reviewDone: () => void store.reviewClose('done'),
@@ -195,7 +187,6 @@
   }
 </script>
 
-<svelte:window onkeydown={keys} />
 
 <div class="review">
   <div class="stage">

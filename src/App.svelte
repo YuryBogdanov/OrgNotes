@@ -258,7 +258,19 @@
     // closing the window only hides it (Rust side): the text stays in memory, so nothing to ask; quitting asks
     const key = keyHandler(runWindow);
     window.addEventListener('keydown', key, true);
-    return () => window.removeEventListener('keydown', key, true);
+    // one ⌘Z (roadmap 0.1): in a text field it is the field's own; anywhere else it takes back the last edit a
+    // feature made — in the Inbox list, on a review card, in the calendar, in goals
+    const undo = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || !e.metaKey || e.shiftKey || e.altKey || e.ctrlKey || e.code !== 'KeyZ') return;
+      if ((e.target as Element | null)?.closest?.('.cm-editor, input, textarea, select, [contenteditable]') || store.sheetOpen) return;
+      e.preventDefault();
+      void store.undoLast();
+    };
+    window.addEventListener('keydown', undo);
+    return () => {
+      window.removeEventListener('keydown', key, true);
+      window.removeEventListener('keydown', undo);
+    };
   });
 
   // The toolbar doubles as the window's title bar.

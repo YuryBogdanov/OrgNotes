@@ -166,6 +166,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 
 ## 9. Open items / known issues
 
+- **Edits and undo (roadmap 0.1):** features never write files directly: `store.transaction(label, tx => …)` (Org operations on a `HeadingRef` — `setStatus`, `setPlanning`, `setTags`, `remove`, `update`) or `store.writeAll(label, texts)`; each is a step of `Journal` (`src/journal.ts`), taken back by `store.undo(step)` (toasts) or `store.undoLast()` — the one ⌘Z outside text fields, wired in `App.svelte`. `onUndo` puts a feature's own state back (a review card, goal counters). An outside change to an open editor is its own history step (`isolateHistory`). Review actions are serialized (`inTurn`).
 - **Core and plugins roadmap:** `docs/roadmap-yadro-i-plaginy.md` (from `docs/brief-yadro-i-plaginy.md`). Every PR of the roadmap updates its task's status there. Stage 0 (core preparation) changes no behaviour except one ⌘Z everywhere.
 
 1. **Full-screen traffic lights** (PR #27, merged anyway): the lights drawn in the toolbar in full screen do not take

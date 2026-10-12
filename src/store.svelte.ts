@@ -22,6 +22,7 @@ import {
 import { byDay, entriesIn, hasDated, isoDay, type CalEntry, type Layer } from './calIndex';
 import { cachedTheme, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
 import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
+import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
 import { DEFAULT_CAL, insertEntry, moveEntry, readCal, withCal, type CalSettings, type NewEntry } from './calEdit';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
@@ -594,8 +595,6 @@ class Store {
     if (!isTauri) return null;
     return this.save(path);
   }
-  /** What the Inbox actions changed in this session, for ⌘Z in the list: each step is one or two files. */
-  private inboxUndo: { path: string; before: string; after: string }[][] = [];
   /** Write files one by one, at once; the step to take it back, or null (and why, said) when a write failed. */
   private async writeSteps(steps: { path: string; text: string }[]): Promise<{ path: string; before: string; after: string }[] | null> {
     const done: { path: string; before: string; after: string }[] = [];
@@ -612,30 +611,50 @@ class Store {
     }
     return done;
   }
-  private async inboxWrite(steps: { path: string; text: string }[]): Promise<boolean> {
-    const done = await this.writeSteps(steps);
-    if (done) this.inboxUndo.push(done);
-    return !!done;
-  }
-  /** Take a step back, if its files were not changed since. */
-  private async undoStep(step: { path: string; before: string; after: string }[]): Promise<boolean> {
-    for (const s of [...step].reverse()) {
-      const f = this.files.find((x) => x.path === s.path);
-      if (!f || f.text !== s.after) {
-        this.say('Отменить нельзя: файл уже изменился');
-        return false;
-      }
+  // ---- the journal of edits (roadmap 0.1): what features write is a transaction and a step of one ⌘Z ------------
+  private journal = new Journal();
+  /**
+   * Build a transaction, write its files at once and record it as a step; `onUndo` puts the feature's own state
+   * back when the step is taken back. Null: nothing changed, a heading was not found (said), or a write failed (said).
+   */
+  async transaction(label: string, build: (tx: Tx) => void, onUndo?: () => void): Promise<Step | null> {
+    const tx = new Tx((path) => {
+      const f = this.files.find((x) => x.path === path);
+      return f && { path: f.path, text: f.text, wf: f.wf };
+    });
+    build(tx);
+    if (tx.conflict) {
+      this.say('Не удалось: заголовок изменился или пропал');
+      return null;
     }
-    for (const s of [...step].reverse()) await this.writeNow(s.path, s.before);
+    const steps = tx.result();
+    if (!steps.length) return null;
+    const done = await this.writeSteps(steps);
+    return done ? this.journal.record(label, done, onUndo) : null;
+  }
+  /** Texts the feature has made itself, as one transaction. */
+  writeAll(label: string, texts: { path: string; text: string }[], onUndo?: () => void): Promise<Step | null> {
+    return this.transaction(label, (tx) => texts.forEach((x) => tx.update(x.path, () => x.text)), onUndo);
+  }
+  /** Take a step back, if its files were not changed since (the toast's «Отменить»). */
+  async undo(step: Step): Promise<boolean> {
+    if (!this.journal.has(step)) return false;
+    if (!canUndo(step, (p) => this.files.find((x) => x.path === p)?.text)) {
+      this.say('Отменить нельзя: файл уже изменился');
+      return false;
+    }
+    for (const c of [...step.changes].reverse()) await this.writeNow(c.path, c.before);
+    this.journal.drop(step);
+    step.onUndo?.();
     return true;
   }
-  /** ⌘Z in the Inbox list: the last action is taken back (if the files were not changed since). */
-  async undoInbox(): Promise<boolean> {
-    const step = this.inboxUndo.pop();
-    if (!step) return false;
-    if (await this.undoStep(step)) return true;
-    this.inboxUndo.push(step);
-    return false;
+  /** ⌘Z outside a text editor: the last step, wherever it was made. False: there is none (or it cannot be). */
+  async undoLast(): Promise<boolean> {
+    const s = this.journal.last();
+    return s ? this.undo(s) : false;
+  }
+  private refOf(f: NoteFile, h: Heading): HeadingRef {
+    return { path: f.path, line: h.line, title: h.title };
   }
   private inboxHeading(item: InboxItem): { f: NoteFile; h: Heading } | null {
     const f = this.inboxFile;
@@ -649,21 +668,22 @@ class Store {
     if (!f) return 'nofile';
     const status = this.inboxCfg.status && f.wf.open.includes(this.inboxCfg.status) ? this.inboxCfg.status : startOf(sequenceFor(f.wf, null));
     const task = entry(title, details, status, this.inboxCfg.created ? new Date() : null);
-    return (await this.inboxWrite([{ path: f.path, text: (this.inboxCfg.add === 'end' ? append : prepend)(f.text, task) }])) ? 'ok' : 'error';
+    const add = this.inboxCfg.add === 'end' ? append : prepend;
+    return (await this.transaction('Новая задача в Inbox', (tx) => tx.update(f.path, (t) => add(t, task)))) ? 'ok' : 'error';
   }
   async inboxDone(item: InboxItem) {
     const r = this.inboxHeading(item);
     if (!r) return;
     const kw = firstDone(sequenceFor(r.f.wf, r.h.keyword)) ?? r.f.wf.done[0];
-    if (kw) await this.inboxWrite([{ path: r.f.path, text: setKeyword(r.f.text, r.h, kw, r.f.wf) }]);
+    if (kw) await this.transaction(`Выполнено: ${r.h.title}`, (tx) => tx.setStatus(this.refOf(r.f, r.h), kw));
   }
   async inboxDelete(item: InboxItem) {
     const r = this.inboxHeading(item);
-    if (r) await this.inboxWrite([{ path: r.f.path, text: remove(r.f.text, r.h) }]);
+    if (r) await this.transaction(`Удалено: ${r.h.title}`, (tx) => tx.remove(this.refOf(r.f, r.h)));
   }
   async inboxDate(item: InboxItem, kind: 'SCHEDULED' | 'DEADLINE', date: Date | null) {
     const r = this.inboxHeading(item);
-    if (r) await this.inboxWrite([{ path: r.f.path, text: setPlanning(r.f.text, r.h, kind, date) }]);
+    if (r) await this.transaction(`Дата: ${r.h.title}`, (tx) => tx.setPlanning(this.refOf(r.f, r.h), kind, date));
   }
   /** «Открыть»: the Inbox file in the editor, at the task. */
   openInboxItem(item: InboxItem) {
@@ -717,7 +737,7 @@ class Store {
         n += r.moved.length;
       }
     }
-    if (steps.length && !(await this.writeSteps(steps))) return 0;
+    if (steps.length && !(await this.writeAll(`Перенос целей в ${quarterLabel(to)}`, steps))) return 0;
     this.goalCarry = null;
     this.goalsQuarter = to;
     this.note(`Перенесено в ${quarterLabel(to)}: ${n}`);
@@ -764,7 +784,7 @@ class Store {
   async addGoalSource(src: GoalSource, opts: { create?: boolean; replace?: string } = {}): Promise<boolean> {
     if (opts.create) {
       const f = this.files.find((x) => x.name === src.file);
-      if (!f || !(await this.writeSteps([{ path: f.path, text: addSourceHeading(f.text, src.heading) }]))) return false;
+      if (!f || !(await this.transaction(`Заголовок «${src.heading}»`, (tx) => tx.update(f.path, (t) => addSourceHeading(t, src.heading))))) return false;
     }
     const list = this.goalSources
       .filter((x) => sourceKey(x) !== sourceKey(src) && sourceKey(x) !== opts.replace)
@@ -787,7 +807,7 @@ class Store {
     if (!(await this.updateConfig((raw) => this.withGoalsWorkflow(raw)))) return false;
     const f = this.files.find((x) => x.path === p.file!.path)!; // read again: the statuses may have changed
     const r = insertGoal(f.text, f.headings, p.src.heading, q, g, weekdayNames(f.text));
-    if (!r || !(await this.writeSteps([{ path: f.path, text: r.text }]))) return false;
+    if (!r || !(await this.writeAll(`Новая цель: ${g.title.trim()}`, [{ path: f.path, text: r.text }]))) return false;
     const path = f.path;
     this.note(`Цель добавлена — ${p.name}`, [{ label: 'Открыть', run: () => this.open(this.files.findIndex((x) => x.path === path), r.line) }]);
     return true;
@@ -855,13 +875,13 @@ class Store {
     for (const [pi, p] of this.layout.panes.entries())
       for (let ti = p.tabs.length - 1; ti >= 0; ti--) if (p.tabs[ti].kind === 'goalReview') closeTab(this.layout, pi, ti);
   }
-  /** Write a step of the review to the person's file. */
-  private async goalWrite(make: (text: string, hs: Heading[], names: string[]) => string | null): Promise<boolean> {
+  /** Write a step of the review to the person's file; `onUndo` puts the review's counters back. */
+  private async goalWrite(label: string, make: (text: string, hs: Heading[], names: string[]) => string | null, onUndo?: () => void): Promise<boolean> {
     const c = this.goalCard;
     const f = c?.p.file && this.files.find((x) => x.path === c.p.file!.path);
     if (!c || !f) return false;
     const next = make(f.text, f.headings, weekdayNames(f.text));
-    return !!next && next !== f.text && !!(await this.writeSteps([{ path: f.path, text: next }]));
+    return !!next && next !== f.text && !!(await this.writeAll(`${label}: ${c.it.title}`, [{ path: f.path, text: next }], onUndo));
   }
   /** «Добавить отметку»: the text of the field under the chosen day (today by default), in date order. */
   async goalAddMark(): Promise<boolean> {
@@ -869,7 +889,9 @@ class Store {
     const c = this.goalCard;
     if (!r || !c || !r.draft.trim()) return false;
     const date = r.date ?? new Date();
-    const ok = await this.goalWrite((t, hs, names) => addMark(t, hs, c.p.src.heading, c.it.q, c.it.title, date, r.draft, names));
+    const ok = await this.goalWrite('Отметка', (t, hs, names) => addMark(t, hs, c.p.src.heading, c.it.q, c.it.title, date, r.draft, names), () => {
+      if (this.goalReview === r) r.marks = Math.max(0, r.marks - 1);
+    });
     if (ok) {
       r.marks++;
       r.draft = '';
@@ -885,9 +907,11 @@ class Store {
     const done = c.p.file!.wf.done.includes(GOAL_STATES.done) ? GOAL_STATES.done : c.p.file!.wf.done[0];
     if (!done || c.goal.keyword === done) return false;
     const g = c.goal;
-    const ok = await this.goalWrite((t, hs) => {
+    const ok = await this.goalWrite('Цель достигнута', (t, hs) => {
       const h = hs.find((x) => x.line === g.line);
       return h ? setKeyword(t, h, done, this.files.find((x) => x.path === c.p.file!.path)!.wf) : null;
+    }, () => {
+      if (this.goalReview === r) r.closed = Math.max(0, r.closed - 1);
     });
     if (ok) {
       r.closed++;
@@ -903,12 +927,14 @@ class Store {
     const g = c.goal;
     const from = g.deadline;
     const mark = from ? `Срок перенесён: ${shortDay(from)} → ${shortDay(to)}` : `Срок: ${shortDay(to)}`;
-    const ok = await this.goalWrite((t, hs, names) => {
+    const ok = await this.goalWrite('Срок перенесён', (t, hs, names) => {
       const h = hs.find((x) => x.line === g.line);
       if (!h) return null;
       const t1 = setPlanning(t, h, 'DEADLINE', to);
       const f = this.files.find((x) => x.path === c.p.file!.path)!;
       return addMark(t1, parseHeadings(t1, f.wf), c.p.src.heading, c.it.q, c.it.title, new Date(), mark, names);
+    }, () => {
+      if (this.goalReview === r) r.moved = Math.max(0, r.moved - 1);
     });
     if (ok) r.moved++;
     return ok;
@@ -919,7 +945,10 @@ class Store {
     const c = this.goalCard;
     if (!r || !c?.goal) return false;
     const f = this.files.find((x) => x.path === c.p.file!.path)!;
-    const ok = await this.goalWrite((t, hs) => moveGoal(t, hs, c.p.src.heading, c.it.q, c.it.title, to, (x) => parseHeadings(x, f.wf))?.text ?? null);
+    const at = r.cur;
+    const ok = await this.goalWrite('Квартал', (t, hs) => moveGoal(t, hs, c.p.src.heading, c.it.q, c.it.title, to, (x) => parseHeadings(x, f.wf))?.text ?? null, () => {
+      if (this.goalReview === r && r.items[at]) r.items[at] = { ...r.items[at], q: c.it.q }; // the card follows the goal back
+    });
     if (ok) r.items[r.cur] = { ...c.it, q: to };
     return ok;
   }
@@ -1523,12 +1552,11 @@ class Store {
       line = r.line;
     } else {
       const r = moveTo(src.f.text, src.h, dst.text, uh);
-      steps = [{ path: dst.path, text: r.dst }, { path: src.f.path, text: r.src }];
+      steps = [{ path: dst.path, text: r.dst }, { path: src.f.path, text: r.src }]; // the target first: nothing is lost
       line = r.line;
     }
-    const done = await this.writeSteps(steps);
+    const done = await this.writeAll(`Перенесено: ${bareTitle(src.h.title)}`, steps);
     if (!done) return 'error';
-    if (req.from === 'inbox') this.inboxUndo.push(done);
     const rec = [{ path: dst.path, key: uh ? keyOf(uh) : '' }, ...this.refileRecent().filter((x) => x.path !== dst.path)].slice(0, 20);
     lsSet(this.recentKey(), JSON.stringify(rec));
     if (req.from === 'palette') this.caretAfterRefile(src.f.path, src.h, same ? line : null);
@@ -1539,7 +1567,7 @@ class Store {
     }
     this.note(`Перенесено в ${name}${uh ? ' › ' + bareTitle(uh.title) : ''}`, [
       { label: 'Открыть', run: () => { const i = this.files.findIndex((x) => x.path === dst.path); if (i >= 0) this.open(i, line); } },
-      { label: 'Отменить', run: () => void this.undoStep(done).then((ok) => { if (ok) this.inboxUndo = this.inboxUndo.filter((s) => s !== done); }) },
+      { label: 'Отменить', run: () => void this.undo(done) },
     ], 3000);
     return 'ok';
   }
@@ -1647,8 +1675,6 @@ class Store {
   review = $state<{ items: ReviewItem[]; cur: number; known: string[] } | null>(null);
   /** An action is being written: the review does not take the task's absence for a change on disk. */
   private reviewBusy = false;
-  /** Takes the last action of the review back (the toast's «Отменить», ⌘Z on the summary). */
-  reviewUndoLast: (() => void) | null = null;
   /** The queue a review would start with now. */
   get reviewPending(): ReviewItem[] {
     const f = this.inboxFile;
@@ -1661,7 +1687,6 @@ class Store {
   /** «Разобрать»: a review of `items` (by default what is in the Inbox now) in the «Разбор Inbox» tab. */
   startReview(items: ReviewItem[] = this.reviewPending) {
     if (!items.length) return;
-    this.reviewUndoLast = null;
     this.reviewCal = false; // folded at every new review, kept from card to card
     this.review = { items, cur: 0, known: this.taskKeys() };
     const at = this.layout.panes.flatMap((p, pi) => p.tabs.map((t, ti) => ({ t, pi, ti }))).find((x) => x.t.kind === 'review');
@@ -1731,18 +1756,15 @@ class Store {
     if (t === null) return;
     this.reviewBusy = true;
     const before = { result: it.result, note: it.note, keyword: it.keyword };
-    const step = await this.writeSteps([{ path: r.f.path, text: t }]);
+    const at = this.review?.items.indexOf(it) ?? -1;
+    const step = await this.writeAll(toast, [{ path: r.f.path, text: t }], () => this.reviewUndone(it, before, at));
     this.reviewBusy = false;
     if (!step) return;
     Object.assign(it, mark);
-    const at = this.review?.items.indexOf(it) ?? -1;
     this.reviewNext();
-    const undo = () => void this.undoStep(step).then((ok) => { if (ok) this.reviewUndone(it, before, at); });
-    this.reviewUndoLast = undo;
-    this.note(toast, [{ label: 'Отменить', run: undo }], 4000);
+    this.note(toast, [{ label: 'Отменить', run: () => void this.undo(step) }], 4000);
   }
   private reviewUndone(it: ReviewItem, before: Partial<ReviewItem>, at: number) {
-    this.reviewUndoLast = null;
     Object.assign(it, before);
     if (this.review && at >= 0) this.reviewShow(at);
   }
@@ -1752,28 +1774,46 @@ class Store {
     const wf = r?.f.wf ?? this.inboxFile?.wf;
     return wf ? closingStatus(wf, r?.h.keyword ?? it.keyword, which, which === 'done' ? this.inboxCfg.reviewDone : this.inboxCfg.reviewCancel) : null;
   }
-  async reviewClose(which: 'done' | 'cancel') {
+  /** The actions of the review run one after another: keys pressed fast wait for the write before them. */
+  private reviewChain: Promise<unknown> = Promise.resolve();
+  private inTurn(fn: () => Promise<void> | void): Promise<void> {
+    const run = this.reviewChain.then(fn, fn);
+    this.reviewChain = run.catch(() => {});
+    return run;
+  }
+  reviewClose(which: 'done' | 'cancel') {
+    return this.inTurn(() => this.reviewCloseNow(which));
+  }
+  private async reviewCloseNow(which: 'done' | 'cancel') {
     const it = this.reviewItem;
     const kw = it && this.reviewStatus(it, which);
     if (!it || !kw) return;
     const word = which === 'done' ? 'Выполнено' : 'Отменено';
     await this.reviewWrite(it, (f, h) => setKeyword(f.text, h, kw, f.wf), { result: which, keyword: kw, note: `${word} · ${kw}` }, `${word}: ${it.title}`);
   }
-  async reviewDefer(date: Date) {
+  reviewDefer(date: Date) {
+    return this.inTurn(() => this.reviewDeferNow(date));
+  }
+  private async reviewDeferNow(date: Date) {
     const it = this.reviewItem;
     if (!it) return;
     await this.reviewWrite(it, (f, h) => setPlanning(f.text, h, 'SCHEDULED', date), { result: 'defer', note: `Отложена до ${short(date)} · в Inbox` }, `Отложена до ${short(date)}: ${it.title}`);
   }
-  async reviewDelete() {
+  reviewDelete() {
+    return this.inTurn(() => this.reviewDeleteNow());
+  }
+  private async reviewDeleteNow() {
     const it = this.reviewItem;
     if (!it) return;
     await this.reviewWrite(it, (f, h) => remove(f.text, h), { result: 'delete', note: 'Удалена' }, `Удалено: ${it.title}`);
   }
   reviewSkip() {
-    const it = this.reviewItem;
-    if (!it) return;
-    it.result = 'skip';
-    this.reviewNext();
+    return this.inTurn(() => {
+      const it = this.reviewItem;
+      if (!it) return;
+      it.result = 'skip';
+      this.reviewNext();
+    });
   }
   /** «Перенести…»: the move of ТЗ 16 over the tab; Esc comes back to the same card. */
   reviewMove() {
@@ -1781,16 +1821,15 @@ class Store {
     const r = it && this.reviewHeading(it);
     if (r) this.refile = { from: 'review', path: r.f.path, line: r.h.line, title: r.h.title, n: Date.now() };
   }
-  private reviewMoved(path: string, line: number, label: string, step: { path: string; before: string; after: string }[]) {
+  private reviewMoved(path: string, line: number, label: string, step: Step) {
     const it = this.reviewItem;
     if (!it) return;
     const before = { result: it.result, note: it.note, path: it.path, line: it.line };
     const at = this.review!.cur;
     Object.assign(it, { result: 'move' as Result, note: '→ ' + label, path, line });
     this.reviewNext();
-    const undo = () => void this.undoStep(step).then((ok) => { if (ok) this.reviewUndone(it, before, at); });
-    this.reviewUndoLast = undo;
-    this.note(`Перенесено в ${label}`, [{ label: 'Отменить', run: undo }], 4000);
+    step.onUndo = () => this.reviewUndone(it, before, at);
+    this.note(`Перенесено в ${label}`, [{ label: 'Отменить', run: () => void this.undo(step) }], 4000);
   }
   /** «Открыть в файле»: the task's file at its heading, in the other pane (or a new tab), the review goes on. */
   reviewOpenInFile() {
@@ -2083,27 +2122,16 @@ class Store {
     this.calCfg = next;
     return this.updateConfig((raw) => withCal(raw, next));
   }
-  /** What the calendar changed in this session, for ⌘Z in it. */
-  private calUndo: { path: string; before: string; after: string }[][] = [];
   /** An entry dropped on a day (and a time in the week): its date is changed in the file, on disk at once. */
   async calMove(e: { path: string; line: number; layer: Layer | 'undated' }, to: Date, time?: string | null): Promise<boolean> {
     const f = this.files.find((x) => x.path === e.path);
     if (!f) return false;
     const text = moveEntry(f.text, e.line, e.layer, to, weekdayNames(f.text), { time, keepDeadline: this.calCfg.keepDeadline });
     if (text === f.text) return false;
-    const done = await this.writeSteps([{ path: f.path, text }]);
+    const done = await this.writeAll(`Дата изменена: ${bareTitle(f.headings.find((h) => h.line === e.line)?.title ?? '')}`, [{ path: f.path, text }]);
     if (!done) return false;
-    this.calUndo.push(done);
-    this.note('Дата изменена', [{ label: 'Отменить', run: () => void this.undoCal() }]);
+    this.note('Дата изменена', [{ label: 'Отменить', run: () => void this.undo(done) }]);
     return true;
-  }
-  /** ⌘Z in the calendar: the last move or new entry is taken back (if the file was not changed since). */
-  async undoCal(): Promise<boolean> {
-    const step = this.calUndo.pop();
-    if (!step) return false;
-    if (await this.undoStep(step)) return true;
-    this.calUndo.push(step);
-    return false;
   }
   /** Where a new task or event goes: the file as set (or the last one / the Inbox) and the heading. */
   calTarget(kind: 'task' | 'event'): { file: NoteFile | undefined; heading: string } {
@@ -2121,9 +2149,9 @@ class Store {
     this.calNew = { kind, date, n: Date.now() };
   }
   /** A new entry written into `file` (relative) as the settings say; on disk at once, ⌘Z in the calendar undoes it. */
-  async calCreate(e: Omit<NewEntry, 'status' | 'dateKind' | 'minutes'>, file: string): Promise<boolean> {
+  async calCreate(e: Omit<NewEntry, 'status' | 'dateKind' | 'minutes'>, file: string): Promise<Step | null> {
     const f = this.files.find((x) => x.name === file);
-    if (!f || !e.title.trim()) return false;
+    if (!f || !e.title.trim()) return null;
     const c = this.calCfg;
     const open = f.wf.sequences.flatMap((s) => s.states.map((x) => x.name));
     const status =
@@ -2133,11 +2161,10 @@ class Store {
     const heading = e.kind === 'task' ? c.taskHeading : c.eventHeading;
     const add = f === this.inboxFile ? this.inboxCfg.add : 'end';
     const r = insertEntry(f.text, heading || null, { ...e, status, dateKind: c.dateKind, minutes: c.minutes }, weekdayNames(f.text), add);
-    const done = await this.writeSteps([{ path: f.path, text: r.text }]);
-    if (!done) return false;
-    this.calUndo.push(done);
+    const done = await this.writeAll(`${e.kind === 'task' ? 'Новая задача' : 'Новое событие'}: ${e.title.trim()}`, [{ path: f.path, text: r.text }]);
+    if (!done) return null;
     if (c.last[e.kind] !== file) await this.setCal({ last: { ...c.last, [e.kind]: file } });
-    return true;
+    return done;
   }
   // ---- the calendar (ТЗ 24): layers and files shown, on this Mac -------------------------------------------------
   calLayers = $state<Layer[]>(readLayers());

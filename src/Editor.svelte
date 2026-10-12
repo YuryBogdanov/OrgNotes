@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { Compartment, EditorState, MapMode, RangeSetBuilder, StateField, Transaction, type Range, type StateEffect } from '@codemirror/state';
   import { Decoration, EditorView, ViewPlugin, WidgetType, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
-  import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+  import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
   import { codeFolding, foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
   import { drawerRanges, headingLines, toneFor, type DrawerRange, type Workflow } from './org';
   import { toneStyle } from './colors';
@@ -575,7 +575,9 @@
       const inside = sel.head > a && sel.head < cur.length - b;
       const line = view.state.doc.lineAt(sel.head);
       const col = sel.head - line.from;
-      view.dispatch({ changes: { from: a, to: cur.length - b, insert: t.slice(a, t.length - b) } });
+      // a change from outside the editor (a feature's edit, the disk): one step of its own in the undo history,
+      // never merged with the typing around it
+      view.dispatch({ changes: { from: a, to: cur.length - b, insert: t.slice(a, t.length - b) }, annotations: isolateHistory.of('full') });
       if (inside) {
         const doc = view.state.doc;
         const ln = doc.line(Math.min(line.number, doc.lines));

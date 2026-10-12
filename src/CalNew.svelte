@@ -37,7 +37,7 @@
     const ok = await store.calCreate({ kind, title, date: fromIso(day), time: /^\d{2}:\d{2}$/.test(time) ? time : null }, file);
     busy = false;
     if (!ok) return;
-    store.note(`${kind === 'task' ? 'Задача добавлена' : 'Событие добавлено'} в «${displayName(file)}»`, [{ label: 'Отменить', run: () => void store.undoCal() }]);
+    store.note(`${kind === 'task' ? 'Задача добавлена' : 'Событие добавлено'} в «${displayName(file)}»`, [{ label: 'Отменить', run: () => void store.undo(ok) }]);
     onclose();
   }
   function key(e: KeyboardEvent) {
