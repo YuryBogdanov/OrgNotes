@@ -11,6 +11,7 @@ import { register as registerPalette } from '../commands';
 import { registerAction, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf } from '../views';
 import { runAgenda, statusKey, type Agenda, type Cond as CoreCond } from '../agendas';
 import { DEFAULT_SEQUENCE, type Heading, type WorkflowDef } from '../org';
+import { parseTheme, type Theme } from '../themes';
 import { displayName } from '../names';
 import type { Tx as CoreTx } from '../journal';
 import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSchema';
@@ -24,6 +25,8 @@ import PluginReview from '../PluginReview.svelte';
 
 const isTauri = '__TAURI_INTERNALS__' in window;
 const invoke = async <T,>(cmd: string, args?: Record<string, unknown>) => (await import('@tauri-apps/api/core')).invoke<T>(cmd, args);
+/** The data files of the built-in plugins (their themes), as text. */
+const DATA = import.meta.glob('../plugins/*/**/*.json', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>;
 const MAINS = import.meta.glob('../plugins/*/main.ts') as Record<string, () => Promise<{ default: Plugin }>>;
 const PLUG = 'M8 2.5v4M12 2.5v4M5.5 6.5h9v3a4.5 4.5 0 0 1-9 0zM10 14v3.5';
 
@@ -64,6 +67,8 @@ class Host {
   private declared = new Set<string>();
   /** The palette keeps its commands; one that has no action now is not offered. */
   private inPalette = new Set<string>();
+  /** What the declared plugins still read (their themes). */
+  private loading: Promise<void>[] = [];
   /** Turned off after an error (until the restart): the reason. */
   failed = new SvelteMap<string, string>();
   /** Activated. */
@@ -107,7 +112,11 @@ class Host {
     this.untrusted.delete(id);
     saveChoice(id, on);
     e.enabled = on;
-    if (!on) return this.teardown(id);
+    if (!on) {
+      this.teardown(id);
+      store.resetMissingThemes(); // a theme of its was chosen: Panopticon again
+      return;
+    }
     this.failed.delete(id);
     this.declareAll();
     await this.activate(e);
@@ -248,11 +257,25 @@ class Host {
       if (s.section) this.keep(id, registerSettings({ id: s.section, icon: s.icon ?? PLUG, order: 90 + i, schema }));
       else if (s.block) this.keep(id, registerSettingsBlock({ section: s.block, order: 50 + i, schema }));
     });
+    if (m.contributes.themes.length) this.loading.push(this.declareThemes(m));
     for (const set of m.contributes.statusSets) {
       const [open, done] = set.states.split('|').map((x) => x.trim().split(/\s+/).filter(Boolean));
       const def: WorkflowDef = { name: set.name, states: [...open.map((n) => ({ name: n, done: false })), ...done.map((n) => ({ name: n, done: true }))] };
       this.keep(id, store.registerStatusSet(id, def, () => this.live(id)));
     }
+  }
+  /** A plugin's themes (roadmap 1.4): JSON files of its folder in the theme format of ТЗ 25. */
+  private async declareThemes(m: Manifest) {
+    const e = this.entry(m.id);
+    if (!e) return;
+    const texts = await Promise.all(m.contributes.themes.map(async (file) => {
+      if (e.builtin) return DATA[`../plugins/${e.dir}/${file.replace(/^\.\//, '')}`] ?? null;
+      return invoke<string>('read_plugin_file', { dir: e.dir, file }).catch(() => null);
+    }));
+    if (!this.declared.has(m.id)) return; // turned off meanwhile
+    const list = texts.map((t) => (t ? parseTheme(t) : null)).filter((t): t is Theme => !!t);
+    if (list.length < texts.length) console.warn(`plugin ${m.id}: ${texts.length - list.length} theme file(s) unreadable`);
+    this.keep(m.id, store.addThemes(m.id, list));
   }
   private showNav(id: string) {
     store.showNav = true;
@@ -266,6 +289,9 @@ class Host {
     this.started = true;
     if (isTauri) await this.listInstalled();
     for (const e of this.entries) if (e.enabled) await this.activate(e);
+    await Promise.all(this.loading.splice(0)); // the plugins' themes are in
+    store.pluginsReady = true;
+    store.resetMissingThemes();
   }
   /** The installed plugins read anew: a plugin gone or changed is taken back, a new one comes in off. */
   private async listInstalled() {

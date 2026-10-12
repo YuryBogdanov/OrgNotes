@@ -1,0 +1,33 @@
+{
+  "format": "panopticon-theme",
+  "version": 1,
+  "name": "Nord",
+  "appearance": "dark",
+  "colors": {
+    "bg": "#2e3440",
+    "fg": "#d8dee9",
+    "dim": "#7b88a1",
+    "curLine": "#3b4252cc",
+    "selection": "#4c566acc",
+    "cursor": "#d8dee9",
+    "h1": "#88c0d0",
+    "h2": "#81a1c1",
+    "h3": "#b48ead",
+    "h4": "#8fbcbb",
+    "date": "#ebcb8b",
+    "tag": "#81a1c1",
+    "link": "#88c0d0",
+    "meta": "#7b88a1",
+    "code": "#8fbcbb",
+    "palette": {
+      "red": "#bf616a",
+      "orange": "#d08770",
+      "yellow": "#ebcb8b",
+      "green": "#a3be8c",
+      "teal": "#88c0d0",
+      "blue": "#81a1c1",
+      "purple": "#b48ead",
+      "gray": "#7b88a1"
+    }
+  }
+}

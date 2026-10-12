@@ -25,13 +25,16 @@ export interface Theme {
   appearance: Appearance;
   builtin: boolean;
   basedOn?: string;
+  /** A plugin's theme (its id): chosen and copied as a built-in one, gone when the plugin is off. */
+  plugin?: string;
   colors: ThemeColors;
 }
 
 const T = (name: string, appearance: Appearance, colors: ThemeColors): Theme => ({ name, appearance, builtin: true, colors });
 
-// The Panopticon themes are the colours the editor had before themes (app.css); the others are laid out from the
-// palettes of the original Emacs themes onto these tokens.
+// The Panopticon themes are the colours the editor had before themes (app.css) — the core's; the themes laid out from
+// the Emacs ones (Leuven, Solarized, Modus, Nord, Gruvbox, Dracula) are a plugin of data, src/plugins/theme-pack
+// (roadmap 1.4).
 export const BUILTIN: Theme[] = [
   T('Panopticon светлая', 'light', {
     bg: '#ffffff', fg: '#1d1d1f', dim: '#6e6e76', curLine: '#0a64d60d', selection: '#0a64d642', cursor: '#0a64d6',
@@ -39,53 +42,11 @@ export const BUILTIN: Theme[] = [
     date: '#a3187a', tag: '#4a4a52', link: '#0a58c2', meta: '#6e6e76', code: '#a3187a',
     palette: { red: '#c4262e', orange: '#935300', yellow: '#7d6400', green: '#1d7f3a', teal: '#0b7a6f', blue: '#0a58c2', purple: '#7a3fc4', gray: '#5f5f66' },
   }),
-  T('Leuven', 'light', {
-    bg: '#ffffff', fg: '#333333', dim: '#8d8d84', curLine: '#ffffd7b3', selection: '#bbddff99', cursor: '#21bdff',
-    h1: '#3c3c3c', h2: '#123555', h3: '#005522', h4: '#ea6300', h5: '#e3258d', h6: '#0077cc', h7: '#2eae2c', h8: '#fd8008',
-    date: '#3a81c3', tag: '#9a9fa4', link: '#006699', meta: '#8d8d84', code: '#006400',
-    palette: { red: '#d0372d', orange: '#ea6300', yellow: '#9e7c00', green: '#50a14f', teal: '#0e8a8a', blue: '#0077cc', purple: '#8e44ad', gray: '#8d8d84' },
-  }),
-  T('Solarized Light', 'light', {
-    bg: '#fdf6e3', fg: '#586e75', dim: '#93a1a1', curLine: '#eee8d5', selection: '#93a1a14d', cursor: '#657b83',
-    h1: '#cb4b16', h2: '#859900', h3: '#268bd2', h4: '#b58900', h5: '#2aa198', h6: '#859900', h7: '#dc322f', h8: '#268bd2',
-    date: '#6c71c4', tag: '#93a1a1', link: '#268bd2', meta: '#93a1a1', code: '#2aa198',
-    palette: { red: '#dc322f', orange: '#cb4b16', yellow: '#b58900', green: '#859900', teal: '#2aa198', blue: '#268bd2', purple: '#6c71c4', gray: '#93a1a1' },
-  }),
-  T('Modus Operandi', 'light', {
-    bg: '#ffffff', fg: '#000000', dim: '#595959', curLine: '#dae5ec99', selection: '#bcbcbc99', cursor: '#000000',
-    h1: '#000000', h2: '#193668', h3: '#721045', h4: '#624416', h5: '#61756c', h6: '#7f0000', h7: '#3f578f', h8: '#595959',
-    date: '#00538b', tag: '#6c4f00', link: '#3548cf', meta: '#595959', code: '#005f5f',
-    palette: { red: '#a60000', orange: '#884900', yellow: '#6f5500', green: '#006800', teal: '#005e8b', blue: '#0031a9', purple: '#721045', gray: '#595959' },
-  }),
   T('Panopticon тёмная', 'dark', {
     bg: '#1e1e22', fg: '#ececef', dim: '#9a9aa5', curLine: '#6cb4ff12', selection: '#0a84ff73', cursor: '#6cb4ff',
     h1: '#6cb4ff', h2: '#5fd3c2', h3: '#f0a45d', h4: '#f0a45d',
     date: '#f58ad4', tag: '#c9c9d2', link: '#6cb4ff', meta: '#9a9aa5', code: '#f58ad4',
     palette: { red: '#ff7b80', orange: '#f0b04d', yellow: '#e8d26a', green: '#6fd58a', teal: '#5fd3c2', blue: '#6cb4ff', purple: '#c39bff', gray: '#a9a9b3' },
-  }),
-  T('Nord', 'dark', {
-    bg: '#2e3440', fg: '#d8dee9', dim: '#7b88a1', curLine: '#3b4252cc', selection: '#4c566acc', cursor: '#d8dee9',
-    h1: '#88c0d0', h2: '#81a1c1', h3: '#b48ead', h4: '#8fbcbb',
-    date: '#ebcb8b', tag: '#81a1c1', link: '#88c0d0', meta: '#7b88a1', code: '#8fbcbb',
-    palette: { red: '#bf616a', orange: '#d08770', yellow: '#ebcb8b', green: '#a3be8c', teal: '#88c0d0', blue: '#81a1c1', purple: '#b48ead', gray: '#7b88a1' },
-  }),
-  T('Gruvbox Dark', 'dark', {
-    bg: '#282828', fg: '#ebdbb2', dim: '#928374', curLine: '#3c3836cc', selection: '#665c54cc', cursor: '#ebdbb2',
-    h1: '#fabd2f', h2: '#83a598', h3: '#8ec07c', h4: '#d3869b', h5: '#fe8019', h6: '#b8bb26', h7: '#fb4934', h8: '#83a598',
-    date: '#d3869b', tag: '#83a598', link: '#83a598', meta: '#928374', code: '#8ec07c',
-    palette: { red: '#fb4934', orange: '#fe8019', yellow: '#fabd2f', green: '#b8bb26', teal: '#8ec07c', blue: '#83a598', purple: '#d3869b', gray: '#a89984' },
-  }),
-  T('Dracula', 'dark', {
-    bg: '#282a36', fg: '#f8f8f2', dim: '#6272a4', curLine: '#44475a99', selection: '#6272a499', cursor: '#f8f8f2',
-    h1: '#ff79c6', h2: '#bd93f9', h3: '#8be9fd', h4: '#f1fa8c', h5: '#50fa7b', h6: '#ffb86c',
-    date: '#f1fa8c', tag: '#8be9fd', link: '#8be9fd', meta: '#6272a4', code: '#50fa7b',
-    palette: { red: '#ff5555', orange: '#ffb86c', yellow: '#f1fa8c', green: '#50fa7b', teal: '#8be9fd', blue: '#82aaff', purple: '#bd93f9', gray: '#8a93b8' },
-  }),
-  T('Modus Vivendi', 'dark', {
-    bg: '#000000', fg: '#ffffff', dim: '#989898', curLine: '#2f3849', selection: '#5a5a5ab3', cursor: '#ffffff',
-    h1: '#ffffff', h2: '#c6daff', h3: '#feacd0', h4: '#d0bc00', h5: '#88ca9f', h6: '#ff9580', h7: '#9ac8ff', h8: '#989898',
-    date: '#79a8ff', tag: '#d0bc00', link: '#79a8ff', meta: '#989898', code: '#00d3d0',
-    palette: { red: '#ff5f59', orange: '#fec43f', yellow: '#d0bc00', green: '#44bc44', teal: '#00d3d0', blue: '#2fafff', purple: '#b6a0ff', gray: '#989898' },
   }),
 ];
 export const DEFAULT_THEME: Record<Appearance, string> = { light: 'Panopticon светлая', dark: 'Panopticon тёмная' };

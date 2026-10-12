@@ -1,0 +1,21 @@
+{
+  "id": "theme-pack",
+  "name": "Темы из Emacs",
+  "version": "1.0.0",
+  "description": "Темы редактора: Leuven, Solarized Light, Modus Operandi и Modus Vivendi, Nord, Gruvbox Dark, Dracula. Плагин без кода — только JSON тем.",
+  "author": "Panopticon",
+  "api": "^1.0",
+  "minAppVersion": "0.9.0",
+  "permissions": [],
+  "contributes": {
+    "themes": [
+      "themes/leuven.json",
+      "themes/solarized-light.json",
+      "themes/modus-operandi.json",
+      "themes/nord.json",
+      "themes/gruvbox-dark.json",
+      "themes/dracula.json",
+      "themes/modus-vivendi.json"
+    ]
+  }
+}

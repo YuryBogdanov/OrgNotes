@@ -146,7 +146,7 @@
                 onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void commitRename(); } }} onblur={() => void commitRename()} />
             {:else}
               <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-              <span class="nm" onclick={() => store.setThemeName(s.a, t.name)} ondblclick={() => !t.builtin && rename(t)}><span class="tn">{t.name}</span><span class="tag">{t.builtin ? 'встроенная' : 'своя'}</span></span>
+              <span class="nm" onclick={() => store.setThemeName(s.a, t.name)} ondblclick={() => !t.builtin && rename(t)}><span class="tn">{t.name}</span><span class="tag">{t.plugin ? 'из плагина' : t.builtin ? 'встроенная' : 'своя'}</span></span>
             {/if}
           </div>
         {/each}

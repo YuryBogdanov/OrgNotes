@@ -1,0 +1,37 @@
+{
+  "format": "panopticon-theme",
+  "version": 1,
+  "name": "Modus Vivendi",
+  "appearance": "dark",
+  "colors": {
+    "bg": "#000000",
+    "fg": "#ffffff",
+    "dim": "#989898",
+    "curLine": "#2f3849",
+    "selection": "#5a5a5ab3",
+    "cursor": "#ffffff",
+    "h1": "#ffffff",
+    "h2": "#c6daff",
+    "h3": "#feacd0",
+    "h4": "#d0bc00",
+    "date": "#79a8ff",
+    "tag": "#d0bc00",
+    "link": "#79a8ff",
+    "meta": "#989898",
+    "code": "#00d3d0",
+    "h5": "#88ca9f",
+    "h6": "#ff9580",
+    "h7": "#9ac8ff",
+    "h8": "#989898",
+    "palette": {
+      "red": "#ff5f59",
+      "orange": "#fec43f",
+      "yellow": "#d0bc00",
+      "green": "#44bc44",
+      "teal": "#00d3d0",
+      "blue": "#2fafff",
+      "purple": "#b6a0ff",
+      "gray": "#989898"
+    }
+  }
+}

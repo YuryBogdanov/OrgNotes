@@ -161,6 +161,7 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
     if (!isStr(x.name) || !isStr(x.states) || !/\|/.test(x.states)) problems.push('набор статусов: name и states вида «A B | C»');
     else statusSets.push({ name: x.name, states: x.states });
   }
+  for (const t of arr(c.themes)) if (!isStr(t) || !/^[\w.-]+(\/[\w.-]+)*\.json$/.test(t) || t.split('/').includes('..')) problems.push(`тема «${String(t)}»: путь к .json внутри папки плагина`);
   if (problems.length) return { ok: false, problems };
   return {
     ok: true,
@@ -171,7 +172,7 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
       main: isStr(j.main) ? j.main : undefined, styles: isStr(j.styles) ? j.styles : undefined,
       defaultEnabled: typeof j.defaultEnabled === 'boolean' ? j.defaultEnabled : undefined,
       permissions: permissions as Permission[], net,
-      contributes: { commands, navSections, views, settings, statusSets, themes: arr(c.themes).filter(isStr) },
+      contributes: { commands, navSections, views, settings, statusSets, themes: arr(c.themes).filter(isStr) as string[] },
       warnings,
     },
   };

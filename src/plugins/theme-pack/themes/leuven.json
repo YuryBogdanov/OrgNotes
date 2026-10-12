@@ -1,0 +1,37 @@
+{
+  "format": "panopticon-theme",
+  "version": 1,
+  "name": "Leuven",
+  "appearance": "light",
+  "colors": {
+    "bg": "#ffffff",
+    "fg": "#333333",
+    "dim": "#8d8d84",
+    "curLine": "#ffffd7b3",
+    "selection": "#bbddff99",
+    "cursor": "#21bdff",
+    "h1": "#3c3c3c",
+    "h2": "#123555",
+    "h3": "#005522",
+    "h4": "#ea6300",
+    "date": "#3a81c3",
+    "tag": "#9a9fa4",
+    "link": "#006699",
+    "meta": "#8d8d84",
+    "code": "#006400",
+    "h5": "#e3258d",
+    "h6": "#0077cc",
+    "h7": "#2eae2c",
+    "h8": "#fd8008",
+    "palette": {
+      "red": "#d0372d",
+      "orange": "#ea6300",
+      "yellow": "#9e7c00",
+      "green": "#50a14f",
+      "teal": "#0e8a8a",
+      "blue": "#0077cc",
+      "purple": "#8e44ad",
+      "gray": "#8d8d84"
+    }
+  }
+}
