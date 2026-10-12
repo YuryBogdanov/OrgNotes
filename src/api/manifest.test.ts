@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { incompatible, parseManifest, satisfies } from './manifest';
+import { hostAllowed, hostOf, incompatible, parseManifest, satisfies } from './manifest';
 
 const base = { id: 'hello', name: 'Привет', version: '1.0.0', api: '^1.0' };
 
@@ -56,5 +56,15 @@ describe('parseManifest', () => {
     expect(ok.ok && ok.manifest.contributes.commands[0].scope).toBe('review');
     const bad = parseManifest({ ...base, contributes: { commands: [{ id: 'hello.x', title: 'X', scope: 'editor' }] } });
     expect(bad.ok ? [] : bad.problems).toEqual(['команда «hello.x»: scope — только review']);
+  });
+  it('the hosts of net: exact, or the subdomains of «*.»; no user part, only http(s)', () => {
+    expect(hostOf('https://Jira.Company.ru/rest?x=1')).toBe('jira.company.ru');
+    expect(hostOf('http://localhost:8080/')).toBe('localhost');
+    expect(hostOf('https://user@evil.com/')).toBeNull();
+    expect(hostOf('file:///etc/passwd')).toBeNull();
+    expect(hostAllowed(['jira.company.ru', '*.corp.ru'], 'jira.company.ru')).toBe(true);
+    expect(hostAllowed(['jira.company.ru'], 'evil-jira.company.ru')).toBe(false);
+    expect(hostAllowed(['*.corp.ru'], 'wiki.corp.ru')).toBe(true);
+    expect(hostAllowed(['*.corp.ru'], 'corp.ru.evil.com')).toBe(false);
   });
 });

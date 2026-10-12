@@ -55,6 +55,7 @@
     {/if}
     {#each e.problems as p (p)}<p class="why" role="note">{p}</p>{/each}
     {#each m?.warnings ?? [] as w (w)}<p class="warn">{w}</p>{/each}
+    {#if plugins.untrusted.get(id)}<p class="warn" role="note">{plugins.untrusted.get(id)}</p>{/if}
     {#if failed && e.enabled}
       <p class="why" role="alert">Выключен после ошибки: {failed}
         <button class="more" aria-expanded={open === id} onclick={() => (open = open === id ? null : id)}>{open === id ? 'Скрыть' : 'Подробнее'}</button></p>

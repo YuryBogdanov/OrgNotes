@@ -16,7 +16,7 @@ import type { Tx as CoreTx } from '../journal';
 import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSchema';
 import { builtinEntries, declareKeys, entries, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, REVIEW_SCOPE, type Entry, type Listed } from './declare';
 import PluginsSettings from '../PluginsSettings.svelte';
-import type { Manifest, ManifestSettings } from './manifest';
+import { hostAllowed, hostOf, type Manifest, type ManifestSettings } from './manifest';
 import type { Ctx, Dispose, EventName, FormSpec, HeadingInfo, HeadingRef, Place, Plugin, Query, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
 import PluginNav from '../PluginNav.svelte';
@@ -103,12 +103,29 @@ class Host {
   async setEnabled(id: string, on: boolean) {
     const e = this.entry(id);
     if (!e?.manifest || (on && e.problems.length)) return;
+    if (on && !e.builtin && !trusted(e.manifest) && !(await this.askTrust(e))) return;
+    this.untrusted.delete(id);
     saveChoice(id, on);
     e.enabled = on;
     if (!on) return this.teardown(id);
     this.failed.delete(id);
     this.declareAll();
     await this.activate(e);
+  }
+  /** The sheet before an installed plugin is first turned on (or asks for other rights): what it gets. */
+  trustReq = $state<{ entry: Entry; resolve: (ok: boolean) => void } | null>(null);
+  private askTrust(entry: Entry) {
+    return new Promise<boolean>((resolve) => {
+      this.trustReq?.resolve(false);
+      this.trustReq = {
+        entry,
+        resolve: (ok) => {
+          this.trustReq = null;
+          if (ok) trust(entry.manifest!);
+          resolve(ok);
+        },
+      };
+    });
   }
   /** «Перезагрузить плагины»: everything off, the folder read again, the plugins that are on started anew. */
   async reload() {
@@ -260,6 +277,13 @@ class Host {
     }
     saveInstalled(list);
     const next = installedEntries(list, builtinEntries, readChoices());
+    // on, but its rights are not the ones let in (a new version asks for more): off until turned on again
+    for (const e of next)
+      if (e.enabled && e.manifest && !trusted(e.manifest)) {
+        e.enabled = false;
+        saveChoice(e.manifest.id, false);
+        this.untrusted.set(e.manifest.id, 'Права плагина изменились — включите его снова');
+      }
     for (const old of this.entries.filter((e) => !e.builtin)) {
       const now = next.find((e) => e.dir === old.dir);
       if (old.manifest && this.declared.has(old.manifest.id) && (!now || JSON.stringify(now.manifest) !== JSON.stringify(old.manifest) || !now.enabled)) this.teardown(old.manifest.id);
@@ -333,6 +357,8 @@ class Host {
     this.teardown(id);
     store.note(`Плагин «${this.name(id)}» выключен: ${msg}`, undefined, 8000);
   }
+  /** Turned off at the start: its rights changed since it was let in. */
+  untrusted = new SvelteMap<string, string>();
   /** Why it was turned off, in full (the list of plugins' «Подробнее»). */
   stack = new SvelteMap<string, string>();
   /** Everything the plugin registered taken back; its code told to stop. */
@@ -461,6 +487,20 @@ class Host {
         },
       },
     };
+    if (can('clipboard'))
+      ctx.clipboard = { write: (text) => navigator.clipboard.writeText(String(text)) };
+    if (can('net'))
+      ctx.net = {
+        fetch: async (url, init = {}) => {
+          const host = hostOf(url);
+          if (!host) throw new Error('адрес — http или https');
+          if (!hostAllowed(m.net, host)) throw new Error(`хоста ${host} нет в манифесте`);
+          const r = await invoke<{ status: number; headers: [string, string][]; text: string }>('net_fetch', {
+            plugin: id, url, method: init.method ?? 'GET', headers: Object.entries(init.headers ?? {}), body: init.body ?? null,
+          });
+          return { status: r.status, ok: r.status >= 200 && r.status < 300, headers: Object.fromEntries(r.headers), text: r.text };
+        },
+      };
     if (can('index.read'))
       ctx.index = {
         query: async (q) => query(q),
@@ -620,6 +660,33 @@ class Host {
 }
 
 export const plugins = new Host();
+
+// ---- the plugins the user has let in (on this Mac): with the rights they had then -------------------------------
+const TRUST_KEY = 'plugins:trusted';
+const rightsOf = (m: Manifest) => JSON.stringify([[...m.permissions].sort(), [...m.net].sort()]);
+function trustedMap(): Record<string, string> {
+  try {
+    const v = JSON.parse(localStorage.getItem(TRUST_KEY) ?? '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+}
+const trusted = (m: Manifest) => trustedMap()[m.id] === rightsOf(m);
+function trust(m: Manifest) {
+  try {
+    localStorage.setItem(TRUST_KEY, JSON.stringify({ ...trustedMap(), [m.id]: rightsOf(m) }));
+  } catch {
+    /* asked again next time */
+  }
+}
+/** The rights in words, for the sheet and the list. */
+export const RIGHTS: Record<string, string> = {
+  'index.read': 'чтение заметок', 'files.read': 'чтение файлов заметок', 'files.edit': 'правка заметок',
+  clipboard: 'запись в буфер обмена', net: 'сеть', process: 'запуск процессов',
+};
+export const rightsText = (m: Manifest) =>
+  m.permissions.map((p) => (p === 'net' && m.net.length ? `${RIGHTS.net} (${m.net.join(', ')})` : (RIGHTS[p] ?? p))).join(', ');
 
 // ---- helpers --------------------------------------------------------------------------------------------------
 

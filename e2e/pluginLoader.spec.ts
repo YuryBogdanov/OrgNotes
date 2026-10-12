@@ -16,9 +16,14 @@ const toast = (page: Page) => page.locator('.toast');
 const sheet = (page: Page) => page.getByRole('dialog', { name: 'Настройки' });
 const card = (page: Page, name: string) => sheet(page).getByRole('group', { name });
 
+// a plugin let in with these rights (as the sheet «Включить плагин» does)
+const TRUSTED = { jira: JSON.stringify([['index.read'], []]) };
 async function open(page: Page, files: Record<string, string>, enabled: Record<string, boolean> = {}) {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.addInitScript((e) => { if (!localStorage.getItem('plugins:enabled')) localStorage.setItem('plugins:enabled', JSON.stringify(e)); }, enabled);
+  await page.addInitScript(([e, t]) => {
+    if (!localStorage.getItem('plugins:enabled')) localStorage.setItem('plugins:enabled', JSON.stringify(e));
+    if (Object.keys(e).length && !localStorage.getItem('plugins:trusted')) localStorage.setItem('plugins:trusted', JSON.stringify(t));
+  }, [enabled, TRUSTED] as const);
   await installTauriMock(page, { ...FILES, ...files });
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
@@ -37,6 +42,11 @@ test('an installed plugin comes in off; on at once: its command in the palette a
   await expect(jira.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
   await expect(card(page, 'Привет')).toContainText('встроенный');
   await jira.getByRole('switch').click();
+  // first time: what it gets, and that it is trusted fully
+  const ask = page.getByRole('alertdialog', { name: 'Включить плагин «Jira»' });
+  await expect(ask).toContainText('получит доступ: чтение заметок');
+  await expect(ask).toContainText('не от намеренно вредного кода');
+  await ask.getByRole('button', { name: 'Включить' }).click();
   await expect(jira.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
   await sheet(page).getByRole('tab', { name: 'Клавиши' }).click();
   await expect(sheet(page).locator('.row', { hasText: 'Jira: проверить связь' })).toContainText('⌃⌥⌘J');
