@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changeStatusAt, cyclePriority, foldTargets, insertHeading, moveSubtree, nextCycleState, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree, type Result } from './outline';
+import { changeStatusAt, cyclePriority, foldTargets, insertHeading, moveSubtree, nextCycleState, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree, insertItem, type Result } from './outline';
 import { DEFAULT_WORKFLOW, resolveWorkflow } from './org';
 
 const apply = (text: string, r: Result | null) => {
@@ -262,5 +262,42 @@ describe('status and workflow rotation', () => {
       const { text, caret } = at('* TODO A\nbo|dy\n');
       expect(changeStatusAt(text, caret, (w, k) => rotateStatus(w, k, 'next'), wf)).toBeNull();
     });
+  });
+});
+
+describe('insertItem (M-RET in a list)', () => {
+  const run = (s: string, box = false) => {
+    const { text, caret } = at(s);
+    const r = insertItem(text, caret, { box });
+    return r ? show(apply(text, r)) : null;
+  };
+  it('at the end of an item: the next item, the same bullet', () => {
+    expect(run('Список:\n- раз|\n- два\n')).toBe('Список:\n- раз\n- |\n- два\n');
+    expect(run('  + вложенный|\n')).toBe('  + вложенный\n  + |\n');
+    expect(run('  * со звёздочкой|\n')).toBe('  * со звёздочкой\n  * |\n');
+  });
+  it('a numbered list: the next number, the following ones go on', () => {
+    expect(run('1. раз|\n2. два\n3. три\n')).toBe('1. раз\n2. |\n3. два\n4. три\n');
+    expect(run('1) раз|\n')).toBe('1) раз\n2) |\n');
+  });
+  it('at the start of an item: a new one above it; inside the line: split there', () => {
+    expect(run('- раз\n|- два\n')).toBe('- раз\n- |\n- два\n');
+    expect(run('1. раз\n|2. два\n')).toBe('1. раз\n2. |\n3. два\n');
+    expect(run('- первая| вторая\n')).toBe('- первая\n- |вторая\n');
+  });
+  it('on a line that continues the item, or with a sub-list: after the whole item', () => {
+    expect(run('- раз\n  продолжение|\n- два\n')).toBe('- раз\n  продолжение\n- |\n- два\n');
+    expect(run('- раз|\n  - под\n- два\n')).toBe('- раз\n  - под\n- |\n- два\n');
+    expect(run('- раз\n  - под|\n- два\n')).toBe('- раз\n  - под\n  - |\n- два\n');
+  });
+  it('a checkbox goes on; ⌥⇧↩ adds one', () => {
+    expect(run('- [X] сделано|\n')).toBe('- [X] сделано\n- [ ] |\n');
+    expect(run('- пункт|\n', true)).toBe('- пункт\n- [ ] |\n');
+  });
+  it('not in an item: null (a heading is made), also a line below the list and a heading', () => {
+    expect(run('просто текст|\n')).toBeNull();
+    expect(run('- раз\nтекст под списком|\n')).toBeNull();
+    expect(run('* Заголовок|\n')).toBeNull();
+    expect(run('- раз\n\n  после пустой|\n')).toBeNull();
   });
 });

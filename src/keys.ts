@@ -98,8 +98,8 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('back', 'Назад', 'go', 'window', ['⌘[']),
   C('followLink', 'Открыть ссылку под курсором', 'go', 'editor', ['⌘↩'], { synonyms: ['ссылка'] }),
 
-  C('newHeading', 'Новый заголовок того же уровня', 'heading', 'editor', ['⌥↩']),
-  C('newTask', 'Новая задача того же уровня', 'heading', 'editor', ['⌥⇧↩']),
+  C('newHeading', 'Новый заголовок того же уровня', 'heading', 'editor', ['⌥↩'], { note: 'В списке — новый пункт', synonyms: ['пункт списка'] }),
+  C('newTask', 'Новая задача того же уровня', 'heading', 'editor', ['⌥⇧↩'], { note: 'В списке — новый пункт с чекбоксом' }),
   C('promote', 'Повысить уровень', 'heading', 'heading', ['⌥←']),
   C('demote', 'Понизить уровень', 'heading', 'heading', ['⌥→']),
   C('promoteTree', 'Повысить уровень с поддеревом', 'heading', 'heading', ['⌥⇧←']),

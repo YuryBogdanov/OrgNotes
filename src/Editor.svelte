@@ -7,7 +7,7 @@
   import { drawerRanges, headingLines, toneFor, type DrawerRange, type Workflow } from './org';
   import { toneStyle } from './colors';
   import { extractLinks, type OrgLink } from './links';
-  import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree, type Result } from './outline';
+  import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree, insertItem, type Result } from './outline';
   import type { Text } from '@codemirror/state';
   import { DEFAULT_LEVELS, orgIndent, type LevelView } from './orgIndent';
   import { orgRich, type RichPick } from './orgRich';
@@ -182,6 +182,9 @@
   /** M-RET / M-S-RET: new heading at the current level. */
   const newHeading = (v: EditorView, todo: boolean, words: Workflow) => {
     const head = sel(v).head;
+    // in a list: a new item (with a checkbox for ⌥⇧↩), as Org's M-RET / M-S-RET there
+    const item = insertItem(v.state.doc.toString(), head, { box: todo });
+    if (item) return apply(v, item);
     const line = v.state.doc.lineAt(head);
     return apply(v, insertHeading(v.state.doc.toString(), head, { todo: todo ? newTaskState(words) : undefined, folded: isFolded(v, line.to) }));
   };
