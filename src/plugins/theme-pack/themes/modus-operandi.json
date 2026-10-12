@@ -1,0 +1,37 @@
+{
+  "format": "panopticon-theme",
+  "version": 1,
+  "name": "Modus Operandi",
+  "appearance": "light",
+  "colors": {
+    "bg": "#ffffff",
+    "fg": "#000000",
+    "dim": "#595959",
+    "curLine": "#dae5ec99",
+    "selection": "#bcbcbc99",
+    "cursor": "#000000",
+    "h1": "#000000",
+    "h2": "#193668",
+    "h3": "#721045",
+    "h4": "#624416",
+    "date": "#00538b",
+    "tag": "#6c4f00",
+    "link": "#3548cf",
+    "meta": "#595959",
+    "code": "#005f5f",
+    "h5": "#61756c",
+    "h6": "#7f0000",
+    "h7": "#3f578f",
+    "h8": "#595959",
+    "palette": {
+      "red": "#a60000",
+      "orange": "#884900",
+      "yellow": "#6f5500",
+      "green": "#006800",
+      "teal": "#005e8b",
+      "blue": "#0031a9",
+      "purple": "#721045",
+      "gray": "#595959"
+    }
+  }
+}

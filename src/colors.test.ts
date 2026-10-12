@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { PALETTE, colorName, contrast, isColor, toneOf } from './colors';
-import { BUILTIN, NAMED, asNamed, levelColor, nearestNamed, themeVars } from './themes';
+import { readFileSync } from 'node:fs';
+import { BUILTIN, NAMED, asNamed, levelColor, nearestNamed, parseTheme, themeVars, type Theme } from './themes';
+
+// the Emacs themes are the plugin «theme-pack» (roadmap 1.4): its JSON files, as the host reads them
+const PACK = JSON.parse(readFileSync(new URL('./plugins/theme-pack/manifest.json', import.meta.url), 'utf8')) as { contributes: { themes: string[] } };
+const PACK_THEMES: Theme[] = PACK.contributes.themes.map((f) => ({ ...parseTheme(readFileSync(new URL('./plugins/theme-pack/' + f, import.meta.url), 'utf8'))!, builtin: true, plugin: 'theme-pack' }));
+const ALL = [...BUILTIN, ...PACK_THEMES];
 
 describe('palette', () => {
   it('has the eight named colours of ТЗ 25', () => {
@@ -24,10 +30,11 @@ describe('palette', () => {
 });
 
 describe('built-in themes', () => {
-  it('four for the light appearance, five for the dark; every colour set', () => {
-    expect(BUILTIN.filter((t) => t.appearance === 'light').map((t) => t.name)).toEqual(['Panopticon светлая', 'Leuven', 'Solarized Light', 'Modus Operandi']);
-    expect(BUILTIN.filter((t) => t.appearance === 'dark').map((t) => t.name)).toEqual(['Panopticon тёмная', 'Nord', 'Gruvbox Dark', 'Dracula', 'Modus Vivendi']);
-    for (const t of BUILTIN) for (const n of NAMED) expect(t.colors.palette[n], t.name + ' ' + n).toMatch(/^#[0-9a-f]{6}$/);
+  it('the core has Panopticon only; the pack four for the light appearance with it, five for the dark; every colour set', () => {
+    expect(BUILTIN.map((t) => t.name)).toEqual(['Panopticon светлая', 'Panopticon тёмная']);
+    expect(ALL.filter((t) => t.appearance === 'light').map((t) => t.name)).toEqual(['Panopticon светлая', 'Leuven', 'Solarized Light', 'Modus Operandi']);
+    expect(ALL.filter((t) => t.appearance === 'dark').map((t) => t.name)).toEqual(['Panopticon тёмная', 'Nord', 'Gruvbox Dark', 'Dracula', 'Modus Vivendi']);
+    for (const t of ALL) for (const n of NAMED) expect(t.colors.palette[n], t.name + ' ' + n).toMatch(/^#[0-9a-f]{6}$/);
   });
   it('the Panopticon themes keep the text readable: text, headings and the palette ≥ 4.5:1', () => {
     for (const t of BUILTIN.filter((x) => x.name.startsWith('Panopticon'))) {
@@ -50,7 +57,7 @@ describe('built-in themes', () => {
 describe('own themes', async () => {
   const { parseTheme, themeJson, uniqueName, copyOf, themeFile } = await import('./themes');
   it('a file is read back as it was written', () => {
-    const t = copyOf(BUILTIN.find((x) => x.name === 'Nord')!, []);
+    const t = copyOf(ALL.find((x) => x.name === 'Nord')!, []);
     expect(t.name).toBe('Nord — моя');
     expect(t.basedOn).toBe('Nord');
     expect(parseTheme(themeJson(t))).toEqual(t);
@@ -71,7 +78,7 @@ describe('own themes', async () => {
     expect(uniqueName('Nord', ['Nord', 'nord (2)'])).toBe('Nord (3)');
     expect(uniqueName('Своя', ['Nord'])).toBe('Своя');
     expect(themeFile('a/b:c')).toBe('a-b-c.json');
-    const own = { ...copyOf(BUILTIN[5], []), name: 'Моя' };
+    const own = { ...copyOf(ALL.find((x) => x.name === 'Nord')!, []), name: 'Моя' };
     expect(copyOf(own, ['Моя'])).toMatchObject({ name: 'Моя (2)', basedOn: 'Nord' });
   });
 });

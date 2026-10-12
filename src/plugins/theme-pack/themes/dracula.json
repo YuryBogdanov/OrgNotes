@@ -1,0 +1,35 @@
+{
+  "format": "panopticon-theme",
+  "version": 1,
+  "name": "Dracula",
+  "appearance": "dark",
+  "colors": {
+    "bg": "#282a36",
+    "fg": "#f8f8f2",
+    "dim": "#6272a4",
+    "curLine": "#44475a99",
+    "selection": "#6272a499",
+    "cursor": "#f8f8f2",
+    "h1": "#ff79c6",
+    "h2": "#bd93f9",
+    "h3": "#8be9fd",
+    "h4": "#f1fa8c",
+    "date": "#f1fa8c",
+    "tag": "#8be9fd",
+    "link": "#8be9fd",
+    "meta": "#6272a4",
+    "code": "#50fa7b",
+    "h5": "#50fa7b",
+    "h6": "#ffb86c",
+    "palette": {
+      "red": "#ff5555",
+      "orange": "#ffb86c",
+      "yellow": "#f1fa8c",
+      "green": "#50fa7b",
+      "teal": "#8be9fd",
+      "blue": "#82aaff",
+      "purple": "#bd93f9",
+      "gray": "#8a93b8"
+    }
+  }
+}

@@ -59,8 +59,8 @@ export function applyAppearance(choice: AppearanceChoice, a: Appearance, theme: 
   const css = `:root{${themeVars(theme.colors)}}`;
   if (styleEl.textContent !== css) {
     styleEl.textContent = css;
-    // an own theme is read from disk after the first paint: kept here, it shows from the start next time
-    if (!theme.builtin) set('theme:last:' + a, themeJson(theme));
+    // an own theme or a plugin's comes after the first paint: kept here, it shows from the start next time
+    if (!BUILTIN.some((b) => b.name === theme.name)) set('theme:last:' + a, themeJson(theme));
   }
   if (windowChoice !== choice && '__TAURI_INTERNALS__' in window) {
     windowChoice = choice;

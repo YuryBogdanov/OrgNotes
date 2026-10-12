@@ -1,0 +1,37 @@
+{
+  "format": "panopticon-theme",
+  "version": 1,
+  "name": "Solarized Light",
+  "appearance": "light",
+  "colors": {
+    "bg": "#fdf6e3",
+    "fg": "#586e75",
+    "dim": "#93a1a1",
+    "curLine": "#eee8d5",
+    "selection": "#93a1a14d",
+    "cursor": "#657b83",
+    "h1": "#cb4b16",
+    "h2": "#859900",
+    "h3": "#268bd2",
+    "h4": "#b58900",
+    "date": "#6c71c4",
+    "tag": "#93a1a1",
+    "link": "#268bd2",
+    "meta": "#93a1a1",
+    "code": "#2aa198",
+    "h5": "#2aa198",
+    "h6": "#859900",
+    "h7": "#dc322f",
+    "h8": "#268bd2",
+    "palette": {
+      "red": "#dc322f",
+      "orange": "#cb4b16",
+      "yellow": "#b58900",
+      "green": "#859900",
+      "teal": "#2aa198",
+      "blue": "#268bd2",
+      "purple": "#6c71c4",
+      "gray": "#93a1a1"
+    }
+  }
+}

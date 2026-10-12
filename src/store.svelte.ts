@@ -1587,7 +1587,23 @@ class Store {
   ownThemes = $state.raw<Theme[]>([]);
   /** Every theme to choose from: the built-in ones, then the own ones by name. */
   get themes(): Theme[] {
-    return [...BUILTIN, ...this.ownThemes];
+    return [...BUILTIN, ...this.pluginThemes, ...this.ownThemes];
+  }
+  /** The plugins' themes (roadmap 1.4: the Emacs ones are the plugin «theme-pack»), in the order they came. */
+  pluginThemes = $state.raw<Theme[]>([]);
+  /** The plugins have been started: till then a chosen plugin's theme is the one cached at the last run. */
+  pluginsReady = $state(false);
+  addThemes(plugin: string, list: Theme[]) {
+    const names = new Set([...BUILTIN, ...this.pluginThemes].map((t) => t.name));
+    const mine = list.filter((t) => !names.has(t.name) && !!names.add(t.name)).map((t) => ({ ...t, builtin: true, plugin }));
+    this.pluginThemes = [...this.pluginThemes, ...mine];
+    this.ownThemes = this.ownThemes.filter((t) => !mine.some((m) => m.name === t.name));
+    return () => void (this.pluginThemes = this.pluginThemes.filter((t) => t.plugin !== plugin));
+  }
+  /** A chosen theme that is gone (its plugin turned off) gives way to Panopticon of its appearance. */
+  resetMissingThemes() {
+    if (!this.themesRead) return;
+    for (const a of ['light', 'dark'] as const) if (!this.themes.some((t) => t.name === this.themeNames[a] && t.appearance === a)) this.setThemeName(a, DEFAULT_THEME[a]);
   }
   /** The own themes have been read (till then a chosen own theme is the one cached at the last run). */
   themesRead = $state(false);
@@ -1597,7 +1613,7 @@ class Store {
     const seen = new Set<string>();
     this.ownThemes = texts
       .map(parseTheme)
-      .filter((t): t is Theme => !!t && !BUILTIN.some((b) => b.name === t.name) && !seen.has(t.name) && !!seen.add(t.name))
+      .filter((t): t is Theme => !!t && ![...BUILTIN, ...this.pluginThemes].some((b) => b.name === t.name) && !seen.has(t.name) && !!seen.add(t.name))
       .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
     this.themesRead = true;
   }
@@ -1708,7 +1724,7 @@ class Store {
   }
   themeFor(a: Appearance): Theme {
     const name = this.themeNames[a];
-    if (!this.themesRead && !this.themes.some((t) => t.name === name)) return cachedTheme(a, name) ?? themeNamed(name, a);
+    if ((!this.themesRead || !this.pluginsReady) && !this.themes.some((t) => t.name === name)) return cachedTheme(a, name) ?? themeNamed(name, a);
     return themeNamed(name, a, this.themes);
   }
   /** The editor theme in effect now. */
