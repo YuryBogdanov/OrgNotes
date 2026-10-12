@@ -24,6 +24,8 @@
   import CaptureWindow from './CaptureWindow.svelte';
   import GoalAdd from './GoalAdd.svelte';
   import GoalForm from './GoalForm.svelte';
+  import GoalReport from './GoalReport.svelte';
+  import GoalCarry from './GoalCarry.svelte';
   import { displayName as nameOf } from './names';
   import { toAccelerator } from './keys';
   import { keyHandler, menuMayRun } from './keyDispatch';
@@ -244,7 +246,7 @@
 <!-- the agenda builder is a sheet over the whole window: the window stays visible under it but takes no input -->
 <!-- full screen with the menu bar shown: the toolbar grows by it (its buttons stay just below it), the traffic lights
      come into the toolbar -->
-<div class="win" inert={!!store.builder || store.settingsOpen || !!store.goalAdd || !!store.goalForm} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
+<div class="win" inert={!!store.builder || store.settingsOpen || !!store.goalAdd || !!store.goalForm || !!store.goalReport || !!store.goalCarry} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
   <Dialogs />
   <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
@@ -374,6 +376,8 @@
 {#if store.settingsOpen && store.loaded}<Settings />{/if}
 {#if store.goalAdd}{#key store.goalAdd.n}<GoalAdd />{/key}{/if}
 {#if store.goalForm}{#key store.goalForm.n}<GoalForm />{/key}{/if}
+{#if store.goalReport}{#key store.goalReport.n}<GoalReport />{/key}{/if}
+{#if store.goalCarry}{#key store.goalCarry.n}<GoalCarry />{/key}{/if}
 {/if}
 
 <style>

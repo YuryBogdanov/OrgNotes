@@ -6,7 +6,7 @@
   import { weekdayNames } from './edits';
   import { listEnter } from './textList';
   import {
-    FIELDS, GOAL_TONES, cmpQuarter, dayLabel, goalNote, isSilent, markDayLabel, quarterLabel, shiftQuarter, shortDay, type Goal,
+    FIELDS, GOAL_TONES, cmpQuarter, dayLabel, goalNote, markDayLabel, quarterLabel, shiftQuarter, shortDay, type Goal,
   } from './goals';
   import { toneFor } from './org';
   import { toneStyle } from './colors';
@@ -33,7 +33,7 @@
   });
   let showMarks = $state(false); // a double click on a mark: «Отметки» open on the left, the caret on it
   let rev = $state<{ line: number; n: number; focus: boolean } | null>(null);
-  const pill = (x: Goal) => (isSilent(x) ? goalNote(x, f?.wf.done ?? []) : goalNote(x, f?.wf.done ?? []));
+  const pill = (x: Goal) => goalNote(x, f?.wf.done ?? [], new Date(), store.goalSettings.silent);
   const chip = (kw: string | null) =>
     !kw ? '' : GOAL_TONES[kw] ? `color:${GOAL_TONES[kw]};background:color-mix(in srgb, ${GOAL_TONES[kw]} 15%, transparent)` : f ? toneStyle(toneFor(kw, f.wf)) : '';
 
@@ -122,7 +122,7 @@
             <span class="av" style="background:{p.color}" aria-hidden="true">{p.ini}</span>
             <b>{p.name} · цель {r.cur + 1} из {total}</b>
             <span class="file">{p.src.file.split('/').pop()}</span>
-            <span class="pill" class:silent={isSilent(g)}>{pill(g)}</span>
+            <span class="pill" class:silent={store.goalSilent(g)}>{pill(g)}</span>
           </div>
           <div class="quick" role="toolbar" aria-label="Быстрые действия">
             <button onclick={status}><span>Статус</span><span class="qv st" style={chip(g.keyword)}>{g.keyword ?? '—'}</span></button>

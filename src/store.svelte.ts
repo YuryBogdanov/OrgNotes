@@ -15,7 +15,8 @@ import { DEFAULT_INBOX, append, entry, inboxItems, prepend, readInbox, remove, w
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
 import {
   GOALS_WORKFLOW, addSourceHeading, avatarColor, initials, insertGoal, quarterOf, readGoals, readSource, sourceKey, withGoals,
-  addMark, findGoal, goalsIn, moveGoal, reviewQueue as goalQueue, shortDay, GOAL_STATES, quarterLabel,
+  addMark, findGoal, shiftQuarter, goalsIn, moveGoal, reviewQueue as goalQueue, shortDay, GOAL_STATES, quarterLabel,
+  carryOver, readGoalSettings, withGoalSettings, isSilent, deadlineSoon, isDone, DEFAULT_GOAL_SETTINGS, type GoalSettings, type Goal,
   type GoalSource, type NewGoal, type Quarter, type SourceGoals,
 } from './goals';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
@@ -137,7 +138,7 @@ class Store {
   errorReq = $state<{ title: string; text: string; resolve: () => void } | null>(null);
   /** While a sheet is up the rest of the window does not react: no shortcuts, no menu commands. */
   get sheetOpen() {
-    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refile || this.pickInbox || this.settingsOpen || this.goalForm || this.goalAdd);
+    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refile || this.pickInbox || this.settingsOpen || this.goalForm || this.goalAdd || this.goalReport || this.goalCarry);
   }
   /** The command palette; `start` opens it right at a step ("Создать файл…" ⇧⌘N, "Перейти к файлу…" ⇧⌘O). */
   palette = $state<{ start?: PaletteStart; n: number } | null>(null);
@@ -347,6 +348,7 @@ class Store {
     this.agendas = readAgendas(parsed?.agendas); // a tab of a deleted agenda shows the built-in one
     this.inboxCfg = readInbox(parsed?.inbox);
     this.goalSources = readGoals(parsed?.goals);
+    this.goalSettings = readGoalSettings(parsed?.goalSettings);
     // only the statuses make the notes be read again; agendas alone do not
     const same = JSON.stringify(config) === JSON.stringify(this.config);
     this.config = config;
@@ -654,6 +656,55 @@ class Store {
   // ---- goals of the quarter (ТЗ 23) ----------------------------------------------------------------------------
   /** Where the goals are: a file and its level-1 heading (`goals` in config.json). */
   goalSources = $state.raw<GoalSource[]>([]);
+  /** «Цели квартала» in «Настройки → Агенды»: when a goal «молчит», how early a deadline is lit. */
+  goalSettings = $state.raw<GoalSettings>(DEFAULT_GOAL_SETTINGS);
+  async setGoalSettings(c: Partial<GoalSettings>) {
+    const next = { ...this.goalSettings, ...c };
+    this.goalSettings = next;
+    return this.updateConfig((raw) => withGoalSettings(raw, next));
+  }
+  goalSilent = (g: Goal) => isSilent(g, new Date(), this.goalSettings.silent);
+  goalSoon = (g: Goal, done: string[]) => deadlineSoon(g, done, new Date(), this.goalSettings.soon);
+  /** «Отчёт за квартал»: `key` the person shown first ('*' = everybody). */
+  goalReport = $state<{ key: string; n: number } | null>(null);
+  openGoalReport(key = '*') {
+    if (this.sheetOpen) return;
+    this.goalReport = { key, n: Date.now() };
+  }
+  /** «Перенести незакрытые»: the list to confirm, from `goalsQuarter` to the next one. */
+  goalCarry = $state<{ key: string; n: number } | null>(null);
+  openGoalCarry(key = '*') {
+    if (this.sheetOpen && !this.goalReport) return;
+    this.goalReport = null;
+    this.goalCarry = { key, n: Date.now() };
+  }
+  /** The open goals of the shown quarter: what «Перенести незакрытые» offers. */
+  openGoalsOf(p: GoalPerson): Goal[] {
+    const done = p.file?.wf.done ?? [];
+    return goalsIn(p.data, this.goalsQuarter).filter((g) => !isDone(g, done));
+  }
+  /** Move the chosen open goals (titles per source) under the next quarter, one write per file. */
+  async carryGoals(chosen: Map<string, string[]>): Promise<number> {
+    const from = this.goalsQuarter;
+    const to = shiftQuarter(from, 1);
+    const steps: { path: string; text: string }[] = [];
+    let n = 0;
+    for (const [key, titles] of chosen) {
+      const p = this.goalPeople.find((x) => x.key === key);
+      const f = p?.file && this.files.find((x) => x.path === p.file!.path);
+      if (!p || !f || !titles.length) continue;
+      const r = carryOver(f.text, p.src.heading, from, to, titles, weekdayNames(f.text), (t) => parseHeadings(t, f.wf));
+      if (r.moved.length) {
+        steps.push({ path: f.path, text: r.text });
+        n += r.moved.length;
+      }
+    }
+    if (steps.length && !(await this.writeSteps(steps))) return 0;
+    this.goalCarry = null;
+    this.goalsQuarter = to;
+    this.note(`Перенесено в ${quarterLabel(to)}: ${n}`);
+    return n;
+  }
   /** The quarter the goals views show (the same in the navigator, the overview and a person's view). */
   goalsQuarter = $state<Quarter>(quarterOf(new Date()));
   /** Each source with its file and what is under its heading now; «Мои цели» first. */
@@ -761,7 +812,7 @@ class Store {
     const p = this.goalPeople.find((x) => x.key === key);
     if (!p?.file) return;
     const q = this.goalsQuarter;
-    const queue = goalQueue(goalsIn(p.data, q), p.file.wf.done);
+    const queue = goalQueue(goalsIn(p.data, q), p.file.wf.done, new Date(), this.goalSettings.silent);
     if (!queue.length) {
       this.note(`Открытых целей в ${quarterLabel(q)} нет`);
       return;

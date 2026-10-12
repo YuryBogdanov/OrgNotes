@@ -3,6 +3,7 @@ import { DEFAULT_SEQUENCE, fromSequences, parseHeadings } from './org';
 import {
   GOALS_WORKFLOW, addSourceHeading, avatarColor, defaultQuarter, goalNote, initials, insertGoal, isSilent, parseQuarter, quarterSub,
   readGoals, readSource, resultLine, shiftQuarter, sourceSummary, withGoals, deadlineSoon, reviewQueue, markLines, markDayLabel, dayLabel, addMark, moveGoal,
+  readGoalSettings, withGoalSettings, reportText, finalMark, lastMarks, carryOver, quarterLabel,
 } from './goals';
 
 const WF = fromSequences([DEFAULT_SEQUENCE, GOALS_WORKFLOW as never], 0, 'project');
@@ -211,5 +212,52 @@ describe('the review: queue, marks, another quarter', () => {
     ]);
     const r2 = moveGoal(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Наставничество', { y: 2026, q: 3 }, hs)!;
     expect(readSource(r2.text, hs(r2.text), 'Квартальные задачи').quarters[1].goals.map((g) => g.title)).toEqual(['Старое', 'Наставничество']);
+  });
+});
+
+describe('part 3: settings, report, carry-over', () => {
+  it('settings: the lists of values, defaults left out of the file', () => {
+    expect(readGoalSettings({ silent: 21, soon: 4 })).toEqual({ silent: 21, soon: 4 });
+    expect(readGoalSettings({ silent: 10 })).toEqual({ silent: 14, soon: 6 });
+    expect(JSON.parse(withGoalSettings('{"version":1}', { silent: 21, soon: 6 }))).toEqual({ version: 1, goalSettings: { silent: 21 } });
+    expect(JSON.parse(withGoalSettings('{"version":1,"goalSettings":{"silent":21}}', { silent: 14, soon: 6 }))).toEqual({ version: 1 });
+  });
+  it('the threshold of «молчит» is a setting', () => {
+    const ci = readSource(FILE, hs(FILE), 'Квартальные задачи').quarters[0].goals[0];
+    expect(isSilent(ci, NOW, 21)).toBe(false);
+    expect(goalNote(ci, [], NOW, 21)).toBe('отметка 20 дней назад');
+  });
+  it('the report: «Название / Что делал / Результат / Срок / Статус», as text and Markdown', () => {
+    const s = readSource(FILE, hs(FILE), 'Квартальные задачи');
+    const people = [{ name: 'Петров Алексей', goals: s.quarters[0].goals.slice(0, 1), done: ['COMPLETED'] }, { name: 'Никто', goals: [], done: [] }];
+    expect(reportText(people, { y: 2026, q: 4 }, 'text')).toBe(
+      'Цели Q4 2026\n\nПЕТРОВ АЛЕКСЕЙ\n\n1. Сократить время сборки CI до 10 минут\n' +
+        'Что делал: Сейчас сборка main занимает 23 минуты.\n\nПлан:\n- разбить e2e на 4 потока;\n- включить кэш.\n18 сен: Поставили цель на 1-1.\n22 сен: Замерили: p90 = 23 мин.\n- главный кандидат — e2e в 4 потока;\n- кэш Docker даст ещё 3–4 мин.\n' +
+        'Результат: - p90 сборки main ≤ 10 минут;\n- медиана сборки PR ≤ 6 минут.\nСрок: 30 ноября 2026\nСтатус: В работе\n',
+    );
+    const md = reportText(people, { y: 2026, q: 4 }, 'md');
+    expect(md.startsWith('# Цели Q4 2026\n\n## Петров Алексей\n\n### Сократить время сборки CI до 10 минут\n**Что делал:** \nСейчас')).toBe(true);
+    expect(md).toContain('**Срок:** 30 ноября 2026\n**Статус:** В работе');
+  });
+  it('the final mark and the last three', () => {
+    const t = addMark(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Сократить время сборки CI до 10 минут', new Date(2026, 9, 12), 'Итог: p90 = 9 мин.', RU)!;
+    const ci = readSource(t, hs(t), 'Квартальные задачи').quarters[0].goals[0];
+    expect(finalMark(ci)?.text).toBe('Итог: p90 = 9 мин.');
+    expect(lastMarks(ci).map((m) => m.text.split('\n')[0])).toEqual(['Замерили: p90 = 23 мин.', 'Поставили цель на 1-1.']);
+  });
+  it('carry-over: under the next quarter, a deadline of the old one becomes the end of the new, a mark', () => {
+    const r = carryOver(FILE, 'Квартальные задачи', { y: 2026, q: 4 }, { y: 2027, q: 1 }, ['Сократить время сборки CI до 10 минут', 'Наставничество', 'Нет такой'], RU, hs, NOW);
+    expect(r.moved).toEqual(['Сократить время сборки CI до 10 минут', 'Наставничество']);
+    const src = readSource(r.text, hs(r.text), 'Квартальные задачи');
+    expect(src.quarters.map((x) => [quarterLabel(x.q), x.goals.map((g) => g.title)])).toEqual([
+      ['Q1 2027', ['Сократить время сборки CI до 10 минут', 'Наставничество']],
+      ['Q4 2026', ['Дизайн-система']],
+      ['Q3 2026', ['Старое']],
+    ]);
+    const [ci, mentor] = src.quarters[0].goals;
+    expect(ci.deadline).toEqual(new Date(2027, 2, 31));
+    expect(r.text).toContain('    DEADLINE: <2027-03-31 Ср>');
+    expect(ci.marks.at(-1)!.text).toBe('Перенесена из Q4 2026');
+    expect(mentor.marks.map((m) => m.text)).toEqual(['Перенесена из Q4 2026']);
   });
 });

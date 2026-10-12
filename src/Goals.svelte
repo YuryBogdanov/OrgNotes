@@ -3,7 +3,7 @@
   import { toneFor } from './org';
   import { toneStyle } from './colors';
   import {
-    GOAL_STATES, GOAL_TONES, deadlineSoon, goalNote, goalsIn, isDone, isSilent, quarterLabel, quarterSub, quarterTitle, resultLine, shiftQuarter, shortDay,
+    GOAL_STATES, GOAL_TONES, goalNote, goalsIn, isDone, quarterLabel, quarterOf, cmpQuarter, quarterSub, quarterTitle, resultLine, shiftQuarter, shortDay,
     qEnd, days, activeWord, type Goal,
   } from './goals';
   import type { Tab } from './layout';
@@ -33,7 +33,7 @@
       for (const g of goalsIn(p.data, q)) {
         const k = kind(g, p);
         if (k) c[k]++;
-        if (isSilent(g)) c.silent++;
+        if (store.goalSilent(g)) c.silent++;
       }
     return c;
   });
@@ -43,7 +43,7 @@
     { f: 'backlog' as const, n: counts.backlog, t: 'в бэклоге', c: 'var(--fg2)' },
     { f: 'silent' as const, n: counts.silent, t: counts.silent === 1 ? 'молчит больше 2 недель' : 'молчат больше 2 недель', c: 'var(--wait)' },
   ]);
-  const shown = (g: Goal, p: GoalPerson) => !filter || (filter === 'silent' ? isSilent(g) : kind(g, p) === filter);
+  const shown = (g: Goal, p: GoalPerson) => !filter || (filter === 'silent' ? store.goalSilent(g) : kind(g, p) === filter);
   const leftDays = $derived(Math.round((+qEnd(q) - +new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())) / 86400000));
   const sub = $derived(
     person
@@ -57,6 +57,9 @@
     return activeWord(a) + (c ? ` · ${c} ${c % 10 === 1 && c % 100 !== 11 ? 'закрыта' : 'закрыто'}` : '');
   };
   // the goals' own colours (ACTIVE blue, BACKLOG grey, COMPLETED green), a status of another set its own
+  // a quarter gone by: its open goals can go on to the next one
+  const past = $derived(cmpQuarter(q, quarterOf(new Date())) < 0);
+  const openLeft = $derived(people.some((p) => store.openGoalsOf(p).length));
   const chip = (kw: string | null, p: GoalPerson) =>
     !kw ? '' : GOAL_TONES[kw] ? `color:${GOAL_TONES[kw]};background:color-mix(in srgb, ${GOAL_TONES[kw]} 15%, transparent)` : toneStyle(toneFor(kw, p.file!.wf));
 </script>
@@ -74,6 +77,8 @@
     </div>
     <button class="pri" disabled={!store.goalPeople.length} onclick={() => store.openGoalForm(person?.key ?? null)}>+ Новая цель</button>
     {#if person}<button class="sec" disabled={!person.found} onclick={() => store.startGoalReview(person.key)}>Разобрать цели</button>{/if}
+    <button class="sec" disabled={!store.goalPeople.length} onclick={() => store.openGoalReport(person?.key ?? '*')}>Отчёт за квартал</button>
+    {#if past && openLeft}<button class="sec" onclick={() => store.openGoalCarry(person?.key ?? '*')}>Перенести незакрытые в {quarterLabel(shiftQuarter(q, 1))}</button>{/if}
   </header>
 
   {#if !store.goalPeople.length}
@@ -112,8 +117,8 @@
             {:else}
               {#each gs as g (g.line)}
                 {@const closed = isDone(g, done(p))}
-                {@const soon = deadlineSoon(g, done(p))}
-                {@const silent = isSilent(g)}
+                {@const soon = store.goalSoon(g, done(p))}
+                {@const silent = store.goalSilent(g)}
                 <button class="row" title="⌥-клик — разобрать с этой цели" onclick={(e) => (e.altKey && !closed ? store.startGoalReview(p.key, g.title) : store.openGoalFile(p.key, g.line))}>
                   <span class="st" class:tone-chip={!!g.keyword && !GOAL_TONES[g.keyword]} style={chip(g.keyword, p)}>{g.keyword ?? '—'}</span>
                   <span class="tt"><span class="t" class:closed>{g.title}</span>{#if resultLine(g)}<span class="res">Результат: {resultLine(g)}</span>{/if}</span>
@@ -124,7 +129,7 @@
                       <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17V3M5 4h10l-2 3 2 3H5" /></svg>{shortDay(g.deadline)}
                     </span>
                   {/if}
-                  <span class="note" class:silent>{goalNote(g, done(p))}</span>
+                  <span class="note" class:silent>{goalNote(g, done(p), new Date(), store.goalSettings.silent)}</span>
                 </button>
               {/each}
             {/if}
