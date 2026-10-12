@@ -9,7 +9,7 @@
   const q = $derived(goals.goalsQuarter);
   const mine = $derived(goals.goalPeople.find((p) => p.src.me));
   const team = $derived(goals.goalPeople.filter((p) => !p.src.me));
-  const shown = $derived(store.tab?.kind === 'goals' ? store.tab.goals : null);
+  const shown = $derived(store.tab?.kind === 'goals' ? ((store.tab.data as string | undefined) ?? '*') : null);
   const stat = (p: GoalPerson) => {
     const gs = goalsIn(p.data, q);
     return { n: gs.length, active: gs.filter((g) => g.keyword === GOAL_STATES.active).length, silent: gs.some((g) => goals.goalSilent(g)) };

@@ -1,14 +1,9 @@
 <script lang="ts">
-  import { goals } from './features/goals.svelte';
   import { store } from './store.svelte';
   import { headingAt } from './org';
   import Editor from './Editor.svelte';
   import Agenda from './Agenda.svelte';
-  import Review from './Review.svelte';
-  import Goals from './Goals.svelte';
-  import CalendarView from './CalendarView.svelte';
-  import GoalReview from './GoalReview.svelte';
-  import { GOAL_ICON } from './goals';
+  import { viewOf } from './views';
   import RichMenu from './RichMenu.svelte';
   import FindBar from './FindBar.svelte';
   import { setPlanning, weekdayNames } from './edits';
@@ -31,8 +26,11 @@
     const h = file.headings[headingAt(file.headings, tab.cursor.line)];
     return h ? [...h.path, h.title] : [];
   });
-  const goalsLabel = (t: Tab) => (!t.goals || t.goals === '*' ? 'Обзор квартала' : (goals.goalPeople.find((p) => p.key === t.goals)?.name ?? 'Цели'));
-  const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'calendar' ? 'Календарь' : t.kind === 'goals' ? goalsLabel(t) : t.kind === 'goalReview' ? `Разбор целей · ${goals.goalPeople.find((p) => p.key === t.goals)?.name ?? ''}` : t.kind === 'review' ? 'Разбор Inbox' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : displayName(t.path ?? ''));
+  const core = (k: string) => k === 'file' || k === 'agenda' || k === 'untitled';
+  /** A feature's tab: its view's name; a kind nobody registers (the feature is off): the name it had. */
+  const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : t.kind === 'file' ? displayName(t.path ?? '') : (viewOf(t.kind)?.label(t) ?? t.label ?? 'Функция выключена'));
+  // a puzzle piece: the tab of a feature that is off
+  const OFF_ICON = 'M8 3h4v2.5a1.5 1.5 0 0 0 3 0V3h2v5h-2.5a1.5 1.5 0 0 0 0 3H17v6H3V11h2.5a1.5 1.5 0 0 0 0-3H3V3h5z';
   // a file deleted on disk stays open: an italic name, and the tooltip says why
   const gone = (t: Tab) => t.kind === 'file' && !!store.orphans[t.path ?? ''];
   const dirty = (t: Tab) => {
@@ -130,7 +128,7 @@
       { label: 'Закрыть остальные', shortcut: store.keyHint('closeOthers'), disabled: pane.tabs.length < 2, action: () => store.closeOthers(pi, idx(t)) },
       'sep',
       { label: 'Переместить в соседний редактор', shortcut: store.keyHint(to > pi ? 'moveRight' : 'moveLeft'), disabled: to < 0, action: () => store.moveTab(pi, idx(t)) },
-      { label: 'Продублировать в соседнем редакторе', shortcut: store.keyHint(to > pi ? 'dupRight' : 'dupLeft'), disabled: to < 0 || t.kind === 'untitled' || t.kind === 'review', action: () => store.duplicateTab(pi, idx(t)) },
+      { label: 'Продублировать в соседнем редакторе', shortcut: store.keyHint(to > pi ? 'dupRight' : 'dupLeft'), disabled: to < 0 || t.kind === 'untitled' || !!viewOf(t.kind)?.single, action: () => store.duplicateTab(pi, idx(t)) },
     ];
     if (hasFile) {
       items.push('sep');
@@ -200,7 +198,7 @@
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const items: MenuItem[] = pane.tabs.map((t, ti) => ({
       label: t.kind === 'file' ? displayName(t.path ?? '') : label(t),
-      icon: t.kind, italic: t.kind === 'untitled', dot: dirty(t), checked: ti === pane.active,
+      icon: core(t.kind) ? t.kind : (viewOf(t.kind)?.icon ?? OFF_ICON), italic: t.kind === 'untitled', dot: dirty(t), checked: ti === pane.active,
       action: () => store.activateTab(pi, ti),
     }));
     menu = { x: r.right - 240, y: r.bottom + 2, items };
@@ -291,12 +289,8 @@
           <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2.2 2" aria-hidden="true"><path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" /></svg>
         {:else if t.kind === 'agenda'}
           <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2.5v3M13 2.5v3" /></svg>
-        {:else if t.kind === 'review'}
-          <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4" /></svg>
-        {:else if t.kind === 'calendar'}
-          <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2.5v3M13 2.5v3M7 12h.01M10 12h.01M13 12h.01" /></svg>
-        {:else if t.kind === 'goals' || t.kind === 'goalReview'}
-          <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={GOAL_ICON} /></svg>
+        {:else if !core(t.kind)}
+          <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={viewOf(t.kind)?.icon ?? OFF_ICON} /></svg>
         {:else}
           <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" /></svg>
         {/if}
@@ -321,14 +315,17 @@
 
   {#if tab?.kind === 'agenda'}
     <div class="content"><Agenda pane={pi} /></div>
-  {:else if tab?.kind === 'review'}
-    <div class="content"><Review {tab} /></div>
-  {:else if tab?.kind === 'goals'}
-    <div class="content"><Goals {tab} /></div>
-  {:else if tab?.kind === 'calendar'}
-    <div class="content"><CalendarView {tab} /></div>
-  {:else if tab?.kind === 'goalReview'}
-    <div class="content"><GoalReview {tab} /></div>
+  {:else if tab && !core(tab.kind)}
+    {@const v = viewOf(tab.kind)}
+    {#if v}
+      <div class="content"><v.component {tab} pane={pi} /></div>
+    {:else}
+      <div class="content off" role="status">
+        <svg width="28" height="28" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={OFF_ICON} /></svg>
+        <b>Функция выключена</b>
+        <span>Вкладка «{label(tab)}» появится снова, когда функцию включат.</span>
+      </div>
+    {/if}
   {:else if file && tab}
     <div class="crumbs" aria-label="Заголовок">
       {#each crumbs as c, i}
@@ -461,4 +458,6 @@
   .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--fg2); }
   .empty p { margin: 2px 0; }
   .empty .sub { font-size: 12px; color: var(--fg3); }
+  .off { align-items: center; justify-content: center; gap: 8px; color: var(--fg2); text-align: center; padding: 24px; }
+  .off b { color: var(--fg); font-size: 15px; }
 </style>

@@ -8,7 +8,7 @@
 
   // The inspector while a calendar tab is shown (ТЗ 24): the chosen day — its entries as cards, and the deadlines
   // ahead of it.
-  const c = $derived(store.tab?.calendar);
+  const c = $derived(store.tab?.kind === 'calendar' ? (store.tab.data as { view: 'month' | 'week'; date: string } | undefined) : undefined);
   const day = $derived(c ? fromIso(c.date) : new Date());
   const list = $derived(c ? (calendar.days(day, day).get(c.date) ?? []) : []);
   const ahead = $derived.by(() => {

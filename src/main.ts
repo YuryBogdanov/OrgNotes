@@ -1,3 +1,5 @@
+// the features' shortcuts first: the keys saved for them are read when the store starts
+import './features/keys';
 import './app.css';
 import { mount } from 'svelte';
 import App from './App.svelte';

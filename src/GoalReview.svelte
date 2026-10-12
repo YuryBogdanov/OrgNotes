@@ -106,9 +106,9 @@
         return true;
       },
     };
-    store.goalReviewKeys = keys;
+    store.setScopeKeys('goalReview', keys);
     return () => {
-      if (store.goalReviewKeys === keys) store.goalReviewKeys = null;
+      if (store.scopeKeys.get('goalReview') === keys) store.setScopeKeys('goalReview', null);
     };
   });
   const kbd = (id: string) => store.keyHint(id);

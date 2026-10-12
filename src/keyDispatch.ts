@@ -3,10 +3,10 @@
 // its second press. The native menu shows the same shortcuts; WebKit gives a key to the page first, so a key run
 // here does not reach the menu, and a menu item run by its key is not run here again.
 
-import { KEY_COMMANDS, pressOf, type Scope } from './keys';
+import { KEY_COMMANDS, SCOPES, pressOf, type Scope } from './keys';
 import { focusedEditor, type EditorKeys } from './editorKeys';
 import { contextOf } from './commands';
-import { store } from './store.svelte';
+import { store, type ScopeKeys } from './store.svelte';
 
 const CHORD_WAIT = 1500; // ms for the second press of a chord
 const PALETTE = new Set(['status', 'schedule', 'deadline', 'tags']);
@@ -26,14 +26,15 @@ export function menuMayRun(press: string | undefined) {
   return true;
 }
 
-type Ctx = { review: typeof store.reviewKeys; goals: typeof store.goalReviewKeys; editor: EditorKeys | null; window: (id: string) => boolean };
+/** The features' scopes active now (their tabs shown), the higher rank first; the editor; the window. */
+type Ctx = { features: [string, ScopeKeys][]; editor: EditorKeys | null; window: (id: string) => boolean };
 
 function scopesNow(c: Ctx): Scope[] {
-  return [...(c.goals ? (['goalReview'] as Scope[]) : []), ...(c.review ? (['review'] as Scope[]) : []), ...(c.editor ? (['heading', 'editor'] as Scope[]) : []), 'window', 'global'];
+  return [...c.features.map(([id]) => id), ...(c.editor ? (['heading', 'editor'] as Scope[]) : []), 'window', 'global'];
 }
 function runOne(id: string, scope: Scope, c: Ctx): boolean {
-  if (scope === 'review') return c.review!.run(id);
-  if (scope === 'goalReview') return c.goals!.run(id);
+  const f = c.features.find(([s]) => s === scope);
+  if (f) return f[1].run(id);
   if (scope === 'heading' && (PALETTE.has(id) || id === 'refile')) {
     if (!contextOf().heading || store.sheetOpen) return false;
     if (id === 'refile') store.startRefile();
@@ -61,7 +62,8 @@ export function keyHandler(window: (id: string) => boolean) {
     if (store.keyRecording) return; // the settings are recording a shortcut
     const press = pressOf(e);
     if (!press) return;
-    const c: Ctx = { review: store.reviewKeys?.active() ? store.reviewKeys : null, goals: store.goalReviewKeys?.active() ? store.goalReviewKeys : null, editor: focusedEditor(), window };
+    const features = [...store.scopeKeys].filter(([, k]) => k.active()).sort(([a], [b]) => (SCOPES.get(b)?.rank ?? 0) - (SCOPES.get(a)?.rank ?? 0));
+    const c: Ctx = { features, editor: focusedEditor(), window };
     const consume = () => {
       e.preventDefault();
       e.stopPropagation();
