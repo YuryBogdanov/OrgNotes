@@ -14,14 +14,40 @@ import { DEFAULT_SEQUENCE, type Heading, type WorkflowDef } from '../org';
 import { displayName } from '../names';
 import type { Tx as CoreTx } from '../journal';
 import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSchema';
-import { entries, saveChoice, type Entry } from './declare';
+import { entries, saveChoice, REVIEW_SCOPE, type Entry } from './declare';
 import type { Manifest, ManifestSettings } from './manifest';
-import type { Ctx, Dispose, EventName, HeadingInfo, HeadingRef, Plugin, Query, Render, Store, ViewSpec } from './index';
+import type { Ctx, Dispose, EventName, FormSpec, HeadingInfo, HeadingRef, Place, Plugin, Query, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
 import PluginNav from '../PluginNav.svelte';
+import PluginReview from '../PluginReview.svelte';
 
 const MAINS = import.meta.glob('../plugins/*/main.ts') as Record<string, () => Promise<{ default: Plugin }>>;
 const PLUG = 'M8 2.5v4M12 2.5v4M5.5 6.5h9v3a4.5 4.5 0 0 1-9 0zM10 14v3.5';
+
+/** The kind of the tab of a plugin's review (one at a time). */
+export const REVIEW_KIND = 'plugin.review';
+export interface FormReq {
+  plugin: string;
+  spec: FormSpec;
+  resolve: (v: Values | null) => void;
+}
+export interface PlaceReq {
+  plugin: string;
+  kind: 'file' | 'heading';
+  title: string;
+  levels?: number[];
+  resolve: (p: Place | null) => void;
+}
+export interface ReviewRun {
+  plugin: string;
+  spec: ReviewSpec;
+  refs: HeadingRef[];
+  /** The card shown; -1: the summary. */
+  cur: number;
+  done: number;
+  resolved: boolean;
+  resolve: (r: ReviewResult) => void;
+}
 
 export interface ViewEntry {
   plugin: string;
@@ -39,6 +65,10 @@ class Host {
   views = new SvelteMap<string, ViewEntry>();
   /** A tab drawn anew (`ui.open` with a new state for a tab shown): its number. */
   redraw = new SvelteMap<string, number>();
+  /** The core's sheets a plugin asked for, and its review. */
+  form = $state<FormReq | null>(null);
+  place = $state<PlaceReq | null>(null);
+  review = $state<ReviewRun | null>(null);
   private dynamic = new SvelteMap<string, { options?(v: Values): CoreOpt[]; hint?(v: Values): string }>();
   private disposers = new Map<string, Dispose[]>();
   private plugins = new Map<string, Plugin>();
@@ -61,6 +91,66 @@ class Host {
   // ---- what the manifests declare, before any code ---------------------------------------------------------------
   declare() {
     for (const e of this.entries) if (e.enabled && e.manifest) this.declareOne(e.manifest);
+    // the core's tab of a plugin's review; its sheets wait the window's keys
+    registerView({
+      kind: REVIEW_KIND, icon: 'M4 4h12v12H4zM7 8h6M7 11h4', component: PluginReview, transient: true, single: true,
+      label: () => this.review?.spec.title ?? 'Разбор', crumbs: () => [this.review?.spec.title ?? 'Разбор'],
+      fileOf: () => this.reviewHeading()?.file.path,
+      onGone: () => this.endReview(false, true),
+    });
+    store.addSheet(() => !!(this.form || this.place));
+  }
+
+  // ---- the review -------------------------------------------------------------------------------------------------
+  /** The card's heading now: found by its title near its line (an action may have moved it). */
+  reviewHeading() {
+    const r = this.review;
+    const ref = r && r.cur >= 0 ? r.refs[r.cur] : null;
+    const f = ref ? fileOf(ref.path) : undefined;
+    const h = f && ref ? findHeading(f.headings, ref) : undefined;
+    return f && h ? { file: f, heading: h, info: infoOf(f, h) } : null;
+  }
+  async reviewAct(actionId: string) {
+    const r = this.review;
+    const c = this.reviewHeading();
+    const a = r?.spec.actions.find((x) => x.id === actionId);
+    if (!r || !c || !a || this.failed.has(r.plugin)) return;
+    let res: 'next' | 'stay' = 'stay';
+    try {
+      res = await a.run(c.info);
+    } catch (err) {
+      this.fail(r.plugin, err);
+      return;
+    }
+    if (this.review !== r) return;
+    const now = this.reviewHeading();
+    if (now) r.refs[r.cur] = now.info.ref; // it may have moved: the card keeps it
+    if (res === 'next') {
+      r.done++;
+      this.reviewStep(1);
+    }
+  }
+  reviewStep(d: number) {
+    const r = this.review;
+    if (!r) return;
+    const n = r.cur + d;
+    if (n < 0) return;
+    r.cur = n < r.refs.length ? n : -1;
+    if (r.cur < 0) this.endReview(true, false, true);
+  }
+  /** The review answers its plugin: through, or left; `keep`: its summary stays shown. */
+  endReview(finished: boolean, gone = false, keep = false) {
+    const r = this.review;
+    if (!r) return;
+    if (!r.resolved) {
+      r.resolved = true;
+      r.resolve({ total: r.refs.length, done: r.done, finished });
+    }
+    if (!keep) this.review = null;
+    if (!gone && !keep) for (const [pi, p] of store.layout.panes.entries()) {
+      const ti = p.tabs.findIndex((t) => t.kind === REVIEW_KIND);
+      if (ti >= 0) store.closeTab(pi, ti);
+    }
   }
   private keep(id: string, d: Dispose) {
     if (!this.disposers.has(id)) this.disposers.set(id, []);
@@ -69,7 +159,7 @@ class Host {
   private declareOne(m: Manifest) {
     const id = m.id;
     store.registerStorage(id);
-    for (const c of m.contributes.commands)
+    for (const c of m.contributes.commands.filter((x) => x.scope !== 'review'))
       registerPalette({
         id: c.id, title: c.title, icon: 'plug', group: 'general', synonyms: c.synonyms,
         when: () => !!actionOf(c.id), run: () => void setTimeout(() => actionOf(c.id)?.()), // once the palette is closed
@@ -144,6 +234,9 @@ class Host {
     console.error(`plugin ${id}:`, err);
     this.failed.set(id, msg);
     untrack(() => {
+      if (this.form?.plugin === id) (this.form.resolve(null), (this.form = null));
+      if (this.place?.plugin === id) (this.place.resolve(null), (this.place = null));
+      if (this.review?.plugin === id) this.endReview(false);
       for (const d of (this.disposers.get(id) ?? []).reverse()) {
         try {
           d();
@@ -210,6 +303,39 @@ class Host {
           });
           L.active = pi;
         },
+        form: (spec) =>
+          new Promise((resolve) => {
+            this.form?.resolve(null);
+            this.form = { plugin: id, spec, resolve };
+          }),
+        pickPlace: (o = {}) =>
+          new Promise((resolve) => {
+            this.place?.resolve(null);
+            this.place = { plugin: id, kind: o.kind ?? 'heading', title: o.title ?? (o.kind === 'file' ? 'Выбор файла' : 'Выбор места'), levels: o.levels, resolve };
+          }),
+        pickDate: (o = {}) =>
+          new Promise((resolve) => {
+            let picked = false;
+            store.openCalendar({
+              kind: 'DATE', initial: o.initial ?? new Date(), current: null, names: [], plate: { kind: 'text', text: o.title ?? 'Выбор даты' },
+              pick: (d) => {
+                picked = true;
+                resolve(new Date(d));
+              },
+            });
+            const stop = watch(() => store.palette, (p) => {
+              if (p) return;
+              stop();
+              if (!picked) resolve(null);
+            });
+          }),
+        review: (spec) =>
+          new Promise((resolve) => {
+            this.endReview(false);
+            if (!spec.items.length) return resolve({ total: 0, done: 0, finished: true });
+            this.review = { plugin: id, spec, refs: spec.items.map((r) => ({ ...r })), cur: 0, done: 0, resolved: false, resolve };
+            openView(store.layout, store.layout.active, REVIEW_KIND, () => ({}), (t) => this.redraw.set(t.id, (this.redraw.get(t.id) ?? 0) + 1));
+          }),
         notify: (text, actions) => store.note(text, actions?.map((a) => ({ label: a.label, run: () => this.guard(id, () => a.run(), undefined) })), actions?.length ? 8000 : 4000),
       },
       storage: { folder: this.storeOf(id, 'folder', 'data', keep), local: this.storeOf(id, 'local', 'data', keep) },

@@ -4,7 +4,7 @@
 
   // A feature's settings drawn from its schema (roadmap 0.6), in the settings sheet's look: a section of its own or,
   // `embedded`, a block inside another section («Цели квартала» in «Агенды»).
-  let { schema, embedded = false }: { schema: Schema; embedded?: boolean } = $props();
+  let { schema, embedded = false, where: sayWhere = true }: { schema: Schema; embedded?: boolean; where?: boolean } = $props();
 
   const v = $derived(schema.values());
   const id = (f: Field) => `${schema.id}-${f.key}`;
@@ -22,9 +22,9 @@
 <svelte:window onkeydowncapture={esc} />
 
 {#snippet groups()}
-  {#each schema.groups as g (g.caption)}
-    {@const where = whereOfGroup(g)}
-    <div class="cap">{g.caption}</div>
+  {#each schema.groups as g, gi (gi)}
+    {@const where = sayWhere ? whereOfGroup(g) : null}
+    {#if g.caption}<div class="cap">{g.caption}</div>{/if}
     <div class="opts">
       {#each g.fields as f (f.key)}
         {@const hint = hintOf(f, v)}

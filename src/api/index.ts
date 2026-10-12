@@ -114,6 +114,51 @@ export interface Opt {
   disabled?: boolean;
 }
 
+// ---- the core's sheets and the review (§5.2) -----------------------------------------------------------------
+
+/** A field of a form (the same kinds as in the settings by schema). */
+export type FormField =
+  | { type: 'choice'; key: string; label: string; hint?: string; look: 'segments' | 'menu'; options: Opt[] }
+  | { type: 'switch'; key: string; label: string; hint?: string }
+  | { type: 'text'; key: string; label: string; hint?: string; placeholder?: string }
+  | { type: 'file'; key: string; label: string; hint?: string }
+  | { type: 'pair'; key: string; key2: string; label: string; hint?: string; labels: [string, string]; options: [Opt[], Opt[]] };
+export interface FormSpec {
+  title: string;
+  groups: { caption?: string; fields: FormField[]; help?: string }[];
+  /** The button that sends it («Создать»). */
+  submit: string;
+  initial?: Values;
+  /** Why the values cannot go (shown, the sheet stays); null: they can. */
+  validate?(v: Values): string | null;
+}
+/** A place: a file, or a heading in it. */
+export type Place = { path: string } | HeadingRef;
+export interface ReviewAction {
+  id: string;
+  label: string;
+  /** A command of the manifest in `"scope": "review"`: its keys run the action. */
+  command?: string;
+  /** What it does to the heading: then the next card, or this one again. */
+  run(h: HeadingInfo): 'next' | 'stay' | Promise<'next' | 'stay'>;
+}
+export interface ReviewSpec {
+  title: string;
+  items: HeadingRef[];
+  actions: ReviewAction[];
+  /** A line in the card's header after «3 из 7». */
+  header?(h: HeadingInfo): string;
+  /** Something under the card. */
+  below?: Render<HeadingRef>;
+}
+export interface ReviewResult {
+  total: number;
+  /** The cards an action moved on from. */
+  done: number;
+  /** The queue went through (else the tab was closed before). */
+  finished: boolean;
+}
+
 export interface Ctx {
   /** The plugin's manifest id. */
   id: string;
@@ -131,6 +176,14 @@ export interface Ctx {
     /** Open the view in the active editor (one tab of a kind per editor) or in the other one. */
     open<S>(viewId: string, state: S, where?: 'here' | 'beside'): Promise<void>;
     notify(text: string, actions?: { label: string; run(): void }[]): void;
+    /** The core's sheet with the fields; null: cancelled. */
+    form(spec: FormSpec): Promise<Values | null>;
+    /** The choice of a file and a heading in it (or the file alone). */
+    pickPlace(o?: { kind?: 'file' | 'heading'; title?: string; levels?: number[] }): Promise<Place | null>;
+    /** The calendar of three months, as for SCHEDULED. */
+    pickDate(o?: { initial?: Date; title?: string }): Promise<Date | null>;
+    /** A review by cards in a tab: one heading at a time, narrowed; it ends when the queue is through or closed. */
+    review(spec: ReviewSpec): Promise<ReviewResult>;
   };
   /** Needs `index.read`. */
   index?: {

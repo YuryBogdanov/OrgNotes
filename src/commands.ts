@@ -68,7 +68,7 @@ export type Plate =
   | { kind: 'text'; text: string; right?: string };
 /** «Выбрать дату…»: the calendar of three months (ТЗ «выбор даты в календаре»). */
 export interface CalSpec {
-  kind: 'SCHEDULED' | 'DEADLINE' | 'MARK'; // MARK: the day of a mark of a goal (ТЗ 23)
+  kind: 'SCHEDULED' | 'DEADLINE' | 'MARK' | 'DATE'; // MARK: the day of a mark of a goal (ТЗ 23); DATE: a plugin's «pickDate»
   initial: Date; // chosen when it opens
   current: Date | null; // the task's date of this kind now (a dashed frame)
   old?: string; // its stamp, whose time and repeat are kept
@@ -354,7 +354,7 @@ function statusStep(c: Ctx): Step {
 
 const DATE_FOOT: [string, string][] = [['↑ ↓', 'выбрать'], ['⇧ + стрелки', 'календарь'], ['↩', 'выполнить'], ['⎋', 'закрыть']];
 const CAL_FOOT: [string, string][] = [['⇧ ← →', 'день'], ['⇧ ↑ ↓', 'неделя'], ['⌥⇧ ← →', 'месяц'], ['⌥⇧ ↑ ↓', 'год'], ['.', 'сегодня'], ['↩', 'выбрать'], ['⌫', 'к вариантам'], ['⎋', 'закрыть']];
-const dateToken = (kind: 'SCHEDULED' | 'DEADLINE' | 'MARK') => ({ icon: (kind === 'DEADLINE' ? 'dead' : 'sched') as Icon, text: kind === 'SCHEDULED' ? 'Запланировать' : kind === 'MARK' ? 'День отметки' : 'Дедлайн' });
+const dateToken = (kind: CalSpec['kind']) => ({ icon: (kind === 'DEADLINE' ? 'dead' : 'sched') as Icon, text: kind === 'SCHEDULED' ? 'Запланировать' : kind === 'MARK' ? 'День отметки' : kind === 'DATE' ? 'Дата' : 'Дедлайн' });
 const jsDate = (d: OrgDate) => new Date(d.y, d.m - 1, d.d);
 
 function dateStep(c: Ctx, kind: 'SCHEDULED' | 'DEADLINE'): Step {

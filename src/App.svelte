@@ -59,6 +59,7 @@
   import { keyHandler, menuMayRun } from './keyDispatch';
   import { actionOf, allNavs, allViews, viewOf } from './views';
   import { plugins } from './api/host.svelte';
+  import PluginSheets from './PluginSheets.svelte';
 
   // the quick entry from another program: a panel of its own with only the entry (the main window does the writing)
   const isCaptureWindow = location.hash === '#capture';
@@ -318,6 +319,7 @@
   {/if}
   {#if store.pickInbox}{#key store.pickInbox}<Picker onclose={() => (store.pickInbox = 0)} />{/key}{/if}
   {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
+  <PluginSheets />
   {#if store.toast}
     <div class="toast" class:acts={!!store.toast.actions} role="status">
       <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 10a6.5 6.5 0 1 1-2-4.7M16.5 3.5V6.5h-3" /></svg>

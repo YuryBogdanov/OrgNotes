@@ -37,7 +37,7 @@
     <span class="rel">{bad ? 'Не похоже на дату' : rel}</span>
     {#if spec.kind === 'MARK'}
       <span class="raw"><span class="lbl">Отметка:</span>{' '}<span class="ts">{stampText(sel, spec.names).replace(/^<(.*)>$/, '[$1]')}</span></span>
-    {:else}
+    {:else if spec.kind !== 'DATE'}<!-- a plugin's choice of a date writes nothing itself -->
       <span class="raw"><span class="lbl">Вставится:</span>{' '}<span class="kw">{spec.kind}:</span>{' '}<span class="ts">{stampText(sel, spec.names, spec.old)}</span></span>
     {/if}
   </div>
