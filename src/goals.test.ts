@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SEQUENCE, fromSequences, parseHeadings } from './org';
 import {
   GOALS_WORKFLOW, addSourceHeading, avatarColor, defaultQuarter, goalNote, initials, insertGoal, isSilent, parseQuarter, quarterSub,
-  readGoals, readSource, resultLine, shiftQuarter, sourceSummary, withGoals, deadlineSoon, reviewQueue, markLines, markDayLabel, dayLabel, addMark, moveGoal,
+  readGoals, readSource, resultLine, sourcesJson, shiftQuarter, sourceSummary, withGoals, deadlineSoon, reviewQueue, markLines, markDayLabel, dayLabel, addMark, moveGoal,
   readGoalSettings, withGoalSettings, reportText, finalMark, lastMarks, carryOver, quarterLabel,
 } from './goals';
 
@@ -259,5 +259,12 @@ describe('part 3: settings, report, carry-over', () => {
     expect(r.text).toContain('    DEADLINE: <2027-03-31 Ср>');
     expect(ci.marks.at(-1)!.text).toBe('Перенесена из Q4 2026');
     expect(mentor.marks.map((m) => m.text)).toEqual(['Перенесена из Q4 2026']);
+  });
+});
+
+describe('sourcesJson (roadmap 0.6)', () => {
+  it('writes the sources as stored: «me» only when set', () => {
+    const list = readGoals([{ file: 'a.org', heading: 'Цели', title: 'А', me: true }, { file: 'b.org', heading: 'Цели', title: 'Б' }]);
+    expect(sourcesJson(list)).toEqual([{ file: 'a.org', heading: 'Цели', title: 'А', me: true }, { file: 'b.org', heading: 'Цели', title: 'Б' }]);
   });
 });

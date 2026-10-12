@@ -5,7 +5,7 @@
 import { store, type NoteFile } from '../store.svelte';
 import { closeTab, newTab, openView, type Tab } from '../layout';
 import { setPlanning, weekdayNames } from '../edits';
-import { readGoals, readGoalSettings, GOALS_WORKFLOW, addSourceHeading, avatarColor, initials, insertGoal, quarterOf, readSource, sourceKey, withGoals, addMark, findGoal, shiftQuarter, goalsIn, moveGoal, reviewQueue as goalQueue, shortDay, GOAL_STATES, quarterLabel, carryOver, withGoalSettings, isSilent, deadlineSoon, isDone, DEFAULT_GOAL_SETTINGS, type GoalSettings, type Goal, type GoalSource, type NewGoal, type Quarter, type SourceGoals } from '../goals';
+import { readGoals, readGoalSettings, sourcesJson, GOALS_WORKFLOW, addSourceHeading, avatarColor, initials, insertGoal, quarterOf, readSource, sourceKey, withGoals, addMark, findGoal, shiftQuarter, goalsIn, moveGoal, reviewQueue as goalQueue, shortDay, GOAL_STATES, quarterLabel, carryOver, withGoalSettings, isSilent, deadlineSoon, isDone, DEFAULT_GOAL_SETTINGS, type GoalSettings, type Goal, type GoalSource, type NewGoal, type Quarter, type SourceGoals } from '../goals';
 import { DEFAULT_SEQUENCE, parseHeadings, setKeyword, type Heading } from '../org';
 
 export interface GoalReviewState {
@@ -40,14 +40,17 @@ export const goalReviewLabel = (t: Tab) => `Разбор целей · ${goals.g
 
 class Goals {
   // ---- goals of the quarter (ТЗ 23) ----------------------------------------------------------------------------
-  /** Where the goals are: a file and its level-1 heading (`goals` in config.json). */
-  goalSources = $state.raw<GoalSource[]>([]);
-  /** «Цели квартала» in «Настройки → Агенды»: when a goal «молчит», how early a deadline is lit. */
-  goalSettings = $state.raw<GoalSettings>(DEFAULT_GOAL_SETTINGS);
+  /** Where the goals are: a file and its level-1 heading — in the notes folder, `.orgnotes/plugins/goals.json`
+   *  (the team's: it goes along with the files). */
+  goalSources = $derived<GoalSource[]>(readGoals((store.folderData('goals') as { sources?: unknown } | undefined)?.sources));
+  private saveSources(list: GoalSource[]) {
+    return store.setFolderData('goals', { sources: sourcesJson(list) });
+  }
+  /** «Цели квартала» in «Настройки → Агенды»: when a goal «молчит», how early a deadline is lit — on this Mac. */
+  goalSettings = $derived<GoalSettings>(readGoalSettings(store.localData('goals')));
   async setGoalSettings(c: Partial<GoalSettings>) {
-    const next = { ...this.goalSettings, ...c };
-    this.goalSettings = next;
-    return store.updateConfig((raw) => withGoalSettings(raw, next));
+    store.setLocalData('goals', { ...this.goalSettings, ...c });
+    return true;
   }
   goalSilent = (g: Goal) => isSilent(g, new Date(), this.goalSettings.silent);
   goalSoon = (g: Goal, done: string[]) => deadlineSoon(g, done, new Date(), this.goalSettings.soon);
@@ -114,20 +117,6 @@ class Goals {
     const i = store.files.indexOf(p.file);
     store.open(i, line ?? (p.data.head >= 0 ? p.file.headings[p.data.head].line : 0));
   }
-  /** «Цели на квартал» in the project's statuses, if no set knows ACTIVE (with «Задачи» if there were none). */
-  private withGoalsWorkflow(raw: string | null): string {
-    let base: Record<string, any> = {};
-    try {
-      const p = raw ? JSON.parse(raw) : null;
-      if (p && typeof p === 'object' && !Array.isArray(p)) base = p;
-    } catch {
-      /* replaced */
-    }
-    const wfs: any[] = Array.isArray(base.workflows) ? base.workflows : [];
-    if (wfs.some((w) => Array.isArray(w?.states) && w.states.some((x: any) => x?.name === 'ACTIVE'))) return raw ?? JSON.stringify(base);
-    const def = { name: DEFAULT_SEQUENCE.name, states: DEFAULT_SEQUENCE.states.map((x) => (x.done ? { name: x.name, done: true } : { name: x.name })) };
-    return JSON.stringify({ version: base.version ?? 1, ...base, workflows: [...(wfs.length ? wfs : [def]), GOALS_WORKFLOW] }, null, 2) + '\n';
-  }
   /** «Добавить цели»: a source (made in the file first if asked); «мои» moves to it; `replace`: «Сменить заголовок…». */
   async addGoalSource(src: GoalSource, opts: { create?: boolean; replace?: string } = {}): Promise<boolean> {
     if (opts.create) {
@@ -138,22 +127,21 @@ class Goals {
       .filter((x) => sourceKey(x) !== sourceKey(src) && sourceKey(x) !== opts.replace)
       .map((x) => (src.me ? { ...x, me: undefined } : x));
     list.push(src);
-    return store.updateConfig((raw) => withGoals(this.withGoalsWorkflow(raw), list));
+    return this.saveSources(list);
   }
   async removeGoalSource(key: string) {
-    return store.updateConfig((raw) => withGoals(raw, this.goalSources.filter((x) => sourceKey(x) !== key)));
+    return this.saveSources(this.goalSources.filter((x) => sourceKey(x) !== key));
   }
   async renameGoalSource(key: string, title: string) {
     const t = title.trim();
     if (!t) return false;
-    return store.updateConfig((raw) => withGoals(raw, this.goalSources.map((x) => (sourceKey(x) === key ? { ...x, title: t } : x))));
+    return this.saveSources(this.goalSources.map((x) => (sourceKey(x) === key ? { ...x, title: t } : x)));
   }
   /** «Новая цель»: written at once, at the end of its quarter (made if needed); a toast with «Открыть». */
   async addGoal(key: string, q: Quarter, g: NewGoal): Promise<boolean> {
     const p = this.goalPeople.find((x) => x.key === key);
     if (!p?.file || !g.title.trim()) return false;
-    if (!(await store.updateConfig((raw) => this.withGoalsWorkflow(raw)))) return false;
-    const f = store.files.find((x) => x.path === p.file!.path)!; // read again: the statuses may have changed
+    const f = store.files.find((x) => x.path === p.file!.path)!;
     const r = insertGoal(f.text, f.headings, p.src.heading, q, g, weekdayNames(f.text));
     if (!r || !(await store.writeAll(`Новая цель: ${g.title.trim()}`, [{ path: f.path, text: r.text }]))) return false;
     const path = f.path;
@@ -314,9 +302,18 @@ class Goals {
 }
 
 export const goals = new Goals();
-store.onConfig((parsed) => {
-  goals.goalSources = readGoals(parsed?.goals);
-  goals.goalSettings = readGoalSettings(parsed?.goalSettings);
+// the sources in the notes folder, the thresholds on this Mac; before roadmap 0.6 both were in config.json
+store.registerStorage('goals', {
+  legacy: (parsed) => (parsed?.goals ? { sources: parsed.goals } : undefined),
+  legacyKeys: ['goals'],
+  localLegacy: (parsed) => parsed?.goalSettings,
 });
+// «Цели на квартал»: the statuses of the goals once there are goals, while no set of the project knows ACTIVE (in
+// memory, roadmap 0.6)
+store.registerStatusSet(
+  'goals',
+  { name: GOALS_WORKFLOW.name, states: GOALS_WORKFLOW.states.map((x) => ({ name: x.name, done: !!x.done, color: x.color })) },
+  (defs) => goals.goalSources.length > 0 && !defs.some((w) => w.states.some((x) => x.name === GOAL_STATES.active)),
+);
 // its sheets: while one is open, the window's other sheets and keys wait
 store.addSheet(() => !!(goals.goalForm || goals.goalAdd || goals.goalReport || goals.goalCarry));

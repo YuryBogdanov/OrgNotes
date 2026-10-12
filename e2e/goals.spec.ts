@@ -16,7 +16,9 @@ async function open(page: Page, config: object | null = CONFIG) {
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Цели' });
 const view = (page: Page) => page.locator('section.pane.active .goals');
 const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string, p);
-const config = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/config.json']));
+const config = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/config.json'] ?? '{}'));
+/** The sources of goals: their file in the notes folder (roadmap 0.6). */
+const sources = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/plugins/goals.json'] ?? '{"sources":[]}').sources);
 const group = (page: Page, name: string) => view(page).getByRole('region', { name });
 
 test.describe('the navigator', () => {
@@ -48,10 +50,10 @@ test.describe('the navigator', () => {
     await page.keyboard.type('Олег Смирнов');
     await page.keyboard.press('Enter');
     await expect(nav(page).getByRole('button', { name: /Олег Смирнов/ })).toBeVisible();
-    await expect.poll(async () => (await config(page)).goals[2].title).toBe('Олег Смирнов');
+    await expect.poll(async () => (await sources(page))[2].title).toBe('Олег Смирнов');
     await nav(page).getByRole('button', { name: /Олег Смирнов/ }).click({ button: 'right' });
     await page.getByRole('menuitem', { name: 'Удалить из целей' }).click();
-    await expect.poll(async () => (await config(page)).goals.length).toBe(3);
+    await expect.poll(async () => (await sources(page)).length).toBe(3);
     await expect(nav(page).getByRole('button', { name: /Олег Смирнов/ })).toHaveCount(0);
   });
 });
@@ -122,7 +124,7 @@ test.describe('«Добавить цели»', () => {
     await dlg.getByRole('button', { name: 'Добавить' }).click();
     await expect(dlg).toHaveCount(0);
     await expect.poll(() => disk(page, KOZLOV)).toBe('#+TITLE: Козлов Сергей\n* О человеке\n* 1-1\n* Развитие\n\n* Квартальные задачи\n');
-    expect((await config(page)).goals.at(-1)).toEqual({ file: 'Работа/Тимлиды/kozlov.org', heading: 'Квартальные задачи', title: 'Козлов Сергей' });
+    expect((await sources(page)).at(-1)).toEqual({ file: 'Работа/Тимлиды/kozlov.org', heading: 'Квартальные задачи', title: 'Козлов Сергей' });
     await expect(nav(page).getByRole('button', { name: /Козлов Сергей/ })).toHaveClass(/on/);
     await expect(view(page).locator('h1')).toHaveText('Козлов Сергей');
   });
@@ -140,7 +142,7 @@ test.describe('«Добавить цели»', () => {
     const ask = page.getByRole('alertdialog', { name: 'Мои цели' });
     await expect(ask).toContainText('Сейчас «Мои цели» — me.org › Квартальные задачи');
     await ask.getByRole('button', { name: 'Сделать' }).click();
-    await expect.poll(async () => (await config(page)).goals.filter((g: any) => g.me).map((g: any) => g.file)).toEqual(['Работа/Тимлиды/petrov.org']);
+    await expect.poll(async () => (await sources(page)).filter((g: any) => g.me).map((g: any) => g.file)).toEqual(['Работа/Тимлиды/petrov.org']);
   });
 
   test('no goals yet: «Указать, где мои цели»; the set «Цели на квартал» comes into the statuses', async ({ page }) => {
@@ -150,8 +152,10 @@ test.describe('«Добавить цели»', () => {
     await expect(dlg.getByRole('switch', { name: /Это мои цели/ })).toHaveAttribute('aria-checked', 'true');
     await dlg.getByRole('option', { name: /^me/ }).click();
     await dlg.getByRole('button', { name: 'Добавить' }).click();
-    await expect.poll(async () => (await config(page)).workflows.map((w: any) => w.name)).toEqual(['Задачи', 'Цели на квартал']);
-    expect((await config(page)).goals).toEqual([{ file: 'Работа/me.org', heading: 'Квартальные задачи', title: 'Юрий', me: true }]);
+    // the set of the goals is in the statuses (in memory, roadmap 0.6), not written to config.json
+    await expect.poll(async () => (await sources(page)).length).toBe(1);
+    expect((await config(page)).workflows).toBeUndefined();
+    expect((await sources(page))).toEqual([{ file: 'Работа/me.org', heading: 'Квартальные задачи', title: 'Юрий', me: true }]);
     await expect(nav(page).locator('.mine')).toContainText('Q4 2026 · 2 активных');
   });
 
@@ -164,7 +168,7 @@ test.describe('«Добавить цели»', () => {
     const dlg = page.getByRole('dialog', { name: 'Добавить цели' });
     await expect(dlg.getByRole('option', { name: /Квартальные задачи/ })).toHaveAttribute('aria-selected', 'true');
     await dlg.getByRole('button', { name: 'Сохранить' }).click();
-    await expect.poll(async () => (await config(page)).goals.map((g: any) => g.heading)).toEqual(['Квартальные задачи', 'Квартальные задачи', 'Квартальные задачи', 'Квартальные задачи']);
+    await expect.poll(async () => (await sources(page)).map((g: any) => g.heading)).toEqual(['Квартальные задачи', 'Квартальные задачи', 'Квартальные задачи', 'Квартальные задачи']);
     await expect(view(page).locator('.row')).toHaveCount(3);
   });
 });

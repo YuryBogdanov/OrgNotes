@@ -158,6 +158,12 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             return;
           }
           if (cmd === 'read_project_config') return disk['/mock/.orgnotes/config.json'] ?? null;
+          // a feature's own settings in the notes folder (roadmap 0.6)
+          if (cmd === 'read_feature_file') return disk[(root() ?? '/mock') + '/.orgnotes/plugins/' + args.id + '.json'] ?? null;
+          if (cmd === 'write_feature_file') {
+            disk[(root() ?? '/mock') + '/.orgnotes/plugins/' + args.id + '.json'] = args.text;
+            return;
+          }
           if (cmd === 'write_project_config') {
             disk['/mock/.orgnotes/config.json'] = args.text;
             emit();

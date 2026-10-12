@@ -78,7 +78,8 @@ test('«Настройки → Агенды → Цели квартала»: «�
   await openSettingsSheet(page, 'Агенды');
   await page.getByLabel('Цель «молчит» через').selectOption('21');
   await page.getByLabel('Предупреждать о сроке за').selectOption('8');
-  await expect.poll(async () => JSON.parse((await disk(page, '/mock/.orgnotes/config.json')) ?? '{}').goalSettings).toEqual({ silent: 21, soon: 8 });
+  // on this Mac (roadmap 0.6)
+  await expect.poll(async () => page.evaluate(() => JSON.parse(localStorage.getItem('feature:goals') ?? '{}'))).toEqual({ silent: 21, soon: 8 });
   await page.keyboard.press('Escape');
   await expect(view(page).locator('.tile', { hasText: 'молч' }).locator('b')).toHaveText('1'); // Смирнов: 31 days
   await expect(view(page).locator('.row', { hasText: 'Сократить время сборки CI' }).locator('.note')).toHaveText('отметка 20 дней назад');

@@ -41,7 +41,9 @@ export function readGoals(raw: unknown): GoalSource[] {
   }
   return out;
 }
-/** config.json with the sources replaced; every other key stays. */
+/** The sources as they are written (the goals' file in the notes folder, roadmap 0.6). */
+export const sourcesJson = (list: GoalSource[]) => list.map((s) => ({ file: s.file, heading: s.heading, title: s.title, ...(s.me ? { me: true } : {}) }));
+/** config.json with the sources replaced; every other key stays (before roadmap 0.6). */
 export function withGoals(raw: string | null, list: GoalSource[]): string {
   let base: Record<string, unknown> = {};
   try {

@@ -117,7 +117,9 @@ function normalize(w: DraftWorkflow) {
 }
 
 export function fromConfig(cfg: ProjectConfig): Draft {
-  const source = cfg.workflows.length ? cfg.workflows : [DEFAULT_SEQUENCE];
+  // the features' sets (registered in memory) are not the project's: not edited, never written
+  const own = cfg.workflows.filter((w) => !w.feature);
+  const source = own.length ? own : [DEFAULT_SEQUENCE];
   const workflows = source.map((w) => {
     const states: DraftState[] = w.states.map((s) => ({
       id: uid(),
