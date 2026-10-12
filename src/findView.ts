@@ -70,11 +70,16 @@ class Badge extends WidgetType {
   }
 }
 
-const marks = EditorView.decorations.compute([findField, foldState], (state) => {
+const marks = EditorView.decorations.compute([findField, foldState, 'selection'], (state) => {
   const f = state.field(findField);
   if (!f || !f.show || !f.starts.length) return Decoration.none;
   const out: Range<Decoration>[] = [];
-  f.starts.forEach((s, i) => out.push(Decoration.mark({ class: i === f.cur ? 'cm-find cm-find-cur' : 'cm-find' }).range(s, s + f.len)));
+  // a match inside the selection is marked too: its yellow would hide the selection under it
+  const inSel = (a: number, b: number) => state.selection.ranges.some((r) => !r.empty && r.from < b && r.to > a);
+  f.starts.forEach((s, i) => {
+    const cls = (i === f.cur ? 'cm-find cm-find-cur' : 'cm-find') + (inSel(s, s + f.len) ? ' cm-find-sel' : '');
+    out.push(Decoration.mark({ class: cls }).range(s, s + f.len));
+  });
   // folded: how many matches each hides
   let outer = -1; // a fold inside a folded one is not shown: only the outer one gets a badge
   foldedRanges(state).between(0, state.doc.length, (a, b) => {

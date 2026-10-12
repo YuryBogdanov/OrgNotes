@@ -9,6 +9,8 @@
   /* popovers (the command palette): their ground, the dim behind, the selected row (white text ≥ 4.5:1) */
   --pop: #ffffff; --scrim: rgba(0,0,0,0.20); --pacc: #0a64d6; --onpacc: #ffffff;
   --stage: #e9e9ee; /* behind the cards of «Разбор Inbox» */
+  /* the editor's own: see-through, so the selection (drawn under the text) shows through the current line */
+  --cur-line: rgba(10,100,214,0.05); --sel-text: rgba(10,100,214,0.26); --sel-text-blur: rgba(0,0,0,0.10);
   --mono: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
   --ui: -apple-system, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
   color-scheme: light;
@@ -24,6 +26,7 @@
     --segon: #55555e; --shadow: none;
     --pop: #2c2c32; --scrim: rgba(0,0,0,0.45); --pacc: #1f6fd6; --onpacc: #ffffff;
     --stage: #18181b;
+    --cur-line: rgba(108,180,255,0.07); --sel-text: rgba(10,132,255,0.45); --sel-text-blur: rgba(255,255,255,0.14);
     color-scheme: dark;
   }
 }
@@ -67,9 +70,13 @@ button { cursor: default; }
 .cm-editor .cm-cursor { border-left-color: var(--acc); }
 .cm-editor .cm-gutters { background: var(--bg) !important; border: 0; color: var(--fg3); font-size: 11.5px; }
 .cm-editor .cm-lineNumbers .cm-gutterElement { padding: 0 12px 0 8px; min-width: 40px; }
-.cm-editor .cm-activeLine { background: var(--cur); }
-.cm-editor .cm-activeLineGutter { background: var(--cur) !important; color: var(--fg); }
-.cm-editor .cm-selectionBackground, .cm-editor.cm-focused .cm-selectionBackground { background: var(--sel) !important; }
+.cm-editor .cm-activeLine { background: var(--cur-line); }
+.cm-editor .cm-activeLineGutter { background: var(--cur-line) !important; color: var(--fg); }
+/* grey without the focus (another pane), blue with it, as in macOS */
+.cm-editor .cm-selectionBackground { background: var(--sel-text-blur) !important; }
+.cm-editor.cm-focused .cm-selectionBackground { background: var(--sel-text) !important; }
+/* while something is selected the current line is not marked: it would only get in the way */
+.cm-editor.cm-has-selection .cm-activeLine, .cm-editor.cm-has-selection .cm-activeLineGutter { background: transparent !important; }
 .cm-editor .cm-foldGutter .cm-gutterElement { padding: 0 4px; color: var(--fg3); }
 .cm-editor .cm-foldPlaceholder { background: var(--field); border: 0; color: var(--fg2); border-radius: 4px; padding: 0 6px; }
 .cm-org-lead { display: none; } /* «Структурный вид»: the stars before the last one of a heading */
@@ -136,7 +143,7 @@ button { cursor: default; }
 .cm-r-s { text-decoration: line-through; }
 .cm-r-code { padding: 0 4px; border-radius: 4px; background: var(--side); color: var(--ts); }
 .cm-rich .cm-r-trule { height: 0; overflow: hidden; line-height: 0; font-size: 0; }
-.cm-rich .cm-r-thead { background: var(--side); font-weight: 700; }
+.cm-rich .cm-r-thead { background: color-mix(in srgb, var(--fg) 5%, transparent); font-weight: 700; } /* see-through: the selection shows */
 .cm-r-pipe { color: transparent; box-shadow: inset 1px 0 0 var(--line); }
 .cm-r-pipe.edge { box-shadow: none; }
 .cm-rich .cm-foldPlaceholder { display: inline-flex; align-items: center; height: 18px; margin-left: 6px; padding: 0 6px; border-radius: 5px; font: 11px var(--ui); vertical-align: middle; }
@@ -149,6 +156,8 @@ button { cursor: default; }
 .cm-find { background: var(--hl); border-radius: 2px; }
 .cm-find-cur { background: var(--hlCur); color: var(--hlCurFg) !important; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hlCur) 70%, #000); }
 .cm-find-cur * { color: var(--hlCurFg) !important; }
+/* a match inside the selection: the yellow paints over the selection layer, so the selection shows as a frame */
+.cm-find.cm-find-sel { box-shadow: inset 0 0 0 100px color-mix(in srgb, var(--sel-text) 50%, transparent), 0 0 0 1.5px var(--acc); } /* the yellow still shows */
 .cm-find-folded { display: inline-flex; align-items: center; height: 17px; margin-left: 8px; padding: 0 7px; border-radius: 9px; background: var(--hl); color: var(--fg); font: 11px var(--ui); vertical-align: middle; }
 .cm-find-ticks { position: absolute; top: 0; right: 0; bottom: 0; width: 8px; pointer-events: none; z-index: 5; }
 .cm-find-ticks span { position: absolute; right: 1px; width: 6px; height: 2px; border-radius: 1px; background: var(--hlCur); opacity: 0.8; }

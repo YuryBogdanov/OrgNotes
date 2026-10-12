@@ -341,6 +341,10 @@
     ];
   }
 
+  /** `cm-has-selection` on the editor while something is selected: the current line is not marked then. Through
+   *  the editor's attributes: CodeMirror rewrites its own classes (on focus, say) and would drop one set by hand. */
+  const selectionClass = EditorView.editorAttributes.compute(['selection'], (s) => (s.selection.main.empty ? {} : { class: 'cm-has-selection' }));
+
   // ---- the commands the keys run (ids of keys.ts) ------------------------------------------------------------
   let curWords = {} as Workflow; // the statuses of the document shown: the newest, a status added in the settings too
   $effect.pre(() => {
@@ -422,7 +426,7 @@
             return el;
           },
         }),
-        foldGutter(), plugin, structure.of(structureExt(words)),
+        foldGutter(), plugin, selectionClass, structure.of(structureExt(words)),
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         EditorView.domEventHandlers({
