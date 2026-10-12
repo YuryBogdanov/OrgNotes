@@ -28,7 +28,39 @@ export type Field =
   /** A file of the folder, chosen with the core's picker («Выбрать…»); null is «not chosen», `clear` names it. */
   | (Base & { type: 'file'; show: (rel: string | null) => string; clear?: string })
   /** Two menus in one row («С 8:00 – До 20:00»): the second key is `key2`. */
-  | (Base & { type: 'pair'; key2: string; labels: [string, string]; options: (v: Values) => [Opt[], Opt[]] });
+  | (Base & { type: 'pair'; key2: string; labels: [string, string]; options: (v: Values) => [Opt[], Opt[]] })
+  // ---- the fields of a plugin's form only (ТЗ 27 §2.4): under their label, the width of the sheet ----
+  /** Lines of text; ↩ goes on a «- » list, ⇥ / ⇧⇥ move its item. */
+  | (Base & { type: 'textarea'; placeholder?: string })
+  /** A day, «yyyy-mm-dd» (null: none): the calendar of three months in the form, or a chip that opens it. */
+  | (Base & { type: 'date'; look: 'inline' | 'chip'; clear?: string })
+  /** A file and its heading (the columns of the choice of a place): { path, heading } — heading null: the file;
+   *  `create` offers a heading that is not there yet. */
+  | (Base & {
+      type: 'place'; levels?: number[]; fileCap?: string; headCap?: string;
+      note?: (path: string) => { text: string; dim?: boolean };
+      headNote?: (path: string, title: string) => string;
+      /** «+ Создать «Квартальные задачи» в конце файла»: the label, when that heading can be made in the file. */
+      create?: (path: string) => string | null;
+    })
+  /** Drawn by the plugin. */
+  | (Base & { type: 'custom'; render: (el: HTMLElement, ctrl: FieldCtrl) => (() => void) | void });
+
+/** What a plugin's field gets: its value, all the values, a way to change it, the changes. */
+export interface FieldCtrl {
+  value(): unknown;
+  values(): Values;
+  set(v: unknown): void;
+  onChange(fn: (v: Values) => void): () => void;
+}
+/** A value of a «place» field. */
+export interface PlaceValue {
+  path: string;
+  heading: string | null;
+  create?: boolean;
+}
+/** Fields drawn under their label, across the sheet. */
+export const WIDE = new Set(['textarea', 'date', 'place', 'custom']);
 
 export interface Group {
   caption: string;

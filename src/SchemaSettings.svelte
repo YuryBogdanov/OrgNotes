@@ -1,6 +1,7 @@
 <script lang="ts">
   import Picker from './Picker.svelte';
-  import { WHERE_NOTE, hintOf, optOf, optValue, optionsOf, whereOfGroup, type Field, type Schema } from './settingsSchema';
+  import FormField from './FormField.svelte';
+  import { WHERE_NOTE, WIDE, hintOf, optOf, optValue, optionsOf, whereOfGroup, type Field, type Schema } from './settingsSchema';
 
   // A feature's settings drawn from its schema (roadmap 0.6), in the settings sheet's look: a section of its own or,
   // `embedded`, a block inside another section («Цели квартала» in «Агенды»).
@@ -28,6 +29,12 @@
     <div class="opts">
       {#each g.fields as f (f.key)}
         {@const hint = hintOf(f, v)}
+        {#if WIDE.has(f.type)}
+          <div class="opt wide">
+            <span class="olab"><span id={id(f)}>{f.label}</span>{#if hint}<small>{hint}</small>{/if}</span>
+            <FormField {f} id={id(f)} values={v} set={(k, x) => set(k, x)} />
+          </div>
+        {:else}
         <div class="opt">
           {#if f.type === 'file'}
             <span id={id(f)}>{f.label}</span>
@@ -74,6 +81,7 @@
             {/if}
           {/if}
         </div>
+        {/if}
       {/each}
     </div>
     {#if g.help || where}<p class="help">{[g.help, where && WHERE_NOTE[where]].filter(Boolean).join(' ')}</p>{/if}
@@ -101,6 +109,7 @@
   .opts { display: flex; flex-direction: column; gap: 6px; }
   .opt { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; background: var(--side); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
   .olab { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .opt.wide { flex-direction: column; align-items: stretch; gap: 8px; }
   .olab small { font-size: 11.5px; color: var(--fg2); }
   .sel { height: 26px; max-width: 260px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 0 6px; font-size: 12.5px; }
   .sel.txt { width: 200px; padding: 0 8px; -webkit-user-select: text; user-select: text; }

@@ -44,7 +44,7 @@ function build(name: string, path: string, text: string, disk: string, diskRaw: 
 }
 
 /** Where the palette opens: a step of a command at once (the card's buttons in «Разбор Inbox» use the heading ones). */
-export type PaletteStart = 'newFile' | 'newFolder' | 'goto' | 'status' | 'priority' | 'schedule' | 'deadline' | 'tags' | 'calendar';
+export type PaletteStart = 'newFile' | 'newFolder' | 'goto' | 'status' | 'priority' | 'schedule' | 'deadline' | 'tags' | 'calendar' | 'step';
 const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
 function readLevels(): LevelView {
@@ -153,6 +153,12 @@ class Store {
   openCalendar(spec: CalSpec & { plate?: Plate }) {
     this.calReq = spec;
     this.openPalette('calendar');
+  }
+  /** The palette at a step a plugin made (`ui.choose`, ТЗ 27). */
+  stepReq: import('./commands').Step | null = null;
+  openStep(step: import('./commands').Step) {
+    this.stepReq = step;
+    this.openPalette('step');
   }
   /** ⇧⌘P: opens, or closes an open palette. */
   togglePalette() {

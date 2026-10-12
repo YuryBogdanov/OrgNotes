@@ -101,6 +101,8 @@ export interface Tx {
   replaceBody(h: HeadingRef, org: string): void;
   move(h: HeadingRef, to: { under: HeadingRef } | { file: string }): void;
   remove(h: HeadingRef): void;
+  /** The file changed by the plugin's own function (its own structure in the file, ТЗ 27): null leaves it. */
+  update(path: string, fn: (text: string) => string | null): void;
 }
 export interface Store {
   get<T>(): T | undefined;
@@ -122,7 +124,33 @@ export type FormField =
   | { type: 'switch'; key: string; label: string; hint?: string }
   | { type: 'text'; key: string; label: string; hint?: string; placeholder?: string }
   | { type: 'file'; key: string; label: string; hint?: string }
-  | { type: 'pair'; key: string; key2: string; label: string; hint?: string; labels: [string, string]; options: [Opt[], Opt[]] };
+  | { type: 'pair'; key: string; key2: string; label: string; hint?: string; labels: [string, string]; options: [Opt[], Opt[]] }
+  // ТЗ 27 §2.4: under their label, across the sheet
+  /** Lines; ↩ goes on a «- » list, ⇥ moves its item. */
+  | { type: 'textarea'; key: string; label: string; hint?: string; placeholder?: string }
+  /** A day as «yyyy-mm-dd» (null: none): the calendar of three months in the form, or a chip that opens it. */
+  | { type: 'date'; key: string; label: string; hint?: string; look: 'inline' | 'chip'; clear?: string }
+  /** A file and its heading, in two columns: { path, heading } (heading null: only the file chosen; `create: true`:
+   *  the heading `create` offered). */
+  | {
+      type: 'place'; key: string; label: string; hint?: string; levels?: number[]; fileCap?: string; headCap?: string;
+      note?(path: string): { text: string; dim?: boolean };
+      headNote?(path: string, title: string): string;
+      create?(path: string): string | null;
+    }
+  /** Drawn by the plugin. */
+  | { type: 'custom'; key: string; label: string; hint?: string; render(el: HTMLElement, ctrl: FieldCtrl): Dispose | void };
+export interface FormCtrl {
+  values(): Values;
+  set(key: string, v: unknown): void;
+  onChange(fn: (v: Values) => void): Dispose;
+}
+export interface FieldCtrl {
+  value(): unknown;
+  values(): Values;
+  set(v: unknown): void;
+  onChange(fn: (v: Values) => void): Dispose;
+}
 export interface FormSpec {
   title: string;
   groups: { caption?: string; fields: FormField[]; help?: string }[];
@@ -131,6 +159,34 @@ export interface FormSpec {
   initial?: Values;
   /** Why the values cannot go (shown, the sheet stays); null: they can. */
   validate?(v: Values): string | null;
+  /** A value changed: what else to set (a file chosen gives a name). */
+  onChange?(changed: string, v: Values): Values | void;
+  /** Right of the sheet's title («Квартал Q4 2026 ⌄»). */
+  headerExtra?(el: HTMLElement, form: FormCtrl): Dispose | void;
+}
+export interface SheetSpec {
+  title: string;
+  render: (el: HTMLElement, sheet: { close(button?: string): void }) => Dispose | void;
+  /** At the bottom, right to left as written; the primary one on ↩. */
+  buttons?: { id: string; label: string; primary?: boolean }[];
+  /** A line at the bottom left. */
+  note?: string;
+}
+export interface MenuItem {
+  label: string;
+  run(): void;
+  danger?: boolean;
+  disabled?: boolean;
+}
+export interface ChooseItem {
+  id: string;
+  label: string;
+  hint?: string;
+}
+export type Named = 'red' | 'orange' | 'yellow' | 'green' | 'teal' | 'blue' | 'purple' | 'gray';
+export interface StatusSet {
+  name: string;
+  states: { name: string; done: boolean }[];
 }
 /** A place: a file, or a heading in it. */
 export type Place = { path: string } | HeadingRef;
@@ -173,7 +229,10 @@ export interface Ctx {
   commands: {
     /** The handler of a command the manifest declares. */
     on(id: string, run: (arg?: unknown) => void | Promise<void>): Dispose;
-    /** A command of the plugin, or of the core: `file.open` {path}, `heading.reveal` {ref}, `agenda.open`. */
+    /** Not offered in the palette, its keys do nothing, while off. */
+    setAvailable(id: string, on: boolean): void;
+    /** A command of the plugin, or of the core: `file.open` {path}, `heading.reveal` {ref}, `agenda.open`,
+     *  `heading.status` {ref} (the palette's statuses for it; the heading's file is the one shown). */
     run(id: string, arg?: unknown): Promise<void>;
   };
   ui: {
@@ -192,6 +251,14 @@ export interface Ctx {
     pickDate(o?: { initial?: Date; title?: string }): Promise<Date | null>;
     /** A review by cards in a tab: one heading at a time, narrowed; it ends when the queue is through or closed. */
     review(spec: ReviewSpec): Promise<ReviewResult>;
+    /** The core's sheet with the plugin's content; the button pressed (null: ⎋). */
+    sheet(spec: SheetSpec): Promise<string | null>;
+    /** The core's context menu at a point of the window. */
+    menu(items: MenuItem[], at: { x: number; y: number }): void;
+    /** A choice from a list in the palette; null: ⎋. */
+    choose(o: { title: string; placeholder?: string; items: ChooseItem[] }): Promise<string | null>;
+    /** Close the tabs of a view of the plugin. */
+    close(viewId: string): void;
   };
   /** Needs `index.read`. */
   index?: {
@@ -199,11 +266,17 @@ export interface Ctx {
     heading(ref: HeadingRef): Promise<HeadingInfo | null>;
     outline(path: string): Promise<HeadingInfo[]>;
     files(): Promise<FileInfo[]>;
+    /** The named colour of a status in the sets of the file (the plugin draws with var(--p-<colour>)). */
+    statusTone(keyword: string, path: string): Promise<Named | null>;
+    /** The statuses the file knows: open and done keywords (for `@panopticon/api/org`). */
+    workflow(path: string): Promise<{ open: string[]; done: string[] }>;
   };
   /** Needs `files.read` (or `files.edit`). */
   files?: { read(path: string): Promise<string> };
   /** Needs `files.edit`. One step of ⌘Z, as an edit by hand. */
-  edit?: { transaction(label: string, build: (tx: Tx) => void): Promise<'ok' | 'conflict' | 'error'> };
+  edit?: {
+    transaction(label: string, build: (tx: Tx) => void, o?: { onUndo?(): void }): Promise<'ok' | 'conflict' | 'error'>;
+  };
   /** The plugin's own: in the notes folder (goes with the notes) and on this Mac. */
   storage: { folder: Store; local: Store };
   events: { on(e: EventName, fn: (payload: unknown) => void): Dispose };
@@ -211,6 +284,8 @@ export interface Ctx {
   clipboard?: { write(text: string): Promise<void> };
   /** Needs `net`: only to the hosts of the manifest's `net` («jira.company.ru», «*.company.ru»); 30 s, 10 MB. */
   net?: { fetch(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<NetResponse> };
+  /** Sets of statuses from code (they replace the plugin's earlier ones; [] none); the manifest's stay. */
+  statusSets: { set(defs: StatusSet[]): void };
   /** The values of the settings the manifest declares. */
   settings: {
     values(): Values;

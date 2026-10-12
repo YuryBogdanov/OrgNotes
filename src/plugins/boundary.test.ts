@@ -6,7 +6,7 @@ import { join, relative, resolve, dirname } from 'node:path';
 // of the core. This test is the rule (there is no ESLint in the project).
 
 const ROOT = resolve(__dirname);
-const ALLOWED = [/^@panopticon\/api$/, /^svelte(\/.*)?$/];
+const ALLOWED = [/^@panopticon\/api(\/org)?$/, /^svelte(\/.*)?$/];
 const SOURCE = /\.(ts|js|svelte)$/;
 
 function files(dir: string): string[] {
