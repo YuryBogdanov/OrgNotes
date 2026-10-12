@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { store, type GoalPerson } from './store.svelte';
+  import { goals, type GoalPerson } from './features/goals.svelte';
+  import { store, } from './store.svelte';
   import { toneFor } from './org';
   import { toneStyle } from './colors';
   import {
@@ -13,10 +14,10 @@
   let { tab }: { tab: Tab } = $props();
 
   const key = $derived(tab.goals ?? '*');
-  const q = $derived(store.goalsQuarter);
+  const q = $derived(goals.goalsQuarter);
   const all = $derived(key === '*');
   const people = $derived.by(() => {
-    const list = all ? store.goalPeople : store.goalPeople.filter((p) => p.key === key);
+    const list = all ? goals.goalPeople : goals.goalPeople.filter((p) => p.key === key);
     // the team by name, «Мои цели» at the end (as on the mockup)
     return [...list].sort((a, b) => Number(!!a.src.me) - Number(!!b.src.me) || a.name.localeCompare(b.name, 'ru'));
   });
@@ -33,7 +34,7 @@
       for (const g of goalsIn(p.data, q)) {
         const k = kind(g, p);
         if (k) c[k]++;
-        if (store.goalSilent(g)) c.silent++;
+        if (goals.goalSilent(g)) c.silent++;
       }
     return c;
   });
@@ -43,7 +44,7 @@
     { f: 'backlog' as const, n: counts.backlog, t: 'в бэклоге', c: 'var(--fg2)' },
     { f: 'silent' as const, n: counts.silent, t: counts.silent === 1 ? 'молчит больше 2 недель' : 'молчат больше 2 недель', c: 'var(--wait)' },
   ]);
-  const shown = (g: Goal, p: GoalPerson) => !filter || (filter === 'silent' ? store.goalSilent(g) : kind(g, p) === filter);
+  const shown = (g: Goal, p: GoalPerson) => !filter || (filter === 'silent' ? goals.goalSilent(g) : kind(g, p) === filter);
   const leftDays = $derived(Math.round((+qEnd(q) - +new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())) / 86400000));
   const sub = $derived(
     person
@@ -59,7 +60,7 @@
   // the goals' own colours (ACTIVE blue, BACKLOG grey, COMPLETED green), a status of another set its own
   // a quarter gone by: its open goals can go on to the next one
   const past = $derived(cmpQuarter(q, quarterOf(new Date())) < 0);
-  const openLeft = $derived(people.some((p) => store.openGoalsOf(p).length));
+  const openLeft = $derived(people.some((p) => goals.openGoalsOf(p).length));
   const chip = (kw: string | null, p: GoalPerson) =>
     !kw ? '' : GOAL_TONES[kw] ? `color:${GOAL_TONES[kw]};background:color-mix(in srgb, ${GOAL_TONES[kw]} 15%, transparent)` : toneStyle(toneFor(kw, p.file!.wf));
 </script>
@@ -71,21 +72,21 @@
       <span>{sub}</span>
     </div>
     <div class="qs" role="group" aria-label="Квартал">
-      <button aria-label="Предыдущий квартал" onclick={() => (store.goalsQuarter = shiftQuarter(q, -1))}>‹ Q{shiftQuarter(q, -1).q}</button>
+      <button aria-label="Предыдущий квартал" onclick={() => (goals.goalsQuarter = shiftQuarter(q, -1))}>‹ Q{shiftQuarter(q, -1).q}</button>
       <span class="cur">{quarterLabel(q)}</span>
-      <button aria-label="Следующий квартал" onclick={() => (store.goalsQuarter = shiftQuarter(q, 1))}>Q{shiftQuarter(q, 1).q} ›</button>
+      <button aria-label="Следующий квартал" onclick={() => (goals.goalsQuarter = shiftQuarter(q, 1))}>Q{shiftQuarter(q, 1).q} ›</button>
     </div>
-    <button class="pri" disabled={!store.goalPeople.length} onclick={() => store.openGoalForm(person?.key ?? null)}>+ Новая цель</button>
-    {#if person}<button class="sec" disabled={!person.found} onclick={() => store.startGoalReview(person.key)}>Разобрать цели</button>{/if}
-    <button class="sec" disabled={!store.goalPeople.length} onclick={() => store.openGoalReport(person?.key ?? '*')}>Отчёт за квартал</button>
-    {#if past && openLeft}<button class="sec" onclick={() => store.openGoalCarry(person?.key ?? '*')}>Перенести незакрытые в {quarterLabel(shiftQuarter(q, 1))}</button>{/if}
+    <button class="pri" disabled={!goals.goalPeople.length} onclick={() => goals.openGoalForm(person?.key ?? null)}>+ Новая цель</button>
+    {#if person}<button class="sec" disabled={!person.found} onclick={() => goals.startGoalReview(person.key)}>Разобрать цели</button>{/if}
+    <button class="sec" disabled={!goals.goalPeople.length} onclick={() => goals.openGoalReport(person?.key ?? '*')}>Отчёт за квартал</button>
+    {#if past && openLeft}<button class="sec" onclick={() => goals.openGoalCarry(person?.key ?? '*')}>Перенести незакрытые в {quarterLabel(shiftQuarter(q, 1))}</button>{/if}
   </header>
 
-  {#if !store.goalPeople.length}
+  {#if !goals.goalPeople.length}
     <div class="empty">
       <p>Целей пока нет. Укажите файл и заголовок, под которым хранятся цели — свои или тимлида.</p>
-      <button class="pri" onclick={() => store.openGoalAdd({ me: true })}>Указать, где мои цели</button>
-      <button onclick={() => store.openGoalAdd()}>Добавить цели человека</button>
+      <button class="pri" onclick={() => goals.openGoalAdd({ me: true })}>Указать, где мои цели</button>
+      <button onclick={() => goals.openGoalAdd()}>Добавить цели человека</button>
     </div>
   {:else}
     <div class="tiles">
@@ -104,22 +105,22 @@
               <span class="av" style="background:{p.color}" aria-hidden="true">{p.ini}</span>
               <span class="gn">{p.name}</span><span class="gs">{p.src.file.split('/').pop()} › {p.src.heading}</span>
               <span class="sum">{p.found ? summary(p) : ''}</span>
-              {#if all && p.found}<button class="rv" onclick={() => store.startGoalReview(p.key)}>Разобрать цели</button>{/if}
-              <button class="plus" aria-label="Новая цель: {p.name}" title="Новая цель" disabled={!p.found} onclick={() => store.openGoalForm(p.key)}>+</button>
+              {#if all && p.found}<button class="rv" onclick={() => goals.startGoalReview(p.key)}>Разобрать цели</button>{/if}
+              <button class="plus" aria-label="Новая цель: {p.name}" title="Новая цель" disabled={!p.found} onclick={() => goals.openGoalForm(p.key)}>+</button>
             </div>
             {#if !p.found}
               <div class="lost">
                 {p.file ? `Заголовок «${p.src.heading}» не найден в ${p.src.file}` : `Файл ${p.src.file} не найден`}. Цели в файле не потеряны.
-                <button onclick={() => store.openGoalAdd({ replace: p.key, file: p.src.file, me: p.src.me })}>Выбрать заново</button>
+                <button onclick={() => goals.openGoalAdd({ replace: p.key, file: p.src.file, me: p.src.me })}>Выбрать заново</button>
               </div>
             {:else if !gs.length}
               <div class="none">В {quarterLabel(q)} целей нет</div>
             {:else}
               {#each gs as g (g.line)}
                 {@const closed = isDone(g, done(p))}
-                {@const soon = store.goalSoon(g, done(p))}
-                {@const silent = store.goalSilent(g)}
-                <button class="row" title="⌥-клик — разобрать с этой цели" onclick={(e) => (e.altKey && !closed ? store.startGoalReview(p.key, g.title) : store.openGoalFile(p.key, g.line))}>
+                {@const soon = goals.goalSoon(g, done(p))}
+                {@const silent = goals.goalSilent(g)}
+                <button class="row" title="⌥-клик — разобрать с этой цели" onclick={(e) => (e.altKey && !closed ? goals.startGoalReview(p.key, g.title) : goals.openGoalFile(p.key, g.line))}>
                   <span class="st" class:tone-chip={!!g.keyword && !GOAL_TONES[g.keyword]} style={chip(g.keyword, p)}>{g.keyword ?? '—'}</span>
                   <span class="tt"><span class="t" class:closed>{g.title}</span>{#if resultLine(g)}<span class="res">Результат: {resultLine(g)}</span>{/if}</span>
                   {#if closed && g.closed}
@@ -129,7 +130,7 @@
                       <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17V3M5 4h10l-2 3 2 3H5" /></svg>{shortDay(g.deadline)}
                     </span>
                   {/if}
-                  <span class="note" class:silent>{goalNote(g, done(p), new Date(), store.goalSettings.silent)}</span>
+                  <span class="note" class:silent>{goalNote(g, done(p), new Date(), goals.goalSettings.silent)}</span>
                 </button>
               {/each}
             {/if}

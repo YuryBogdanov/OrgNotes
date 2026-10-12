@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goals } from './features/goals.svelte';
   import { calendar } from './features/calendar.svelte';
   import { onMount, untrack } from 'svelte';
   import { store } from './store.svelte';
@@ -130,8 +131,8 @@
       store.showNav = true;
       store.setNavMode('goals');
     },
-    newGoal: () => store.openGoalForm(store.goalKeyOfFile()),
-    goalsOverview: () => store.openGoals('*'),
+    newGoal: () => goals.openGoalForm(goals.goalKeyOfFile()),
+    goalsOverview: () => goals.openGoals('*'),
     navExpand: () => store.navTree('expand'),
     newFile: () => {
       if (!store.canManageFiles) return;
@@ -203,7 +204,7 @@
   });
   // closing the «Разбор Inbox» tab ends the review (everything is on disk already); so for the goals
   $effect(() => {
-    if (store.goalReview && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'goalReview'))) store.goalReview = null;
+    if (goals.goalReview && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'goalReview'))) goals.goalReview = null;
   });
   $effect(() => {
     if (store.review && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'review'))) store.review = null;
@@ -290,7 +291,7 @@
 <!-- the agenda builder is a sheet over the whole window: the window stays visible under it but takes no input -->
 <!-- full screen with the menu bar shown: the toolbar grows by it (its buttons stay just below it), the traffic lights
      come into the toolbar -->
-<div class="win" inert={!!store.builder || store.settingsOpen || !!store.goalAdd || !!store.goalForm || !!store.goalReport || !!store.goalCarry} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
+<div class="win" inert={!!store.builder || store.settingsOpen || !!goals.goalAdd || !!goals.goalForm || !!goals.goalReport || !!goals.goalCarry} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
   <Dialogs />
   <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
@@ -360,10 +361,10 @@
         <span>Календарь</span><span class="sep">›</span><span class="last">{c ? calCrumb(c) : ''}</span>
       {:else if store.tab?.kind === 'goalReview'}
         {@const gk = store.tab.goals}
-        <span>Цели</span><span class="sep">›</span><span class="last">Разбор · {store.goalPeople.find((p) => p.key === gk)?.name ?? ''}</span>
+        <span>Цели</span><span class="sep">›</span><span class="last">Разбор · {goals.goalPeople.find((p) => p.key === gk)?.name ?? ''}</span>
       {:else if store.tab?.kind === 'goals'}
         {@const gk = store.tab.goals}
-        <span>Цели</span><span class="sep">›</span><span class="last">{!gk || gk === '*' ? 'Обзор квартала' : (store.goalPeople.find((p) => p.key === gk)?.name ?? 'Цели')}</span>
+        <span>Цели</span><span class="sep">›</span><span class="last">{!gk || gk === '*' ? 'Обзор квартала' : (goals.goalPeople.find((p) => p.key === gk)?.name ?? 'Цели')}</span>
       {:else if store.tab?.kind === 'untitled'}
         <span class="last">{store.tab.title}</span><span class="sep">·</span><span>не сохранено</span>
       {:else if crumbs.length}
@@ -427,10 +428,10 @@
 </div>
 {#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
 {#if store.settingsOpen && store.loaded}<Settings />{/if}
-{#if store.goalAdd}{#key store.goalAdd.n}<GoalAdd />{/key}{/if}
-{#if store.goalForm}{#key store.goalForm.n}<GoalForm />{/key}{/if}
-{#if store.goalReport}{#key store.goalReport.n}<GoalReport />{/key}{/if}
-{#if store.goalCarry}{#key store.goalCarry.n}<GoalCarry />{/key}{/if}
+{#if goals.goalAdd}{#key goals.goalAdd.n}<GoalAdd />{/key}{/if}
+{#if goals.goalForm}{#key goals.goalForm.n}<GoalForm />{/key}{/if}
+{#if goals.goalReport}{#key goals.goalReport.n}<GoalReport />{/key}{/if}
+{#if goals.goalCarry}{#key goals.goalCarry.n}<GoalCarry />{/key}{/if}
 {/if}
 
 <style>

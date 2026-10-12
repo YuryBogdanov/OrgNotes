@@ -1,19 +1,20 @@
 <script lang="ts">
-  import { store, type GoalPerson } from './store.svelte';
+  import { goals, type GoalPerson } from './features/goals.svelte';
+  import { store, } from './store.svelte';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import { GOAL_STATES, goalsIn, quarterLabel, activeWord } from './goals';
 
   // The navigator in the «Цели» mode (ТЗ 23): «Мои цели» pinned on top, «Обзор квартала», the team, «Добавить ещё
   // цели». A click shows the goals in the active pane; a double click opens the file at the heading.
-  const q = $derived(store.goalsQuarter);
-  const mine = $derived(store.goalPeople.find((p) => p.src.me));
-  const team = $derived(store.goalPeople.filter((p) => !p.src.me));
+  const q = $derived(goals.goalsQuarter);
+  const mine = $derived(goals.goalPeople.find((p) => p.src.me));
+  const team = $derived(goals.goalPeople.filter((p) => !p.src.me));
   const shown = $derived(store.tab?.kind === 'goals' ? store.tab.goals : null);
   const stat = (p: GoalPerson) => {
     const gs = goalsIn(p.data, q);
-    return { n: gs.length, active: gs.filter((g) => g.keyword === GOAL_STATES.active).length, silent: gs.some((g) => store.goalSilent(g)) };
+    return { n: gs.length, active: gs.filter((g) => g.keyword === GOAL_STATES.active).length, silent: gs.some((g) => goals.goalSilent(g)) };
   };
-  const total = $derived(store.goalPeople.reduce((s, p) => s + goalsIn(p.data, q).length, 0));
+  const total = $derived(goals.goalPeople.reduce((s, p) => s + goalsIn(p.data, q).length, 0));
 
   // ---- right click: open, rename, another heading, remove ------------------------------------------------------
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
@@ -23,11 +24,11 @@
     menu = {
       x: e.clientX, y: e.clientY,
       items: [
-        { label: 'Открыть файл', disabled: !p.file, action: () => store.openGoalFile(p.key) },
+        { label: 'Открыть файл', disabled: !p.file, action: () => goals.openGoalFile(p.key) },
         { label: 'Переименовать…', disabled: !!p.src.me, action: () => (renaming = p.key) },
-        { label: 'Сменить заголовок…', action: () => store.openGoalAdd({ replace: p.key, file: p.src.file, me: p.src.me }) },
+        { label: 'Сменить заголовок…', action: () => goals.openGoalAdd({ replace: p.key, file: p.src.file, me: p.src.me }) },
         'sep',
-        { label: 'Удалить из целей', danger: true, action: () => void store.removeGoalSource(p.key) },
+        { label: 'Удалить из целей', danger: true, action: () => void goals.removeGoalSource(p.key) },
       ],
     };
   }
@@ -37,7 +38,7 @@
   }
   function renameKey(e: KeyboardEvent, key: string) {
     if (e.key === 'Enter') {
-      void store.renameGoalSource(key, (e.currentTarget as HTMLInputElement).value);
+      void goals.renameGoalSource(key, (e.currentTarget as HTMLInputElement).value);
       renaming = null;
     } else if (e.key === 'Escape') {
       e.stopPropagation();
@@ -55,17 +56,17 @@
     {#if mine}
       {@const st = stat(mine)}
       <button class="mine" class:on={shown === mine.key} aria-current={shown === mine.key ? 'true' : undefined}
-        onclick={() => store.openGoals(mine.key)} ondblclick={() => store.openGoalFile(mine.key)} oncontextmenu={(e) => personMenu(e, mine)}>
+        onclick={() => goals.openGoals(mine.key)} ondblclick={() => goals.openGoalFile(mine.key)} oncontextmenu={(e) => personMenu(e, mine)}>
         {@render avatar(mine, 28)}
         <span class="mt"><b>Мои цели</b><span>{mine.found ? `${quarterLabel(q)} · ${activeWord(st.active)}` : 'Заголовок не найден'}</span></span>
         {#if st.silent}<span class="dot" title="Есть цели без отметок больше 2 недель"></span>{/if}
       </button>
     {:else}
-      <button class="setmine" onclick={() => store.openGoalAdd({ me: true })}>Указать, где мои цели</button>
+      <button class="setmine" onclick={() => goals.openGoalAdd({ me: true })}>Указать, где мои цели</button>
     {/if}
   </div>
   <div class="lst">
-    <button class="row" class:on={shown === '*'} aria-current={shown === '*' ? 'true' : undefined} onclick={() => store.openGoals('*')}>
+    <button class="row" class:on={shown === '*'} aria-current={shown === '*' ? 'true' : undefined} onclick={() => goals.openGoals('*')}>
       <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h6v6H3zM11 4h6v6h-6zM3 12h6v4H3zM11 12h6v4h-6z" /></svg>
       <span class="nm">Обзор квартала</span><span class="n">{total}</span>
     </button>
@@ -76,7 +77,7 @@
         <div class="row">{@render avatar(p, 20)}<input class="rn" aria-label="Название в навигаторе" value={p.src.title} use:focusSelect onkeydown={(e) => renameKey(e, p.key)} onblur={() => (renaming = null)} /></div>
       {:else}
         <button class="row" class:on={shown === p.key} aria-current={shown === p.key ? 'true' : undefined} title={p.found ? `${p.src.file} › ${p.src.heading}` : 'Заголовок не найден'}
-          onclick={() => store.openGoals(p.key)} ondblclick={() => store.openGoalFile(p.key)} oncontextmenu={(e) => personMenu(e, p)}>
+          onclick={() => goals.openGoals(p.key)} ondblclick={() => goals.openGoalFile(p.key)} oncontextmenu={(e) => personMenu(e, p)}>
           {@render avatar(p, 20)}
           <span class="nm">{p.name}</span>
           {#if !p.found}<span class="lost">не найден</span>{:else}
@@ -86,7 +87,7 @@
         </button>
       {/if}
     {/each}
-    <button class="add" onclick={() => store.openGoalAdd()}>
+    <button class="add" onclick={() => goals.openGoalAdd()}>
       <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
       Добавить ещё цели
     </button>

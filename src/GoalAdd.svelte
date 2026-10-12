@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goals } from './features/goals.svelte';
   import { tick } from 'svelte';
   import { store } from './store.svelte';
   import { better, fuzzy } from './fuzzy';
@@ -6,7 +7,7 @@
 
   // «Добавить цели» (ТЗ 23, 2.3): a file, then its level-1 heading where the goals are; the name in the navigator,
   // «Это мои цели». The same sheet changes the heading of a source («Сменить заголовок…»).
-  const req = store.goalAdd!;
+  const req = goals.goalAdd!;
   const NEW = '\u0000new';
 
   let q = $state('');
@@ -18,7 +19,7 @@
   let confirmMe = $state(false);
   let busy = $state(false);
 
-  const mineNow = $derived(store.goalSources.find((s) => s.me));
+  const mineNow = $derived(goals.goalSources.find((s) => s.me));
   const base = (n: string) => n.split('/').pop()!.replace(/\.org$/, '');
   const files = $derived(
     store.files
@@ -28,7 +29,7 @@
       .map((x) => x.f),
   );
   const noteOf = (rel: string) => {
-    const s = store.goalSources.filter((x) => x.file === rel && sourceKey(x) !== req.replace);
+    const s = goals.goalSources.filter((x) => x.file === rel && sourceKey(x) !== req.replace);
     return s.some((x) => x.me) ? 'мои цели' : s.length ? 'уже в целях' : 'не добавлен';
   };
   const cur = $derived(store.files.find((f) => f.name === file));
@@ -49,7 +50,7 @@
   if (file) pickFile(file);
   else if (req.replace) pickFile(req.replace.split('#')[0]);
   if (req.replace) {
-    const s = store.goalSources.find((x) => sourceKey(x) === req.replace);
+    const s = goals.goalSources.find((x) => sourceKey(x) === req.replace);
     if (s) {
       name = s.title;
       named = true;
@@ -73,14 +74,14 @@
     busy = true;
     const heading = head === NEW ? SOURCE_HEADING : head!;
     const src = { file: file!, heading, title: name.trim(), ...(me ? { me: true } : {}) };
-    const ok = await store.addGoalSource(src, { create: head === NEW, replace: req.replace });
+    const ok = await goals.addGoalSource(src, { create: head === NEW, replace: req.replace });
     busy = false;
     if (!ok) return;
-    store.goalAdd = null;
+    goals.goalAdd = null;
     store.setNavMode('goals');
-    store.openGoals(sourceKey(src));
+    goals.openGoals(sourceKey(src));
   }
-  const close = () => (store.goalAdd = null);
+  const close = () => (goals.goalAdd = null);
 
   // ---- keyboard: ↑↓ in the list in focus, ↩ adds, ⎋ closes -----------------------------------------------------
   let col = $state<'file' | 'head'>(req.replace || req.file ? 'head' : 'file');

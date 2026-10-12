@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goals } from './features/goals.svelte';
   import { calendar } from './features/calendar.svelte';
   import { store, SECTIONS, type SettingsSection } from './store.svelte';
   import KeysSettings from './KeysSettings.svelte';
@@ -625,13 +626,13 @@
           <div class="opts">
             <div class="opt">
               <label for="g-silent">Цель «молчит» через</label>
-              <select id="g-silent" class="sel" value={String(store.goalSettings.silent)} onchange={(e) => void store.setGoalSettings({ silent: +e.currentTarget.value })}>
+              <select id="g-silent" class="sel" value={String(goals.goalSettings.silent)} onchange={(e) => void goals.setGoalSettings({ silent: +e.currentTarget.value })}>
                 {#each [7, 14, 21, 30] as d (d)}<option value={String(d)}>{days(d)}</option>{/each}
               </select>
             </div>
             <div class="opt">
               <label for="g-soon">Предупреждать о сроке за</label>
-              <select id="g-soon" class="sel" value={String(store.goalSettings.soon)} onchange={(e) => void store.setGoalSettings({ soon: +e.currentTarget.value })}>
+              <select id="g-soon" class="sel" value={String(goals.goalSettings.soon)} onchange={(e) => void goals.setGoalSettings({ soon: +e.currentTarget.value })}>
                 {#each [2, 4, 6, 8] as w (w)}<option value={String(w)}>{w} {w < 5 ? 'недели' : 'недель'}</option>{/each}
               </select>
             </div>

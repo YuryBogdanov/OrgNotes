@@ -3,6 +3,7 @@
 // the current state and a shortcut. A command either runs at once or returns the next step, shown in the same
 // palette window (a list to pick from, or a text to type).
 import { store, type NoteFile } from './store.svelte';
+import { goals } from './features/goals.svelte';
 import { calendar } from './features/calendar.svelte';
 import { fuzzy, better, type Match } from './fuzzy';
 import { displayName } from './names';
@@ -202,32 +203,32 @@ register({
 });
 register({
   id: 'newGoal', title: 'Новая цель…', icon: 'goal', group: 'general', synonyms: ['цель', 'квартал', 'goal'],
-  when: () => store.goalPeople.some((p) => p.found), hint: () => (store.goalKeyOfFile() ? `для ${store.goalPeople.find((p) => p.key === store.goalKeyOfFile())!.name}` : ''),
-  run: () => void setTimeout(() => store.openGoalForm(store.goalKeyOfFile())), // once the palette is closed
+  when: () => goals.goalPeople.some((p) => p.found), hint: () => (goals.goalKeyOfFile() ? `для ${goals.goalPeople.find((p) => p.key === goals.goalKeyOfFile())!.name}` : ''),
+  run: () => void setTimeout(() => goals.openGoalForm(goals.goalKeyOfFile())), // once the palette is closed
 });
 register({
   id: 'goalReview', title: 'Разобрать цели…', icon: 'goal', group: 'general', keyId: '', synonyms: ['разбор', '1-1', 'цели', 'отметки'],
-  when: () => store.goalPeople.some((p) => p.found),
+  when: () => goals.goalPeople.some((p) => p.found),
   run: () => ({
     placeholder: 'Чьи цели разобрать',
     plate: () => ({ kind: 'text', text: 'Разбор целей квартала на 1-1' }),
     rows: (q) => {
-      const rows: Row[] = store.goalPeople
+      const rows: Row[] = goals.goalPeople
         .filter((p) => p.found)
         .map((p) => ({ p, m: q.trim() ? fuzzy(q, p.name) : null }))
         .filter((x) => !q.trim() || x.m)
-        .map(({ p, m }) => ({ id: 'goal:' + p.key, group: 'ЛЮДИ', title: p.name, at: m?.at, icon: 'goal' as Icon, hint: p.src.file.split('/').pop(), run: () => store.startGoalReview(p.key) }));
+        .map(({ p, m }) => ({ id: 'goal:' + p.key, group: 'ЛЮДИ', title: p.name, at: m?.at, icon: 'goal' as Icon, hint: p.src.file.split('/').pop(), run: () => goals.startGoalReview(p.key) }));
       return rows.length ? rows : [NOTHING];
     },
   }),
 });
 register({
   id: 'goalsOverview', title: 'Цели: обзор квартала', icon: 'goal', group: 'general', synonyms: ['цели', 'квартал'],
-  when: () => store.goalSources.length > 0, run: () => store.openGoals('*'),
+  when: () => goals.goalSources.length > 0, run: () => goals.openGoals('*'),
 });
 register({
   id: 'goalsAdd', title: 'Добавить цели…', icon: 'goal', group: 'general', keyId: '', synonyms: ['цели', 'источник', 'тимлид'],
-  when: () => store.files.length > 0, run: () => void setTimeout(() => store.openGoalAdd()),
+  when: () => store.files.length > 0, run: () => void setTimeout(() => goals.openGoalAdd()),
 });
 register({
   id: 'calendar', title: 'Календарь', icon: 'cal', group: 'general', synonyms: ['месяц', 'неделя', 'события'],

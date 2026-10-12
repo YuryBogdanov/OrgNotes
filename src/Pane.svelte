@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goals } from './features/goals.svelte';
   import { store } from './store.svelte';
   import { headingAt } from './org';
   import Editor from './Editor.svelte';
@@ -30,8 +31,8 @@
     const h = file.headings[headingAt(file.headings, tab.cursor.line)];
     return h ? [...h.path, h.title] : [];
   });
-  const goalsLabel = (t: Tab) => (!t.goals || t.goals === '*' ? 'Обзор квартала' : (store.goalPeople.find((p) => p.key === t.goals)?.name ?? 'Цели'));
-  const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'calendar' ? 'Календарь' : t.kind === 'goals' ? goalsLabel(t) : t.kind === 'goalReview' ? `Разбор целей · ${store.goalPeople.find((p) => p.key === t.goals)?.name ?? ''}` : t.kind === 'review' ? 'Разбор Inbox' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : displayName(t.path ?? ''));
+  const goalsLabel = (t: Tab) => (!t.goals || t.goals === '*' ? 'Обзор квартала' : (goals.goalPeople.find((p) => p.key === t.goals)?.name ?? 'Цели'));
+  const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'calendar' ? 'Календарь' : t.kind === 'goals' ? goalsLabel(t) : t.kind === 'goalReview' ? `Разбор целей · ${goals.goalPeople.find((p) => p.key === t.goals)?.name ?? ''}` : t.kind === 'review' ? 'Разбор Inbox' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : displayName(t.path ?? ''));
   // a file deleted on disk stays open: an italic name, and the tooltip says why
   const gone = (t: Tab) => t.kind === 'file' && !!store.orphans[t.path ?? ''];
   const dirty = (t: Tab) => {
