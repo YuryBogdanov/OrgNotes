@@ -1,4 +1,4 @@
-# ТЗ: API плагинов v1 и загрузчик
+# ТЗ: API плагинов v1 и загрузчик (v1.1 — после пилота)
 
 2026-10-12 · Claude по решениям Yury Bogdanov
 
@@ -318,6 +318,28 @@ net?: { fetch(url: string, init?: { method?; headers?; body?: string }): Promise
 - добавляет раздел навигатора «Привет» со списком файлов;
 - добавляет вид-вкладку «Доска», где показано состояние и есть кнопка, которая транзакцией ставит DONE первой задаче (⌘Z её отменяет);
 - добавляет настройку в своём разделе.
+
+## API v1.1 — после пилота (роадмап 2.3)
+
+Пилот — перенос целей квартала (ТЗ 27) — добавил в API без поломок прежнего, поэтому версия API стала 1.1.0, а плагины с `"api": "^1.0"` работают как работали:
+- **Своя структура в файле:** `tx.update(path, fn)`; `transaction(…, { onUndo })`; библиотека `@panopticon/api/org` (пока только для встроенных плагинов).
+- **Форма:** поля `textarea`, `date`, `place`, `custom`; `onChange` и `headerExtra`.
+- **Интерфейс:**
+  - `ui.sheet` (и `bare`), `ui.menu` (с `'sep'`), `ui.choose`, `ui.close`;
+  - `ui.widget` — календарь, выбор места, строки приложения в элементе плагина;
+  - `ui.currentReview()`;
+  - `pickDate({ kind, names, current })`.
+- **Разбор:** части карточки `head`, `quick`, `aside`, `summary`, `narrow`; у действий `disabled`, `sub`, `kind`; у разбора `noSkip`, `beforeStep`, `width`, `start`, `cls`, `crumbs`, `backCommand`.
+- **Данные и команды:**
+  - `index.statusTone`, `index.workflow`;
+  - `statusSets.set(…, { ifMissing })`;
+  - `commands.setAvailable`, `commands.keyOf`;
+  - `"step": true` у команды манифеста;
+  - команды приложения `heading.status` и `file.open` со строкой;
+  - `tab.active` с состоянием своей вкладки.
+- **Плагины без сборки приложения:** шаблон `templates/plugin` (TypeScript, Svelte, сборка в один модуль) и инструкция `docs/plugins/README.md`.
+
+Справочник по всему API — в инструкции. Чего пока нет — в конце инструкции и в роадмапе.
 
 ## Разбивка и приёмка
 
