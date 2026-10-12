@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Compartment, EditorState, MapMode, Prec, RangeSetBuilder, StateField, Transaction, type Range, type StateEffect } from '@codemirror/state';
+  import { Compartment, EditorState, MapMode, RangeSetBuilder, StateField, Transaction, type Range, type StateEffect } from '@codemirror/state';
   import { Decoration, EditorView, ViewPlugin, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
   import { codeFolding, foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
@@ -12,6 +12,7 @@
   import { DEFAULT_LEVELS, orgIndent, type LevelView } from './orgIndent';
   import { orgRich, type RichPick } from './orgRich';
   import { findExtension, findField, foundInfo, moveFind, setFind, type FindQuery } from './findView';
+  import { registerEditor } from './editorKeys';
 
   let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, rich = false, richNumbers = false, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
     levels?: LevelView; // «Структурный вид»: one star per level, text moved by level
@@ -340,7 +341,50 @@
     ];
   }
 
+  // ---- the commands the keys run (ids of keys.ts) ------------------------------------------------------------
+  let curWords = {} as Workflow; // the statuses of the document shown: the newest, a status added in the settings too
+  $effect.pre(() => {
+    curWords = wf;
+  });
+  const docText = (v: EditorView) => v.state.doc.toString();
+  const status = (v: EditorView, f: (w: Workflow, k: string | null) => string | null) => onHeading(v) && run(v, changeStatusAt(docText(v), sel(v).head, f, curWords));
+  const shift = (v: EditorView, d: -1 | 1) => onHeading(v) && run(v, shiftSubtree(docText(v), sel(v).head, d));
+  const commands: Record<string, (v: EditorView) => boolean> = {
+    newHeading: (v) => newHeading(v, false, curWords),
+    newTask: (v) => newHeading(v, true, curWords),
+    // heading lines only, so Option+arrows keep moving by word inside text (as in Org on a Mac)
+    promote: (v) => shift(v, -1),
+    demote: (v) => shift(v, 1),
+    promoteTree: (v) => shift(v, -1),
+    demoteTree: (v) => shift(v, 1),
+    subtreeUp: (v) => onHeading(v) && run(v, moveSubtree(docText(v), sel(v).head, -1)),
+    subtreeDown: (v) => onHeading(v) && run(v, moveSubtree(docText(v), sel(v).head, 1)),
+    prioUp: (v) => onHeading(v) && run(v, cyclePriority(docText(v), sel(v).head, 'up', curWords)),
+    prioDown: (v) => onHeading(v) && run(v, cyclePriority(docText(v), sel(v).head, 'down', curWords)),
+    // statuses: inside the workflow, and between workflows (heading lines only)
+    statusNext: (v) => status(v, (w, k) => rotateStatus(w, k, 'next')),
+    statusPrev: (v) => status(v, (w, k) => rotateStatus(w, k, 'prev')),
+    wfNext: (v) => status(v, (w, k) => rotateWorkflow(w, k, 'next')),
+    wfPrev: (v) => status(v, (w, k) => rotateWorkflow(w, k, 'prev')),
+    cycleVisibility: (v) => cycleVisibility(v),
+    fold: (v) => {
+      // the visible line: after an arrow the caret may sit at the end of a folded drawer, on its hidden :END:
+      const l = v.state.doc.lineAt(v.lineBlockAt(v.state.selection.main.head).from);
+      cycleState.delete(v);
+      if (headingSet(v.state.doc).has(l.number - 1)) return toggleFold(v); // a heading: its subtree
+      const d = drawerMap(v.state.doc).get(l.number - 1);
+      return d ? toggleDrawer(v, d) : false; // the first line of a drawer: that drawer only
+    },
+    followLink: (v) => {
+      const l = linkAt(v.state.doc, v.state.selection.main.head);
+      if (!l) return false;
+      onfollow(l);
+      return true;
+    },
+  };
+
   function makeState(doc: string, words: Workflow) {
+    curWords = words;
     const plugin = ViewPlugin.fromClass(
       class {
         decorations: DecorationSet;
@@ -392,42 +436,8 @@
           },
         }),
         EditorView.lineWrapping,
-        Prec.high(
-          keymap.of([
-            { key: 'Alt-Enter', run: (v) => newHeading(v, false, words) },
-            { key: 'Alt-Shift-Enter', run: (v) => newHeading(v, true, words) },
-            // heading lines only, so Option+arrows keep moving by word inside text (as in Org on a Mac)
-            { key: 'Alt-ArrowLeft', run: (v) => onHeading(v) && run(v, shiftSubtree(v.state.doc.toString(), sel(v).head, -1)) },
-            { key: 'Alt-ArrowRight', run: (v) => onHeading(v) && run(v, shiftSubtree(v.state.doc.toString(), sel(v).head, 1)) },
-            { key: 'Alt-Shift-ArrowLeft', run: (v) => onHeading(v) && run(v, shiftSubtree(v.state.doc.toString(), sel(v).head, -1)) },
-            { key: 'Alt-Shift-ArrowRight', run: (v) => onHeading(v) && run(v, shiftSubtree(v.state.doc.toString(), sel(v).head, 1)) },
-            { key: 'Alt-ArrowUp', run: (v) => onHeading(v) && run(v, moveSubtree(v.state.doc.toString(), sel(v).head, -1)) },
-            { key: 'Alt-ArrowDown', run: (v) => onHeading(v) && run(v, moveSubtree(v.state.doc.toString(), sel(v).head, 1)) },
-            { key: 'Shift-ArrowUp', run: (v) => onHeading(v) && run(v, cyclePriority(v.state.doc.toString(), sel(v).head, 'up', words)) },
-            { key: 'Shift-ArrowDown', run: (v) => onHeading(v) && run(v, cyclePriority(v.state.doc.toString(), sel(v).head, 'down', words)) },
-            // statuses: Shift+←/→ inside the workflow, Ctrl+Shift+←/→ between workflows (heading lines only)
-            { key: 'Shift-ArrowRight', run: (v) => onHeading(v) && run(v, changeStatusAt(v.state.doc.toString(), sel(v).head, (w, k) => rotateStatus(w, k, 'next'), words)) },
-            { key: 'Shift-ArrowLeft', run: (v) => onHeading(v) && run(v, changeStatusAt(v.state.doc.toString(), sel(v).head, (w, k) => rotateStatus(w, k, 'prev'), words)) },
-            { key: 'Ctrl-Shift-ArrowRight', run: (v) => onHeading(v) && run(v, changeStatusAt(v.state.doc.toString(), sel(v).head, (w, k) => rotateWorkflow(w, k, 'next'), words)) },
-            { key: 'Ctrl-Shift-ArrowLeft', run: (v) => onHeading(v) && run(v, changeStatusAt(v.state.doc.toString(), sel(v).head, (w, k) => rotateWorkflow(w, k, 'prev'), words)) },
-            { key: 'Shift-Tab', run: cycleVisibility },
-          ]),
-        ),
+        // the configurable keys are run by the window's handler (editorKeys.ts); here only the fixed ones
         keymap.of([
-          { key: 'Mod-Enter', run: (v) => {
-              const l = linkAt(v.state.doc, v.state.selection.main.head);
-              if (!l) return false;
-              onfollow(l);
-              return true;
-            } },
-          { key: 'Tab', run: (v) => {
-              // the visible line: after an arrow the caret may sit at the end of a folded drawer, on its hidden :END:
-              const l = v.state.doc.lineAt(v.lineBlockAt(v.state.selection.main.head).from);
-              cycleState.delete(v);
-              if (headingSet(v.state.doc).has(l.number - 1)) return toggleFold(v); // a heading: its subtree
-              const d = drawerMap(v.state.doc).get(l.number - 1);
-              return d ? toggleDrawer(v, d) : false; // the first line of a drawer: that drawer only
-            } },
           ...foldKeymap, ...historyKeymap, ...defaultKeymap,
         ]),
         EditorView.updateListener.of((u) => {
@@ -470,7 +480,12 @@
         return v.state.sliceDoc(r.from, r.to);
       },
     });
-    return () => view?.destroy();
+    const v = view;
+    const unregister = registerEditor(v.dom, { run: (id) => commands[id]?.(v) ?? false, onHeading: () => onHeading(v) });
+    return () => {
+      unregister();
+      v.destroy();
+    };
   });
 
   $effect(() => {

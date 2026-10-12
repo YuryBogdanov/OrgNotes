@@ -127,10 +127,10 @@
       <button class="rv stop" onclick={() => store.endReview()}>
         <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h10v10H5z" /></svg>Закончить</button>
     {:else if file}
-      <button class="rv" disabled={!pending.length} title={pending.length ? 'Разобрать Inbox (⇧⌘R)' : 'Нечего разбирать'} onclick={() => store.startReview()}>
+      <button class="rv" disabled={!pending.length} title={pending.length ? store.titled('Разобрать Inbox', 'review') : 'Нечего разбирать'} onclick={() => store.startReview()}>
         <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4.5l9 5.5-9 5.5z" /></svg>Разобрать</button>
     {/if}
-    <button class="plus" aria-label="Новая задача в Inbox (⇧⌘I)" title="Новая задача в Inbox (⇧⌘I)" onclick={() => store.openCapture()}>
+    <button class="plus" aria-label={store.titled('Новая задача в Inbox', 'capture')} title={store.titled('Новая задача в Inbox', 'capture')} onclick={() => store.openCapture()}>
       <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
     </button>
   </div>
@@ -170,7 +170,7 @@
     </div>
     <div class="foot">Порядок — {store.inboxCfg.reviewOrder === 'old' ? 'от старых к новым' : 'от новых к старым'}. Задача старше {days(store.inboxCfg.stale)} помечена цветом.</div>
   {:else if !items.length}
-    <div class="empty">Inbox разобран: задач нет.<br />Новая — кнопкой «+» или ⇧⌘I.</div>
+    <div class="empty">Inbox разобран: задач нет.<br />Новая — кнопкой «+»{store.keyHint('capture') ? ` или ${store.keyHint('capture')}` : ''}.</div>
   {:else}
     {#if pending.length}
       <div class="prog"><div class="pt"><span>{tasksWord(pending.length)}</span>{#if oldest}<span>самой старой {days(oldest)}</span>{/if}</div></div>

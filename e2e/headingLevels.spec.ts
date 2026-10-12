@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, openSettingsSheet } from './tauriMock';
 import { WORK } from './levelsFixture';
 
 // ТЗ «Отображение уровней заголовков (одна звёздочка, отступы)».
@@ -214,11 +214,21 @@ test.describe('the real text', () => {
 test.describe('settings', () => {
   test('off: the file as it is; text only: moved by the step plus its own stars; the step 1–4; switching is not an edit', async ({ page }) => {
     await open(page);
-    const set = (l: object) =>
-      page.evaluate((l) => {
-        localStorage.setItem('editor:levels', JSON.stringify(l));
-        window.dispatchEvent(new StorageEvent('storage', { key: 'editor:levels', newValue: JSON.stringify(l) })); // as from the settings window
-      }, l);
+    // through «Настройки › Основные», closed again with ⎋
+    const set = async (l: { oneStar: boolean; indent: boolean; step: number }) => {
+      await openSettingsSheet(page, 'Основные');
+      for (const [name, on] of [['Одна звёздочка на уровень', l.oneStar], ['Сдвигать текст по уровню', l.indent]] as const) {
+        const sw = page.getByRole('switch', { name });
+        if (((await sw.getAttribute('aria-checked')) === 'true') !== on) await sw.click();
+        await expect(sw).toHaveAttribute('aria-checked', String(on));
+      }
+      const step = page.getByRole('group', { name: 'Шаг отступа' });
+      for (let i = 0; i < 4 && !(await step.textContent())?.includes(`${l.step} симв.`); i++)
+        await page.getByRole('button', { name: (await step.textContent())!.match(/\d/)![0] < String(l.step) ? 'Больше' : 'Меньше' }).click();
+      await expect(step).toContainText(`${l.step} симв.`);
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog', { name: 'Настройки' })).toHaveCount(0);
+    };
     const w = await charW(page);
     const s1 = await leftOf(page, 'Q4 2026', '*');
     await set({ oneStar: false, indent: false, step: 2 });
@@ -233,12 +243,10 @@ test.describe('settings', () => {
     expect(await disk(page)).toBe(WORK);
   });
 
-  test('«Основные» in the settings window: the switches and the stepper reach the editor at once', async ({ page, context }) => {
+  test('«Основные» in the settings sheet: the switches and the stepper reach the editor at once', async ({ page }) => {
     await open(page);
-    const settings = await context.newPage();
-    await installTauriMock(settings, { [FILE]: WORK });
-    await settings.goto('/#settings');
-    await settings.getByRole('tab', { name: 'Основные' }).click();
+    await openSettingsSheet(page, 'Основные');
+    const settings = page;
     await expect(settings.getByRole('switch', { name: 'Одна звёздочка на уровень' })).toHaveAttribute('aria-checked', 'true');
     await expect(settings.getByRole('switch', { name: 'Сдвигать текст по уровню' })).toHaveAttribute('aria-checked', 'true');
     await expect(settings.getByRole('group', { name: 'Шаг отступа' })).toContainText('2 симв.');

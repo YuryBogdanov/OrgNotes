@@ -53,7 +53,7 @@ test.describe('one file', () => {
     await unwritable(page); // the disk is writable again
     await page.keyboard.press('Enter');
     await expect(sheet(page)).toHaveCount(0);
-    expect((await disk(page))['/mock/work.org']).toBe('* Q4 2026 правка\n** TODO Бюджет\nтекст\n');
+    await expect.poll(async () => (await disk(page))['/mock/work.org']).toBe('* Q4 2026 правка\n** TODO Бюджет\nтекст\n'); // written right after
     await expect(panes(page).nth(0).getByText('Нет открытых вкладок')).toBeVisible();
   });
 

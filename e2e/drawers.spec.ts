@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, openSettingsSheet } from './tauriMock';
 
 // ТЗ «Сворачивание drawers (:PROPERTIES:, :LOGBOOK:)».
 const IB = '/mock/inbox.org';
@@ -200,8 +200,8 @@ test.describe('only the view', () => {
 
 test('the switch in Settings › Основные › Drawers is kept on this Mac', async ({ page }) => {
   await installTauriMock(page, FILES());
-  await page.goto('/#settings');
-  await page.getByRole('tab', { name: 'Основные' }).click();
+  await page.goto('/');
+  await openSettingsSheet(page, 'Основные');
   const sw = page.getByRole('switch', { name: 'Сворачивать drawers при открытии файла' });
   await expect(sw).toHaveAttribute('aria-checked', 'true');
   await sw.click();

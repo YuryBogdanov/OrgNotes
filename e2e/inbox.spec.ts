@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, openSettingsSheet } from './tauriMock';
 import { FILES, INBOX, NOW } from './inboxFixture';
 
 // ТЗ «Inbox — раздел навигатора и быстрый ввод задачи (⇧⌘I)».
@@ -220,8 +220,8 @@ test.describe('sorting out', () => {
 test.describe('settings → Inbox', () => {
   test('the file, the status, :CREATED:, the order, the counter, the details; written to config.json', async ({ page }) => {
     await installTauriMock(page, FILES());
-    await page.goto('/#settings');
-    await page.getByRole('tab', { name: 'Inbox' }).click();
+    await page.goto('/');
+    await openSettingsSheet(page, 'Inbox');
     await expect(page.getByTestId('ib-file')).toHaveText('inbox.org');
     await expect(page.getByLabel('Куда добавлять')).toHaveValue('top');
     await page.getByLabel('Куда добавлять').selectOption('end');
@@ -235,8 +235,8 @@ test.describe('settings → Inbox', () => {
 
   test('«Выбрать…»: the palette of files, the chosen one shown as a path; a missing file says so', async ({ page }) => {
     await installTauriMock(page, { ...FILES(), '/mock/.orgnotes/config.json': JSON.stringify({ version: 1, inbox: { file: 'gone.org' } }) });
-    await page.goto('/#settings');
-    await page.getByRole('tab', { name: 'Inbox' }).click();
+    await page.goto('/');
+    await openSettingsSheet(page, 'Inbox');
     await expect(page.getByTestId('ib-file')).toHaveText('gone.org — не найден');
     await page.getByRole('button', { name: 'Выбрать файл Inbox' }).click();
     await expect(page.locator('.pal')).toContainText('Файл Inbox');
@@ -255,24 +255,28 @@ test.describe('settings → Inbox', () => {
     await expect.poll(() => page.evaluate((p) => (window as any).__disk[p] as string, IB)).toBe(INBOX() + '\n* TODO В конец\n');
   });
 
-  test('the shortcut: recorded from the keys, for any program or not; a taken one says so', async ({ page }) => {
+  test('the shortcut: «Inbox» leads to «Клавиши», recorded there, for any program or not; a taken one says so', async ({ page }) => {
     await installTauriMock(page, FILES());
     await page.addInitScript(() => ((window as any).__shortcutTaken = 'Alt+CmdOrCtrl+KeyK'));
-    await page.goto('/#settings');
-    await page.getByRole('tab', { name: 'Inbox' }).click();
-    const rec = page.getByRole('button', { name: 'Сочетание клавиш' });
-    await expect(rec).toHaveText('⇧⌘I');
-    await rec.click();
-    await expect(rec).toHaveText('Нажмите сочетание…');
+    await page.goto('/');
+    await openSettingsSheet(page, 'Inbox');
+    await expect(page.getByText('⇧⌘I — изменить в разделе «Клавиши»')).toBeVisible();
+    await page.getByText('⇧⌘I — изменить в разделе «Клавиши»').locator('..').getByRole('button', { name: 'Открыть…' }).click();
+    await expect(page.getByRole('tab', { name: 'Клавиши' })).toHaveAttribute('aria-selected', 'true');
+    const row = page.locator('[data-cmd="capture"]');
+    await row.getByRole('button', { name: 'Изменить сочетание ⇧⌘I' }).click();
+    await expect(row.locator('.chip.rec')).toHaveText('Нажмите сочетание…');
     await page.keyboard.press('Control+Meta+n');
-    await expect(rec).toHaveText('⌃⌘N');
+    await expect(row.locator('.chip')).toHaveText(['⌃⌘N']);
     expect(await log(page)).toContainEqual(['shortcut', 'Control+CmdOrCtrl+KeyN', true]);
+    await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab', { name: 'Inbox' }).click();
     await page.getByRole('switch', { name: 'Работает из любой программы' }).click();
     expect(await log(page)).toContainEqual(['shortcut', 'Control+CmdOrCtrl+KeyN', false]);
     await page.getByRole('switch', { name: 'Работает из любой программы' }).click();
-    await rec.click();
+    await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab', { name: 'Клавиши' }).click();
+    await row.getByRole('button', { name: 'Изменить сочетание ⌃⌘N' }).click();
     await page.keyboard.press('Alt+Meta+k');
-    await expect(page.locator('.err')).toContainText('сочетание уже занято другой программой');
+    await expect(row.locator('.hint.err')).toHaveText('Занято другой программой');
   });
 });
 

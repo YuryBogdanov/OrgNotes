@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, openSettingsSheet } from './tauriMock';
 import { MY_DAY, NOTES, withAgenda } from './agendaFixture';
 
 // ТЗ «Конструктор агенды».
@@ -578,8 +578,8 @@ test.describe('the navigator mode «Агенда»', () => {
 test.describe('settings → «Агенды»', () => {
   test('«Мои агенды» with ×, asking first; a change of statuses keeps the agendas', async ({ page }) => {
     await installTauriMock(page, withAgenda(NOTES(), MY_DAY, { ...MY_DAY, id: 'a2', name: 'Пятничные 1:1' }));
-    await page.goto('/#settings');
-    await page.getByRole('tab', { name: 'Агенды' }).click();
+    await page.goto('/');
+    await openSettingsSheet(page, 'Агенды');
     const rows = page.getByRole('list', { name: 'Мои агенды' }).getByRole('listitem');
     await expect(rows).toHaveText([/Мой день\s*4 блока/, /Пятничные 1:1\s*4 блока/]);
     await page.getByRole('button', { name: 'Удалить агенду Пятничные 1:1' }).click();
@@ -600,15 +600,16 @@ test.describe('settings → «Агенды»', () => {
     expect((await config(page)).agendas.map((a: { name: string }) => a.name)).toEqual(['Мой день', 'Свежая']);
   });
 
-  test('«Новая агенда в конструкторе…» opens the builder in the main window', async ({ page, context }) => {
+  test('«Новая агенда в конструкторе…» closes the settings and opens the builder; ⌘, brings the settings back after it', async ({ page }) => {
     await start(page);
-    const settings = await context.newPage();
-    await installTauriMock(settings, NOTES());
-    await settings.goto('/#settings');
-    await settings.getByRole('tab', { name: 'Агенды' }).click();
-    await expect(settings.getByText('Своих агенд пока нет.')).toBeVisible();
-    await settings.getByRole('button', { name: 'Новая агенда в конструкторе…' }).click();
+    await openSettingsSheet(page, 'Агенды');
+    await expect(page.getByText('Своих агенд пока нет.')).toBeVisible();
+    await page.getByRole('button', { name: 'Новая агенда в конструкторе…' }).click();
+    await expect(page.getByRole('dialog', { name: 'Настройки' })).toHaveCount(0);
     await expect(builder(page)).toBeVisible();
+    // one sheet at a time: ⌘, does nothing over the builder
+    await page.keyboard.press('Meta+Comma');
+    await expect(page.getByRole('dialog', { name: 'Настройки' })).toHaveCount(0);
     await expect(builder(page).getByRole('textbox').first()).toHaveValue('Новая агенда');
   });
 });

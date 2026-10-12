@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { store } from './store.svelte';
+  import { store, SECTIONS, type SettingsSection } from './store.svelte';
+  import KeysSettings from './KeysSettings.svelte';
   import { toneFor, type Workflow } from './org';
   import { toneOf, toneStyle, colorName } from './colors';
   import ColorPicker from './ColorPicker.svelte';
@@ -11,8 +12,7 @@
     toJson, validate, type DraftState,
   } from './workflowEditor';
 
-  // `standalone`: the settings live in their own window; otherwise they are a sheet over the app (plain browser).
-  let { standalone = false }: { standalone?: boolean } = $props();
+  // The settings: a sheet over the main window (as the agenda builder), sections on the left. Changes apply at once.
 
   let draft = $state(fromConfig(store.config));
   let selectedId = $state(draft.workflows[0]?.id ?? '');
@@ -21,7 +21,6 @@
   const json = $derived(toJson(store.configText, draft));
   // nothing is written until the user actually changes something
   let baseline = toJson(store.configText, draft);
-  let savedFlash = $state(false);
 
   $effect(() => {
     const j = json;
@@ -30,8 +29,6 @@
       baseline = j;
       // from the newest file: the main window may have written agendas meanwhile
       await store.updateConfig((raw) => toJson(raw, draft));
-      savedFlash = true;
-      setTimeout(() => (savedFlash = false), 1500);
     }, 250);
     return () => clearTimeout(t);
   });
@@ -274,16 +271,52 @@
     }
   }
 
+  /** ⎋ closes (an open popover, dialog or edit takes it first), ⌘[ ⌘] go to the section before / after. */
   function key(e: KeyboardEvent) {
-    if (e.key === 'Escape' && confirmAgenda) {
-      confirmAgenda = null;
+    if (e.defaultPrevented) return;
+    if (e.key === 'Escape') {
+      if (confirmAgenda) confirmAgenda = null;
+      else if (!picker && !pickFile && !rename && !confirmDelete) store.closeSettings();
+      e.preventDefault();
       return;
     }
-    if (e.key === 'Escape' && !standalone && !picker && !pickFile && !rename && !confirmDelete) store.settingsOpen = false;
+    if (e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey && (e.code === 'BracketLeft' || e.code === 'BracketRight')) {
+      e.preventDefault();
+      step(e.code === 'BracketLeft' ? -1 : 1);
+    }
   }
-
-  const TABS = ['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы'];
-  const READY = ['Основные', 'Статусы', 'Агенды', 'Inbox'];
+  /** The section before / after that is ready (the others are not made yet). */
+  function step(d: -1 | 1, focus = false) {
+    const ready = SECTIONS.filter((x) => READY.includes(x));
+    const i = ready.indexOf(tab);
+    const next = ready[(i + d + ready.length) % ready.length];
+    store.showSection(next);
+    if (focus) queueMicrotask(() => document.querySelector<HTMLElement>(`[data-section="${next}"]`)?.focus());
+  }
+  function sideKey(e: KeyboardEvent) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      step(e.key === 'ArrowUp' ? -1 : 1, true);
+    }
+  }
+  const READY: SettingsSection[] = ['Основные', 'Статусы', 'Агенды', 'Inbox', 'Клавиши'];
+  const ICON: Record<SettingsSection, string> = {
+    Основные: 'M10 7.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2zM10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2',
+    Статусы: 'M3 10h14M12.5 6l4 4-4 4',
+    Теги: 'M3 3h6.5l7.5 7.5-6 6L3.5 9.5zM6.8 6.8h.01',
+    Агенды: 'M7.5 5h9M7.5 10h9M7.5 15h9M3.5 5h.01M3.5 10h.01M3.5 15h.01',
+    Календарь: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3',
+    Inbox: 'M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4',
+    Файлы: 'M3 6a1.5 1.5 0 0 1 1.5-1.5H8l1.5 2h6A1.5 1.5 0 0 1 17 8v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5z',
+    Клавиши: 'M2.5 6h15v9h-15zM5 9h.01M8 9h.01M11 9h.01M14 9h.01M6 12h8',
+  };
+  const tab = $derived(READY.includes(store.settingsSection) ? store.settingsSection : 'Основные');
+  // another section starts at its top
+  let contentEl: HTMLDivElement | undefined = $state();
+  $effect(() => {
+    void tab;
+    if (contentEl) contentEl.scrollTop = 0;
+  });
 
   // ---- Inbox ---------------------------------------------------------------------------------------------------
   let pickFile = $state(false); // «Выбрать…»: the palette of files, the same as in the Inbox stub
@@ -301,74 +334,42 @@
     const seqs = store.inboxFile?.wf.sequences ?? store.config.workflows;
     return [...new Set(seqs.flatMap((sq) => sq.states.filter((x) => !x.done).map((x) => x.name)))];
   });
-  /** "Shift+CmdOrCtrl+KeyI" → «⇧⌘I». */
-  const keyLabel = (k: string) =>
-    k.split('+').map((p) => ({ Control: '⌃', Alt: '⌥', Shift: '⇧', CmdOrCtrl: '⌘', Super: '⌘' } as Record<string, string>)[p] ?? p.replace(/^Key|^Digit/, '')).join('');
-  let recording = $state(false);
-  let keyError = $state('');
-  async function recordKey(e: KeyboardEvent) {
-    if (!recording) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.key === 'Escape') {
-      recording = false;
-      return;
-    }
-    if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return; // a modifier alone: wait for the key
-    if (!e.metaKey && !e.ctrlKey && !e.altKey) {
-      keyError = 'Нужна хотя бы одна из клавиш ⌘, ⌃ или ⌥';
-      return;
-    }
-    const parts = [e.ctrlKey && 'Control', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'CmdOrCtrl', e.code].filter(Boolean) as string[];
-    recording = false;
-    await setKey(parts.join('+'), store.captureGlobal);
-  }
-  async function setKey(k: string, global: boolean) {
-    const err = await store.setCaptureKey(k, global);
-    keyError = err ? `Не удалось занять ${keyLabel(k)}: ${/registered|taken|exist/i.test(err) ? 'сочетание уже занято другой программой' : err}` : '';
-  }
-
   // ---- Агенды: «Мои агенды» -----------------------------------------------------------------------------
   let confirmAgenda = $state<{ id: string; name: string } | null>(null);
-  async function newAgenda() {
-    if (!standalone) {
-      store.settingsOpen = false;
-      store.newAgendaInBuilder();
-      return;
-    }
-    // the builder opens in the main window, which comes to the front
-    try {
-      localStorage.setItem('cmd:newAgenda', String(Date.now()));
-    } catch {
-      /* no storage */
-    }
-    try {
-      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-      await (await WebviewWindow.getByLabel('main'))?.setFocus();
-    } catch {
-      /* not in the app */
-    }
+  /** «Новая агенда»: the settings close and the builder opens (one sheet at a time); ⌘, brings them back. */
+  function newAgenda() {
+    store.closeSettings();
+    store.newAgendaInBuilder();
   }
-  let tab = $state('Статусы');
   const bannerCount = $derived(problems.length + Object.keys(errors).length);
 </script>
 
-<!-- while the shortcut is being recorded every key goes to it (a clicked button has no focus in WebKit) -->
-<svelte:window onkeydown={(e) => (recording ? recordKey(e) : key(e))} onmousedown={(e) => { if (recording && !(e.target as Element).closest('.keyrec')) recording = false; }} />
+<svelte:window onkeydown={(e) => { if (!store.keyRecording) key(e); }} />
 
-{#snippet body()}
-  <div class="win" class:standalone role={standalone ? undefined : 'dialog'} aria-modal={standalone ? undefined : true} aria-label="Настройки">
+<div class="scrim" aria-hidden="true"></div>
+<div class="win" role="dialog" aria-modal="true" aria-label="Настройки">
     <header>
-      <div class="tabs" role="tablist" aria-label="Разделы настроек">
-        {#each TABS as t}
-          <button role="tab" aria-selected={t === tab} class:on={t === tab} disabled={!READY.includes(t)} title={READY.includes(t) ? '' : 'Пока не реализовано'} onclick={() => (tab = t)}>{t}</button>
-        {/each}
-      </div>
-      <span class="flash" class:show={savedFlash}>Сохранено в .orgnotes/config.json</span>
-      {#if !standalone}<button class="close" aria-label="Закрыть настройки" onclick={() => (store.settingsOpen = false)}>×</button>{/if}
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="2.6" /><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6" /></svg>
+      <div class="ttl"><span class="t1">Настройки</span><span class="t2">{tab}</span></div>
+      <span class="live">Изменения применяются сразу</span>
+      <button class="done-b" onclick={() => store.closeSettings()}>Готово</button>
     </header>
+    <div class="main">
+    <!-- svelte-ignore a11y_interactive_supports_focus -->
+    <div class="sections" role="tablist" aria-orientation="vertical" aria-label="Разделы настроек" tabindex="-1" onkeydown={sideKey}>
+      {#each SECTIONS as t (t)}
+        <button role="tab" data-section={t} aria-selected={t === tab} tabindex={t === tab ? 0 : -1} class:on={t === tab} disabled={!READY.includes(t)} title={READY.includes(t) ? '' : 'Пока не реализовано'} onclick={() => store.showSection(t)}>
+          <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICON[t]} /></svg>
+          <span>{t}</span>
+        </button>
+      {/each}
+      <div class="sidehelp">{store.keyHint('settings') || '⌘,'} — открыть · ⎋ — закрыть<br />⌘[ ⌘] — предыдущий / следующий раздел</div>
+    </div>
 
-    {#if tab === 'Inbox'}
+    <div class="content" class:wide={tab === 'Статусы'} bind:this={contentEl}>
+    {#if tab === 'Клавиши'}
+      <div class="page"><KeysSettings /></div>
+    {:else if tab === 'Inbox'}
       <div class="body">
         <section class="general" aria-label="Inbox">
           <div class="cap">ФАЙЛ</div>
@@ -393,16 +394,13 @@
           <div class="cap">БЫСТРЫЙ ВВОД</div>
           <div class="opts">
             <div class="opt">
-              <span id="ib-key">Сочетание клавиш</span>
-              <button class="keyrec" class:rec={recording} aria-labelledby="ib-key" onclick={() => { recording = true; keyError = ''; }}>
-                {recording ? 'Нажмите сочетание…' : keyLabel(store.captureKey)}
-              </button>
+              <span>{store.keyHint('capture') || 'Без сочетания'} — изменить в разделе «Клавиши»</span>
+              <button class="change" onclick={() => store.showSection('Клавиши')}>Открыть…</button>
             </div>
-            {#if keyError}<div class="err">{keyError}</div>{/if}
             <div class="opt">
               <label for="ib-global">Работает из любой программы</label>
               <button id="ib-global" class="switch" role="switch" aria-checked={store.captureGlobal} aria-label="Работает из любой программы"
-                onclick={() => setKey(store.captureKey, !store.captureGlobal)}><span></span></button>
+                onclick={() => void store.setCaptureKey(store.captureKey, !store.captureGlobal)}><span></span></button>
             </div>
             <div class="opt">
               <label for="ib-confirm">Показывать подтверждение «Добавлено в Inbox»</label>
@@ -506,8 +504,8 @@
               <span class="fname">{store.dir ? store.dir.split('/').pop() : 'Не выбрана'}</span>
               {#if store.dir}<span class="fpath" title={store.dir}>{store.dir.replace(/^\/Users\/[^/]+/, '~')}</span>{/if}
             </div>
-            <!-- the change happens in the main window, where the tabs are -->
-            <button class="change" onclick={() => { try { localStorage.setItem('cmd:changeFolder', String(Date.now())); } catch { /* no storage */ } }}>Изменить…</button>
+            <!-- the settings close: what they show belongs to the folder being left -->
+            <button class="change" onclick={() => { store.closeSettings(); void store.changeFolder(); }}>Изменить…</button>
           </div>
           <p class="help">Приложение работает с одной папкой: все org-файлы в ней и её подпапках. Сменить её можно и в меню «Файл → Открыть другую папку…».</p>
           <div class="cap">НАВИГАТОР</div>
@@ -562,6 +560,14 @@
             </div>
           </div>
           <p class="help">Блоки :PROPERTIES:, :LOGBOOK: и другие показываются одной строкой с «…», в том числе новые — от Inbox и смены статуса. Tab на этой строке или клик по «…» разворачивает. Только вид: файл не меняется. Настройка хранится на этом Mac.</p>
+          <div class="cap">КЛАВИШИ</div>
+          <div class="opt">
+            <div class="folder">
+              <span>Сочетания клавиш перенесены в раздел «Клавиши»</span>
+              <span class="fpath">Набор «Как в Emacs / Как в macOS» и все команды</span>
+            </div>
+            <button class="change" onclick={() => store.showSection('Клавиши')}>Открыть…</button>
+          </div>
         </section>
       </div>
     {:else}
@@ -719,6 +725,8 @@
       {/if}
     </div>
     {/if}
+    </div>
+    </div>
 
     {#if picker && pickerState}
       <ColorPicker value={pickerState.color} keyword={pickerState.keyword} fallback={toneFor(pickerState.keyword || 'X', asWorkflow)}
@@ -769,32 +777,44 @@
         </div>
       </div>
     {/if}
-  </div>
-{/snippet}
-
-{#if standalone}
-  {@render body()}
-{:else}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="scrim" onmousedown={() => (store.settingsOpen = false)}>
-    <div class="sheet" onmousedown={(e) => e.stopPropagation()}>{@render body()}</div>
-  </div>
-{/if}
+</div>
 
 <style>
-  .scrim { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center; padding: 24px; }
-  .sheet { width: min(1040px, 100%); height: min(760px, 100%); display: flex; }
-  .win { position: relative; flex: 1; display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4); min-width: 0; }
-  .win.standalone { height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
-  header { display: flex; align-items: center; gap: 16px; padding: 10px 14px; background: var(--bar); border-bottom: 1px solid var(--line); }
-  .tabs { display: flex; gap: 2px; }
-  .tabs button { border: 0; background: transparent; padding: 5px 14px; border-radius: 7px; color: var(--fg2); }
-  .tabs button.on { background: var(--field); color: var(--fg); font-weight: 600; }
-  .tabs button:disabled { opacity: 0.45; }
-  .flash { margin-left: auto; font-size: 12px; color: var(--done); opacity: 0; transition: opacity 0.2s; }
-  .flash.show { opacity: 1; }
-  .close { border: 0; background: transparent; font-size: 20px; width: 28px; height: 28px; color: var(--fg2); border-radius: 6px; }
-  .close:hover { background: var(--field); }
+  /* a sheet over the main window, as the agenda builder: clicks on the dimmed window do nothing */
+  .scrim { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.42); }
+  .win {
+    position: fixed; z-index: 71; left: 50%; top: 36px; bottom: 36px; transform: translateX(-50%); width: min(1100px, calc(100% - 72px));
+    display: grid; grid-template-rows: 56px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); border-radius: 12px; overflow: hidden; background: var(--bg); border: 1px solid var(--line);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  }
+  header { display: flex; align-items: center; gap: 12px; padding: 0 16px 0 22px; background: var(--bar); border-bottom: 1px solid var(--line); }
+  .ttl { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+  .t1 { font-size: 15px; font-weight: 700; }
+  .t2 { font-size: 11.5px; color: var(--fg2); }
+  .live { font-size: 11.5px; color: var(--fg3); }
+  .done-b { height: 28px; padding: 0 14px; border: 0; border-radius: 7px; background: var(--acc); color: var(--onacc); font-weight: 600; }
+  .done-b:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  .main { min-height: 0; min-width: 0; display: flex; }
+  .sections { flex: 0 0 210px; box-sizing: border-box; background: var(--side); border-right: 1px solid var(--line); padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; overflow: auto; outline: none; }
+  .sections button { display: flex; align-items: center; gap: 10px; height: 32px; flex: 0 0 32px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--fg); text-align: left; }
+  .sections button svg { flex: 0 0 17px; }
+  .sections button.on { background: var(--sel); color: var(--acc); font-weight: 600; }
+  .sections button:disabled { opacity: 0.45; }
+  .sections button:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
+  .sidehelp { margin-top: auto; padding: 10px 8px 2px; font-size: 11px; color: var(--fg3); line-height: 1.45; }
+  /* the section: a column up to 760 in the middle with its own scroll; the statuses take the whole width */
+  .content { flex: 1 1 0; min-width: 0; min-height: 0; overflow: auto; }
+  .content:not(.wide) > :global(*) { max-width: 760px; margin: 0 auto; box-sizing: border-box; }
+  .content.wide { display: flex; }
+  .page { padding: 20px 28px 32px; }
+  /* a narrow window: the sections go to a strip on top */
+  @media (max-width: 820px) {
+    .main { flex-direction: column; }
+    .sections { flex: 0 0 auto; flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; padding: 8px; }
+    .sections button { flex: 0 0 auto; }
+    .sidehelp { display: none; }
+    .live { display: none; }
+  }
 
   .body { flex: 1; min-height: 0; display: flex; }
   aside { flex: 0 0 270px; border-right: 1px solid var(--line); background: var(--side); padding: 14px 10px; overflow: auto; }
@@ -811,7 +831,7 @@
   .chip { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
   .add { width: 100%; margin-top: 4px; height: 30px; border: 1px dashed var(--line); background: transparent; border-radius: 7px; color: var(--acc); }
   .help { font-size: 12px; line-height: 1.5; color: var(--fg2); padding: 10px 6px; }
-  .general { max-width: 560px; }
+  .general { max-width: 760px; }
   .opts { display: flex; flex-direction: column; gap: 6px; }
   .sel { height: 26px; max-width: 260px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 0 6px; font-size: 12.5px; }
   .val { font-size: 12.5px; color: var(--fg2); }
@@ -820,8 +840,6 @@
   .segs button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); font-weight: 500; }
   .ibfile { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .ibfile .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .keyrec { min-width: 110px; height: 26px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
-  .keyrec.rec { border-color: var(--acc); color: var(--acc); font-weight: 400; letter-spacing: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 25%, transparent); }
   .stepper { display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 7px; background: var(--field); }
   .stepper button { width: 24px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; font-size: 14px; }
   .stepper button:hover:not(:disabled) { background: var(--bg); }

@@ -222,7 +222,7 @@
   <div class="head">
     <span class="title" title={store.dir ?? ''}>{store.dir ? store.dir.split('/').pop() : 'НАВИГАТОР'}</span>
     {#if store.canManageFiles}
-      <button class="open" aria-label="Создать файл" title="Создать файл (⌘N)" onclick={() => startCreate(store.file ? parentOf(store.file.name) : '', 'file')}>
+      <button class="open" aria-label="Создать файл" title={store.titled('Создать файл', 'newFile')} onclick={() => startCreate(store.file ? parentOf(store.file.name) : '', 'file')}>
         <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 4v12M4 10h12" /></svg>
       </button>
       <button class="open" aria-label="Создать папку" title="Создать папку" onclick={() => startCreate(store.file ? parentOf(store.file.name) : '', 'folder')}>

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, openSettingsSheet } from './tauriMock';
 import { FILES, INBOX, WORK } from './reviewFixture';
 
 // ТЗ «Разбор Inbox по карточкам».
@@ -97,15 +97,15 @@ test.describe('the card', () => {
 });
 
 test.describe('the actions', () => {
-  test('⌥⌘1 done, ⌥⌘2 cancelled — on disk at once, the next card; the toast takes the last one back', async ({ page }) => {
+  test('⌘1 done, ⌘2 cancelled — on disk at once, the next card; the toast takes the last one back', async ({ page }) => {
     await start(page);
-    await page.keyboard.press('Alt+Meta+1');
+    await page.keyboard.press('Meta+1');
     await expect.poll(() => disk(page)).toMatch(/\* DONE Продлить страховку авто\nCLOSED: \[/);
     await expect(title(page)).toContainText('Позвонить в банк про лимиты');
     await expect(card(page).locator('.k')).toHaveText('Задача 2 из 5');
     await expect(queue(page).first().locator('.sub')).toHaveText('Выполнено · DONE');
     await expect(queue(page).first().locator('.t')).toHaveClass(/strike/);
-    await page.keyboard.press('Alt+Meta+2');
+    await page.keyboard.press('Meta+2');
     await expect.poll(() => disk(page)).toMatch(/\* CANCELLED Позвонить в банк про лимиты\nCLOSED:/);
     await expect(toast(page)).toContainText('Отменено: Позвонить в банк про лимиты');
     await expect(panel(page).locator('.prog')).toContainText('Разобрано 2 из 5');
@@ -118,7 +118,7 @@ test.describe('the actions', () => {
 
   test('«Отложить…»: SCHEDULED on the chosen day, it stays in the Inbox and leaves the queue till then', async ({ page }) => {
     await start(page);
-    await page.keyboard.press('Alt+Meta+4');
+    await page.keyboard.press('Meta+4');
     const pop = page.getByRole('dialog', { name: 'Отложить до' });
     await expect(pop.locator('.opt .ol')).toHaveText(['Завтра', 'Через 3 дня', 'На следующей неделе', 'Через месяц', 'Выбрать дату…']);
     await expect(pop.locator('.opt.on .ol')).toHaveText('Завтра');
@@ -132,15 +132,15 @@ test.describe('the actions', () => {
     await expect(title(page)).toContainText('Позвонить в банк');
   });
 
-  test('«Перенести…»: the move of ТЗ 16; Esc comes back to the card; ⌥⌘[ shows the moved task in its new file', async ({ page }) => {
+  test('«Перенести…»: the move of ТЗ 16; Esc comes back to the card; ⌘[ shows the moved task in its new file', async ({ page }) => {
     await start(page);
-    await page.keyboard.press('Alt+Meta+3');
+    await page.keyboard.press('Meta+3');
     const dlg = page.getByRole('dialog', { name: 'Перенести задачу' });
     await expect(dlg.locator('.plate .right')).toHaveText('из inbox');
     await page.keyboard.press('Escape');
     await expect(dlg).toHaveCount(0);
     await expect(title(page)).toContainText('Продлить страховку авто');
-    await page.keyboard.press('Alt+Meta+3');
+    await page.keyboard.press('Meta+3');
     await page.keyboard.type('fin');
     await page.keyboard.press('Enter');
     await page.keyboard.type('банки');
@@ -149,23 +149,23 @@ test.describe('the actions', () => {
     await expect.poll(() => disk(page)).not.toContain('Продлить страховку'); // the Inbox is written after the target
     await expect(queue(page).first().locator('.sub')).toHaveText('→ finance › Банки и лимиты');
     await expect(title(page)).toContainText('Позвонить в банк');
-    await page.keyboard.press('Alt+Meta+BracketLeft');
+    await page.keyboard.press('Meta+BracketLeft');
     await expect(card(page).locator('.moved')).toHaveText('Перенесена в finance › Банки и лимиты');
     await expect(card(page).locator('.where')).toContainText('finance.org');
     await expect(title(page)).toContainText('*** TODO Продлить страховку авто');
-    await page.keyboard.press('Alt+Meta+1'); // done again: in the target file now
+    await page.keyboard.press('Meta+1'); // done again: in the target file now
     await expect.poll(() => disk(page, FIN)).toContain('*** DONE Продлить страховку авто');
   });
 
   test('skipped tasks do not come back in the same pass; the summary counts and offers them', async ({ page }) => {
     await start(page);
-    await page.keyboard.press('Alt+Meta+5'); // skip
-    await page.keyboard.press('Alt+Meta+1');
-    await page.keyboard.press('Alt+Meta+2');
-    await page.keyboard.press('Alt+Meta+4');
+    await page.keyboard.press('Meta+5'); // skip
+    await page.keyboard.press('Meta+1');
+    await page.keyboard.press('Meta+2');
+    await page.keyboard.press('Meta+4');
     await page.keyboard.press('1');
     await expect(title(page)).toContainText('Без даты создания');
-    await page.keyboard.press('Alt+Meta+1');
+    await page.keyboard.press('Meta+1');
     const done = page.locator('.review .done');
     await expect(done.locator('h2')).toHaveText('Разбор закончен');
     await expect(done.locator('p')).toHaveText('Осталась 1 пропущенная задача. Её можно разобрать сейчас или в следующий раз.');
@@ -176,7 +176,7 @@ test.describe('the actions', () => {
     await page.keyboard.press('Meta+z'); // the summary: ⌘Z takes the last action back, its card again
     await expect(title(page)).toContainText('Без даты создания');
     await expect.poll(() => disk(page)).toContain('* TODO Без даты создания');
-    await page.keyboard.press('Alt+Meta+1');
+    await page.keyboard.press('Meta+1');
     await expect(done.locator('h2')).toHaveText('Разбор закончен');
     await done.getByRole('button', { name: 'Разобрать пропущенную' }).click();
     await expect(card(page).locator('.k')).toHaveText('Задача 1 из 1');
@@ -188,7 +188,7 @@ test.describe('the actions', () => {
 
   test('«…»: delete (asks when the task has text) and «Открыть в файле» in the other pane', async ({ page }) => {
     await start(page);
-    await page.keyboard.press('Alt+Meta+5');
+    await page.keyboard.press('Meta+5');
     await card(page).page().getByRole('button', { name: 'Ещё: удалить, открыть в файле' }).click();
     await page.getByRole('menuitem', { name: 'Удалить…' }).click();
     await expect(page.getByRole('alertdialog', { name: 'Удаление задачи' })).toBeVisible();
@@ -213,8 +213,8 @@ test.describe('the actions', () => {
 
 test('Settings › Inbox › РАЗБОР: statuses, the order of the cards, the age', async ({ page }) => {
   await installTauriMock(page, FILES());
-  await page.goto('/#settings');
-  await page.getByRole('tab', { name: 'Inbox' }).click();
+  await page.goto('/');
+  await openSettingsSheet(page, 'Inbox');
   await expect(page.getByLabel('Статус «Выполнено»')).toHaveValue('DONE');
   await expect(page.getByLabel('Статус «Отменено»')).toHaveValue('CANCELLED');
   await page.getByRole('radio', { name: 'Новые сначала' }).click();

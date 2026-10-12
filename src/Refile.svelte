@@ -215,7 +215,7 @@
     <input bind:this={input} bind:value={q} oninput={typed} onkeydown={key} spellcheck="false" autocomplete="off"
       placeholder={step === 1 ? 'файл…' : `Заголовок в ${fileName}…`} aria-label={step === 1 ? 'Файл' : 'Заголовок'}
       role="combobox" aria-expanded="true" aria-controls="rf-list" aria-activedescendant={sel ? 'rf-' + sel : undefined} />
-    {#if fromPalette}<kbd>⇧⌘P</kbd>{/if}
+    {#if fromPalette && store.keyHint('palette')}<kbd>{store.keyHint('palette')}</kbd>{/if}
   </div>
   {#if err}<div class="err" role="alert">{err}</div>{/if}
 

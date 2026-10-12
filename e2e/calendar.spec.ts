@@ -141,7 +141,7 @@ test('the same calendar from «Отложить» of the Inbox review', async ({
   await open(page);
   await page.getByRole('tablist', { name: 'Режимы навигатора' }).getByRole('tab', { name: 'Inbox' }).click();
   await page.locator('.inbox').getByRole('button', { name: 'Разобрать' }).click();
-  await page.keyboard.press('Alt+Meta+4');
+  await page.keyboard.press('Meta+4');
   await page.getByRole('dialog', { name: 'Отложить до' }).locator('.opt', { hasText: 'Выбрать дату…' }).click();
   await expect(cal(page)).toBeVisible();
   await expect(pal(page).locator('.tok')).toHaveText('Запланировать');

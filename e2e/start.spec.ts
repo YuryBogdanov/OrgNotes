@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, openSettingsSheet } from './tauriMock';
 
 // ТЗ «Первый запуск и рабочая папка».
 const FILES = () => ({
@@ -151,14 +151,12 @@ test.describe('an unavailable folder', () => {
 });
 
 test.describe('changing the folder', () => {
+  // «Изменить…» closes the settings: what they show belongs to the folder being left
   const fromSettings = async (page: Page) => {
-    const settings = await page.context().newPage();
-    await installTauriMock(settings, FILES());
-    await settings.goto('/#settings');
-    await settings.getByRole('tab', { name: 'Основные' }).click();
-    await expect(settings.locator('.folder .fname')).toHaveText('mock');
-    await settings.getByRole('button', { name: 'Изменить…' }).click();
-    await settings.close();
+    await openSettingsSheet(page, 'Основные');
+    await expect(page.locator('.folder .fname')).toHaveText('mock');
+    await page.getByRole('button', { name: 'Изменить…' }).click();
+    await expect(page.getByRole('dialog', { name: 'Настройки' })).toHaveCount(0);
   };
 
   test('panel → the unsaved question → «Папка найдена» → «Открыть»; a cancel at any step changes nothing', async ({ page }) => {

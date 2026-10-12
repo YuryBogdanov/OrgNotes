@@ -56,11 +56,11 @@
     if (!h || !f) return [];
     const d = (o?: { y: number; m: number; d: number }) => (o ? short(new Date(o.y, o.m - 1, o.d)) : '—');
     return [
-      { start: 'status' as const, icon: ICONS.status, label: 'Статус', val: h.keyword ?? '—', style: h.keyword ? toneStyle(toneFor(h.keyword, f.wf)) : '', tone: !!h.keyword, tip: 'Статус · ⇧← ⇧→ в тексте' },
-      { start: 'priority' as const, icon: ICONS.prio, label: 'Приоритет', val: h.priority ?? '—', style: '', tone: false, tip: 'Приоритет · ⇧↑ ⇧↓ на заголовке' },
-      { start: 'schedule' as const, icon: ICONS.sched, label: 'Запланировано', val: d(h.scheduled), style: '', tone: false, date: !!h.scheduled, tip: 'Запланировать · ⇧⌘P' },
-      { start: 'deadline' as const, icon: ICONS.dead, label: 'Дедлайн', val: d(h.deadline), style: '', tone: false, date: !!h.deadline, tip: 'Дедлайн · ⇧⌘P' },
-      { start: 'tags' as const, icon: ICONS.tag, label: 'Теги', val: h.tags.join(', ') || '—', style: '', tone: false, tip: 'Теги · ⇧⌘P' },
+      { start: 'status' as const, icon: ICONS.status, label: 'Статус', val: h.keyword ?? '—', style: h.keyword ? toneStyle(toneFor(h.keyword, f.wf)) : '', tone: !!h.keyword, tip: `Статус · ${kbd('statusPrev')} ${kbd('statusNext')} в тексте` },
+      { start: 'priority' as const, icon: ICONS.prio, label: 'Приоритет', val: h.priority ?? '—', style: '', tone: false, tip: `Приоритет · ${kbd('prioUp')} ${kbd('prioDown')} на заголовке` },
+      { start: 'schedule' as const, icon: ICONS.sched, label: 'Запланировано', val: d(h.scheduled), style: '', tone: false, date: !!h.scheduled, tip: `Запланировать · ${kbd('schedule') || kbd('palette')}` },
+      { start: 'deadline' as const, icon: ICONS.dead, label: 'Дедлайн', val: d(h.deadline), style: '', tone: false, date: !!h.deadline, tip: `Дедлайн · ${kbd('deadline') || kbd('palette')}` },
+      { start: 'tags' as const, icon: ICONS.tag, label: 'Теги', val: h.tags.join(', ') || '—', style: '', tone: false, tip: `Теги · ${kbd('tags') || kbd('palette')}` },
     ];
   });
   const openStep = (start: 'status' | 'priority' | 'schedule' | 'deadline' | 'tags') => {
@@ -129,31 +129,41 @@
       ],
     };
   }
-  /** ⌥⌘1…⌥⌘5 the actions, ⌥⌘[ the card before (⌘1, ⌘2, ⌘[ belong to the menu «Вид»). */
+  /** The summary has no editor: ⌘Z takes the last action of the review back. */
   function keys(e: KeyboardEvent) {
     if (store.tab !== tab || !review || store.palette || store.refile || defer || confirmDel) return;
-    // the summary has no editor: ⌘Z takes the last action of the review back
     if (review.cur < 0 && e.metaKey && !e.altKey && !e.shiftKey && e.code === 'KeyZ' && store.reviewUndoLast) {
       e.preventDefault();
       store.reviewUndoLast();
-      return;
     }
-    if (!(e.metaKey && e.altKey) || e.shiftKey || e.ctrlKey) return;
-    if (e.code === 'BracketLeft') {
-      e.preventDefault();
-      store.reviewBack();
-      return;
-    }
-    if (!item) return;
-    const n = /^Digit([1-5])$/.exec(e.code)?.[1];
-    if (!n) return;
-    e.preventDefault();
-    if (n === '1') void store.reviewClose('done');
-    else if (n === '2') void store.reviewClose('cancel');
-    else if (n === '3') store.reviewMove();
-    else if (n === '4') void openDefer();
-    else store.reviewSkip();
   }
+  // ⌘1…⌘5 the actions, ⌘[ the card before (as set in «Клавиши»): while this tab is shown they win over the window's
+  const RUN: Record<string, () => void> = {
+    reviewDone: () => void store.reviewClose('done'),
+    reviewCancel: () => void store.reviewClose('cancel'),
+    reviewMove: () => store.reviewMove(),
+    reviewDefer: () => void openDefer(),
+    reviewSkip: () => store.reviewSkip(),
+  };
+  $effect(() => {
+    const keys = {
+      active: () => store.tab === tab && !!store.review && !store.palette && !store.refile && !defer && !confirmDel,
+      run: (id: string) => {
+        if (id === 'reviewBack') {
+          store.reviewBack();
+          return true;
+        }
+        if (!store.reviewItem || !RUN[id]) return false;
+        RUN[id]();
+        return true;
+      },
+    };
+    store.reviewKeys = keys;
+    return () => {
+      if (store.reviewKeys === keys) store.reviewKeys = null;
+    };
+  });
+  const kbd = (id: string) => store.keyHint(id);
 
   // ---- the summary ------------------------------------------------------------------------------------------
   const count = (r: string) => review?.items.filter((x) => x.result === r).length ?? 0;
@@ -234,21 +244,21 @@
   {#if review && item}
     <div class="bar">
       <button class="back" disabled={review.cur <= 0} onclick={() => store.reviewBack()}>
-        <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l-6 6 6 6" /></svg>Назад<kbd>⌥⌘[</kbd>
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l-6 6 6 6" /></svg>Назад{#if kbd('reviewBack')}<kbd>{kbd('reviewBack')}</kbd>{/if}
       </button>
       <div class="acts">
         <button class="a done-b" disabled={!doneKw} onclick={() => store.reviewClose('done')}>
-          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg>Выполнено<span class="hint">{doneKw}</span><kbd>⌥⌘1</kbd>
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg>Выполнено<span class="hint">{doneKw}</span>{#if kbd('reviewDone')}<kbd>{kbd('reviewDone')}</kbd>{/if}
         </button>
         <button class="a" disabled={!cancelKw} title={cancelKw ? '' : 'В наборе нет статуса для отмены'} onclick={() => store.reviewClose('cancel')}>
-          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" /></svg>Отменить<span class="hint">{cancelKw ?? ''}</span><kbd>⌥⌘2</kbd>
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" /></svg>Отменить<span class="hint">{cancelKw ?? ''}</span>{#if kbd('reviewCancel')}<kbd>{kbd('reviewCancel')}</kbd>{/if}
         </button>
         <button class="a move-b" onclick={() => store.reviewMove()}>
-          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICONS.refile} /></svg>Перенести…<kbd>⌥⌘3</kbd>
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICONS.refile} /></svg>Перенести…{#if kbd('reviewMove')}<kbd>{kbd('reviewMove')}</kbd>{/if}
         </button>
         <div class="dwrap">
           <button class="a" class:on={!!defer} aria-haspopup="dialog" onclick={() => (defer ? (defer = null) : openDefer())}>
-            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5V10l2.5 1.5" /></svg>Отложить…<kbd>⌥⌘4</kbd>
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5V10l2.5 1.5" /></svg>Отложить…{#if kbd('reviewDefer')}<kbd>{kbd('reviewDefer')}</kbd>{/if}
           </button>
           {#if defer}
             {@const d = defer}
@@ -272,7 +282,7 @@
           {/if}
         </div>
         <button class="a" onclick={() => store.reviewSkip()}>
-          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5l6 5-6 5M13 5v10" /></svg>Пропустить<kbd>⌥⌘5</kbd>
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5l6 5-6 5M13 5v10" /></svg>Пропустить{#if kbd('reviewSkip')}<kbd>{kbd('reviewSkip')}</kbd>{/if}
         </button>
       </div>
       <button class="dots" aria-label="Ещё: удалить, открыть в файле" title="Ещё" onclick={moreMenu}>

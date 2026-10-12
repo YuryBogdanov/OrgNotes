@@ -118,19 +118,18 @@
   function tabMenu(e: MouseEvent, t: Tab, ti: number) {
     e.preventDefault();
     const to = targetOf(store.layout, pi);
-    const arrow = to > pi ? '→' : '←';
     const hasFile = t.kind === 'file';
     const items: MenuItem[] = [
-      { label: 'Закрыть', shortcut: '⌘W', action: () => store.closeTab(pi, idx(t)) },
-      { label: 'Закрыть остальные', shortcut: '⌥⌘W', disabled: pane.tabs.length < 2, action: () => store.closeOthers(pi, idx(t)) },
+      { label: 'Закрыть', shortcut: store.keyHint('closeTab'), action: () => store.closeTab(pi, idx(t)) },
+      { label: 'Закрыть остальные', shortcut: store.keyHint('closeOthers'), disabled: pane.tabs.length < 2, action: () => store.closeOthers(pi, idx(t)) },
       'sep',
-      { label: 'Переместить в соседний редактор', shortcut: `⌃⌘${arrow}`, disabled: to < 0, action: () => store.moveTab(pi, idx(t)) },
-      { label: 'Продублировать в соседнем редакторе', shortcut: `⌥⌃⌘${arrow}`, disabled: to < 0 || t.kind === 'untitled' || t.kind === 'review', action: () => store.duplicateTab(pi, idx(t)) },
+      { label: 'Переместить в соседний редактор', shortcut: store.keyHint(to > pi ? 'moveRight' : 'moveLeft'), disabled: to < 0, action: () => store.moveTab(pi, idx(t)) },
+      { label: 'Продублировать в соседнем редакторе', shortcut: store.keyHint(to > pi ? 'dupRight' : 'dupLeft'), disabled: to < 0 || t.kind === 'untitled' || t.kind === 'review', action: () => store.duplicateTab(pi, idx(t)) },
     ];
     if (hasFile) {
       items.push('sep');
-      items.push({ label: 'Показать в навигаторе', shortcut: '⇧⌘J', action: () => store.revealInNavigator(t) });
-      items.push({ label: 'Скопировать путь', shortcut: '⌥⌘C', action: () => store.copyPath(t) });
+      items.push({ label: 'Показать в навигаторе', shortcut: store.keyHint('revealInNav'), action: () => store.revealInNavigator(t) });
+      items.push({ label: 'Скопировать путь', shortcut: store.keyHint('copyPath'), action: () => store.copyPath(t) });
     }
     menuTab = t.id;
     menu = { x: e.clientX, y: e.clientY, items };
@@ -210,7 +209,7 @@
     const el = e.currentTarget as HTMLElement;
     tipTimer = setTimeout(() => {
       const r = el.getBoundingClientRect();
-      tip = { text: gone(t) ? `Файла нет на диске: ${t.path} · ⌘S создаст его снова` : t.path!, x: r.left, y: r.bottom + 4 };
+      tip = { text: gone(t) ? `Файла нет на диске: ${t.path} · ${store.keyHint('save') || '«Сохранить»'} создаст его снова` : t.path!, x: r.left, y: r.bottom + 4 };
     }, 1000);
   }
   function tipEnd() {
@@ -257,7 +256,7 @@
   const bar = $derived.by(() => {
     // dot 7 + gap + "Не сохранено" + gap + the button, inside 12 px padding; the hint goes first, then ⌘S
     const fixed = 24 + 7 + 10 + tw('Не сохранено') + 10 + btnW;
-    const keys = tw('⌘S') + 8;
+    const keys = tw(store.keyHint('save')) + 8;
     return { keys: !font || fixed + keys <= uw, hint: !font || fixed + keys + 10 + tw(HINT) + 10 <= uw };
   });
   let bottom: HTMLElement | undefined = $state();
@@ -360,7 +359,7 @@
       <span class="odot" aria-hidden="true"></span>
       <span class="us">Не сохранено</span>
       {#if store.draftNotice}<span class="hint err">{store.draftNotice}</span>{:else if bar.hint}<span class="hint">{HINT}</span>{/if}
-      <span class="usr">{#if bar.keys}<span>⌘S</span>{/if}<button bind:offsetWidth={btnW} onclick={() => store.saveAs(tab)}>Сохранить как…</button></span>
+      <span class="usr">{#if bar.keys && store.keyHint('save')}<span>{store.keyHint('save')}</span>{/if}<button bind:offsetWidth={btnW} onclick={() => store.saveAs(tab)}>Сохранить как…</button></span>
     </div>
   {:else}
     <div class="empty">

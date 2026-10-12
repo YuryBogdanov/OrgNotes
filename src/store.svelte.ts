@@ -13,6 +13,7 @@ import { closingStatus, locate, nextOpen, reviewQueue, short, type Result, type 
 import { DEFAULT_LEVELS, type LevelView } from './orgIndent';
 import { DEFAULT_INBOX, append, entry, inboxItems, prepend, readInbox, remove, withInbox, type InboxConfig, type InboxItem } from './inbox';
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
+import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
 export interface NoteFile {
@@ -40,7 +41,7 @@ function build(name: string, path: string, text: string, disk: string, diskRaw: 
 }
 
 /** Where the palette opens: a step of a command at once (the card's buttons in «Разбор Inbox» use the heading ones). */
-export type PaletteStart = 'newFile' | 'goto' | 'status' | 'priority' | 'schedule' | 'deadline' | 'tags' | 'calendar';
+export type PaletteStart = 'newFile' | 'newFolder' | 'goto' | 'status' | 'priority' | 'schedule' | 'deadline' | 'tags' | 'calendar';
 const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
 function readLevels(): LevelView {
@@ -86,6 +87,8 @@ class Store {
   config = $state.raw<ProjectConfig>(EMPTY_CONFIG); // <notes>/.orgnotes/config.json
   private configRaw: string | null = null;
   settingsOpen = $state(false);
+  /** The section of the settings shown; the last one is shown next time (a preference of this Mac). */
+  settingsSection = $state<SettingsSection>(SECTIONS.includes(lsGet('settings:section') as SettingsSection) ? (lsGet('settings:section') as SettingsSection) : 'Основные');
   get configText() {
     return this.configRaw;
   }
@@ -129,7 +132,7 @@ class Store {
   errorReq = $state<{ title: string; text: string; resolve: () => void } | null>(null);
   /** While a sheet is up the rest of the window does not react: no shortcuts, no menu commands. */
   get sheetOpen() {
-    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refile || this.pickInbox);
+    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refile || this.pickInbox || this.settingsOpen);
   }
   /** The command palette; `start` opens it right at a step ("Создать файл…" ⇧⌘N, "Перейти к файлу…" ⇧⌘O). */
   palette = $state<{ start?: PaletteStart; n: number } | null>(null);
@@ -380,34 +383,69 @@ class Store {
     return total;
   }
 
-  /** Settings open in their own window inside the app, and as a sheet in a plain browser. */
-  async openSettings() {
-    if (!isTauri || (window as any).__ORG_SETTINGS_OVERLAY__) {
-      this.settingsOpen = true;
+  /**
+   * ⌘,: the settings as a sheet over the main window (the same as the agenda builder), at `section` or the last one
+   * shown. Again ⌘, closes them. One sheet at a time: with another one up nothing happens.
+   */
+  openSettings(section?: SettingsSection) {
+    if (this.settingsOpen && !section) {
+      this.closeSettings();
       return;
     }
-    try {
-      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
-      const existing = await WebviewWindow.getByLabel('settings');
-      if (existing) {
-        await existing.setFocus();
-        return;
-      }
-      new WebviewWindow('settings', {
-        url: 'index.html#settings',
-        title: 'Настройки',
-        width: 1040,
-        height: 740,
-        minWidth: 840,
-        minHeight: 560,
-        center: true,
-        dragDropEnabled: false,
-      });
-    } catch (e) {
-      this.settingsOpen = true; // never leave the user without settings
-      this.say('Не удалось открыть окно настроек: ' + e);
-    }
+    if (this.sheetOpen && !this.settingsOpen) return;
+    if (section) this.showSection(section);
+    this.settingsOpen = true;
   }
+  closeSettings() {
+    this.settingsOpen = false;
+    this.keyRecording = false;
+  }
+  showSection(section: SettingsSection) {
+    this.settingsSection = section;
+    lsSet('settings:section', section);
+  }
+
+  // ---- keyboard shortcuts (ТЗ «раздел „Клавиши“»): a set of defaults and the changes on top, on this Mac ----------
+  keyState = $state<KeyState>(parseState(lsGet('keys')));
+  /** Every command's shortcuts now; the quick entry's is its own setting (it is registered with the system). */
+  bindings = $derived.by(() => {
+    const b = bindingsOf(this.keyState);
+    b.set('capture', this.captureKey ? [fromAccelerator(this.captureKey)] : []);
+    return b;
+  });
+  /** A shortcut is being recorded in the settings: the window's keys wait. */
+  keyRecording = $state(false);
+  /** The first shortcut of a command, for tooltips and hints («⇧⌘O»); '' if it has none. */
+  keyHint(id: string) {
+    return this.bindings.get(id)?.[0] ?? '';
+  }
+  /** «Найти далее (⌘G)», or the title alone. */
+  titled(title: string, id: string) {
+    const k = this.keyHint(id);
+    return k ? `${title} (${k})` : title;
+  }
+  /** Give a command these shortcuts; the quick entry's goes to the system (an error says why it could not). */
+  async setKeys(id: string, keys: string[]): Promise<string | null> {
+    if (id === 'capture') return this.setCaptureKey(keys[0] ? (toAccelerator(keys[0]) ?? '') : '', this.captureGlobal);
+    this.keyState = withKeys(this.keyState, id, keys);
+    this.saveKeys();
+    return null;
+  }
+  setPreset(preset: Preset) {
+    this.keyState = { ...this.keyState, preset };
+    this.saveKeys();
+  }
+  /** «Сбросить все»: the defaults of the set, the quick entry's ⇧⌘I too. */
+  async resetKeys() {
+    this.keyState = { ...DEFAULT_STATE, preset: this.keyState.preset };
+    this.saveKeys();
+    if (this.captureKey !== DEFAULT_CAPTURE_KEY) await this.setCaptureKey(DEFAULT_CAPTURE_KEY, this.captureGlobal);
+  }
+  private saveKeys() {
+    lsSet('keys', JSON.stringify(this.keyState));
+  }
+  /** The review registers its keys while its tab is shown (⌘1…⌘5 there win over the window's). */
+  reviewKeys: { active: () => boolean; run: (id: string) => boolean } | null = null;
 
   /** Persist the project config (Settings) and apply it right away. */
   async saveConfig(json: string): Promise<boolean> {
@@ -421,8 +459,8 @@ class Store {
     }
   }
   /**
-   * Change the project config from its newest text on disk: the settings window and the main window both write
-   * it (statuses, agendas), and neither may drop what the other just wrote.
+   * Change the project config from its newest text on disk: statuses and agendas are written at different times,
+   * and neither may drop what the other just wrote (nor what was written by hand meanwhile).
    */
   async updateConfig(make: (raw: string | null) => string): Promise<boolean> {
     let raw = this.configRaw;
@@ -1038,46 +1076,26 @@ class Store {
   }
 
   async listen() {
-    // the settings window changes view preferences of this Mac
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'nav:headings') this.navHeadings = e.newValue === '1';
-      if (e.key === 'editor:levels') this.levels = readLevels();
-      if (e.key === 'editor:drawers') this.foldDrawers = lsGet('editor:drawers') !== '0';
-      if (e.key === 'editor:rich') this.rich = lsGet('editor:rich') === '1';
-      if (e.key === 'editor:richNumbers') this.richNumbers = lsGet('editor:richNumbers') === '1';
-      if (e.key === 'capture:key' || e.key === 'capture:global') {
-        this.captureKey = lsGet('capture:key') || DEFAULT_CAPTURE_KEY;
-        this.captureGlobal = lsGet('capture:global') !== '0';
-      }
-    });
     // back in front: check the open files again in case an event was missed
     window.addEventListener('focus', () => this.activated());
-    // «Изменить…» in the settings window: the change happens here, where the tabs are
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'cmd:changeFolder' && e.newValue) void this.changeFolder();
-      // «Новая агенда в конструкторе…» in the settings window: the builder opens here
-      if (e.key === 'cmd:newAgenda' && e.newValue) this.newAgendaInBuilder();
-    });
     setInterval(() => this.tickDay(), 60_000);
     window.addEventListener('blur', () => (this.appActive = false));
     if (!isTauri) return;
     const { listen } = await import('@tauri-apps/api/event');
     await listen('notes-changed', () => this.reload());
     await listen<{ fullscreen: boolean; lights: boolean; menu: number }>('titlebar', (e) => (this.titlebar = e.payload));
-    if (location.hash !== '#settings') {
-      // the quick entry: ⇧⌘I with this window in front, and the tasks the panel hands over
-      const { emitTo } = await import('@tauri-apps/api/event');
-      await listen('capture-here', () => this.openCapture());
-      await listen<{ id: number; title: string; details: string }>('capture-submit', async (e) => {
-        const result = await this.addToInbox(e.payload.title, e.payload.details);
-        await emitTo('capture', 'capture-result', { id: e.payload.id, result });
-      });
-      await listen('capture-pick', () => {
-        this.setNavMode('inbox');
-        this.pickInbox = Date.now();
-      });
-      void this.applyCaptureKey();
-    }
+    // the quick entry: ⇧⌘I with this window in front, and the tasks the panel hands over
+    const { emitTo } = await import('@tauri-apps/api/event');
+    await listen('capture-here', () => this.openCapture());
+    await listen<{ id: number; title: string; details: string }>('capture-submit', async (e) => {
+      const result = await this.addToInbox(e.payload.title, e.payload.details);
+      await emitTo('capture', 'capture-result', { id: e.payload.id, result });
+    });
+    await listen('capture-pick', () => {
+      this.setNavMode('inbox');
+      this.pickInbox = Date.now();
+    });
+    void this.applyCaptureKey();
     await listen('quit-requested', () => this.quit()); // «Завершить» from the Dock
   }
 
@@ -2082,6 +2100,8 @@ class Store {
 }
 
 export const DEFAULT_CAPTURE_KEY = 'Shift+CmdOrCtrl+KeyI';
+export const SECTIONS = ['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши'] as const;
+export type SettingsSection = (typeof SECTIONS)[number];
 export type NavMode = 'files' | 'inbox' | 'agendas' | 'search';
 /** The search in every file: up to this many matches are listed. */
 export const SEARCH_CAP = 1000;

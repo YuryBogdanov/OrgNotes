@@ -611,7 +611,7 @@
     <span class="fh">Изменения применяются после сохранения</span>
     <div class="acts">
       <button class="btn" onclick={cancel}>Отмена</button>
-      <button class="btn primary" disabled={!!problem} title={problem ?? 'Сохранить агенду (⌘S)'} aria-keyshortcuts="Meta+S" onclick={save}>Сохранить агенду</button>
+      <button class="btn primary" disabled={!!problem} title={problem ?? store.titled('Сохранить агенду', 'save')} onclick={save}>Сохранить агенду</button>
     </div>
   </div>
 

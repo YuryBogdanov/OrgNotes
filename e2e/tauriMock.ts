@@ -254,3 +254,12 @@ export async function installTauriMock(page: Page, files: Record<string, string>
     { files, eventDelay: opts.eventDelayMs ?? 300, listDelay: opts.listDelayMs ?? 0 },
   );
 }
+
+/** ⌘, in the main window: the settings sheet, at a section. The app must be loaded (it is waited for). */
+export async function openSettingsSheet(page: import('@playwright/test').Page, section = 'Статусы') {
+  const { expect } = await import('@playwright/test');
+  await expect(page.locator('.toolbar, .start').first()).toBeVisible();
+  await page.keyboard.press('Meta+Comma');
+  await expect(page.getByRole('dialog', { name: 'Настройки' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab', { name: section, exact: true }).click();
+}

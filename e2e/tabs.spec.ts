@@ -47,7 +47,7 @@ test.describe('context menu', () => {
     await tabs(page, 0).first().click({ button: 'right' });
     const items = await page.getByRole('menuitem').allInnerTexts();
     expect(items.map((t) => t.replace(/\s+/g, ' ').trim())).toEqual([
-      'Закрыть ⌘W', 'Закрыть остальные ⌥⌘W', 'Переместить в соседний редактор ⌃⌘→', 'Продублировать в соседнем редакторе ⌥⌃⌘→', 'Показать в навигаторе ⇧⌘J', 'Скопировать путь ⌥⌘C',
+      'Закрыть ⌘W', 'Закрыть остальные ⌥⌘W', 'Переместить в соседний редактор ⌃⌘→', 'Продублировать в соседнем редакторе ⌃⌥⌘→', 'Показать в навигаторе ⇧⌘J', 'Скопировать путь ⌥⌘C',
     ]);
     await expect(tabs(page, 0).first()).toHaveClass(/menu/);
     await expect(tabs(page, 0).first().getByRole('button', { name: /Закрыть вкладку/ })).toHaveCSS('opacity', '1');
@@ -61,7 +61,7 @@ test.describe('context menu', () => {
     await twoPanes(page);
     await tabs(page, 1).first().click({ button: 'right' });
     await expect(menuItem(page, /Переместить в соседний редактор/)).toContainText('⌃⌘←');
-    await expect(menuItem(page, /Продублировать/)).toContainText('⌥⌃⌘←');
+    await expect(menuItem(page, /Продублировать/)).toContainText('⌃⌥⌘←');
   });
 
   test('"Закрыть остальные" keeps the clicked tab', async ({ page }) => {
