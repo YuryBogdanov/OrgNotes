@@ -159,6 +159,14 @@ export interface ReviewResult {
   finished: boolean;
 }
 
+export interface NetResponse {
+  status: number;
+  ok: boolean;
+  /** Lower-case names. */
+  headers: Record<string, string>;
+  text: string;
+}
+
 export interface Ctx {
   /** The plugin's manifest id. */
   id: string;
@@ -199,6 +207,10 @@ export interface Ctx {
   /** The plugin's own: in the notes folder (goes with the notes) and on this Mac. */
   storage: { folder: Store; local: Store };
   events: { on(e: EventName, fn: (payload: unknown) => void): Dispose };
+  /** Needs `clipboard`. */
+  clipboard?: { write(text: string): Promise<void> };
+  /** Needs `net`: only to the hosts of the manifest's `net` («jira.company.ru», «*.company.ru»); 30 s, 10 MB. */
+  net?: { fetch(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<NetResponse> };
   /** The values of the settings the manifest declares. */
   settings: {
     values(): Values;

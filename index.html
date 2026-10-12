@@ -3,6 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- no network from the window (ТЗ 26 §6.2): a plugin goes out only through net.fetch (Rust, the manifest's hosts);
+         the dev server's websocket is let in for the hot reload. The app's own policy (tauri.conf.json) is as strict. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: http://asset.localhost; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost ws://localhost:*; object-src 'none'; base-uri 'self'" />
     <title>Panopticon</title>
   </head>
   <body>

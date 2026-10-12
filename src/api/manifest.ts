@@ -183,3 +183,18 @@ export function incompatible(m: Pick<Manifest, 'api' | 'minAppVersion'>, api: st
   if (m.minAppVersion && !satisfies(app, '>=' + m.minAppVersion)) return `нужно приложение ${m.minAppVersion} или новее, установлено ${app}`;
   return null;
 }
+
+/** The host of an http(s) address (lower case, no port); null when it is not one or has a user part. */
+export function hostOf(url: string): string | null {
+  const m = /^https?:\/\/([^/?#]*)/i.exec(url);
+  if (!m || !m[1] || m[1].includes('@')) return null;
+  const host = m[1].startsWith('[') ? m[1].slice(0, m[1].indexOf(']') + 1) : m[1].split(':')[0];
+  return host && /^[a-z0-9.\-[\]:]+$/i.test(host) ? host.toLowerCase() : null;
+}
+/** The manifest's `net` lets a plugin go to this host: the same, or «*.company.ru» for its subdomains. */
+export function hostAllowed(net: string[], host: string): boolean {
+  return net.some((h) => {
+    const x = h.toLowerCase();
+    return x.startsWith('*.') ? host.endsWith(x.slice(1)) : host === x;
+  });
+}

@@ -292,7 +292,7 @@
 <!-- the agenda builder is a sheet over the whole window: the window stays visible under it but takes no input -->
 <!-- full screen with the menu bar shown: the toolbar grows by it (its buttons stay just below it), the traffic lights
      come into the toolbar -->
-<div class="win" inert={!!store.builder || store.settingsOpen || !!goals.goalAdd || !!goals.goalForm || !!goals.goalReport || !!goals.goalCarry} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
+<div class="win" inert={!!store.builder || store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!goals.goalAdd || !!goals.goalForm || !!goals.goalReport || !!goals.goalCarry} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
   <Dialogs />
   <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
@@ -319,7 +319,6 @@
   {/if}
   {#if store.pickInbox}{#key store.pickInbox}<Picker onclose={() => (store.pickInbox = 0)} />{/key}{/if}
   {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
-  <PluginSheets />
   {#if store.toast}
     <div class="toast" class:acts={!!store.toast.actions} role="status">
       <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 10a6.5 6.5 0 1 1-2-4.7M16.5 3.5V6.5h-3" /></svg>
@@ -424,6 +423,8 @@
 </div>
 {#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
 {#if store.settingsOpen && store.loaded}<Settings />{/if}
+<!-- the sheets a plugin asks for: over the window and the settings (the trust sheet comes from «Плагины») -->
+<PluginSheets />
 {#if goals.goalAdd}{#key goals.goalAdd.n}<GoalAdd />{/key}{/if}
 {#if goals.goalForm}{#key goals.goalForm.n}<GoalForm />{/key}{/if}
 {#if goals.goalReport}{#key goals.goalReport.n}<GoalReport />{/key}{/if}

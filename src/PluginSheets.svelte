@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { plugins, type FormReq, type PlaceReq } from './api/host.svelte';
+  import { plugins, rightsText, type FormReq, type PlaceReq } from './api/host.svelte';
   import { store } from './store.svelte';
   import PlacePicker from './PlacePicker.svelte';
   import SchemaSettings from './SchemaSettings.svelte';
@@ -87,14 +87,33 @@
     </footer>
   </div>
 {/if}
+{#each plugins.trustReq ? [plugins.trustReq] : [] as t (t)}
+  {@const m = t.entry.manifest!}
+  <div class="scrim" aria-hidden="true"></div>
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div class="pform trust" role="alertdialog" aria-modal="true" aria-label="Включить плагин «{m.name}»" tabindex="-1"
+    onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); t.resolve(false); } }}>
+    <header><b>Включить плагин «{m.name}»?</b></header>
+    <div class="body">
+      <p>Плагин «{m.name}»{m.author ? ` (${m.author})` : ''} получит доступ: {m.permissions.length ? rightsText(m) : 'только к своим настройкам'}.</p>
+      <p class="fine">Плагин работает внутри приложения: права защищают от ошибок, но не от намеренно вредного кода. Включайте плагины только из источников, которым доверяете.</p>
+    </div>
+    <footer>
+      <span class="kh"></span>
+      <button onclick={() => t.resolve(false)}>Отмена</button>
+      <!-- svelte-ignore a11y_autofocus -->
+      <button class="pri" autofocus onclick={() => t.resolve(true)}>Включить</button>
+    </footer>
+  </div>
+{/each}
 {#each plugins.place ? [plugins.place] : [] as p (p)}
   <PlacePicker kind={p.kind} title={p.title} token={p.title} placeholder="Найти файл" levels={p.levels} recent={store.refileRecentFiles('')}
     onpick={(x) => picked(p, x)} onclose={() => closed(p)} />
 {/each}
 
 <style>
-  .scrim { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.42); }
-  .pform { position: fixed; z-index: 71; left: 50%; top: 64px; max-height: calc(100% - 128px); transform: translateX(-50%); width: min(620px, calc(100% - 48px)); display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5); overflow: hidden; outline: none; }
+  .scrim { position: fixed; inset: 0; z-index: 80; background: rgba(0, 0, 0, 0.42); }
+  .pform { position: fixed; z-index: 81; left: 50%; top: 64px; max-height: calc(100% - 128px); transform: translateX(-50%); width: min(620px, calc(100% - 48px)); display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5); overflow: hidden; outline: none; }
   header { flex: 0 0 52px; display: flex; align-items: center; gap: 10px; padding: 0 20px; background: var(--bar); border-bottom: 1px solid var(--line); }
   header b { font-size: 15px; }
   .who { margin-left: auto; font-size: 11.5px; color: var(--fg3); }
@@ -104,4 +123,7 @@
   .bad { font-size: 12px; color: var(--todo); margin-right: auto; }
   footer button { height: 30px; padding: 0 14px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); }
   footer .pri { border: 0; background: var(--acc); color: var(--onacc); font-weight: 600; }
+  .trust { z-index: 81; }
+  .trust .body p { margin: 0; font-size: 13px; line-height: 1.5; }
+  .trust .fine { color: var(--fg2); font-size: 12px; }
 </style>

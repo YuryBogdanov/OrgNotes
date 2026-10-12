@@ -171,6 +171,11 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             return t;
           }
           if (cmd === 'open_plugins_folder') return null;
+          // a plugin's net.fetch (roadmap 1.3): Rust checks the manifest; here the answer is the test's
+          if (cmd === 'net_fetch') {
+            w.__log.push(['net', args.plugin, args.method, args.url]);
+            return w.__net ?? { status: 200, headers: [['content-type', 'application/json']], text: '{"ok":true}' };
+          }
           if (cmd === 'read_feature_file') return disk[(root() ?? '/mock') + '/.orgnotes/plugins/' + args.id + '.json'] ?? null;
           if (cmd === 'write_feature_file') {
             disk[(root() ?? '/mock') + '/.orgnotes/plugins/' + args.id + '.json'] = args.text;
