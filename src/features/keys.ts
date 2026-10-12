@@ -17,23 +17,10 @@ registerKeys([
   C('reviewCalendar', 'Разбор: Показать / скрыть календарь', 'inbox', 'review', ['⌘K'], { synonyms: ['календарь'], after: 'reviewBack' }),
 ]);
 
-// ---- the goals of the quarter --------------------------------------------------------------------------------
-registerGroup({ id: 'goals', title: 'ЦЕЛИ' });
-// the review of goals is a tab of its own: its keys win over the window's and the editor's (its card has one)
-registerScope({ id: 'goalReview', name: 'в разборе целей', over: ['window', 'editor', 'heading', 'review'], outside: { scopes: ['window', 'editor'], word: 'Вне разбора' }, rank: 20 });
-registerKeys([
-  C('navGoals', 'Навигатор: цели', 'view', 'window', ['⌃⌘4'], { synonyms: ['цели'], after: 'navAgendas' }),
-  C('newGoal', 'Новая цель…', 'goals', 'window', [], { synonyms: ['цель', 'квартал'] }),
-  C('goalsOverview', 'Цели: обзор квартала', 'goals', 'window', [], { synonyms: ['цели квартала'] }),
-  C('goalMark', 'Разбор целей: Добавить отметку', 'goals', 'goalReview', ['⌘↩']),
-  C('goalDone', 'Разбор целей: Цель достигнута', 'goals', 'goalReview', ['⌘1']),
-  C('goalShift', 'Разбор целей: Сдвинуть срок…', 'goals', 'goalReview', ['⌘2']),
-  C('goalBack', 'Разбор целей: Назад', 'goals', 'goalReview', ['⌘[']),
-  C('goalNext', 'Разбор целей: Следующая', 'goals', 'goalReview', ['⌘]']),
-]);
+// the goals of the quarter: the plugin «quarter-goals» (ТЗ 27), its keys in its manifest
 
 // ---- the calendar --------------------------------------------------------------------------------------------
 registerKeys([
-  C('navCalendar', 'Навигатор: календарь', 'view', 'window', ['⌃⌘5'], { synonyms: ['слои'], after: 'navGoals' }),
+  C('navCalendar', 'Навигатор: календарь', 'view', 'window', ['⌃⌘5'], { synonyms: ['слои'], after: 'navAgendas' }),
   C('calendar', 'Календарь', 'go', 'window', ['⌘3'], { synonyms: ['месяц', 'неделя'], after: 'agenda' }),
 ]);

@@ -1,0 +1,186 @@
+{
+  "id": "quarter-goals",
+  "name": "Цели квартала",
+  "version": "1.0.0",
+  "description": "Цели на квартал своих и команды: обзор, «Мои цели», новая цель, отметки, разбор на 1-1, отчёт и перенос квартала.",
+  "author": "Panopticon",
+  "api": "^1.0",
+  "minAppVersion": "0.9.0",
+  "main": "main.js",
+  "permissions": [
+    "index.read",
+    "files.edit",
+    "clipboard"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "id": "quarter-goals.nav",
+        "title": "Навигатор: цели",
+        "keys": [
+          "⌃⌘4"
+        ],
+        "synonyms": [
+          "цели"
+        ]
+      },
+      {
+        "id": "quarter-goals.new",
+        "title": "Новая цель…",
+        "synonyms": [
+          "цель",
+          "квартал",
+          "goal"
+        ]
+      },
+      {
+        "id": "quarter-goals.review",
+        "title": "Разобрать цели…",
+        "synonyms": [
+          "разбор",
+          "1-1",
+          "цели",
+          "отметки"
+        ],
+        "step": true
+      },
+      {
+        "id": "quarter-goals.overview",
+        "title": "Цели: обзор квартала",
+        "synonyms": [
+          "цели",
+          "квартал"
+        ]
+      },
+      {
+        "id": "quarter-goals.add",
+        "title": "Добавить цели…",
+        "synonyms": [
+          "цели",
+          "источник",
+          "тимлид"
+        ]
+      },
+      {
+        "id": "quarter-goals.mark",
+        "title": "Разбор целей: Добавить отметку",
+        "keys": [
+          "⌘↩"
+        ],
+        "scope": "review"
+      },
+      {
+        "id": "quarter-goals.done",
+        "title": "Разбор целей: Цель достигнута",
+        "keys": [
+          "⌘1"
+        ],
+        "scope": "review"
+      },
+      {
+        "id": "quarter-goals.shift",
+        "title": "Разбор целей: Сдвинуть срок…",
+        "keys": [
+          "⌘2"
+        ],
+        "scope": "review"
+      },
+      {
+        "id": "quarter-goals.back",
+        "title": "Разбор целей: Назад",
+        "keys": [
+          "⌘["
+        ],
+        "scope": "review"
+      },
+      {
+        "id": "quarter-goals.next",
+        "title": "Разбор целей: Следующая",
+        "keys": [
+          "⌘]"
+        ],
+        "scope": "review"
+      }
+    ],
+    "navSections": [
+      {
+        "id": "quarter-goals",
+        "title": "Цели",
+        "icon": "M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z",
+        "key": "quarter-goals.nav"
+      }
+    ],
+    "views": [
+      {
+        "id": "quarter-goals.overview",
+        "title": "Цели",
+        "icon": "M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"
+      }
+    ],
+    "settings": [
+      {
+        "block": "Агенды",
+        "groups": [
+          {
+            "caption": "ЦЕЛИ КВАРТАЛА",
+            "fields": [
+              {
+                "key": "silent",
+                "type": "choice",
+                "look": "menu",
+                "where": "local",
+                "label": "Цель «молчит» через",
+                "default": 14,
+                "options": [
+                  {
+                    "value": 7,
+                    "label": "7 дней"
+                  },
+                  {
+                    "value": 14,
+                    "label": "14 дней"
+                  },
+                  {
+                    "value": 21,
+                    "label": "21 день"
+                  },
+                  {
+                    "value": 30,
+                    "label": "30 дней"
+                  }
+                ]
+              },
+              {
+                "key": "soon",
+                "type": "choice",
+                "look": "menu",
+                "where": "local",
+                "label": "Предупреждать о сроке за",
+                "default": 6,
+                "options": [
+                  {
+                    "value": 2,
+                    "label": "2 недели"
+                  },
+                  {
+                    "value": 4,
+                    "label": "4 недели"
+                  },
+                  {
+                    "value": 6,
+                    "label": "6 недель"
+                  },
+                  {
+                    "value": 8,
+                    "label": "8 недель"
+                  }
+                ]
+              }
+            ],
+            "help": "Цель ACTIVE без отметок дольше этого срока подсвечивается в разделе «Цели» и первой попадает в разбор. Срок цели подсвечивается, когда до него остаётся меньше выбранного. Источники целей и их файлы задаются в навигаторе «Цели»."
+          }
+        ]
+      }
+    ]
+  }
+}

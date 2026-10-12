@@ -1,7 +1,7 @@
 import {
   activeTab, addPane, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
   openFile, openFromAgenda, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
-  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, openGoals,
+  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { displayName, noteName, withOrg } from './names';
@@ -415,6 +415,9 @@ class Store {
   registerStorage(id: string, o: StorageSpec = {}) {
     this.storages.set(id, o);
   }
+  hasStorage(id: string) {
+    return this.storages.has(id);
+  }
   /** config.json still has the feature's old keys (its file is not written yet). */
   hasLegacy(id: string) {
     return (this.storages.get(id)?.legacyKeys ?? []).some((k) => this.parsedConfig && k in this.parsedConfig);
@@ -642,7 +645,8 @@ class Store {
     return t?.kind === 'agenda' && t.agenda ? this.agendas.find((a) => a.id === t.agenda) : undefined;
   }
   /** The left navigator: the files, or the list of agendas. A setting of the window: switching tabs or panes keeps it. */
-  navMode = $state<NavMode>(lsGet('nav:mode') || 'files'); // a feature's mode that is not there falls back to «Файлы» (NavPanel)
+  // a feature's mode that is not there falls back to «Файлы» (NavPanel); «Цели» became the plugin «quarter-goals» (ТЗ 27)
+  navMode = $state<NavMode>(((m) => (m === 'goals' ? 'quarter-goals' : m))(lsGet('nav:mode')) || 'files');
   setNavMode(m: NavMode) {
     this.navMode = m;
     this.showNav = true;

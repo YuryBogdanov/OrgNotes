@@ -18,7 +18,8 @@ const view = (page: Page) => page.locator('section.pane.active .goals');
 const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string, p);
 const config = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/config.json'] ?? '{}'));
 /** The sources of goals: their file in the notes folder (roadmap 0.6). */
-const sources = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/plugins/goals.json'] ?? '{"sources":[]}').sources);
+// the goals are the plugin «quarter-goals» (ТЗ 27): its data in the notes folder
+const sources = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/plugins/quarter-goals.json'] ?? '{"data":{"sources":[]}}').data.sources);
 const group = (page: Page, name: string) => view(page).getByRole('region', { name });
 
 test.describe('the navigator', () => {

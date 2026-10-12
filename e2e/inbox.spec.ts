@@ -29,7 +29,7 @@ test.describe('the navigator', () => {
     await page.goto('/');
     await expect(page.locator('.cm-content').first()).toBeVisible();
     const tabs = modes(page).getByRole('tab');
-    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Задачи', 'Агенда', 'Цели', 'Календарь', 'Теги', 'Поиск по заметкам']);
+    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Задачи', 'Агенда', 'Календарь', 'Теги', 'Поиск по заметкам', 'Цели']); // «Цели» is a plugin: after the core's (ТЗ 27)
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
     await expect(tabs.nth(1)).toHaveAttribute('title', /^Inbox/);
     await expect(tabs.nth(2)).toBeDisabled();

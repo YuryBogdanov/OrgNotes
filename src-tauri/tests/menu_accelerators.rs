@@ -37,7 +37,6 @@ fn every_default_accelerator_parses() {
         "Control+CmdOrCtrl+Digit1",
         "Control+CmdOrCtrl+Digit2",
         "Control+CmdOrCtrl+Digit3",
-        "Control+CmdOrCtrl+Digit4",
         "Control+CmdOrCtrl+Digit5",
         "Control+CmdOrCtrl+Digit6",
         "Control+CmdOrCtrl+KeyJ",

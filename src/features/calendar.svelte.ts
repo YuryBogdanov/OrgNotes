@@ -153,7 +153,7 @@ class Calendar {
     const f = store.files.find((x) => x.name === file);
     if (!f || !e.title.trim()) return null;
     const c = this.cfg;
-    const open = f.wf.sequences.flatMap((s) => s.states.map((x) => x.name));
+    const open = (f.wf.sequences ?? []).flatMap((s) => s.states.map((x) => x.name));
     const status =
       e.kind === 'task'
         ? c.taskStatus && f.wf.open.includes(c.taskStatus) ? c.taskStatus : startOf(sequenceFor(f.wf, null))

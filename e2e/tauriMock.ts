@@ -318,3 +318,10 @@ export async function expandTree(page: import('@playwright/test').Page) {
   await expect(b).toBeVisible();
   if (await b.isEnabled()) await b.click();
 }
+
+/** The plugins are started (their commands are in the palette): the window comes first, the plugins after it. */
+export async function pluginsReady(page: import('@playwright/test').Page) {
+  const { expect } = await import('@playwright/test');
+  // polled from here: a function given to waitForFunction must not be async (a promise is always truthy)
+  await expect.poll(() => page.evaluate(async () => (await import('/src/store.svelte.ts' as string)).store.pluginsReady === true)).toBe(true);
+}

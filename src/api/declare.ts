@@ -110,7 +110,7 @@ export const groupOf = (id: string) => 'plugin:' + id;
 
 /** The scope of the keys of a plugin's review (its tab): over the window and the editor, as the goals' review. */
 export const REVIEW_SCOPE = 'pluginReview';
-registerScope({ id: REVIEW_SCOPE, name: 'в разборе плагина', over: ['window', 'editor', 'heading'], outside: { scopes: ['window', 'editor'], word: 'Вне разбора' }, rank: 30 });
+registerScope({ id: REVIEW_SCOPE, name: 'в разборе плагина', over: ['window', 'editor', 'heading', 'review'], outside: { scopes: ['window', 'editor'], word: 'Вне разбора' }, rank: 30 });
 
 /** A plugin's commands in the registry of keys (and its group of «Клавиши»). */
 export function declareKeys(m: Manifest) {

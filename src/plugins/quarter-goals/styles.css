@@ -1,0 +1,4 @@
+/* the 1-1 review on the core's frame: the goal on the left, the marks on the right (as before the plugin) */
+.greview .cols { flex-wrap: wrap; }
+.greview .cols .ed { flex: 3 1 460px; min-height: 360px; border-right: 1px solid var(--line); }
+.greview .cols .pa { flex: 2 1 300px; border-left: 0; }

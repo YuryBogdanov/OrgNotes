@@ -4,7 +4,7 @@
 // belong to features and are registered (views.ts); a kind nobody registers (a feature turned off) stays a tab with
 // its state kept, shown as «Функция выключена».
 
-import { viewOf } from './views';
+import { kindAlias, viewOf } from './views';
 
 export type TabKind = 'file' | 'agenda' | 'untitled' | (string & {}); // and the kinds of the features (views.ts)
 export interface Cursor {
@@ -360,10 +360,12 @@ export function restore(raw: string | null, exists: (path: string) => boolean): 
         if (st?.kind === 'agenda') tabs.push({ ...newTab('agenda'), ...(typeof st.agenda === 'string' && st.agenda ? { agenda: st.agenda } : {}) });
         else if (typeof st?.kind === 'string' && !core(st.kind)) {
           // a feature's tab: its state as the feature reads it back; no feature (turned off): kept as it was
-          const v = viewOf(st.kind);
+          const kind = kindAlias(st.kind); // a feature that became a plugin (ТЗ 27): its tabs under the new name
+          if (!kind) return;
+          const v = viewOf(kind);
           if (v?.transient) return;
           const raw = st.data ?? st[st.kind]; // before roadmap 0.3 the state was `calendar` / `goals`
-          tabs.push({ ...newTab(st.kind), data: v?.restore ? v.restore(raw) : raw, ...(v ? {} : { label: typeof st.label === 'string' ? st.label : undefined }) });
+          tabs.push({ ...newTab(kind), data: v?.restore ? v.restore(raw) : raw, ...(v ? {} : { label: typeof st.label === 'string' ? st.label : undefined }) });
         } else if (st?.kind === 'file' && typeof st.path === 'string' && exists(st.path)) {
           const t = newTab('file', st.path, st.cursor?.line ?? 0);
           t.cursor = { line: st.cursor?.line ?? 0, col: st.cursor?.col ?? 0 };

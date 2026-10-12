@@ -3,21 +3,16 @@
 // these become the manifests of the built-in plugins.
 
 import './keys';
-import { registerNav, registerSettings, registerSettingsBlock, registerView } from '../views';
+import { registerNav, registerSettings, registerView } from '../views';
 import { calendar } from './calendar.svelte';
-import { goals, goalsLabel, goalReviewLabel, goalsSchema } from './goals.svelte';
 import { inboxReview } from './review.svelte';
 import { inbox } from './inbox.svelte';
 import { store } from '../store.svelte';
 import { fromIso, monthTitle, weekNumber } from '../calIndex';
-import { GOAL_ICON } from '../goals';
 import CalendarView from '../CalendarView.svelte';
 import CalendarDay from '../CalendarDay.svelte';
 import CalendarPanel from '../CalendarPanel.svelte';
 import { calendarSchema } from './calendarSettings';
-import Goals from '../Goals.svelte';
-import GoalReview from '../GoalReview.svelte';
-import GoalsPanel from '../GoalsPanel.svelte';
 import Review from '../Review.svelte';
 import InboxPanel from '../InboxPanel.svelte';
 
@@ -31,17 +26,9 @@ registerView({
   transient: true, single: true, fileOf: (t) => t.path, onGone: () => (inboxReview.review = null),
 });
 
-// ---- the goals of the quarter --------------------------------------------------------------------------------------
-registerNav({ id: 'goals', label: 'Цели', icon: GOAL_ICON, key: 'navGoals', order: 40, component: GoalsPanel });
-registerView({
-  kind: 'goals', label: goalsLabel, icon: GOAL_ICON, component: Goals, crumbs: (t) => ['Цели', goalsLabel(t)],
-  restore: (d) => (typeof d === 'string' && d ? d : '*'),
-});
-registerView({
-  kind: 'goalReview', label: goalReviewLabel, icon: GOAL_ICON, component: GoalReview,
-  crumbs: (t) => ['Цели', `Разбор · ${goals.goalPeople.find((p) => p.key === t.data)?.name ?? ''}`],
-  transient: true, fileOf: (t) => t.path, onGone: () => (goals.goalReview = null),
-});
+// ---- the goals of the quarter: the built-in plugin «quarter-goals» (ТЗ 27); what the core kept under the old id
+// moves to it
+import './goalsMigration';
 
 // ---- the calendar --------------------------------------------------------------------------------------------------
 const calCrumb = (c: { view: 'month' | 'week'; date: string }) => (c.view === 'week' ? `Неделя ${weekNumber(fromIso(c.date))}` : monthTitle(fromIso(c.date)));
@@ -52,7 +39,6 @@ registerView({
   restore: (d: any) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? { view: d.view === 'week' ? 'week' : 'month', date: d.date } : calendar.fresh()),
 });
 registerSettings({ id: 'Календарь', icon: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3', order: 50, schema: calendarSchema });
-registerSettingsBlock({ section: 'Агенды', order: 10, schema: goalsSchema });
 
 // the plugins that are on: what their manifests declare (roadmap 1.1); their code is started by App once drawn
 import '../api/host.svelte';
