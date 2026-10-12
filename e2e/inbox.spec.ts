@@ -23,13 +23,13 @@ async function open(page: Page, files: Record<string, string> = FILES()) {
 }
 
 test.describe('the navigator', () => {
-  test('the bar: Файлы first (and by default), then Inbox, Задачи, Агенда, Теги, Поиск; names as tips; the count on Inbox', async ({ page }) => {
+  test('the bar: Файлы first (and by default), then Inbox, Задачи, Агенда, Цели, Теги, Поиск; names as tips; the count on Inbox', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 800 });
     await installTauriMock(page, FILES());
     await page.goto('/');
     await expect(page.locator('.cm-content').first()).toBeVisible();
     const tabs = modes(page).getByRole('tab');
-    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Задачи', 'Агенда', 'Теги', 'Поиск по заметкам']);
+    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Задачи', 'Агенда', 'Цели', 'Теги', 'Поиск по заметкам']);
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
     await expect(tabs.nth(1)).toHaveAttribute('title', /^Inbox/);
     await expect(tabs.nth(2)).toBeDisabled();

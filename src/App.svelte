@@ -22,6 +22,8 @@
   import Picker from './Picker.svelte';
   import Refile from './Refile.svelte';
   import CaptureWindow from './CaptureWindow.svelte';
+  import GoalAdd from './GoalAdd.svelte';
+  import GoalForm from './GoalForm.svelte';
   import { displayName as nameOf } from './names';
   import { toAccelerator } from './keys';
   import { keyHandler, menuMayRun } from './keyDispatch';
@@ -90,6 +92,12 @@
     outline: () => store.showOutline(),
     captureHere: () => store.openCapture(),
     navCollapse: () => store.navTree('collapse'),
+    navGoals: () => {
+      store.showNav = true;
+      store.setNavMode('goals');
+    },
+    newGoal: () => store.openGoalForm(store.goalKeyOfFile()),
+    goalsOverview: () => store.openGoals('*'),
     navExpand: () => store.navTree('expand'),
     newFile: () => {
       if (!store.canManageFiles) return;
@@ -233,7 +241,7 @@
 <!-- the agenda builder is a sheet over the whole window: the window stays visible under it but takes no input -->
 <!-- full screen with the menu bar shown: the toolbar grows by it (its buttons stay just below it), the traffic lights
      come into the toolbar -->
-<div class="win" inert={!!store.builder || store.settingsOpen} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
+<div class="win" inert={!!store.builder || store.settingsOpen || !!store.goalAdd || !!store.goalForm} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
   <Dialogs />
   <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
@@ -292,6 +300,9 @@
     <div class="path">
       {#if store.mode === 'agenda'}
         {#if store.agenda}<span>Агенда</span><span class="sep">›</span><span class="last">{store.agenda.name}</span>{:else}<span class="last">Агенда</span>{/if}
+      {:else if store.tab?.kind === 'goals'}
+        {@const gk = store.tab.goals}
+        <span>Цели</span><span class="sep">›</span><span class="last">{!gk || gk === '*' ? 'Обзор квартала' : (store.goalPeople.find((p) => p.key === gk)?.name ?? 'Цели')}</span>
       {:else if store.tab?.kind === 'untitled'}
         <span class="last">{store.tab.title}</span><span class="sep">·</span><span>не сохранено</span>
       {:else if crumbs.length}
@@ -355,6 +366,8 @@
 </div>
 {#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
 {#if store.settingsOpen && store.loaded}<Settings />{/if}
+{#if store.goalAdd}{#key store.goalAdd.n}<GoalAdd />{/key}{/if}
+{#if store.goalForm}{#key store.goalForm.n}<GoalForm />{/key}{/if}
 {/if}
 
 <style>

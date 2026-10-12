@@ -5,7 +5,7 @@
 
 export type Scope = 'global' | 'window' | 'editor' | 'heading' | 'review';
 export type Preset = 'emacs' | 'mac';
-export type GroupId = 'global' | 'app' | 'file' | 'search' | 'view' | 'go' | 'heading' | 'inbox';
+export type GroupId = 'global' | 'app' | 'file' | 'search' | 'view' | 'go' | 'heading' | 'inbox' | 'goals';
 
 export interface KeyCommand {
   id: string;
@@ -28,6 +28,7 @@ export const GROUPS: { id: GroupId; title: string; note?: string }[] = [
   { id: 'go', title: 'ПЕРЕХОДЫ' },
   { id: 'heading', title: 'ЗАГОЛОВКИ И ЗАДАЧИ', note: 'в редакторе, курсор на заголовке' },
   { id: 'inbox', title: 'INBOX И РАЗБОР' },
+  { id: 'goals', title: 'ЦЕЛИ' },
 ];
 
 export const SCOPE_NAMES: Record<Scope, string> = {
@@ -85,6 +86,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('navFiles', 'Навигатор: файлы', 'view', 'window', ['⌃⌘1']),
   C('navInbox', 'Навигатор: Inbox', 'view', 'window', ['⌃⌘2']),
   C('navAgendas', 'Навигатор: агенды', 'view', 'window', ['⌃⌘3']),
+  C('navGoals', 'Навигатор: цели', 'view', 'window', ['⌃⌘4'], { synonyms: ['цели'] }),
   C('navSearch', 'Навигатор: поиск', 'view', 'window', ['⌃⌘6']),
   C('navCollapse', 'Навигатор: свернуть всё', 'view', 'window', [], { synonyms: ['дерево', 'папки'] }),
   C('navExpand', 'Навигатор: развернуть всё', 'view', 'window', [], { synonyms: ['дерево', 'папки'] }),
@@ -125,6 +127,9 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('reviewDefer', 'Разбор: Отложить…', 'inbox', 'review', ['⌘4']),
   C('reviewSkip', 'Разбор: Пропустить', 'inbox', 'review', ['⌘5']),
   C('reviewBack', 'Разбор: Назад', 'inbox', 'review', ['⌘[']),
+
+  C('newGoal', 'Новая цель…', 'goals', 'window', [], { synonyms: ['цель', 'квартал'] }),
+  C('goalsOverview', 'Цели: обзор квартала', 'goals', 'window', [], { synonyms: ['цели квартала'] }),
 ];
 export const commandById = new Map(KEY_COMMANDS.map((c) => [c.id, c]));
 

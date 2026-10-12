@@ -27,6 +27,7 @@ export const ICONS = {
   inbox: 'M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4',
   prio: 'M10 3v10M10 16.5v.01',
   clear: 'M5 5l10 10M15 5L5 15',
+  goal: 'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z',
   gear: 'M10 7.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2zM10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6',
 };
 export type Icon = keyof typeof ICONS;
@@ -197,6 +198,19 @@ register({
 register({
   id: 'navExpand', title: 'Навигатор: развернуть всё', icon: 'folder', group: 'general', synonyms: ['дерево', 'папки', 'развернуть'],
   when: () => store.files.length > 0, run: () => store.navTree('expand'),
+});
+register({
+  id: 'newGoal', title: 'Новая цель…', icon: 'goal', group: 'general', synonyms: ['цель', 'квартал', 'goal'],
+  when: () => store.goalPeople.some((p) => p.found), hint: () => (store.goalKeyOfFile() ? `для ${store.goalPeople.find((p) => p.key === store.goalKeyOfFile())!.name}` : ''),
+  run: () => void setTimeout(() => store.openGoalForm(store.goalKeyOfFile())), // once the palette is closed
+});
+register({
+  id: 'goalsOverview', title: 'Цели: обзор квартала', icon: 'goal', group: 'general', synonyms: ['цели', 'квартал'],
+  when: () => store.goalSources.length > 0, run: () => store.openGoals('*'),
+});
+register({
+  id: 'goalsAdd', title: 'Добавить цели…', icon: 'goal', group: 'general', keyId: '', synonyms: ['цели', 'источник', 'тимлид'],
+  when: () => store.files.length > 0, run: () => void setTimeout(() => store.openGoalAdd()),
 });
 register({
   id: 'settings', title: 'Настройки…', icon: 'gear', group: 'general', synonyms: ['параметры', 'клавиши', 'сочетания', 'preferences'],
