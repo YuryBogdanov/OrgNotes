@@ -1,8 +1,9 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import CardReview from './CardReview.svelte';
   import NarrowEditor from './NarrowEditor.svelte';
   import { plugins, REVIEW_KIND } from './api/host.svelte';
-  import { REVIEW_SCOPE } from './api/declare';
+  import { reviewScope } from './api/declare';
   import { store } from './store.svelte';
   import type { Tab } from './layout';
   import type { CardRender, ReviewCard } from './api/index';
@@ -61,10 +62,13 @@
 
   // something of the plugin under the card: drawn again for each card
   let belowEl = $state<HTMLElement>();
+  // drawn again only when the card changes (not when an action stays on it: a calendar opened under it stays open)
+  const belowKey = $derived(c ? `${plugins.review?.cur}|${c.info.ref.path}|${c.info.ref.line}` : '');
   $effect(() => {
     const node = belowEl;
+    void belowKey;
     const run = plugins.review;
-    const ref = c?.info.ref;
+    const ref = untrack(() => c?.info.ref);
     if (!node || !run?.spec.below || !ref) return;
     const d = plugins.guard(run.plugin, () => run.spec.below!(node, ref, { id: tab.id, setState: () => {} }), undefined);
     return () => {
@@ -87,9 +91,9 @@
   });
 </script>
 
-<CardReview cls={'preview' + (r?.spec.cls ? ' ' + r.spec.cls : '')} scope={REVIEW_SCOPE} {keys} width={r?.spec.width ?? 820}
+<CardReview cls={'preview' + (r?.spec.cls ? ' ' + r.spec.cls : '')} scope={reviewScope(r?.plugin ?? '')} {keys} width={r?.spec.width ?? 820}
   state={r && r.cur >= 0 && c ? 'card' : r && r.cur < 0 ? 'summary' : 'empty'}
-  cardKey={r && c ? r.cur + '|' + c.info.ref.path + '|' + c.info.ref.title : ''}
+  cardKey={r && c ? r.cur + '|' + c.info.ref.path : ''}
   back={r ? { disabled: r.cur === 0, run: () => void plugins.reviewStep(-1), key: r.spec.backCommand ?? '' } : null}>
   {#snippet head()}
     {#if r && c}
@@ -110,7 +114,7 @@
       <div class="cols" class:with={!!r.spec.aside}>
         <div class="ed">
           <NarrowEditor file={c.file} line={c.heading.line} end={c.heading.end} {tab} fileKey={'preview|' + r.cur + '|' + c.file.path + '|' + (narrow.fold ?? []).join(',')}
-            folded={narrow.fold ?? []} lineNote={narrow.note ?? null} reveal={narrow.reveal ? { line: narrow.reveal.line, n: narrow.reveal.n, focus: true } : null} />
+            folded={narrow.fold ?? []} lineNote={narrow.note ?? null} onnarrow={(line) => plugins.reviewEdited(line)} reveal={narrow.reveal ? { line: narrow.reveal.line, n: narrow.reveal.n, focus: true } : null} />
         </div>
         {#if r.spec.aside}<aside class="pa" use:part={() => r.spec.aside}></aside>{/if}
       </div>

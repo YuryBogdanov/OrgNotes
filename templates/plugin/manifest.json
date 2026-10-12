@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Шаблон плагина: команда, раздел навигатора на Svelte, настройка.",
   "author": "Вы",
-  "api": "^1.1",
+  "api": "^1.2",
   "minAppVersion": "1.0.0",
   "main": "main.js",
   "permissions": ["index.read"],

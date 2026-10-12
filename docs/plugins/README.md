@@ -1,6 +1,6 @@
 # Как написать плагин для Panopticon
 
-API плагинов **v1.1** (приложение 1.0 и новее). Подробности и решения — в ТЗ 26 и ТЗ 27, здесь — то, что нужно, чтобы написать и поставить плагин.
+API плагинов **v1.2** (приложение 1.0 и новее). Подробности и решения — в ТЗ 26 и ТЗ 27, здесь — то, что нужно, чтобы написать и поставить плагин.
 
 ## Что такое плагин
 
@@ -50,7 +50,7 @@ export default {
   "version": "0.1.0",
   "description": "Что делает",
   "author": "Кто",
-  "api": "^1.1",
+  "api": "^1.2",
   "minAppVersion": "1.0.0",
   "main": "main.js",
   "styles": "styles.css",
@@ -75,7 +75,7 @@ export default {
 
 | Поле | Что это |
 |---|---|
-| `api` | Диапазон версий API: `^1.1`. Если API приложения не подходит, плагин не включится и покажет причину. |
+| `api` | Диапазон версий API: `^1.2`. Если API приложения не подходит, плагин не включится и покажет причину. |
 | `minAppVersion` | Самая старая версия приложения, на которой плагин работает. |
 | `main` | Файл кода; без него плагин — только данные (например, набор тем). |
 | `styles` | Необязательный CSS: подключается тегом `<style>`. Можно не писать, если стили лежат в коде (так собирает шаблон). |
@@ -113,7 +113,7 @@ Ids команд, разделов и вкладок начинаются с `<i
 | `commands.on(id, run)` | Обработчик команды из манифеста. |
 | `commands.setAvailable(id, on)` | Скрыть команду: её нет в палитре, клавиши не работают. |
 | `commands.keyOf(id)` | Текущее сочетание команды — для подсказок в интерфейсе плагина. |
-| `commands.run(id, arg)` | Своя команда или команда приложения: `file.open {path, line?}`, `heading.reveal {ref}`, `heading.status {ref}` (палитра статусов, файл заголовка должен быть открыт во вкладке), `agenda.open`. |
+| `commands.run(id, arg)` | Своя команда или команда приложения:<br>• `file.open {path, line?, beside?, focus?}` — `beside` открывает в соседнем редакторе, текущая вкладка остаётся впереди;<br>• `heading.reveal {ref}`;<br>• `heading.status`, `heading.schedule`, `heading.deadline`, `heading.tags`, `heading.priority` `{ref}` — шаг палитры для заголовка, его файл должен быть открыт во вкладке;<br>• `agenda.open`;<br>• `capture.open` — быстрый ввод;<br>• `inbox.pickFile`, `inbox.createFile`. |
 
 **Интерфейс**
 
@@ -123,14 +123,16 @@ Ids команд, разделов и вкладок начинаются с `<i
 | `ui.view(id, { title, crumbs?, restore?, render })` | Вид вкладки. `render(el, state, tab)`; `tab.setState(s)` сохраняет состояние вместе с раскладкой. |
 | `ui.open(viewId, state, 'here' \| 'beside')`, `ui.close(viewId)` | Открыть вкладку плагина (в этом или соседнем редакторе) и закрыть его вкладки. |
 | `ui.notify(text, actions?)` | Уведомление внизу окна, с кнопками. |
+| `ui.setBadge(navId, n)` | Число на кнопке раздела навигатора. |
+| `ui.refile(ref, { before?, quiet? })` | Перенос заголовка приложения («Перенести в…»). Возвращает, куда ушёл заголовок, или `null`, если отменили. |
 | `ui.form({ title, groups, submit, validate?, onChange?, headerExtra? })` | Лист с полями. Поля — те же, что в настройках, плюс: `textarea` (списки «- »), `date` (`inline` \| `chip`), `place` (файл и заголовок колонками, `create`), `custom` (рисует плагин). |
 | `ui.sheet({ title, render, buttons? })` | Лист с содержимым плагина. С `bare: true` плагин рисует весь диалог сам. |
 | `ui.menu(items, {x, y})` | Контекстное меню; `'sep'` — разделитель. |
 | `ui.choose({ title, items })` | Выбор из списка в палитре. |
 | `ui.pickPlace({ kind?, levels? })` | Выбор «файл + заголовок». |
 | `ui.pickDate({ initial?, kind?, names?, current? })` | Календарь на три месяца. |
-| `ui.widget(el, field, value, onChange)` | Календарь, выбор места или поле со списками приложения внутри элемента плагина. |
-| `ui.review(spec)` | Разбор карточками: по одному заголовку, суженный редактор, действия на клавишах команд с `scope: review`. Плагин может нарисовать шапку, быстрые кнопки, панель справа, сводку (`head`, `quick`, `aside`, `summary`), свернуть строки (`narrow`) и сохранить ввод перед сменой карточки (`beforeStep`). `ui.currentReview()` → `step`, `redraw`, `update`. |
+| `ui.widget(el, field, value, onChange)` | Календарь, выбор места, поле со списками или месяц записей календаря (`month`) приложения внутри элемента плагина. |
+| `ui.review(spec)` | Разбор карточками: по одному заголовку, суженный редактор, действия на клавишах команд с `scope: review`. Плагин может:<br>• нарисовать шапку, быстрые кнопки, панель справа, сводку (`head`, `quick`, `aside`, `summary`);<br>• свернуть строки (`narrow`);<br>• сохранить ввод перед сменой карточки (`beforeStep`).<br>Заголовок карточки можно править прямо в ней. Клавиши разбора у каждого плагина свои. `ui.currentReview()` → `step`, `redraw`, `update`. |
 
 **Данные**
 
@@ -139,12 +141,14 @@ Ids команд, разделов и вкладок начинаются с `<i
 | `index.query({ conds, sources?, sort? })` | Заголовки с задачами — тот же движок, что у агенды. Условия как в конструкторе агенды. |
 | `index.heading(ref)`, `index.outline(path)`, `index.files()` | Один заголовок, заголовки файла, файлы папки. |
 | `index.workflow(path)`, `index.statusTone(keyword, path)` | Статусы файла; цвет статуса — рисуйте через `var(--p-<цвет>)`. |
+| `index.inbox()` | Файл Inbox (настройка приложения; туда пишет быстрый ввод). |
 | `files.read(path)` | Текст файла папки заметок. |
+| `edit.undo()` | Отменить последний шаг журнала (кнопка «Отменить» в уведомлении). |
 | `edit.transaction(label, tx => …, { onUndo? })` | Одна правка — один шаг ⌘Z. Операции `tx`: `setStatus`, `setPlanning`, `setTags`, `setProperty`, `insertHeading`, `replaceBody`, `move`, `remove`, `update(path, text => …)` — своя функция над текстом файла (для своей структуры в файле). |
 | `storage.folder`, `storage.local` | Свои данные: `get`, `set`, `onChange`. В папке заметок — `.orgnotes/plugins/<id>.json`; на этом Mac — локально. |
 | `settings.values()`, `settings.onChange`, `settings.dynamic(key, { options?, hint? })` | Значения настроек из манифеста; варианты и подсказки, которые зависят от значений. |
 | `statusSets.set(defs, { ifMissing? })` | Наборы статусов из кода. |
-| `events.on(...)` | События: `file.changed {path, by}`, `heading.changed`, `tab.active {kind, path, state}`, `folder.changed`, `day.changed`, `theme.changed`. |
+| `events.on(...)` | События: `file.changed {path, by}`, `heading.changed`, `tab.active {kind, path, state}`, `folder.changed`, `inbox.changed {path}`, `day.changed`, `theme.changed`. |
 
 ## Права
 

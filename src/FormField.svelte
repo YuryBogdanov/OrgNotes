@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import Calendar from './Calendar.svelte';
   import PlacePicker from './PlacePicker.svelte';
+  import CalReview from './CalReview.svelte';
   import { store } from './store.svelte';
   import { busyDays, longDate, shiftDate } from './calendar';
   import { listEnter, listIndent } from './textList';
@@ -122,6 +123,12 @@
   </div>
 {:else if f.type === 'custom'}
   <div class="own" bind:this={own}></div>
+{:else if f.type === 'month'}
+  {@const m = (values[f.key] ?? null) as { path: string; line: number; date: string | null; open: boolean } | null}
+  {@const abs = m ? (store.files.find((x) => x.name === m.path)?.path ?? m.path) : ''}
+  {#if m}
+    <CalReview task={{ path: abs, line: m.line, date: day(m.date) }} open={m.open} keyId={f.keyId} ontoggle={() => set(f.key, { ...m, open: !m.open })} />
+  {/if}
 {/if}
 
 <style>
