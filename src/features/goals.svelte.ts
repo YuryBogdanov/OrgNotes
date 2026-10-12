@@ -3,7 +3,7 @@
 // every feature; the core knows nothing of it.
 
 import { store, type NoteFile } from '../store.svelte';
-import { closeTab, newTab, openGoals } from '../layout';
+import { closeTab, newTab, openView, type Tab } from '../layout';
 import { setPlanning, weekdayNames } from '../edits';
 import { readGoals, readGoalSettings, GOALS_WORKFLOW, addSourceHeading, avatarColor, initials, insertGoal, quarterOf, readSource, sourceKey, withGoals, addMark, findGoal, shiftQuarter, goalsIn, moveGoal, reviewQueue as goalQueue, shortDay, GOAL_STATES, quarterLabel, carryOver, withGoalSettings, isSilent, deadlineSoon, isDone, DEFAULT_GOAL_SETTINGS, type GoalSettings, type Goal, type GoalSource, type NewGoal, type Quarter, type SourceGoals } from '../goals';
 import { DEFAULT_SEQUENCE, parseHeadings, setKeyword, type Heading } from '../org';
@@ -29,6 +29,14 @@ export interface GoalPerson {
   color: string;
   name: string; // «Мои цели» for mine
 }
+
+/** The name of a goals tab: the overview or a person. */
+export const goalsLabel = (t: Tab) => {
+  const key = (t.data as string | undefined) ?? '*';
+  return key === '*' ? 'Обзор квартала' : (goals.goalPeople.find((p) => p.key === key)?.name ?? 'Цели');
+};
+/** «Разбор целей · Петров Алексей». */
+export const goalReviewLabel = (t: Tab) => `Разбор целей · ${goals.goalPeople.find((p) => p.key === t.data)?.name ?? ''}`;
 
 class Goals {
   // ---- goals of the quarter (ТЗ 23) ----------------------------------------------------------------------------
@@ -97,7 +105,7 @@ class Goals {
   );
   /** «Цели»: the overview (`*`) or one person, in the goals tab of the active pane. */
   openGoals(key = '*') {
-    openGoals(store.layout, store.layout.active, key);
+    openView(store.layout, store.layout.active, 'goals', () => key, (t) => (t.data = key));
   }
   /** Open the file of a source at its heading (a double click in the navigator). */
   openGoalFile(key: string, line?: number) {
@@ -201,12 +209,12 @@ class Goals {
     const found = store.layout.panes.flatMap((pn, pi) => pn.tabs.map((t, ti) => ({ t, pi, ti }))).find((x) => x.t.kind === 'goalReview');
     if (found) {
       found.t.path = p.file.path;
-      found.t.goals = key;
+      found.t.data = key;
       store.activateTab(found.pi, found.ti);
     } else {
       const pn = store.layout.panes[store.layout.active];
       const at = pn.tabs.length ? pn.active + 1 : 0;
-      pn.tabs.splice(at, 0, { ...newTab('goalReview', p.file.path), goals: key });
+      pn.tabs.splice(at, 0, { ...newTab('goalReview', p.file.path), data: key });
       pn.active = at;
     }
   }

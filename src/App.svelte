@@ -1,4 +1,5 @@
 <script lang="ts">
+  import './features'; // the built-in features register their tabs, sections and keys (roadmap 0.3)
   import { inboxReview } from './features/review.svelte';
   import { goals } from './features/goals.svelte';
   import { calendar } from './features/calendar.svelte';
@@ -56,8 +57,7 @@
     };
   });
   import { keyHandler, menuMayRun } from './keyDispatch';
-  import { fromIso, monthTitle, weekNumber } from './calIndex';
-  const calCrumb = (c: { view: 'month' | 'week'; date: string }) => (c.view === 'week' ? `Неделя ${weekNumber(fromIso(c.date))}` : monthTitle(fromIso(c.date)));
+  import { allNavs, allViews, viewOf } from './views';
 
   // the quick entry from another program: a panel of its own with only the entry (the main window does the writing)
   const isCaptureWindow = location.hash === '#capture';
@@ -124,14 +124,6 @@
     captureHere: () => store.openCapture(),
     navCollapse: () => store.navTree('collapse'),
     calendar: () => calendar.showHere(),
-    navCalendar: () => {
-      store.showNav = true;
-      store.setNavMode('calendar');
-    },
-    navGoals: () => {
-      store.showNav = true;
-      store.setNavMode('goals');
-    },
     newGoal: () => goals.openGoalForm(goals.goalKeyOfFile()),
     goalsOverview: () => goals.openGoals('*'),
     navExpand: () => store.navTree('expand'),
@@ -203,12 +195,9 @@
     menu.setEnabled('copyPath', t?.kind === 'file');
     menu.setChecked('rich', store.rich);
   });
-  // closing the «Разбор Inbox» tab ends the review (everything is on disk already); so for the goals
+  // closing the last tab of a kind tells its feature (a review ends: everything is on disk already)
   $effect(() => {
-    if (goals.goalReview && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'goalReview'))) goals.goalReview = null;
-  });
-  $effect(() => {
-    if (inboxReview.review && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'review'))) inboxReview.review = null;
+    for (const v of allViews()) if (v.onGone && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === v.kind))) v.onGone();
   });
 
   // the panel of the quick entry knows the Inbox file's name from here
@@ -229,6 +218,13 @@
     !store.sheetOpen || (id === 'palette' && store.palette) || (id === 'settings' && store.settingsOpen) ||
     (id === 'save' && store.builder && !store.unsavedReq && !store.saveAsReq && !store.errorReq && !store.diskReq);
   /** A command of the window run by its key; false if it may not run now (the key then goes on). */
+  // the features' sections of the navigator: their shortcuts show them (⌃⌘2 Inbox, ⌃⌘4 Цели, ⌃⌘5 Календарь)
+  for (const n of allNavs())
+    if (n.key)
+      actions[n.key] = () => {
+        store.showNav = true;
+        store.setNavMode(n.id);
+      };
   const runWindow = (id: string) => {
     if (!actions[id] || !allowed(id)) return false;
     actions[id]();
@@ -357,15 +353,9 @@
     <div class="path">
       {#if store.mode === 'agenda'}
         {#if store.agenda}<span>Агенда</span><span class="sep">›</span><span class="last">{store.agenda.name}</span>{:else}<span class="last">Агенда</span>{/if}
-      {:else if store.tab?.kind === 'calendar'}
-        {@const c = store.tab.calendar}
-        <span>Календарь</span><span class="sep">›</span><span class="last">{c ? calCrumb(c) : ''}</span>
-      {:else if store.tab?.kind === 'goalReview'}
-        {@const gk = store.tab.goals}
-        <span>Цели</span><span class="sep">›</span><span class="last">Разбор · {goals.goalPeople.find((p) => p.key === gk)?.name ?? ''}</span>
-      {:else if store.tab?.kind === 'goals'}
-        {@const gk = store.tab.goals}
-        <span>Цели</span><span class="sep">›</span><span class="last">{!gk || gk === '*' ? 'Обзор квартала' : (goals.goalPeople.find((p) => p.key === gk)?.name ?? 'Цели')}</span>
+      {:else if viewOf(store.tab?.kind)?.crumbs}
+        {@const cs = viewOf(store.tab?.kind)!.crumbs!(store.tab!)}
+        {#each cs as c, i (i)}{#if i}<span class="sep">›</span>{/if}<span class:last={i === cs.length - 1}>{c}</span>{/each}
       {:else if store.tab?.kind === 'untitled'}
         <span class="last">{store.tab.title}</span><span class="sep">·</span><span>не сохранено</span>
       {:else if crumbs.length}
@@ -382,7 +372,7 @@
         <button aria-label="Агенда" title="Агенда" aria-pressed={pressed === 'agenda'} class:on={pressed === 'agenda'} onclick={() => store.toggleSecond('agenda')}>
           <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5h9M8 10h9M8 14.5h9" /><circle cx="4" cy="5.5" r="1" /><circle cx="4" cy="10" r="1" /><circle cx="4" cy="14.5" r="1" /></svg>
         </button>
-        <button aria-label="Календарь" title="Календарь" aria-pressed={pressed === 'calendar'} class:on={pressed === 'calendar'} onclick={() => { store.toggleSecond('calendar'); if (secondKind(store.layout) === 'calendar') store.setNavMode('calendar'); }}>
+        <button aria-label="Календарь" title="Календарь" aria-pressed={pressed === 'calendar'} class:on={pressed === 'calendar'} onclick={() => calendar.toggleSecond()}>
           <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2.5v3M13 2.5v3" /><circle cx="10" cy="12.5" r="2" /></svg>
         </button>
       </div>

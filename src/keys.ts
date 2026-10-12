@@ -3,9 +3,10 @@
 // what clashes with what. A shortcut is kept as it is shown: «⇧⌘O», a chord as two presses «⌃C S».
 // The menu bar, the keys of the window, of the editor and of the review all take their shortcuts from here.
 
-export type Scope = 'global' | 'window' | 'editor' | 'heading' | 'review' | 'goalReview';
+/** The core's scopes; a feature registers its own (a review's tab) with `registerScope`. */
+export type Scope = 'global' | 'window' | 'editor' | 'heading' | (string & {});
 export type Preset = 'emacs' | 'mac';
-export type GroupId = 'global' | 'app' | 'file' | 'search' | 'view' | 'go' | 'heading' | 'inbox' | 'goals';
+export type GroupId = string;
 
 export interface KeyCommand {
   id: string;
@@ -17,6 +18,7 @@ export interface KeyCommand {
   mac?: string[];
   synonyms?: string[];
   note?: string; // a line under the title
+  after?: string; // a feature's command: its place in the list, after this one (else at the end)
 }
 
 export const GROUPS: { id: GroupId; title: string; note?: string }[] = [
@@ -28,7 +30,6 @@ export const GROUPS: { id: GroupId; title: string; note?: string }[] = [
   { id: 'go', title: 'ПЕРЕХОДЫ' },
   { id: 'heading', title: 'ЗАГОЛОВКИ И ЗАДАЧИ', note: 'в редакторе, курсор на заголовке' },
   { id: 'inbox', title: 'INBOX И РАЗБОР' },
-  { id: 'goals', title: 'ЦЕЛИ' },
 ];
 
 export const SCOPE_NAMES: Record<Scope, string> = {
@@ -36,11 +37,9 @@ export const SCOPE_NAMES: Record<Scope, string> = {
   window: 'в окне',
   editor: 'в редакторе',
   heading: 'на заголовке',
-  review: 'в разборе Inbox',
-  goalReview: 'в разборе целей',
 };
 
-const C = (id: string, title: string, group: GroupId, scope: Scope, keys: string[] = [], more: Partial<KeyCommand> = {}): KeyCommand => ({ id, title, group, scope, keys, ...more });
+export const C = (id: string, title: string, group: GroupId, scope: Scope, keys: string[] = [], more: Partial<KeyCommand> = {}): KeyCommand => ({ id, title, group, scope, keys, ...more });
 
 export const KEY_COMMANDS: KeyCommand[] = [
   C('capture', 'Новая задача в Inbox', 'global', 'global', ['⇧⌘I'], { synonyms: ['быстрый ввод', 'inbox'] }),
@@ -85,10 +84,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('nav', 'Навигатор', 'view', 'window', ['⌘0'], { synonyms: ['боковая панель'] }),
   C('insp', 'Инспектор', 'view', 'window', ['⌥⌘0']),
   C('navFiles', 'Навигатор: файлы', 'view', 'window', ['⌃⌘1']),
-  C('navInbox', 'Навигатор: Inbox', 'view', 'window', ['⌃⌘2']),
   C('navAgendas', 'Навигатор: агенды', 'view', 'window', ['⌃⌘3']),
-  C('navGoals', 'Навигатор: цели', 'view', 'window', ['⌃⌘4'], { synonyms: ['цели'] }),
-  C('navCalendar', 'Навигатор: календарь', 'view', 'window', ['⌃⌘5'], { synonyms: ['слои'] }),
   C('navSearch', 'Навигатор: поиск', 'view', 'window', ['⌃⌘6']),
   C('navCollapse', 'Навигатор: свернуть всё', 'view', 'window', [], { synonyms: ['дерево', 'папки'] }),
   C('navExpand', 'Навигатор: развернуть всё', 'view', 'window', [], { synonyms: ['дерево', 'папки'] }),
@@ -96,7 +92,6 @@ export const KEY_COMMANDS: KeyCommand[] = [
 
   C('notes', 'Заметки', 'go', 'window', ['⌘1']),
   C('agenda', 'Агенда', 'go', 'window', ['⌘2']),
-  C('calendar', 'Календарь', 'go', 'window', ['⌘3'], { synonyms: ['месяц', 'неделя'] }),
   C('back', 'Назад', 'go', 'window', ['⌘[']),
   C('followLink', 'Открыть ссылку под курсором', 'go', 'editor', ['⌘↩'], { synonyms: ['ссылка'] }),
 
@@ -122,25 +117,45 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('tags', 'Изменить теги…', 'heading', 'heading', [], { emacs: ['⌃C ⌃Q'], mac: [], synonyms: ['метки'] }),
   C('refile', 'Перенести в другой файл…', 'heading', 'heading', [], { emacs: ['⌃C ⌃W'], mac: [], synonyms: ['refile', 'переместить'] }),
 
-  C('review', 'Разобрать Inbox', 'inbox', 'window', ['⇧⌘R'], { synonyms: ['разбор', 'карточки'] }),
   C('captureHere', 'Новая задача в Inbox (внутри окна)', 'inbox', 'window', [], { synonyms: ['быстрый ввод'] }),
-  C('reviewDone', 'Разбор: Выполнено', 'inbox', 'review', ['⌘1']),
-  C('reviewCancel', 'Разбор: Отменить', 'inbox', 'review', ['⌘2']),
-  C('reviewMove', 'Разбор: Перенести…', 'inbox', 'review', ['⌘3']),
-  C('reviewDefer', 'Разбор: Отложить…', 'inbox', 'review', ['⌘4']),
-  C('reviewSkip', 'Разбор: Пропустить', 'inbox', 'review', ['⌘5']),
-  C('reviewBack', 'Разбор: Назад', 'inbox', 'review', ['⌘[']),
-  C('reviewCalendar', 'Разбор: Показать / скрыть календарь', 'inbox', 'review', ['⌘K'], { synonyms: ['календарь'] }),
 
-  C('newGoal', 'Новая цель…', 'goals', 'window', [], { synonyms: ['цель', 'квартал'] }),
-  C('goalsOverview', 'Цели: обзор квартала', 'goals', 'window', [], { synonyms: ['цели квартала'] }),
-  C('goalMark', 'Разбор целей: Добавить отметку', 'goals', 'goalReview', ['⌘↩']),
-  C('goalDone', 'Разбор целей: Цель достигнута', 'goals', 'goalReview', ['⌘1']),
-  C('goalShift', 'Разбор целей: Сдвинуть срок…', 'goals', 'goalReview', ['⌘2']),
-  C('goalBack', 'Разбор целей: Назад', 'goals', 'goalReview', ['⌘[']),
-  C('goalNext', 'Разбор целей: Следующая', 'goals', 'goalReview', ['⌘]']),
 ];
 export const commandById = new Map(KEY_COMMANDS.map((c) => [c.id, c]));
+
+// ---- what features add (roadmap 0.3): their commands, groups and scopes --------------------------------------------
+
+/** A feature's commands with their defaults: they take part in the menu, the palette's hints, «Клавиши», the clashes. */
+export function registerKeys(list: KeyCommand[]) {
+  for (const c of list) {
+    if (commandById.has(c.id)) continue;
+    const at = c.after ? KEY_COMMANDS.findIndex((x) => x.id === c.after) : -1;
+    if (at >= 0) KEY_COMMANDS.splice(at + 1, 0, c);
+    else KEY_COMMANDS.push(c);
+    commandById.set(c.id, c);
+  }
+}
+/** A group of «Клавиши» of a feature (at the end). */
+export function registerGroup(g: { id: GroupId; title: string; note?: string }) {
+  if (!GROUPS.some((x) => x.id === g.id)) GROUPS.push(g);
+}
+/** A scope of a feature: a tab whose keys win over the scopes it is inside (`over`) while it is active. */
+export interface ScopeSpec {
+  id: string;
+  /** «в разборе Inbox» */
+  name: string;
+  /** The scopes it is inside: the same shortcut there is no clash. */
+  over: Scope[];
+  /** «Вне разбора ⌘1 — …»: the scopes whose shortcut the note names, and its first word. */
+  outside: { scopes: Scope[]; word: string };
+  /** Which of the features' scopes is tried first (higher first). */
+  rank: number;
+}
+export const SCOPES = new Map<string, ScopeSpec>();
+export function registerScope(s: ScopeSpec) {
+  SCOPES.set(s.id, s);
+  SCOPE_NAMES[s.id] = s.name;
+  for (const o of s.over) NESTED.push([s.id, o]);
+}
 
 /** For reference at the end of the section: not configurable. */
 export const FIXED_KEYS: { keys: string; title: string }[] = [
@@ -306,9 +321,8 @@ export function parseState(raw: string | null): KeyState {
 
 // ---- clashes ----------------------------------------------------------------------------------------------------
 
-/** Scopes where one is inside the other: the inner one wins there, the outer one works elsewhere. */
-// the review of goals is a tab of its own: its keys win over the window's and the editor's (its card has one)
-const NESTED = [['review', 'window'], ['heading', 'editor'], ['goalReview', 'window'], ['goalReview', 'editor'], ['goalReview', 'heading'], ['goalReview', 'review']];
+/** Scopes where one is inside the other: the inner one wins there, the outer one works elsewhere (features add theirs). */
+const NESTED: string[][] = [['heading', 'editor']];
 export const nested = (a: Scope, b: Scope) => NESTED.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
 /** The same shortcut, or one is the first press of the other's chord. */
 export const clash = (a: string, b: string) => a === b || b.startsWith(a + ' ') || a.startsWith(b + ' ');
@@ -331,18 +345,11 @@ export function conflictsOf(bindings: Map<string, string[]>, id: string, key: st
 /** «Вне разбора ⌘1 — „Заметки“»: the same key in the outer scope of a nested pair. */
 export function outerNote(bindings: Map<string, string[]>, id: string): string {
   const me = commandById.get(id);
-  if (!me || (me.scope !== 'review' && me.scope !== 'heading' && me.scope !== 'goalReview')) return '';
-  if (me.scope === 'goalReview') {
-    for (const k of bindings.get(id) ?? []) {
-      const other = KEY_COMMANDS.find((c) => (c.scope === 'window' || c.scope === 'editor') && (bindings.get(c.id) ?? []).includes(k));
-      if (other) return `Вне разбора ${k} — «${other.title}»`;
-    }
-    return '';
-  }
-  const outer: Scope = me.scope === 'review' ? 'window' : 'editor';
+  const spec = me && (me.scope === 'heading' ? { scopes: ['editor'], word: 'Вне заголовка' } : SCOPES.get(me.scope)?.outside);
+  if (!me || !spec) return '';
   for (const k of bindings.get(id) ?? []) {
-    const other = KEY_COMMANDS.find((c) => c.scope === outer && (bindings.get(c.id) ?? []).includes(k));
-    if (other) return `${me.scope === 'review' ? 'Вне разбора' : 'Вне заголовка'} ${k} — «${other.title}»`;
+    const other = KEY_COMMANDS.find((c) => spec.scopes.includes(c.scope) && (bindings.get(c.id) ?? []).includes(k));
+    if (other) return `${spec.word} ${k} — «${other.title}»`;
   }
   return '';
 }

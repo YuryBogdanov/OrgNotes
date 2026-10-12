@@ -13,7 +13,7 @@
   // (a click filters), a group per person, a row per goal: status, title and «Результат: …», deadline, last mark.
   let { tab }: { tab: Tab } = $props();
 
-  const key = $derived(tab.goals ?? '*');
+  const key = $derived((tab.data as string | undefined) ?? '*');
   const q = $derived(goals.goalsQuarter);
   const all = $derived(key === '*');
   const people = $derived.by(() => {

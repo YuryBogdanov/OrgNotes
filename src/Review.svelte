@@ -158,9 +158,9 @@
         return true;
       },
     };
-    store.reviewKeys = keys;
+    store.setScopeKeys('review', keys);
     return () => {
-      if (store.reviewKeys === keys) store.reviewKeys = null;
+      if (store.scopeKeys.get('review') === keys) store.setScopeKeys('review', null);
     };
   });
   const kbd = (id: string) => store.keyHint(id);

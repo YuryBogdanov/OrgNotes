@@ -1,7 +1,8 @@
 <script lang="ts">
   import { goals } from './features/goals.svelte';
   import { calendar } from './features/calendar.svelte';
-  import { store, SECTIONS, type SettingsSection } from './store.svelte';
+  import { store, type SettingsSection } from './store.svelte';
+  import { allSettings, settingsOf } from './views';
   import KeysSettings from './KeysSettings.svelte';
   import AppearanceSettings from './AppearanceSettings.svelte';
   import ThemeEditor from './ThemeEditor.svelte';
@@ -280,7 +281,7 @@
     if (e.defaultPrevented) return;
     if (e.key === 'Escape') {
       if (confirmAgenda) confirmAgenda = null;
-      else if (!picker && !pickFile && !pickCal && !rename && !confirmDelete) store.closeSettings();
+      else if (!picker && !pickFile && !rename && !confirmDelete) store.closeSettings();
       e.preventDefault();
       return;
     }
@@ -291,7 +292,7 @@
   }
   /** The section before / after that is ready (the others are not made yet). */
   function step(d: -1 | 1, focus = false) {
-    const ready = SECTIONS.filter((x) => READY.includes(x));
+    const ready = sections.filter((x) => READY.includes(x));
     const i = ready.indexOf(tab);
     const next = ready[(i + d + ready.length) % ready.length];
     store.showSection(next);
@@ -303,14 +304,16 @@
       step(e.key === 'ArrowUp' ? -1 : 1, true);
     }
   }
-  const READY: SettingsSection[] = ['Основные', 'Оформление', 'Статусы', 'Агенды', 'Календарь', 'Inbox', 'Клавиши'];
+  // the core's sections, in the order of the mockup; the features' (Календарь) come from the registry (views.ts)
+  const CORE: [SettingsSection, number][] = [['Основные', 0], ['Оформление', 10], ['Статусы', 20], ['Теги', 30], ['Агенды', 40], ['Inbox', 60], ['Файлы', 70], ['Клавиши', 80]];
+  const sections = [...CORE, ...allSettings().map((x): [SettingsSection, number] => [x.id, x.order])].sort((a, b) => a[1] - b[1]).map(([id]) => id);
+  const READY: SettingsSection[] = ['Основные', 'Оформление', 'Статусы', 'Агенды', 'Inbox', 'Клавиши', ...allSettings().map((x) => x.id)];
   const ICON: Record<SettingsSection, string> = {
     Основные: 'M10 7.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2zM10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2',
     Оформление: 'M10 3a7 7 0 1 0 0 14c1 0 1.5-.6 1.5-1.3 0-1.1-1-1.4-1-2.4 0-.8.7-1.3 1.5-1.3H14a3 3 0 0 0 3-3C17 5.6 13.9 3 10 3zM6.5 9.5h.01M8.5 6.5h.01M12 6.5h.01',
     Статусы: 'M3 10h14M12.5 6l4 4-4 4',
     Теги: 'M3 3h6.5l7.5 7.5-6 6L3.5 9.5zM6.8 6.8h.01',
     Агенды: 'M7.5 5h9M7.5 10h9M7.5 15h9M3.5 5h.01M3.5 10h.01M3.5 15h.01',
-    Календарь: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3',
     Inbox: 'M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4',
     Файлы: 'M3 6a1.5 1.5 0 0 1 1.5-1.5H8l1.5 2h6A1.5 1.5 0 0 1 17 8v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5z',
     Клавиши: 'M2.5 6h15v9h-15zM5 9h.01M8 9h.01M11 9h.01M14 9h.01M6 12h8',
@@ -340,14 +343,6 @@
     return [...new Set(seqs.flatMap((sq) => sq.states.filter((x) => !x.done).map((x) => x.name)))];
   });
   // ---- Календарь ------------------------------------------------------------------------------------------------
-  let pickCal = $state<'task' | 'event' | null>(null); // «Выбрать…» of the file for tasks / events
-  const calPath = (rel: string | null) => {
-    if (!rel) return store.inboxCfg.file ? `Inbox — ${store.inboxCfg.file.split('/').join(' / ')}` : 'Inbox (файл не выбран)';
-    return rel.split('/').join(' / ') + (store.files.some((f) => f.name === rel) ? '' : ' — не найден');
-  };
-  const allStates = $derived([...new Set(store.config.workflows.flatMap((sq) => sq.states.filter((x) => !x.done).map((x) => x.name)))]);
-  const eventStates = $derived(calendar.cfg.eventStatus && !allStates.includes(calendar.cfg.eventStatus) ? [calendar.cfg.eventStatus, ...allStates] : allStates);
-  const LEN: [number, string][] = [[30, '30 минут'], [60, '1 час'], [90, '1,5 часа'], [120, '2 часа']];
   // ---- Агенды: «Мои агенды» -----------------------------------------------------------------------------
   let confirmAgenda = $state<{ id: string; name: string } | null>(null);
   /** «Новая агенда»: the settings close and the builder opens (one sheet at a time); ⌘, brings them back. */
@@ -371,9 +366,9 @@
     <div class="main">
     <!-- svelte-ignore a11y_interactive_supports_focus -->
     <div class="sections" role="tablist" aria-orientation="vertical" aria-label="Разделы настроек" tabindex="-1" onkeydown={sideKey}>
-      {#each SECTIONS as t (t)}
+      {#each sections as t (t)}
         <button role="tab" data-section={t} aria-selected={t === tab} tabindex={t === tab ? 0 : -1} class:on={t === tab} disabled={!READY.includes(t)} title={READY.includes(t) ? '' : 'Пока не реализовано'} onclick={() => store.showSection(t)}>
-          <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICON[t]} /></svg>
+          <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICON[t] ?? settingsOf(t)?.icon} /></svg>
           <span>{t}</span>
         </button>
       {/each}
@@ -491,117 +486,9 @@
           <p class="help">«Разобрать» показывает задачи Inbox по одной. У задачи из другого набора статусов «Выполнено» и «Отменить» ставят первый и второй завершающие статусы её набора. Залежавшиеся задачи помечаются цветом в списке и на карточке.</p>
         </section>
       </div>
-    {:else if tab === 'Календарь'}
-      {@const c = calendar.cfg}
-      <div class="body">
-        <section class="general" aria-label="Календарь">
-          <div class="cap">КУДА СОХРАНЯЮТСЯ НОВЫЕ ЗАПИСИ</div>
-          <div class="opts">
-            <div class="opt">
-              <span class="olab"><span id="cal-pick">Выбор файла</span><small>Для кнопок «+ Задача» и «+ Событие» и двойного клика по дню</small></span>
-              <div class="segs" role="radiogroup" aria-labelledby="cal-pick">
-                {#each [['default', 'По умолчанию'], ['ask', 'Спрашивать'], ['last', 'Как в прошлый раз']] as [v, t] (v)}
-                  <button role="radio" aria-checked={c.pick === v} class:on={c.pick === v} onclick={() => void calendar.setCfg({ pick: v as typeof c.pick })}>{t}</button>
-                {/each}
-              </div>
-            </div>
-            {#each [['task', 'задач'], ['event', 'событий']] as [k, w] (k)}
-              {@const fileKey = k === 'task' ? 'taskFile' : 'eventFile'}
-              {@const headKey = k === 'task' ? 'taskHeading' : 'eventHeading'}
-              <div class="opt">
-                <span id="cal-{k}-file">Файл для {w}</span>
-                <span class="ibfile">
-                  <span class="val" aria-labelledby="cal-{k}-file" data-testid="cal-{k}-file">{calPath(c[fileKey])}</span>
-                  {#if c[fileKey]}<button class="change" aria-label="Файл для {w}: как Inbox" title="Как Inbox" onclick={() => void calendar.setCfg({ [fileKey]: null })}>×</button>{/if}
-                  <button class="change" aria-label="Выбрать файл для {w}" onclick={() => (pickCal = k as 'task' | 'event')}>Выбрать…</button>
-                </span>
-              </div>
-              <div class="opt">
-                <span class="olab"><label for="cal-{k}-head">Заголовок для {w}</label><small>{c[headKey] ? 'Запись добавляется в конец этого заголовка; если его нет, он будет создан' : 'Без заголовка — в начало или конец файла, как в Inbox'}</small></span>
-                <input id="cal-{k}-head" class="sel txt" value={c[headKey]} placeholder="Без заголовка" spellcheck="false"
-                  onchange={(e) => void calendar.setCfg({ [headKey]: e.currentTarget.value.replace(/^\*+\s*/, '').trim() })} />
-              </div>
-            {/each}
-          </div>
-          <p class="help">Файл не выбран — записи идут в файл Inbox. Заголовок — первого уровня, без звёздочки. Настройки хранятся в папке заметок.</p>
-
-          <div class="cap">ЧТО СОЗДАЁТСЯ</div>
-          <div class="opts">
-            <div class="opt">
-              <label for="cal-tstatus">Статус новой задачи</label>
-              <select id="cal-tstatus" class="sel" value={c.taskStatus ?? ''} onchange={(e) => void calendar.setCfg({ taskStatus: e.currentTarget.value || null })}>
-                <option value="">Начальный статус набора</option>
-                {#each allStates as st (st)}<option value={st}>{st}</option>{/each}
-              </select>
-            </div>
-            <div class="opt">
-              <label for="cal-estatus">Статус нового события</label>
-              <select id="cal-estatus" class="sel" value={c.eventStatus} onchange={(e) => void calendar.setCfg({ eventStatus: e.currentTarget.value })}>
-                <option value="">Без статуса</option>
-                {#each eventStates as st (st)}<option value={st}>{st}</option>{/each}
-              </select>
-            </div>
-            <div class="opt">
-              <span id="cal-dkind">Дата, если создаёте по дню</span>
-              <div class="segs" role="radiogroup" aria-labelledby="cal-dkind">
-                {#each [['SCHEDULED', 'SCHEDULED'], ['DEADLINE', 'DEADLINE'], ['plain', 'Просто дата']] as [v, t] (v)}
-                  <button role="radio" aria-checked={c.dateKind === v} class:on={c.dateKind === v} onclick={() => void calendar.setCfg({ dateKind: v as typeof c.dateKind })}>{t}</button>
-                {/each}
-              </div>
-            </div>
-            <div class="opt">
-              <label for="cal-len">Длительность события</label>
-              <select id="cal-len" class="sel" value={String(c.minutes)} onchange={(e) => void calendar.setCfg({ minutes: +e.currentTarget.value })}>
-                {#each LEN as [m, t] (m)}<option value={String(m)}>{t}</option>{/each}
-              </select>
-            </div>
-          </div>
-          <p class="help">Статус события ставится, если он есть в наборах файла; иначе событие создаётся без статуса. Длительность — для события со временем.</p>
-
-          <div class="cap">ВИД</div>
-          <div class="opts">
-            <div class="opt">
-              <span id="cal-view">Вид по умолчанию</span>
-              <div class="segs" role="radiogroup" aria-labelledby="cal-view">
-                <button role="radio" aria-checked={c.view === 'month'} class:on={c.view === 'month'} onclick={() => void calendar.setCfg({ view: 'month' })}>Месяц</button>
-                <button role="radio" aria-checked={c.view === 'week'} class:on={c.view === 'week'} onclick={() => void calendar.setCfg({ view: 'week' })}>Неделя</button>
-              </div>
-            </div>
-            <div class="opt">
-              <span id="cal-hours">Часы в недельном виде</span>
-              <span class="hrs" role="group" aria-labelledby="cal-hours">
-                <select class="sel" aria-label="С" value={String(c.from)} onchange={(e) => void calendar.setCfg({ from: +e.currentTarget.value })}>
-                  {#each Array.from({ length: 13 }, (_, i) => i) as h (h)}<option value={String(h)} disabled={h >= c.to}>{h}:00</option>{/each}
-                </select>
-                –
-                <select class="sel" aria-label="До" value={String(c.to)} onchange={(e) => void calendar.setCfg({ to: +e.currentTarget.value })}>
-                  {#each Array.from({ length: 13 }, (_, i) => 12 + i) as h (h)}<option value={String(h)} disabled={h <= c.from}>{h}:00</option>{/each}
-                </select>
-              </span>
-            </div>
-            {#each [['weekNumbers', 'Номера недель'], ['weekends', 'Показывать выходные'], ['undated', 'Блок «Без даты» в боковой панели']] as [k, t] (k)}
-              {@const key = k as 'weekNumbers' | 'weekends' | 'undated'}
-              <div class="opt">
-                <label for="cal-{k}">{t}</label>
-                <button id="cal-{k}" class="switch" role="switch" aria-checked={c[key]} aria-label={t} onclick={() => void calendar.setCfg({ [key]: !c[key] })}><span></span></button>
-              </div>
-            {/each}
-          </div>
-
-          <div class="cap">ПЕРЕНОС МЫШЬЮ</div>
-          <div class="opts">
-            <div class="opt">
-              <span class="olab"><label for="cal-keepdl">Не менять дедлайн при переносе задачи</label><small>{c.keepDeadline ? 'Меняется только дата SCHEDULED' : 'DEADLINE сдвигается на столько же дней'}</small></span>
-              <button id="cal-keepdl" class="switch" role="switch" aria-checked={c.keepDeadline} aria-label="Не менять дедлайн при переносе задачи" onclick={() => void calendar.setCfg({ keepDeadline: !c.keepDeadline })}><span></span></button>
-            </div>
-            <div class="opt">
-              <span class="olab"><label for="cal-askrep">Спрашивать при переносе повторяющейся записи</label><small>Повтор переносится целиком: следующие пойдут от новой даты</small></span>
-              <button id="cal-askrep" class="switch" role="switch" aria-checked={c.askRepeat} aria-label="Спрашивать при переносе повторяющейся записи" onclick={() => void calendar.setCfg({ askRepeat: !c.askRepeat })}><span></span></button>
-            </div>
-          </div>
-          <p class="help">Перетащите плашку на другой день, в неделе — и на время. ⌘Z в календаре отменяет последний перенос.</p>
-        </section>
-      </div>
+    {:else if settingsOf(tab)}
+      {@const S = settingsOf(tab)!.component}
+      <S />
     {:else if tab === 'Агенды'}
       <div class="body">
         <section class="general" aria-label="Агенды">
@@ -879,10 +766,6 @@
     {/if}
 
     {#if pickFile}<Picker onclose={() => (pickFile = false)} />{/if}
-    {#if pickCal}
-      {@const k = pickCal}
-      <Picker label={k === 'task' ? 'Файл для задач' : 'Файл для событий'} onclose={() => (pickCal = null)} onpick={(rel) => void calendar.setCfg(k === 'task' ? { taskFile: rel } : { eventFile: rel })} />
-    {/if}
 
     {#if confirmAgenda}
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->

@@ -1,8 +1,12 @@
 // Editor panes and their tabs. One or two panes side by side; each keeps its own tabs; exactly one pane is
 // active and receives keyboard input and commands. Plain data + functions that mutate it in place, so the
-// store can keep it in $state and tests can use plain objects.
+// store can keep it in $state and tests can use plain objects. Kinds of tabs besides file, agenda and untitled
+// belong to features and are registered (views.ts); a kind nobody registers (a feature turned off) stays a tab with
+// its state kept, shown as «Функция выключена».
 
-export type TabKind = 'file' | 'agenda' | 'untitled' | 'review' | 'goals' | 'goalReview' | 'calendar'; // review: «Разбор Inbox», its `path` is the card's file; goals: ТЗ 23
+import { viewOf } from './views';
+
+export type TabKind = 'file' | 'agenda' | 'untitled' | (string & {}); // and the kinds of the features (views.ts)
 export interface Cursor {
   line: number;
   col: number;
@@ -17,8 +21,8 @@ export interface Tab {
   title?: string; // untitled tabs: "Без названия", "Без названия 2", …
   text?: string; // untitled tabs: the text, not on disk until "Сохранить как…"
   agenda?: string; // agenda tabs: the id of a custom agenda («Мои агенды»); none = the built-in one
-  goals?: string; // goals tabs: the source shown (file#heading), '*' = «Обзор квартала»
-  calendar?: { view: 'month' | 'week'; date: string }; // calendar tabs: the view and the chosen day (YYYY-MM-DD)
+  data?: any; // a feature's tab: its state (JSON), kept after a restart
+  label?: string; // a tab of a kind nobody registers: the name it had
 }
 export interface Pane {
   id: string;
@@ -42,7 +46,7 @@ const reveal = (line: number, focus = false) => ({ line, n: ++revealSeq, focus }
 export function newTab(kind: TabKind, path?: string, line = 0, focus = false): Tab {
   return { id: uid('t'), kind, path, cursor: { line, col: 0 }, reveal: kind === 'file' ? reveal(line, focus) : null, fromAgenda: null };
 }
-export const copyTab = (t: Tab): Tab => ({ ...newTab(t.kind, t.path, t.cursor.line), cursor: { ...t.cursor }, reveal: t.kind === 'file' ? reveal(t.cursor.line) : null, agenda: t.agenda, goals: t.goals, calendar: t.calendar ? { ...t.calendar } : undefined });
+export const copyTab = (t: Tab): Tab => ({ ...newTab(t.kind, t.path, t.cursor.line), cursor: { ...t.cursor }, reveal: t.kind === 'file' ? reveal(t.cursor.line) : null, agenda: t.agenda, data: t.data === undefined ? undefined : JSON.parse(JSON.stringify(t.data)), label: t.label });
 const newPane = (tabs: Tab[]): Pane => ({ id: uid('p'), tabs, active: 0 });
 
 export const emptyLayout = (first?: Tab): Layout => ({ panes: [newPane(first ? [first] : [])], active: 0, ratio: 0.5 });
@@ -115,34 +119,16 @@ export function openAgenda(L: Layout, pi: number): Tab {
   return t;
 }
 
-/** «Календарь» (ТЗ 24): the calendar tab of the pane (made if there is none), as the agenda: one per pane. */
-export function openCalendar(L: Layout, pi: number, view: 'month' | 'week' = 'month'): Tab {
+/** A feature's tab in the pane, one per pane (as the agenda): shown if there is one (`update` changes it), else made. */
+export function openView(L: Layout, pi: number, kind: string, data: () => unknown, update?: (t: Tab) => void): Tab {
   const p = L.panes[pi];
-  const i = p.tabs.findIndex((t) => t.kind === 'calendar');
+  const i = p.tabs.findIndex((t) => t.kind === kind);
   if (i >= 0) {
     p.active = i;
+    update?.(p.tabs[i]);
     return p.tabs[i];
   }
-  const t = calendarTab(view);
-  insertAfterActive(p, t);
-  return t;
-}
-const today = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-export const calendarTab = (view: 'month' | 'week' = 'month'): Tab => ({ ...newTab('calendar'), calendar: { view, date: today() } });
-
-/** «Цели»: the goals tab of the pane shows `key` (made if there is none). */
-export function openGoals(L: Layout, pi: number, key: string): Tab {
-  const p = L.panes[pi];
-  const i = p.tabs.findIndex((t) => t.kind === 'goals');
-  if (i >= 0) {
-    p.active = i;
-    p.tabs[i].goals = key;
-    return p.tabs[i];
-  }
-  const t = { ...newTab('goals'), goals: key };
+  const t = { ...newTab(kind), data: data() };
   insertAfterActive(p, t);
   return t;
 }
@@ -207,7 +193,8 @@ export function focusPane(L: Layout, dir: -1 | 1) {
  *  - pressing the pressed "Агенда" closes the agenda tab (and the pane with it when that was its only tab).
  * `fileTab` is what a new second editor shows: a copy of the current tab.
  */
-export function toggleSecond(L: Layout, kind: TabKind, fileTab: () => Tab | undefined) {
+/** The toolbar's «Второй редактор», «Агенда» and a feature's button: `make` gives a new tab of `kind`. */
+export function toggleSecond(L: Layout, kind: TabKind, make: () => Tab | undefined) {
   const pressed = secondKind(L);
   if (pressed === kind && kind === 'file') return closePane(L, 1);
   if (pressed === kind) {
@@ -218,18 +205,24 @@ export function toggleSecond(L: Layout, kind: TabKind, fileTab: () => Tab | unde
     } else closeTab(L, 1, p.active);
     return;
   }
-  const make = () => (kind === 'agenda' ? newTab('agenda') : kind === 'calendar' ? calendarTab() : fileTab());
   if (L.panes.length < 2) {
-    const t = make();
+    const t = kind === 'agenda' ? newTab('agenda') : make();
     if (!t) return;
     L.active = addPane(L, 'right', t);
     return;
   }
   if (kind === 'agenda') openAgenda(L, 1);
-  else if (kind === 'calendar') openCalendar(L, 1);
-  else {
-    const t = fileTab();
+  else if (kind === 'file') {
+    const t = make();
     if (t) insertAfterActive(L.panes[1], t);
+  } else {
+    const p = L.panes[1];
+    const i = p.tabs.findIndex((t) => t.kind === kind);
+    if (i >= 0) p.active = i;
+    else {
+      const t = make();
+      if (t) insertAfterActive(p, t);
+    }
   }
   L.active = 1;
 }
@@ -332,16 +325,24 @@ export function dropMissing(L: Layout, exists: (path: string) => boolean) {
 
 // ---- restoring after a restart -----------------------------------------------------------
 
+const core = (k: string) => k === 'file' || k === 'agenda' || k === 'untitled';
+
 export function serialize(L: Layout): string {
   return JSON.stringify({
     v: 1,
     active: L.active,
     ratio: L.ratio,
-    // untitled tabs are not restored after a restart (their text is not on disk), nor a review (it is a session)
+    // untitled tabs are not restored after a restart (their text is not on disk), nor a session (a review)
     panes: L.panes.map((p) => {
-      const tabs = p.tabs.filter((t) => t.kind !== 'untitled' && t.kind !== 'review' && t.kind !== 'goalReview');
+      const tabs = p.tabs.filter((t) => t.kind !== 'untitled' && !viewOf(t.kind)?.transient);
       const act = p.tabs[p.active];
-      return { active: Math.max(0, tabs.indexOf(act)), tabs: tabs.map((t) => ({ kind: t.kind, path: t.path, cursor: t.cursor, ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.goals ? { goals: t.goals } : {}), ...(t.calendar ? { calendar: t.calendar } : {}) })) };
+      return {
+        active: Math.max(0, tabs.indexOf(act)),
+        tabs: tabs.map((t) => {
+          const label = core(t.kind) ? undefined : (viewOf(t.kind)?.label(t) ?? t.label);
+          return { kind: t.kind, path: t.path, cursor: t.cursor, ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.data !== undefined ? { data: t.data } : {}), ...(label ? { label } : {}) };
+        }),
+      };
     }),
   });
 }
@@ -357,12 +358,13 @@ export function restore(raw: string | null, exists: (path: string) => boolean): 
       let active = 0;
       (Array.isArray(sp.tabs) ? sp.tabs : []).forEach((st: any, i: number) => {
         if (st?.kind === 'agenda') tabs.push({ ...newTab('agenda'), ...(typeof st.agenda === 'string' && st.agenda ? { agenda: st.agenda } : {}) });
-        else if (st?.kind === 'goals') tabs.push({ ...newTab('goals'), goals: typeof st.goals === 'string' && st.goals ? st.goals : '*' });
-        else if (st?.kind === 'calendar') {
-          const c = st.calendar;
-          tabs.push({ ...calendarTab(), ...(c && /^\d{4}-\d{2}-\d{2}$/.test(c.date) ? { calendar: { view: c.view === 'week' ? 'week' : 'month', date: c.date } } : {}) });
-        }
-        else if (st?.kind === 'file' && typeof st.path === 'string' && exists(st.path)) {
+        else if (typeof st?.kind === 'string' && !core(st.kind)) {
+          // a feature's tab: its state as the feature reads it back; no feature (turned off): kept as it was
+          const v = viewOf(st.kind);
+          if (v?.transient) return;
+          const raw = st.data ?? st[st.kind]; // before roadmap 0.3 the state was `calendar` / `goals`
+          tabs.push({ ...newTab(st.kind), data: v?.restore ? v.restore(raw) : raw, ...(v ? {} : { label: typeof st.label === 'string' ? st.label : undefined }) });
+        } else if (st?.kind === 'file' && typeof st.path === 'string' && exists(st.path)) {
           const t = newTab('file', st.path, st.cursor?.line ?? 0);
           t.cursor = { line: st.cursor?.line ?? 0, col: st.cursor?.col ?? 0 };
           t.reveal = null; // the editor restores the caret, column included

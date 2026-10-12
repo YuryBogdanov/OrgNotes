@@ -5,7 +5,7 @@
   import { toneStyle } from './colors';
   import { displayName } from './names';
   import Outline from './Outline.svelte';
-  import CalendarDay from './CalendarDay.svelte';
+  import { viewOf } from './views';
 
   const f = $derived(store.file);
   const h = $derived(f && store.selected >= 0 ? f.headings[store.selected] : undefined);
@@ -41,8 +41,9 @@
 </script>
 
 <div class="insp">
-  {#if store.tab?.kind === 'calendar'}
-  <CalendarDay />
+  {#if viewOf(store.tab?.kind)?.inspector}
+  {@const Insp = viewOf(store.tab?.kind)!.inspector!}
+  <Insp />
   {:else}
   <div class="tabs" role="tablist" aria-label="Инспектор">
     <button role="tab" aria-label="Задача" title="Задача" aria-selected={store.inspectorTab === 'task'} class:on={store.inspectorTab === 'task'} onclick={() => store.setInspectorTab('task')}>

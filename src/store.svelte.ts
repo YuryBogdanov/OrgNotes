@@ -14,6 +14,7 @@ import { DEFAULT_INBOX, append, entry, prepend, readInbox, withInbox, type Inbox
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
 import { cachedTheme, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
 import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
+import { navOf, viewOf } from './views';
 import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
@@ -90,7 +91,7 @@ class Store {
   private configRaw: string | null = null;
   settingsOpen = $state(false);
   /** The section of the settings shown; the last one is shown next time (a preference of this Mac). */
-  settingsSection = $state<SettingsSection>(SECTIONS.includes(lsGet('settings:section') as SettingsSection) ? (lsGet('settings:section') as SettingsSection) : 'Основные');
+  settingsSection = $state<SettingsSection>(lsGet('settings:section') || 'Основные'); // one that is not there: «Основные»
   get configText() {
     return this.configRaw;
   }
@@ -285,7 +286,8 @@ class Store {
   }
   get cur(): number {
     const t = this.tab;
-    const path = t?.kind === 'review' || t?.kind === 'goalReview' ? (t.path ?? '') : this.curPath; // a review: the card's file
+    const v = viewOf(t?.kind);
+    const path = v?.fileOf ? (v.fileOf(t!) ?? '') : this.curPath; // a review: the card's file
     return this.files.findIndex((f) => f.path === path);
   }
   get file(): NoteFile | undefined {
@@ -470,10 +472,13 @@ class Store {
   private saveKeys() {
     lsSet('keys', JSON.stringify(this.keyState));
   }
-  /** The review of goals registers its keys while its tab is shown. */
-  goalReviewKeys: { active: () => boolean; run: (id: string) => boolean } | null = null;
-  /** The review registers its keys while its tab is shown (⌘1…⌘5 there win over the window's). */
-  reviewKeys: { active: () => boolean; run: (id: string) => boolean } | null = null;
+  /** A feature's scope of keys (keys.ts `registerScope`) runs its commands while its tab is shown (⌘1…⌘5 of a
+   *  review win over the window's): set by the tab, taken away when it goes. */
+  scopeKeys = new Map<string, ScopeKeys>();
+  setScopeKeys(scope: string, keys: ScopeKeys | null) {
+    if (keys) this.scopeKeys.set(scope, keys);
+    else this.scopeKeys.delete(scope);
+  }
 
   /** Persist the project config (Settings) and apply it right away. */
   async saveConfig(json: string): Promise<boolean> {
@@ -512,7 +517,7 @@ class Store {
     return t?.kind === 'agenda' && t.agenda ? this.agendas.find((a) => a.id === t.agenda) : undefined;
   }
   /** The left navigator: the files, or the list of agendas. A setting of the window: switching tabs or panes keeps it. */
-  navMode = $state<NavMode>((['files', 'inbox', 'agendas', 'goals', 'calendar', 'search'] as const).find((m) => m === lsGet('nav:mode')) ?? 'files');
+  navMode = $state<NavMode>(lsGet('nav:mode') || 'files'); // a feature's mode that is not there falls back to «Файлы» (NavPanel)
   setNavMode(m: NavMode) {
     this.navMode = m;
     this.showNav = true;
@@ -1106,7 +1111,7 @@ class Store {
       await emitTo('capture', 'capture-result', { id: e.payload.id, result });
     });
     await listen('capture-pick', () => {
-      this.setNavMode('inbox');
+      if (navOf('inbox')) this.setNavMode('inbox'); // the Inbox section, when it is on
       this.pickInbox = Date.now();
     });
     void this.applyCaptureKey();
@@ -1414,14 +1419,15 @@ class Store {
     }
   }
   /** Toolbar: "Второй редактор" / "Агенда" in the second pane. */
-  toggleSecond(kind: 'file' | 'agenda' | 'calendar') {
-    toggleSecond(this.layout, kind, () => {
+  /** «Второй редактор», «Агенда», or a feature's button: `make` gives the feature's new tab. */
+  toggleSecond(kind: string, make?: () => Tab | undefined) {
+    toggleSecond(this.layout, kind, make ?? (() => {
       const t = this.tab;
       if (t?.kind === 'file') return copyTab(t);
       const anyFile = this.layout.panes.flatMap((p) => p.tabs).find((x) => x.kind === 'file');
       if (anyFile) return copyTab(anyFile);
       return this.files[0] ? newTab('file', this.files[0].path) : undefined;
-    });
+    }));
   }
   splitRight() {
     return splitRight(this.layout);
@@ -2068,6 +2074,12 @@ class Store {
 
 export const DEFAULT_CAPTURE_KEY = 'Shift+CmdOrCtrl+KeyI';
 /** What a feature does around a move it asked for. */
+/** What a feature's tab does with the keys of its scope. */
+export interface ScopeKeys {
+  active: () => boolean;
+  run: (id: string) => boolean;
+}
+/** What a feature does around a move it asked for. */
 export interface RefileHooks {
   /** Just before the write: a fade of the row going away, say. */
   before?(h: Heading): Promise<void> | void;
@@ -2085,9 +2097,10 @@ export interface RefileReq {
   hooks?: RefileHooks;
   n: number;
 }
-export const SECTIONS = ['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши'] as const;
-export type SettingsSection = (typeof SECTIONS)[number];
-export type NavMode = 'files' | 'inbox' | 'agendas' | 'goals' | 'calendar' | 'search';
+/** A section of the settings sheet: the core's (Основные … Клавиши) or a feature's (views.ts). */
+export type SettingsSection = string;
+/** The navigator's mode: the core's (files, agendas, search) or a feature's section (views.ts). */
+export type NavMode = string;
 /** The search in every file: up to this many matches are listed. */
 export const SEARCH_CAP = 1000;
 export interface SearchGroup {

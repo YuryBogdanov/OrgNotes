@@ -14,7 +14,7 @@
   // chosen day in the inspector. A cell shows what fits (three at least), the rest is behind «… ещё N».
   let { tab }: { tab: Tab } = $props();
 
-  const cal = $derived(tab.calendar ?? { view: 'month' as const, date: isoDay(new Date()) });
+  const cal = $derived((tab.data as { view: 'month' | 'week'; date: string } | undefined) ?? { view: 'month' as const, date: isoDay(new Date()) });
   const sel = $derived(fromIso(cal.date));
   const today = $derived(isoDay(new Date()));
   const cfg = $derived(calendar.cfg);

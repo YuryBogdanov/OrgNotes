@@ -3,7 +3,7 @@
 // nothing of it — its settings come by `store.onConfig`.
 
 import { store, type NoteFile } from '../store.svelte';
-import { openCalendar, openFile, openFromAgenda, type Tab } from '../layout';
+import { newTab, openFile, openFromAgenda, openView, type Tab } from '../layout';
 import { startOf, sequenceFor } from '../org';
 import { weekdayNames } from '../edits';
 import { bareTitle } from '../refile';
@@ -47,12 +47,22 @@ class Calendar {
   // ---- the tab -----------------------------------------------------------------------------------------------
   /** ⌘3: the calendar in the active pane; the navigator shows its layers and files. */
   showHere() {
-    openCalendar(store.layout, store.layout.active, this.cfg.view);
+    openView(store.layout, store.layout.active, 'calendar', () => this.fresh());
     store.setNavMode('calendar');
+  }
+  /** The state of a new calendar tab: the view as set, today. */
+  fresh(): { view: 'month' | 'week'; date: string } {
+    return { view: this.cfg.view, date: isoDay(new Date()) };
+  }
+  /** The toolbar's «Календарь»: in the second pane (or out of it). */
+  toggleSecond() {
+    store.toggleSecond('calendar', () => ({ ...newTab('calendar'), data: this.fresh() }));
+    const p = store.layout.panes[1];
+    if (p?.tabs[p.active]?.kind === 'calendar') store.setNavMode('calendar');
   }
   /** Change the calendar state of a tab (the view, the chosen day). */
   setTab(t: Tab, c: Partial<{ view: 'month' | 'week'; date: string }>) {
-    t.calendar = { ...(t.calendar ?? { view: 'month', date: isoDay(new Date()) }), ...c };
+    t.data = { ...(t.data ?? { view: 'month', date: isoDay(new Date()) }), ...c };
   }
   /** An entry picked in the calendar: its file in a new tab of this pane, or (⌘) in the neighbour pane. */
   openEntry(e: { path: string; line: number }, neighbour = false) {

@@ -1,3 +1,4 @@
+import './features/keys'; // the built-in features' commands, as in the app
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
