@@ -106,6 +106,89 @@ export function insertHeading(text: string, caret: number, opts: { todo?: string
   return { changes: [{ from: caret, to: caret, insert: '\n' + prefix }], caret: caret + 1 + prefix.length };
 }
 
+// ---- M-RET in a list: a new item (org-insert-item) --------------------------------------------------------------
+
+// «- », «+ », « * » (a star only indented: at the start of a line it is a heading), «1. », «1) »; and a checkbox
+const ITEM = /^(\s*)([-+]|\*(?=\s)|\d+[.)])(\s+)(\[[ xX-]\]\s+)?/;
+const itemAt = (c: Ctx, i: number) => {
+  if (c.real.has(i)) return null;
+  const m = ITEM.exec(c.lines[i]);
+  if (!m || (m[2] === '*' && !m[1])) return null;
+  return { indent: m[1].length, bullet: m[2], gap: m[3], box: !!m[4], end: m[0].length };
+};
+const indentOf = (l: string) => /^\s*/.exec(l)![0].length;
+/** The item the caret is in: its first line, if the line is the item or a line that continues it. */
+function itemOf(c: Ctx, ln: number): number {
+  for (let j = ln; j >= 0; j--) {
+    if (c.real.has(j) || !c.lines[j].trim()) return -1;
+    const it = itemAt(c, j);
+    if (it) return j === ln || c.lines.slice(j + 1, ln + 1).every((l) => indentOf(l) > it.indent) ? j : -1;
+  }
+  return -1;
+}
+/** The line after an item: its continuation lines are those indented deeper (a sub-list too). */
+function itemEnd(c: Ctx, i: number, indent: number): number {
+  let e = i + 1;
+  while (e < c.n && !c.real.has(e) && c.lines[e].trim() && indentOf(c.lines[e]) > indent) e++;
+  return e;
+}
+
+/**
+ * ⌥↩ on a list item, as Org's M-RET there: a new item of the same list (its bullet, the next number; the following
+ * numbers go on). At the start of the item: above it; inside its first line: the rest of the line goes to the new
+ * item; at its end or on a line that continues it: after the whole item. `box`: with a checkbox (⌥⇧↩), as the
+ * item has one anyway. Null when the caret is not in an item (a heading is made then).
+ */
+export function insertItem(text: string, caret: number, opts: { box?: boolean } = {}): Result | null {
+  const c = ctx(text);
+  const ln = lineAt(c, caret);
+  const first = itemOf(c, ln);
+  if (first < 0) return null;
+  const it = itemAt(c, first)!;
+  const num = /^(\d+)([.)])$/.exec(it.bullet);
+  const marker = (n: number) => ' '.repeat(it.indent) + (num ? `${n}${num[2]}` : it.bullet) + it.gap + (it.box || opts.box ? '[ ] ' : '');
+  const changes: Edit[] = [];
+  const start = c.starts[first];
+  const col = caret - c.starts[ln];
+  let prefix: string;
+  const n = num ? +num[1] + 1 : 0;
+  let newCaret: number;
+  if (ln === first && col <= it.end) {
+    // at the start: the new item above this one, which takes the next number
+    prefix = marker(num ? +num[1] : 0);
+    if (num) {
+      const from = start + it.indent;
+      changes.push({ from, to: from + num[1].length, insert: prefix.slice(it.indent) + '\n' + ' '.repeat(it.indent) + n });
+    } else changes.push({ from: start, to: start, insert: prefix + '\n' });
+    newCaret = start + prefix.length;
+  } else if (ln === first && caret < start + c.lines[ln].length) {
+    // inside the first line: split there
+    prefix = '\n' + marker(n);
+    const tail = /^\s*/.exec(text.slice(caret))![0].length; // the spaces after the caret go
+    changes.push({ from: caret, to: caret + tail, insert: prefix });
+    newCaret = caret + prefix.length;
+  } else {
+    const e = itemEnd(c, first, it.indent);
+    const pos = c.starts[e - 1] + c.lines[e - 1].length;
+    prefix = '\n' + marker(n);
+    changes.push({ from: pos, to: pos, insert: prefix });
+    newCaret = pos + prefix.length;
+  }
+  // the numbers after it go on by one
+  if (num) {
+    for (let i = itemEnd(c, first, it.indent); i < c.n; ) {
+      const sib = itemAt(c, i);
+      if (!sib || sib.indent !== it.indent) break;
+      const m = /^(\s*)(\d+)([.)])/.exec(c.lines[i]);
+      if (!m) break;
+      const from = c.starts[i] + m[1].length;
+      changes.push({ from, to: from + m[2].length, insert: String(+m[2] + 1) });
+      i = itemEnd(c, i, sib.indent);
+    }
+  }
+  return { changes, caret: newCaret };
+}
+
 // ---- M-left / M-right: the heading alone; M-S-left / M-S-right: with its subtree ----------
 
 /** Promote (delta -1) or demote (+1) the heading under the caret together with everything below it. */

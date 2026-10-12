@@ -292,3 +292,29 @@ test('the bug: a new heading after «1-1 meetings», then ⌥→ — the meeting
   await page.keyboard.press('Alt+ArrowRight');
   await expect.poll(async () => doc(page)).toBe('* Employee\n** 1-1 meetings\n*** Third 1-1 meeting\n*** Second 1-1 meeting\n*** First 1-1 meeting\n');
 });
+
+test('⌥↩ follows what the caret is in: a list item makes the next item, plain text a heading', async ({ page }) => {
+  await installTauriMock(page, { '/mock/Keys.org': '* Проект\nПлан:\n- раз\n- два\n1. первый\n2. второй\nПросто текст\n' });
+  await page.goto('/');
+  const line = (t: string) => page.locator('.cm-line', { hasText: t });
+  await line('- раз').click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Alt+Enter');
+  await page.keyboard.type('полтора');
+  await expect.poll(async () => doc(page)).toBe('* Проект\nПлан:\n- раз\n- полтора\n- два\n1. первый\n2. второй\nПросто текст\n');
+  await line('1. первый').click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Alt+Enter');
+  await page.keyboard.type('вставка');
+  await expect.poll(async () => doc(page)).toContain('1. первый\n2. вставка\n3. второй\n');
+  await line('- два').click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Alt+Shift+Enter');
+  await page.keyboard.type('с чекбоксом');
+  await expect.poll(async () => doc(page)).toContain('- два\n- [ ] с чекбоксом\n1. первый');
+  await line('Просто текст').click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Alt+Enter');
+  await page.keyboard.type('Новый');
+  await expect.poll(async () => doc(page)).toContain('Просто текст\n* Новый');
+});
