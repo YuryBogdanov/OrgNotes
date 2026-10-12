@@ -1,0 +1,473 @@
+// The host of the plugins (ТЗ 26 §4–5, roadmap 1.1): what the manifests of the plugins that are on declare is
+// registered with the shell (sections, kinds of tabs, settings, palette commands, sets of statuses); `start` loads
+// their code and gives each its `ctx`. Every call of a plugin's code runs inside a guard: an error turns the plugin
+// off until the restart and takes back all it registered.
+
+import { SvelteMap } from 'svelte/reactivity';
+import { untrack } from 'svelte';
+import { store } from '../store.svelte';
+import { openView } from '../layout';
+import { register as registerPalette } from '../commands';
+import { registerAction, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf } from '../views';
+import { runAgenda, statusKey, type Agenda, type Cond as CoreCond } from '../agendas';
+import { DEFAULT_SEQUENCE, type Heading, type WorkflowDef } from '../org';
+import { displayName } from '../names';
+import type { Tx as CoreTx } from '../journal';
+import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSchema';
+import { entries, saveChoice, type Entry } from './declare';
+import type { Manifest, ManifestSettings } from './manifest';
+import type { Ctx, Dispose, EventName, HeadingInfo, HeadingRef, Plugin, Query, Render, Store, ViewSpec } from './index';
+import PluginView from '../PluginView.svelte';
+import PluginNav from '../PluginNav.svelte';
+
+const MAINS = import.meta.glob('../plugins/*/main.ts') as Record<string, () => Promise<{ default: Plugin }>>;
+const PLUG = 'M8 2.5v4M12 2.5v4M5.5 6.5h9v3a4.5 4.5 0 0 1-9 0zM10 14v3.5';
+
+export interface ViewEntry {
+  plugin: string;
+  spec: ViewSpec<any>;
+}
+
+class Host {
+  readonly entries: Entry[] = entries;
+  /** Turned off after an error (until the restart): the reason. */
+  failed = new SvelteMap<string, string>();
+  /** Activated. */
+  active = new SvelteMap<string, true>();
+  /** What a plugin's code gave: the drawings of its sections and kinds of tabs. */
+  navs = new SvelteMap<string, { plugin: string; render: Render }>();
+  views = new SvelteMap<string, ViewEntry>();
+  /** A tab drawn anew (`ui.open` with a new state for a tab shown): its number. */
+  redraw = new SvelteMap<string, number>();
+  private dynamic = new SvelteMap<string, { options?(v: Values): CoreOpt[]; hint?(v: Values): string }>();
+  private disposers = new Map<string, Dispose[]>();
+  private plugins = new Map<string, Plugin>();
+  private started = false;
+
+  manifest(id: string): Manifest | undefined {
+    return this.entries.find((e) => e.manifest?.id === id)?.manifest ?? undefined;
+  }
+  name(id: string) {
+    return this.manifest(id)?.name ?? id;
+  }
+  /** The plugin may run now: on, not failed. */
+  live(id: string) {
+    return this.entries.some((e) => e.enabled && e.manifest?.id === id) && !this.failed.has(id);
+  }
+  setEnabled(id: string, on: boolean) {
+    saveChoice(id, on); // the loader (roadmap 1.2) turns it on and off at once; until then, after a restart
+  }
+
+  // ---- what the manifests declare, before any code ---------------------------------------------------------------
+  declare() {
+    for (const e of this.entries) if (e.enabled && e.manifest) this.declareOne(e.manifest);
+  }
+  private keep(id: string, d: Dispose) {
+    if (!this.disposers.has(id)) this.disposers.set(id, []);
+    this.disposers.get(id)!.push(d);
+  }
+  private declareOne(m: Manifest) {
+    const id = m.id;
+    store.registerStorage(id);
+    for (const c of m.contributes.commands)
+      registerPalette({
+        id: c.id, title: c.title, icon: 'plug', group: 'general', synonyms: c.synonyms,
+        when: () => !!actionOf(c.id), run: () => void setTimeout(() => actionOf(c.id)?.()), // once the palette is closed
+      });
+    m.contributes.navSections.forEach((n, i) => {
+      this.keep(id, registerNav({ id: n.id, label: n.title, icon: n.icon, key: n.key, order: 100 + i, component: PluginNav }));
+      if (n.key) this.keep(id, registerAction(n.key, () => this.showNav(n.id)));
+    });
+    for (const v of m.contributes.views) {
+      const spec = () => this.views.get(v.id)?.spec;
+      this.keep(id, registerView({
+        kind: v.id, icon: v.icon, component: PluginView,
+        label: (t) => this.guard(id, () => spec()?.title(t.data), v.title) ?? v.title,
+        crumbs: (t) => this.guard(id, () => spec()?.crumbs?.(t.data), null) ?? [this.guard(id, () => spec()?.title(t.data), v.title) ?? v.title],
+        restore: (raw) => {
+          const r = spec()?.restore;
+          return r ? this.guard(id, () => r(raw), raw) : raw;
+        },
+      }));
+    }
+    m.contributes.settings.forEach((s, i) => {
+      const schema = this.schemaOf(m, s, i);
+      if (s.section) this.keep(id, registerSettings({ id: s.section, icon: s.icon ?? PLUG, order: 90 + i, schema }));
+      else if (s.block) this.keep(id, registerSettingsBlock({ section: s.block, order: 50 + i, schema }));
+    });
+    for (const set of m.contributes.statusSets) {
+      const [open, done] = set.states.split('|').map((x) => x.trim().split(/\s+/).filter(Boolean));
+      const def: WorkflowDef = { name: set.name, states: [...open.map((n) => ({ name: n, done: false })), ...done.map((n) => ({ name: n, done: true }))] };
+      this.keep(id, store.registerStatusSet(id, def, () => this.live(id)));
+    }
+  }
+  private showNav(id: string) {
+    store.showNav = true;
+    store.setNavMode(id);
+  }
+
+  // ---- the code --------------------------------------------------------------------------------------------------
+  /** Load and activate the plugins that are on (after the window is drawn). */
+  async start() {
+    if (this.started) return;
+    this.started = true;
+    for (const e of this.entries) {
+      const m = e.manifest;
+      if (!e.enabled || !m) continue;
+      const load = e.builtin ? MAINS[`../plugins/${e.dir}/main.ts`] : undefined;
+      if (!load) continue; // a plugin of data only (themes, roadmap 1.4)
+      try {
+        const p = (await load()).default;
+        this.plugins.set(m.id, p);
+        await p.activate(this.ctxOf(m));
+        this.active.set(m.id, true);
+      } catch (err) {
+        this.fail(m.id, err);
+      }
+    }
+  }
+  /** Run a plugin's code; an error turns the plugin off. */
+  guard<T>(id: string, fn: () => T, fallback: T): T {
+    if (this.failed.has(id)) return fallback;
+    try {
+      const r = fn();
+      if (r instanceof Promise) r.catch((err) => this.fail(id, err));
+      return r;
+    } catch (err) {
+      this.fail(id, err);
+      return fallback;
+    }
+  }
+  fail(id: string, err: unknown) {
+    if (this.failed.has(id)) return;
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`plugin ${id}:`, err);
+    this.failed.set(id, msg);
+    untrack(() => {
+      for (const d of (this.disposers.get(id) ?? []).reverse()) {
+        try {
+          d();
+        } catch {
+          /* taken back as far as it goes */
+        }
+      }
+      this.disposers.delete(id);
+      for (const [k, v] of this.views) if (v.plugin === id) this.views.delete(k);
+      for (const [k, v] of this.navs) if (v.plugin === id) this.navs.delete(k);
+      store.refreshStatusSets();
+      if (this.manifest(id)?.contributes.navSections.some((n) => n.id === store.navMode)) store.setNavMode('files');
+      try {
+        void this.plugins.get(id)?.deactivate?.();
+      } catch {
+        /* off anyway */
+      }
+    });
+    store.note(`Плагин «${this.name(id)}» выключен: ${msg}`, undefined, 8000);
+  }
+
+  // ---- ctx ----------------------------------------------------------------------------------------------------
+  private ctxOf(m: Manifest): Ctx {
+    const id = m.id;
+    const can = (p: string) => m.permissions.includes(p as never);
+    const keep = (d: Dispose): Dispose => {
+      this.keep(id, d);
+      return d;
+    };
+    const declared = (kind: string, ok: boolean, x: string) => {
+      if (!ok) throw new Error(`${kind} «${x}» нет в манифесте`);
+    };
+    const ctx: Ctx = {
+      id,
+      commands: {
+        on: (cmd, run) => {
+          declared('команды', m.contributes.commands.some((c) => c.id === cmd), cmd);
+          return keep(registerAction(cmd, () => this.guard(id, () => run(), undefined)));
+        },
+        run: async (cmd, arg) => {
+          if (m.contributes.commands.some((c) => c.id === cmd)) return void actionOf(cmd)?.();
+          coreCommand(cmd, arg);
+        },
+      },
+      ui: {
+        navSection: (nav, render) => {
+          declared('раздела', m.contributes.navSections.some((n) => n.id === nav), nav);
+          this.navs.set(nav, { plugin: id, render });
+          return keep(() => void (this.navs.get(nav)?.render === render && this.navs.delete(nav)));
+        },
+        view: (v, spec) => {
+          declared('вида', m.contributes.views.some((x) => x.id === v), v);
+          this.views.set(v, { plugin: id, spec });
+          return keep(() => void (this.views.get(v)?.spec === spec && this.views.delete(v)));
+        },
+        open: async (v, state, where = 'here') => {
+          declared('вида', m.contributes.views.some((x) => x.id === v), v);
+          const L = store.layout;
+          if (where === 'beside' && L.panes.length < 2) store.splitRight();
+          const pi = where === 'beside' ? 1 : L.active;
+          openView(L, pi, v, () => clone(state), (t) => {
+            t.data = clone(state);
+            this.redraw.set(t.id, (this.redraw.get(t.id) ?? 0) + 1);
+          });
+          L.active = pi;
+        },
+        notify: (text, actions) => store.note(text, actions?.map((a) => ({ label: a.label, run: () => this.guard(id, () => a.run(), undefined) })), actions?.length ? 8000 : 4000),
+      },
+      storage: { folder: this.storeOf(id, 'folder', 'data', keep), local: this.storeOf(id, 'local', 'data', keep) },
+      events: { on: (e, fn) => keep(this.listen(id, e, fn)) },
+      settings: {
+        values: () => this.settingsValues(m),
+        onChange: (fn) => keep(watch(() => this.settingsValues(m), (v) => this.guard(id, () => fn(v), undefined))),
+        dynamic: (key, spec) => {
+          const k = id + ':' + key;
+          this.dynamic.set(k, spec);
+          return keep(() => void (this.dynamic.get(k) === spec && this.dynamic.delete(k)));
+        },
+      },
+    };
+    if (can('index.read'))
+      ctx.index = {
+        query: async (q) => query(q),
+        heading: async (ref) => {
+          const f = fileOf(ref.path);
+          const h = f && findHeading(f.headings, ref);
+          return f && h ? infoOf(f, h) : null;
+        },
+        outline: async (path) => {
+          const f = fileOf(path);
+          return f ? f.headings.map((h) => infoOf(f, h)) : [];
+        },
+        files: async () => store.files.map((f) => ({ path: f.name, title: displayName(f.name) })),
+      };
+    if (can('files.read') || can('files.edit'))
+      ctx.files = {
+        read: async (path) => {
+          const f = fileOf(path);
+          if (!f) throw new Error(`нет файла «${path}» в рабочей папке`);
+          return f.text;
+        },
+      };
+    if (can('files.edit'))
+      ctx.edit = {
+        transaction: async (label, build) => {
+          let t: CoreTx | null = null;
+          const ev: Changed[] = [];
+          const step = await store.transaction(label, (tx) => {
+            t = tx;
+            build(apiTx(tx, ev));
+          });
+          const tx = t as CoreTx | null;
+          if (step) {
+            for (const [r, w] of ev) this.headingChanged(r, w);
+            return 'ok';
+          }
+          return tx?.conflict ? 'conflict' : tx && !tx.error && !tx.result().length ? 'ok' : 'error';
+        },
+      };
+    return ctx;
+  }
+
+  /** The plugin's own place of a storage: `{ data, settings }` in its file (or on this Mac). */
+  private whole(id: string, where: 'folder' | 'local'): Record<string, unknown> {
+    const v = where === 'folder' ? store.folderData(id) : store.localData(id);
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  }
+  private async put(id: string, where: 'folder' | 'local', part: 'data' | 'settings', value: unknown) {
+    const next = { ...this.whole(id, where), [part]: value };
+    if (where === 'folder') await store.setFolderData(id, next);
+    else store.setLocalData(id, next);
+  }
+  private storeOf(id: string, where: 'folder' | 'local', part: 'data', keep: (d: Dispose) => Dispose): Store {
+    return {
+      get: <T>() => clone(this.whole(id, where)[part]) as T | undefined,
+      set: (v) => this.put(id, where, part, clone(v)),
+      onChange: (fn) => keep(watch(() => JSON.stringify(this.whole(id, where)[part] ?? null), () => this.guard(id, () => fn(), undefined))),
+    };
+  }
+
+  // ---- settings by the manifest's schema --------------------------------------------------------------------------
+  private fields(m: Manifest): Field[] {
+    return m.contributes.settings.flatMap((s) => s.groups.flatMap((g) => g.fields));
+  }
+  settingsValues(m: Manifest): Values {
+    const out: Values = {};
+    const folder = (this.whole(m.id, 'folder').settings ?? {}) as Values;
+    const local = (this.whole(m.id, 'local').settings ?? {}) as Values;
+    for (const f of this.fields(m))
+      for (const k of f.type === 'pair' ? [f.key, f.key2] : [f.key]) {
+        const own = f.where === 'folder' ? folder : local;
+        const d = (f as { default?: unknown; default2?: unknown })[k === f.key ? 'default' : 'default2'];
+        out[k] = k in own ? own[k] : (d ?? null);
+      }
+    return out;
+  }
+  private async setSettings(m: Manifest, patch: Values) {
+    const by = { folder: {} as Values, local: {} as Values };
+    for (const f of this.fields(m)) for (const k of f.type === 'pair' ? [f.key, f.key2] : [f.key]) if (k in patch) by[f.where][k] = patch[k];
+    for (const where of ['folder', 'local'] as const)
+      if (Object.keys(by[where]).length) await this.put(m.id, where, 'settings', { ...((this.whole(m.id, where).settings ?? {}) as Values), ...by[where] });
+  }
+  private schemaOf(m: Manifest, s: ManifestSettings, i: number): Schema {
+    const dyn = (key: string) => this.dynamic.get(m.id + ':' + key);
+    const field = (f: Field): Field => {
+      const hint = (v: Values) => this.guard(m.id, () => dyn(f.key)?.hint?.(v), undefined) ?? (typeof f.hint === 'string' ? f.hint : '');
+      if (f.type === 'choice') return { ...f, hint, options: (v) => this.guard(m.id, () => dyn(f.key)?.options?.(v), undefined) ?? (Array.isArray(f.options) ? f.options : []) };
+      if (f.type === 'file') return { ...f, hint, show: (rel) => rel ?? 'Не выбран' };
+      if (f.type === 'pair') {
+        const both = (f as unknown as { options?: [CoreOpt[], CoreOpt[]] }).options;
+        return { ...f, hint, options: () => (Array.isArray(both) ? both : [[], []]) };
+      }
+      return { ...f, hint };
+    };
+    return {
+      id: `${m.id}-${i}`,
+      label: s.section ?? s.block ?? m.name,
+      groups: s.groups.map((g): Group => ({ ...g, fields: g.fields.map(field) })),
+      values: () => this.settingsValues(m),
+      set: (patch) => this.setSettings(m, patch),
+    };
+  }
+
+  // ---- events -------------------------------------------------------------------------------------------------
+  private listen(id: string, e: EventName, fn: (p: unknown) => void): Dispose {
+    const send = (p: unknown) => this.guard(id, () => fn(p), undefined);
+    switch (e) {
+      case 'file.changed': {
+        let last = new Map(store.files.map((f) => [f.name, f.text]));
+        return watch(() => store.files, (files) => {
+          const next = new Map(files.map((f) => [f.name, f.text]));
+          for (const [name, text] of next)
+            if (last.get(name) !== text) {
+              const by = store.diskTaken.has(name) ? 'disk' : 'edit';
+              store.diskTaken.delete(name);
+              send({ path: name, by });
+            }
+          last = next;
+        });
+      }
+      case 'heading.changed':
+        this.headingListeners.add(send);
+        return () => this.headingListeners.delete(send);
+      case 'tab.active':
+        return watch(() => store.tab?.id, () => send({ kind: store.tab?.kind ?? null, path: store.tab?.kind === 'file' ? store.file?.name ?? null : null }));
+      case 'folder.changed':
+        return watch(() => store.dir, (d) => send({ folder: d }));
+      case 'theme.changed': {
+        const o = new MutationObserver(() => send({ appearance: document.documentElement.dataset.appearance ?? null }));
+        o.observe(document.documentElement, { attributes: true, attributeFilter: ['data-appearance', 'style'] });
+        return () => o.disconnect();
+      }
+      case 'day.changed': {
+        let day = new Date().toDateString();
+        const tick = () => {
+          const d = new Date().toDateString();
+          if (d !== day) {
+            day = d;
+            send({ date: new Date() });
+          }
+        };
+        const t = setInterval(tick, 60_000);
+        document.addEventListener('visibilitychange', tick); // the Mac woke up
+        return () => {
+          clearInterval(t);
+          document.removeEventListener('visibilitychange', tick);
+        };
+      }
+    }
+    throw new Error(`нет события «${e}»`);
+  }
+  private headingListeners = new Set<(p: unknown) => void>();
+  /** After a plugin's transaction: what it changed in which heading. */
+  headingChanged(ref: HeadingRef, what: 'status' | 'planning' | 'tags' | 'property' | 'body' | 'moved' | 'removed') {
+    for (const l of this.headingListeners) l({ ref, what });
+  }
+}
+
+export const plugins = new Host();
+
+// ---- helpers --------------------------------------------------------------------------------------------------
+
+const clone = <T>(v: T): T => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
+/** An effect outside any component: `fn` with the new value when it changes (not at first). */
+function watch<T>(read: () => T, fn: (v: T) => void): Dispose {
+  let first = true;
+  return $effect.root(() => {
+    $effect(() => {
+      const v = read();
+      if (first) {
+        first = false;
+        return;
+      }
+      untrack(() => fn(v));
+    });
+  });
+}
+const fileOf = (path: string) => store.files.find((f) => f.name === path);
+function findHeading(hs: Heading[], ref: HeadingRef) {
+  return hs.find((h) => h.line === ref.line && h.title === ref.title) ?? hs.filter((h) => h.title === ref.title).sort((a, b) => Math.abs(a.line - ref.line) - Math.abs(b.line - ref.line))[0];
+}
+function infoOf(f: (typeof store.files)[number], h: Heading): HeadingInfo {
+  const inherited = new Set<string>(f.filetags);
+  for (let p = h.parent; p >= 0; p = f.headings[p].parent) for (const t of f.headings[p].tags) inherited.add(t);
+  return {
+    ref: { path: f.name, line: h.line, title: h.title }, level: h.level, keyword: h.keyword, done: !!h.keyword && f.wf.done.includes(h.keyword),
+    priority: h.priority, title: h.title, tags: [...new Set([...h.tags, ...inherited])],
+    ...(h.scheduled ? { scheduled: { ...h.scheduled } } : {}), ...(h.deadline ? { deadline: { ...h.deadline } } : {}), ...(h.closed ? { closed: { ...h.closed } } : {}),
+  } as HeadingInfo;
+}
+/** The agenda's engine on a query: a keyword without its set means it in every set. */
+function query(q: Query): HeadingInfo[] {
+  const sets = new Set<string>();
+  for (const f of store.files) for (const s of f.wf.sequences ?? [DEFAULT_SEQUENCE]) sets.add(s.name);
+  const conds: CoreCond[] = q.conds.map((c, i) => ({
+    ...(c as CoreCond), id: 'q' + i,
+    values: c.field === 'status' ? (c.values ?? []).flatMap((v) => (v.includes('\u001f') ? [v] : [...sets].map((s) => statusKey(s, v)))) : c.values,
+  }));
+  const a: Agenda = { id: 'q', name: 'q', sources: q.sources ?? [], blocks: [{ id: 'b', name: 'q', color: 'blue', conds, group: 'none', sort: q.sort ?? 'prio', limit: null }] };
+  const [r] = runAgenda(a, store.files, new Date(new Date().setHours(0, 0, 0, 0)));
+  if (!r) throw new Error('условие запроса не закончено');
+  return r.groups.flatMap((g) => g.tasks).flatMap((t) => {
+    const f = fileOf(t.path);
+    const h = f?.headings.find((x) => x.line === t.line);
+    return f && h ? [infoOf(f, h)] : [];
+  });
+}
+/** The core's commands a plugin may run (ТЗ 26: a minimum, grows with our plugins). */
+function coreCommand(cmd: string, arg: unknown) {
+  const a = (arg ?? {}) as { path?: string; ref?: HeadingRef };
+  switch (cmd) {
+    case 'file.open': {
+      const i = store.files.findIndex((f) => f.name === a.path);
+      if (i < 0) throw new Error(`нет файла «${a.path}»`);
+      return store.open(i);
+    }
+    case 'heading.reveal': {
+      const i = a.ref ? store.files.findIndex((f) => f.name === a.ref!.path) : -1;
+      const h = i >= 0 && a.ref ? findHeading(store.files[i].headings, a.ref) : undefined;
+      if (!h) throw new Error('заголовок не найден');
+      return store.open(i, h.line);
+    }
+    case 'agenda.open':
+      return store.showAgendaHere();
+  }
+  throw new Error(`нет команды «${cmd}»`);
+}
+type Changed = [HeadingRef, Parameters<Host['headingChanged']>[1]];
+/** A reference of the API (a path in the notes folder) as the core's (the file's full path). */
+const coreRef = (h: HeadingRef): HeadingRef => ({ ...h, path: fileOf(h.path)?.path ?? h.path });
+const corePath = (rel: string) => fileOf(rel)?.path ?? rel;
+/** The plugin's Tx over the core's (§5.4): the same operations; what changed in which heading, for the events. */
+function apiTx(tx: CoreTx, ev: Changed[]) {
+  return {
+    setStatus: (h: HeadingRef, kw: string | null) => (tx.setStatus(coreRef(h), kw), ev.push([h, 'status'])),
+    setPlanning: (h: HeadingRef, k: 'SCHEDULED' | 'DEADLINE', d: Date | null) => (tx.setPlanning(coreRef(h), k, d), ev.push([h, 'planning'])),
+    setTags: (h: HeadingRef, tags: string[]) => (tx.setTags(coreRef(h), tags), ev.push([h, 'tags'])),
+    setProperty: (h: HeadingRef, k: string, v: string | null) => (tx.setProperty(coreRef(h), k, v), ev.push([h, 'property'])),
+    insertHeading: (at: { under: HeadingRef; position: 'first' | 'last' } | { file: string; position: 'top' | 'end' }, org: string) =>
+      tx.insertHeading('under' in at ? { under: coreRef(at.under), position: at.position } : { file: corePath(at.file), position: at.position }, org),
+    replaceBody: (h: HeadingRef, org: string) => (tx.replaceBody(coreRef(h), org), ev.push([h, 'body'])),
+    move: (h: HeadingRef, to: { under: HeadingRef } | { file: string }) => (tx.move(coreRef(h), 'under' in to ? { under: coreRef(to.under) } : { file: corePath(to.file) }), ev.push([h, 'moved'])),
+    remove: (h: HeadingRef) => (tx.remove(coreRef(h)), ev.push([h, 'removed'])),
+  };
+}
+
+plugins.declare();

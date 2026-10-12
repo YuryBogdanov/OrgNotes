@@ -375,7 +375,12 @@ class Store {
    *  written to config.json; `when` says whether the project needs it (no set knows ACTIVE yet, say). */
   private featureSets: { id: string; def: WorkflowDef; when?: (defs: WorkflowDef[]) => boolean }[] = [];
   registerStatusSet(id: string, def: WorkflowDef, when?: (defs: WorkflowDef[]) => boolean) {
-    this.featureSets.push({ id, def, when });
+    const s = { id, def, when };
+    this.featureSets.push(s);
+    return () => {
+      this.featureSets = this.featureSets.filter((x) => x !== s);
+      this.refreshStatusSets();
+    };
   }
   /** The project's config as written (the features' sets not added). */
   private baseConfig: ProjectConfig = EMPTY_CONFIG;
@@ -716,8 +721,8 @@ class Store {
       return f && { path: f.path, text: f.text, wf: f.wf };
     });
     build(tx);
-    if (tx.conflict) {
-      this.say('Не удалось: заголовок изменился или пропал');
+    if (tx.conflict || tx.error) {
+      this.say(tx.conflict ? 'Не удалось: заголовок изменился или пропал' : 'Не удалось: ' + tx.error);
       return null;
     }
     const steps = tx.result();
@@ -939,7 +944,7 @@ class Store {
     const gen = { ...this.diskGen };
     const files = list.map((n) => {
       const o = old.get(n.path);
-      if (!o) return fromDisk(n, this.config);
+      if (!o) return (this.diskTaken.add(n.name), fromDisk(n, this.config));
       if (n.text === o.diskRaw) return o; // nothing new on disk: untouched, «touched», or the echo of our own save
       const { text, eol } = splitEol(n.text);
       if (text === o.text) {
@@ -954,6 +959,7 @@ class Store {
         return o;
       }
       // no edits: take the disk version silently
+      this.diskTaken.add(o.name);
       if (this.isVisible(n.path)) reloaded.push(o.name);
       gen[n.path] = (gen[n.path] ?? 0) + 1;
       return fromDisk(n, this.config);
@@ -986,6 +992,8 @@ class Store {
     for (const p of this.orphanAsked) if (!orphans[p]) this.orphanAsked.delete(p);
     if (reloaded.length) this.showReloaded(reloaded);
   }
+  /** The files just taken from disk (their names): the plugins' «file.changed» says «disk» for them, then forgets. */
+  diskTaken = new Set<string>();
 
   /** Shown in one of the panes (the active tab of a pane). */
   private isVisible(path: string) {

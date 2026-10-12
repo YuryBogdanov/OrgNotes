@@ -35,7 +35,7 @@
 - API устроен так, будто между плагином и ядром граница, чтобы в v2 можно было перейти на iframe или Worker без переписывания плагинов:
   - каждый вызов `ctx` асинхронный или возвращает `Dispose`;
   - на вход и выход идут только данные: JSON, `HeadingRef`, `Date`. Объекты ядра (store, NoteFile, Tab, EditorView) наружу не выходят;
-  - вид плагина получает DOM-элемент и рисует в нём сам: `render(el, state, ctx) → Dispose`. Svelte от плагина не требуется;
+  - вид плагина получает DOM-элемент и рисует в нём сам: `render(el, state, tab) → Dispose`. Svelte от плагина не требуется;
   - общие механизмы ядра (форма, выбор даты, выбор места, разбор) — это вызовы, которые открывают интерфейс ядра и возвращают результат. Компонентов для вставки API не даёт.
 - Права защищают от ошибок, а не от злого умысла. Это сказано пользователю при включении стороннего плагина (п. 7.2).
 - Ошибку плагина ядро ловит, и плагин выключается до перезапуска. От зависания (бесконечного цикла) v1 не защищает: это записано в «Чего нет в v1».
@@ -154,17 +154,16 @@ ui: {
   navSection(id: string, render: Render): Dispose;                       // id из манифеста
   view<S>(id: string, spec: { title(state: S): string; crumbs?(state: S): string[]; render: Render<S>; restore?(raw: unknown): S }): Dispose;
   open<S>(viewId: string, state: S, where?: 'here' | 'beside'): Promise<void>;
-  setState<S>(tabId: string, state: S): void;                           // вид меняет своё состояние (сохраняется с раскладкой)
   form(spec: FormSpec): Promise<Values | null>;                          // лист ядра; поля — те же, что в схеме настроек
   pickPlace(o?: { kind?: 'file' | 'heading'; levels?: number[]; title?: string }): Promise<HeadingRef | { path: string } | null>;
   pickDate(o?: { initial?: Date; title?: string }): Promise<Date | null>;
   review(spec: ReviewSpec): Promise<ReviewResult>;                       // вкладка разбора карточками (0.4)
   notify(text: string, actions?: { label: string; run(): void }[]): void;
 }
-type Render<S = void> = (el: HTMLElement, state: S, ctx: Ctx) => Dispose;
+type Render<S = void> = (el: HTMLElement, state: S, tab: { id: string; setState(s: S): void }) => Dispose | void;
 ```
 
-- `view.render` получает пустой элемент во вкладке. Тема (`--p-*`, `--ed-*`, `data-appearance`) доступна через CSS-переменные.
+- `view.render` получает пустой элемент во вкладке и её ручку: `tab.setState(s)` меняет состояние вкладки, оно сохраняется с раскладкой. `ctx` плагин держит у себя в замыкании, поэтому третьим аргументом идёт вкладка (уточнено в 1.1). Тема (`--p-*`, `--ed-*`, `data-appearance`) доступна через CSS-переменные.
 - `review`: `ReviewSpec = { title; items: HeadingRef[]; actions: { id; label; key?; run(h): Promise<'next' | 'stay'> }[]; header?(h): string; below?: Render<HeadingRef> }`. Карточка, суженный редактор, «Назад», сводка и клавиши остаются за ядром. Действия правят файлы через `edit.transaction`, поэтому ⌘Z работает как везде.
 - `pickPlace` — это `PlacePicker` из 0.5, вид «палитра».
 - `form`: `FormSpec = { title; groups: Group[]; submit: string; initial?: Values }`. Поля описываются той же схемой, что в настройках (0.6). Поле ↔ подзаголовок 4-го уровня (из брифа) в v1 не делаем: плагин сам пишет подзаголовки транзакцией. Вернёмся после пилота.

@@ -1,0 +1,36 @@
+{
+  "id": "hello",
+  "name": "Привет",
+  "version": "1.0.0",
+  "description": "Пример плагина: команда, раздел навигатора, вкладка и настройка — только через API.",
+  "author": "Panopticon",
+  "api": "^1.0",
+  "minAppVersion": "0.9.0",
+  "main": "main.js",
+  "defaultEnabled": false,
+  "permissions": ["index.read", "files.edit"],
+  "contributes": {
+    "commands": [
+      { "id": "hello.greet", "title": "Привет: поздороваться", "keys": ["⌃⌘H"], "synonyms": ["пример", "плагин"] },
+      { "id": "hello.board", "title": "Привет: доска", "synonyms": ["пример", "плагин"] },
+      { "id": "hello.show", "title": "Навигатор: Привет", "keys": ["⌃⌘7"] }
+    ],
+    "navSections": [{ "id": "hello", "title": "Привет", "icon": "M4 10.5c1.5 3 4 4.5 6 4.5s4.5-1.5 6-4.5M7 7.5h.01M13 7.5h.01", "key": "hello.show" }],
+    "views": [{ "id": "hello.board", "title": "Доска", "icon": "M3.5 3.5h13v13h-13zM3.5 8h13M8 8v8.5" }],
+    "settings": [
+      {
+        "section": "Привет",
+        "groups": [
+          {
+            "caption": "ПРИВЕТСТВИЕ",
+            "fields": [
+              { "key": "greeting", "type": "text", "label": "Слово приветствия", "placeholder": "Привет", "where": "folder", "default": "Привет" },
+              { "key": "count", "type": "switch", "label": "Считать открытые задачи", "where": "local", "default": true }
+            ],
+            "help": "Пример настроек плагина: поля описаны в манифесте, лист рисует приложение."
+          }
+        ]
+      }
+    ]
+  }
+}
