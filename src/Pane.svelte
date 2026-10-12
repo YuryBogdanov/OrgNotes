@@ -5,6 +5,7 @@
   import Agenda from './Agenda.svelte';
   import Review from './Review.svelte';
   import RichMenu from './RichMenu.svelte';
+  import FindBar from './FindBar.svelte';
   import { setPlanning, weekdayNames } from './edits';
   import type { RichPick } from './orgRich';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
@@ -41,6 +42,59 @@
     for (let i = 0; i < hs.length; i++) if (hs[i].line <= tab.cursor.line) k = i;
     const h = hs[k];
     return h ? [...h.path, h.title] : [];
+  });
+
+  // ---- ⌘F: this pane's fb (it stays across the tabs of the pane; the other pane has its own) -------------------
+  let fb = $state({ open: false, q: '', go: 0, dir: 1 as 1 | -1, at: null as number | null, global: false, focusN: 0 });
+  let found = $state<{ total: number; cur: number; folded: number; wrapped: boolean } | null>(null);
+  let api: { selection: () => string } | null = null;
+  let lastReq = 0;
+  const findProp = $derived(fb.q ? { q: fb.q, cs: store.findCase, word: store.findWord, show: fb.open, at: fb.at, go: fb.go, dir: fb.dir } : null);
+  const oneLine = () => {
+    const s = api?.selection() ?? '';
+    return s && !s.includes('\n') ? s : '';
+  };
+  const focusText = () => requestAnimationFrame(() => document.querySelector<HTMLElement>(`section.pane[data-pane="${pi}"] .cm-content`)?.focus());
+  function step(dir: 1 | -1) {
+    if (!fb.q) return void openBar();
+    fb.at = null;
+    fb.dir = dir;
+    fb.go++;
+  }
+  function openBar() {
+    const s = oneLine();
+    if (s) fb.q = s;
+    fb.at = null;
+    fb.global = false;
+    fb.open = true;
+    fb.focusN++;
+  }
+  function closeBar() {
+    fb.open = false;
+    fb.global = false;
+    focusText();
+  }
+  $effect(() => {
+    const r = store.findReq;
+    if (!r || r.pane !== pi || r.n === lastReq) return;
+    lastReq = r.n;
+    if (r.kind === 'open') openBar();
+    else if (r.kind === 'next' || r.kind === 'prev') step(r.kind === 'next' ? 1 : -1);
+    else if (r.kind === 'useSel') {
+      const s = oneLine();
+      if (s) {
+        fb.q = s;
+        fb.at = null;
+      }
+    } else if (r.kind === 'jump' && r.at && r.q) {
+      // from the search in every file: the file is open now; the match there becomes the current one
+      const f = store.files.find((x) => x.path === r.at!.path);
+      if (!f) return;
+      const lines = f.text.split('\n');
+      let pos = 0;
+      for (let k = 0; k < r.at.line; k++) pos += lines[k].length + 1;
+      Object.assign(fb, { q: r.q, at: pos + r.at.col, open: true, global: true });
+    }
   });
 
   let richPick = $state<{ pick: RichPick; path: string } | null>(null); // a click on a drawn status or priority
@@ -270,9 +324,13 @@
         <button aria-pressed={store.rich} class:on={store.rich} onclick={() => store.setRich(true)}>Оформление</button>
       </div>
     </div>
+    {#if fb.open}
+      <FindBar bind:q={() => fb.q, (v) => { fb.q = v; fb.at = null; fb.global = false; }} info={found} global={fb.global} focusN={fb.focusN}
+        onnext={() => step(1)} onprev={() => step(-1)} onclose={closeBar} />
+    {/if}
     <div class="ed">
       <Editor text={file.text} fileKey={tab.id + '|' + file.path} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} resetOn={store.diskGen[file.path] ?? 0} levels={store.levels} drawers={store.foldDrawers} rich={store.rich} richNumbers={store.richNumbers}
-        onrich={(pick) => richChoice(pick, file.path)}
+        onrich={(pick) => richChoice(pick, file.path)} find={findProp} onfound={(i) => (found = i)} onapi={(a) => (api = a)}
         onchange={(t) => store.setText(t, file.path)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>
     {#if tab.fromAgenda}

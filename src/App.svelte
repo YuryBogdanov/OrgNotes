@@ -129,6 +129,14 @@
     capture: () => store.openCapture(),
     review: () => store.startReview(),
     rich: () => store.setRich(!store.rich),
+    find: () => store.askFind('open'),
+    findAll: () => store.openSearch(window.getSelection()?.toString() ?? ''),
+    findNext: () => store.askFind('next'),
+    findPrev: () => store.askFind('prev'),
+    useSelection: () => store.askFind('useSel'),
+    searchNext: () => store.searchStep(1),
+    searchPrev: () => store.searchStep(-1),
+    navSearch: () => store.openSearch(),
     insp: () => (store.showInspector = !store.showInspector),
   };
   $effect(() => {
@@ -164,6 +172,11 @@
     if (e.ctrlKey && e.code === 'Digit3') return 'navAgendas';
     if (e.shiftKey && e.code === 'KeyI') return 'capture';
     if (e.shiftKey && e.code === 'KeyR') return 'review';
+    if (e.ctrlKey && e.code === 'Digit6') return 'navSearch';
+    if (e.code === 'KeyF') return e.shiftKey ? 'findAll' : e.altKey || e.ctrlKey ? null : 'find';
+    if (e.code === 'KeyG' && e.altKey) return e.shiftKey ? 'searchPrev' : 'searchNext';
+    if (e.code === 'KeyG' && !e.ctrlKey) return e.shiftKey ? 'findPrev' : 'findNext';
+    if (e.code === 'KeyE' && !e.shiftKey && !e.altKey && !e.ctrlKey) return 'useSelection';
     if (e.shiftKey && e.code === 'KeyW') return 'closeWindow';
     if (e.shiftKey && e.code === 'KeyP') return 'palette';
     if (e.shiftKey && e.code === 'KeyN') return 'paletteNewFile';

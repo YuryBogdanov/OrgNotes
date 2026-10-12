@@ -1,6 +1,14 @@
 // Notes for the Inbox tests: an inbox.org with unsorted tasks, and a work file to move them into.
+/** The time the stamps are counted from: the last 14:00 that has passed (never in the future, so a task added now is
+ *  the newest), so «5 мин» and «вчера» hold at any hour, midnight too (the test of the relative times gives the page
+ *  the same clock). */
+export const NOW = (() => {
+  const d = new Date();
+  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 14, 0);
+  return t > d ? new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1, 14, 0) : t;
+})();
 const stamp = (minutesAgo: number) => {
-  const d = new Date(Date.now() - minutesAgo * 60000);
+  const d = new Date(+NOW - minutesAgo * 60000);
   const p = (n: number) => String(n).padStart(2, '0');
   const wd = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
   return `[${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${wd} ${p(d.getHours())}:${p(d.getMinutes())}]`;

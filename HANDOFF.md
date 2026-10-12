@@ -88,6 +88,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 | `layout.ts` | Panes/tabs model (1–2 panes), serialise/restore. Agenda tabs carry `agenda` (custom agenda id). |
 | `Editor.svelte` | CodeMirror setup, decorations (keywords, links shown descriptive), fold service, keymaps; compartments for undo and the structural view. `scrollPastEnd`. |
 | Drawers (in `Editor.svelte`, `org.ts` `drawerRanges`) | Folded like headings via the same `foldService`; folded on open and when the app adds one (a `transactionExtender` skips typed/pasted/undone text); ⇧Tab and heading Tab leave them as they are. |
+| `FindBar.svelte`, `findView.ts`, `SearchPanel.svelte`, `search.ts` | Search (ТЗ 21). ⌘F: a pane's bar (state in `Pane.svelte`) → `Editor` `find` prop → `findField` (matches over the whole file, highlight, «N в свёрнутом», scroll ticks). ⇧⌘F: `store.search` + `runSearch` (over `store.files` in memory, in portions, cancellable, cap 1000) → `SearchPanel`; a result → `store.openHit` → the pane's bar with `at`. |
 | `Calendar.svelte`, `calendar.ts` | The palette's date calendar (ТЗ 20): a step with `calendar: CalSpec` (`calStep` in `commands.ts`); keys live in `Palette.svelte` (⇧/⌥⇧ + arrows, «.», ↩, ⌫). Opened on its own with `store.openCalendar` (the review's «Отложить», a date chip of «Оформленный текст»). |
 | `orgRich.ts`, `rich.ts`, `RichMenu.svelte` | «Оформленный текст» (ТЗ 19, like org-modern): replaces the structural view in the `structure` compartment when `store.rich`; line decorations + widgets per visible line; lines touched by a user-placed caret (`userCaret` field) show raw text. Clicks on status/priority/date open `RichMenu` (writes via `store.patchAt`). Stage 2 (proportional font) and 3 (blocks) not built. |
 | `orgIndent.ts` | «Структурный вид»: one star per level (marker widget; hidden stars stay in DOM with `display:none`), indents, atomic ranges, Backspace = level up. |
@@ -130,7 +131,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 - **App config (Rust):** the notes dir and its bookmark, in the app config dir. Identifier `dev.local.panopticon`.
 - **localStorage (per Mac):**
   - `layout:<dir>`, `lastFile:<dir>`, `saveAsDir:…`;
-  - `nav:mode`, `nav:headings`, `inspector:tab`, `editor:levels`, `editor:drawers` ('0' = drawers open on open), `editor:rich`, `editor:richNumbers`;
+  - `nav:mode`, `nav:headings`, `inspector:tab`, `editor:levels`, `editor:drawers` ('0' = drawers open on open), `editor:rich`, `editor:richNumbers`, `find:cs`, `find:word`, `search:recent`;
   - `capture:key`, `capture:global`, `capture:draft`, `capture:file`;
   - one-shot commands from the settings window: `cmd:changeFolder`, `cmd:newAgenda`.
 

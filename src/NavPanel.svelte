@@ -3,6 +3,7 @@
   import Navigator from './Navigator.svelte';
   import AgendaList from './AgendaList.svelte';
   import InboxPanel from './InboxPanel.svelte';
+  import SearchPanel from './SearchPanel.svelte';
   import type { NavMode } from './store.svelte';
 
   // The left panel: a bar of modes (as in Xcode) over the navigator of that mode. The mode belongs to the window:
@@ -14,7 +15,7 @@
     { id: 'tasks', label: 'Задачи', icon: 'M3.5 5.5l1.5 1.5 3-3M3.5 12.5l1.5 1.5 3-3M11 5.5h6M11 12.5h6' },
     { id: 'agendas', label: 'Агенда', icon: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3', on: 'agendas', key: '⌃⌘3' },
     { id: 'tags', label: 'Теги', icon: 'M3 3h6.5l7.5 7.5-6 6L3.5 9.5zM6.8 6.8h.01' },
-    { id: 'search', label: 'Поиск по заметкам', icon: 'M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM13.5 13.5L17 17' },
+    { id: 'search', label: 'Поиск по заметкам', icon: 'M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM13.5 13.5L17 17', on: 'search', key: '⌃⌘6' },
   ];
   // the number of unsorted Inbox tasks on its button (0: none; more than 99: «99+»)
   const count = $derived(store.inboxCfg.counter ? store.inboxList.length : 0);
@@ -31,7 +32,7 @@
     {/each}
   </div>
   <div class="body">
-    {#if store.navMode === 'agendas'}<AgendaList />{:else if store.navMode === 'inbox'}<InboxPanel />{:else}<Navigator />{/if}
+    {#if store.navMode === 'agendas'}<AgendaList />{:else if store.navMode === 'inbox'}<InboxPanel />{:else if store.navMode === 'search'}<SearchPanel />{:else}<Navigator />{/if}
   </div>
 </div>
 

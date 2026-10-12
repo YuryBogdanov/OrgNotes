@@ -47,7 +47,26 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
             it('copyPath', 'Скопировать путь', 'Alt+CmdOrCtrl+KeyC', false),
           ],
         },
-        { text: 'Правка', items: [{ item: 'Undo' }, { item: 'Redo' }, sep, { item: 'Cut' }, { item: 'Copy' }, { item: 'Paste' }, { item: 'SelectAll' }] },
+        {
+          text: 'Правка',
+          items: [
+            { item: 'Undo' }, { item: 'Redo' }, sep, { item: 'Cut' }, { item: 'Copy' }, { item: 'Paste' }, { item: 'SelectAll' }, sep,
+            {
+              text: 'Найти',
+              items: [
+                it('find', 'Найти…', 'CmdOrCtrl+KeyF'),
+                it('findAll', 'Найти во всех файлах…', 'Shift+CmdOrCtrl+KeyF'),
+                sep,
+                it('findNext', 'Найти далее', 'CmdOrCtrl+KeyG'),
+                it('findPrev', 'Найти ранее', 'Shift+CmdOrCtrl+KeyG'),
+                it('useSelection', 'Искать выделенное', 'CmdOrCtrl+KeyE'),
+                sep,
+                it('searchNext', 'Следующий результат во всех файлах', 'Alt+CmdOrCtrl+KeyG'),
+                it('searchPrev', 'Предыдущий результат во всех файлах', 'Shift+Alt+CmdOrCtrl+KeyG'),
+              ],
+            },
+          ],
+        },
         {
           text: 'Вид',
           items: [
@@ -75,6 +94,7 @@ export async function installMenu(actions: MenuActions): Promise<AppMenu | null>
             it('navFiles', 'Навигатор: файлы', 'Control+CmdOrCtrl+Digit1'),
             it('navInbox', 'Навигатор: Inbox', 'Control+CmdOrCtrl+Digit2'),
             it('navAgendas', 'Навигатор: агенды', 'Control+CmdOrCtrl+Digit3'),
+            it('navSearch', 'Навигатор: поиск', 'Control+CmdOrCtrl+Digit6'),
             it('insp', 'Инспектор', 'Alt+CmdOrCtrl+Digit0'),
             sep,
             { item: 'Fullscreen' },
