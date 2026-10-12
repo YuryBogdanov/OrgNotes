@@ -5,6 +5,8 @@
 import { parseHeadings, setKeyword, type Heading, type Workflow } from './org';
 import { setPlanning, setTags } from './edits';
 import { remove } from './inbox';
+import { insertHeading, replaceBody, setProperty } from './orgOps';
+import { moveTo, moveWithin } from './refile';
 
 /** A heading as a feature knows it: lines move with every edit, so the title is checked too. */
 export interface HeadingRef {
@@ -111,6 +113,52 @@ export class Tx {
   }
   remove(ref: HeadingRef) {
     this.on(ref, (t, h) => remove(t, h));
+  }
+  /** What the plugins' API adds (ТЗ 26): a property, a new heading, a body, a move. A wrong org text: `error`. */
+  error: string | null = null;
+  private orFail(fn: () => string | null, what: string): string | null {
+    try {
+      const r = fn();
+      if (r === null) this.error = what;
+      return r;
+    } catch {
+      this.error = what;
+      return null;
+    }
+  }
+  setProperty(ref: HeadingRef, key: string, value: string | null) {
+    if (!/^[A-Za-z0-9_-]+$/.test(key)) this.error = 'имя свойства — латиница, цифры, _ и -';
+    else this.on(ref, (t, h) => setProperty(t, h, key, value));
+  }
+  insertHeading(at: { under: HeadingRef; position: 'first' | 'last' } | { file: string; position: 'top' | 'end' }, org: string) {
+    const bad = 'нужен один заголовок с подзаголовками';
+    if ('under' in at) {
+      const h = this.heading(at.under);
+      if (!h) this.conflict = true;
+      else this.update(at.under.path, (t) => this.orFail(() => insertHeading(t, { under: h, position: at.position }, org), bad));
+    } else this.update(at.file, (t) => this.orFail(() => insertHeading(t, { position: at.position }, org), bad));
+  }
+  replaceBody(ref: HeadingRef, org: string) {
+    const h = this.heading(ref);
+    if (!h) this.conflict = true;
+    else this.update(ref.path, (t) => this.orFail(() => replaceBody(t, h, org), 'в тексте под заголовком не может быть заголовков'));
+  }
+  move(ref: HeadingRef, to: { under: HeadingRef } | { file: string }) {
+    const h = this.heading(ref);
+    const under = 'under' in to ? (this.heading(to.under) ?? null) : null;
+    const dst = 'under' in to ? to.under.path : to.file;
+    if (!h || ('under' in to && !under) || this.text(dst) === undefined) {
+      this.conflict = true;
+      return;
+    }
+    if (dst === ref.path) {
+      this.update(dst, (t) => this.orFail(() => moveWithin(t, h, under).text, 'заголовок нельзя перенести внутрь него самого'));
+      return;
+    }
+    const src = this.text(ref.path)!;
+    const r = moveTo(src, h, this.text(dst)!, under);
+    this.update(dst, () => r.dst); // the target first: a failed write loses nothing
+    this.update(ref.path, () => r.src);
   }
   /** The files the transaction changes, in the order they were first touched (a move writes its target first). */
   result(): { path: string; text: string }[] {

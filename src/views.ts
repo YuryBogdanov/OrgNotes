@@ -5,6 +5,7 @@
 import type { Component } from 'svelte';
 import type { Tab } from './layout';
 import type { Schema } from './settingsSchema';
+import { SvelteMap } from 'svelte/reactivity';
 
 /** A kind of tab a feature shows (the calendar, the goals, a review). Its state lives in `tab.data`. */
 export interface ViewSpec {
@@ -30,9 +31,12 @@ export interface ViewSpec {
   /** Called when the last tab of the kind is closed (a review ends). */
   onGone?(): void;
 }
-const views = new Map<string, ViewSpec>();
+// reactive: a plugin's kinds, sections and commands come and go while the window is open (roadmap 1.1)
+const views = new SvelteMap<string, ViewSpec>();
+/** Registers it; the returned function takes it back (a plugin turned off). */
 export function registerView(v: ViewSpec) {
   views.set(v.kind, v);
+  return () => void (views.get(v.kind) === v && views.delete(v.kind));
 }
 export const viewOf = (kind: string | undefined) => (kind ? views.get(kind) : undefined);
 export const allViews = () => [...views.values()];
@@ -50,9 +54,10 @@ export interface NavSpec {
   /** A number on the button (the Inbox's count); 0 shows nothing. */
   badge?(): number;
 }
-const navs = new Map<string, NavSpec>();
+const navs = new SvelteMap<string, NavSpec>();
 export function registerNav(n: NavSpec) {
   navs.set(n.id, n);
+  return () => void (navs.get(n.id) === n && navs.delete(n.id));
 }
 export const navOf = (id: string) => navs.get(id);
 export const allNavs = () => [...navs.values()];
@@ -67,9 +72,10 @@ export interface SettingsSpec {
   component?: Component;
   schema?: Schema;
 }
-const sections = new Map<string, SettingsSpec>();
+const sections = new SvelteMap<string, SettingsSpec>();
 export function registerSettings(s: SettingsSpec) {
   sections.set(s.id, s);
+  return () => void (sections.get(s.id) === s && sections.delete(s.id));
 }
 export const settingsOf = (id: string) => sections.get(id);
 export const allSettings = () => [...sections.values()];
@@ -80,10 +86,17 @@ export interface SettingsBlockSpec {
   order: number;
   schema: Schema;
 }
-const blocks: SettingsBlockSpec[] = [];
+const blocks = new SvelteMap<string, SettingsBlockSpec>();
 export function registerSettingsBlock(b: SettingsBlockSpec) {
-  const i = blocks.findIndex((x) => x.schema.id === b.schema.id);
-  if (i >= 0) blocks.splice(i, 1);
-  blocks.push(b);
+  blocks.set(b.schema.id, b);
+  return () => void (blocks.get(b.schema.id) === b && blocks.delete(b.schema.id));
 }
-export const blocksOf = (section: string) => blocks.filter((b) => b.section === section).sort((a, b) => a.order - b.order);
+export const blocksOf = (section: string) => [...blocks.values()].filter((b) => b.section === section).sort((a, b) => a.order - b.order);
+
+/** A command's action (a plugin's): run by its keys, the palette and «commands.run». */
+const actions = new SvelteMap<string, () => void>();
+export function registerAction(id: string, run: () => void) {
+  actions.set(id, run);
+  return () => void (actions.get(id) === run && actions.delete(id));
+}
+export const actionOf = (id: string) => actions.get(id);

@@ -57,7 +57,8 @@
     };
   });
   import { keyHandler, menuMayRun } from './keyDispatch';
-  import { allNavs, allViews, viewOf } from './views';
+  import { actionOf, allNavs, allViews, viewOf } from './views';
+  import { plugins } from './api/host.svelte';
 
   // the quick entry from another program: a panel of its own with only the entry (the main window does the writing)
   const isCaptureWindow = location.hash === '#capture';
@@ -226,8 +227,9 @@
         store.setNavMode(n.id);
       };
   const runWindow = (id: string) => {
-    if (!actions[id] || !allowed(id)) return false;
-    actions[id]();
+    const run = actions[id] ?? actionOf(id); // a plugin's command (roadmap 1.1)
+    if (!run || !allowed(id)) return false;
+    run();
     return true;
   };
   // the menu bar with the shortcuts as set now, built again when one changes
@@ -254,6 +256,7 @@
     if (isCaptureWindow) return; // a thin panel: no files, no menu
     store.load();
     store.listen();
+    void plugins.start(); // the plugins' code (roadmap 1.1), once the window is up
     // closing the window only hides it (Rust side): the text stays in memory, so nothing to ask; quitting asks
     const key = keyHandler(runWindow);
     window.addEventListener('keydown', key, true);

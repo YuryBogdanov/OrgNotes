@@ -32,7 +32,7 @@
     {/each}
   </div>
   <div class="body">
-    {#if store.navMode === 'agendas'}<AgendaList />{:else if store.navMode === 'search'}<SearchPanel />{:else if feature}<feature.component />{:else}<Navigator />{/if}
+    {#if store.navMode === 'agendas'}<AgendaList />{:else if store.navMode === 'search'}<SearchPanel />{:else if feature}<feature.component id={feature.id} />{:else}<Navigator />{/if}
   </div>
 </div>
 

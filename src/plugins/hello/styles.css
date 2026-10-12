@@ -1,0 +1,9 @@
+/* «Привет»: the theme's variables are the app's (--fg, --fg2, --line, --acc, …) */
+.hello-h { margin: 14px 16px 8px; font-size: 12px; font-weight: 600; color: var(--fg2); }
+.hello-files { list-style: none; margin: 0; padding: 0 8px; }
+.hello-files button { width: 100%; text-align: left; padding: 5px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--fg); font-size: 13px; }
+.hello-files button:hover { background: var(--field); }
+.hello-board { max-width: 520px; margin: 40px auto; padding: 0 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.hello-board h2 { margin: 0; font-size: 22px; }
+.hello-board p { margin: 0; color: var(--fg2); }
+.hello-board button { height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); font-size: 13px; }

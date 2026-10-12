@@ -53,3 +53,6 @@ registerView({
 });
 registerSettings({ id: 'Календарь', icon: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3', order: 50, schema: calendarSchema });
 registerSettingsBlock({ section: 'Агенды', order: 10, schema: goalsSchema });
+
+// the plugins that are on: what their manifests declare (roadmap 1.1); their code is started by App once drawn
+import '../api/host.svelte';
