@@ -167,6 +167,9 @@ export interface FormSpec {
 export interface SheetSpec {
   title: string;
   render: (el: HTMLElement, sheet: { close(button?: string): void }) => Dispose | void;
+  /** The plugin draws the whole sheet (its header, body, footer, keys); the core gives the dimmed window, the place
+   *  over it and «a sheet is open» (ТЗ 27: the goals' own sheets as they were). */
+  bare?: boolean;
   /** At the bottom, right to left as written; the primary one on ↩. */
   buttons?: { id: string; label: string; primary?: boolean }[];
   /** A line at the bottom left. */
@@ -195,9 +198,23 @@ export interface ReviewAction {
   label: string;
   /** A command of the manifest in `"scope": "review"`: its keys run the action. */
   command?: string;
+  /** A word after the label («COMPLETED»). */
+  sub?: string;
+  /** The look: the main one, a «done» one (green). */
+  kind?: 'primary' | 'ok';
+  /** Not now (no text of the mark yet, the goal is closed already). */
+  disabled?(h: HeadingInfo): boolean;
   /** What it does to the heading: then the next card, or this one again. */
   run(h: HeadingInfo): 'next' | 'stay' | Promise<'next' | 'stay'>;
 }
+/** What a part of the card is drawn for: the heading now, and the card's place in the queue. */
+export interface ReviewCard {
+  heading: HeadingInfo;
+  index: number;
+  total: number;
+}
+/** A card's part drawn by the plugin: drawn again for each card (and when `redraw()` asks). */
+export type CardRender = (el: HTMLElement, card: ReviewCard) => Dispose | void;
 export interface ReviewSpec {
   title: string;
   items: HeadingRef[];
@@ -206,6 +223,31 @@ export interface ReviewSpec {
   header?(h: HeadingInfo): string;
   /** Something under the card. */
   below?: Render<HeadingRef>;
+  // ---- ТЗ 27 §2.3: a review of its own on the core's frame ----
+  /** The card's header instead of «Разбор · 3 из 7 · file». */
+  head?: CardRender;
+  /** The strip of quick buttons under the header. */
+  quick?: CardRender;
+  /** A panel right of the narrowed editor. */
+  aside?: CardRender;
+  /** Lines folded in the narrowed editor, and a note at the end of a line («3 — справа»). */
+  narrow?(h: HeadingInfo): { fold?: number[]; note?: { line: number; text: string } | null };
+  /** The summary instead of «Разобрано N из M» (under «Разбор закончен»); `end()` closes the review. */
+  summary?: (el: HTMLElement, r: ReviewResult & { end(): void }) => Dispose | void;
+  /** No «Пропустить» (the plugin has its own «Следующая»). */
+  noSkip?: boolean;
+  /** Before the card changes (an action's «next», «Назад», a key): what is being written is saved. */
+  beforeStep?(h: HeadingInfo): void | Promise<void>;
+  /** The card's widest, px (820). */
+  width?: number;
+}
+/** The review shown (from `ui.review`): move it, draw the card again. */
+export interface ReviewHandle {
+  step(d: 1 | -1): Promise<void>;
+  /** The card's parts drawn again (they read the file anew). */
+  redraw(): void;
+  /** Only the bar read again (an action's `disabled` changed: a note typed). */
+  update(): void;
 }
 export interface ReviewResult {
   total: number;
@@ -259,6 +301,11 @@ export interface Ctx {
     choose(o: { title: string; placeholder?: string; items: ChooseItem[] }): Promise<string | null>;
     /** Close the tabs of a view of the plugin. */
     close(viewId: string): void;
+    /** A control of the core in the plugin's element: the calendar of three months, the choice of a place in
+     *  columns, lines with lists — as the form's fields. `set` changes its value from outside. */
+    widget(el: HTMLElement, field: FormField, value: unknown, onChange: (v: unknown) => void): { set(v: unknown): void; dispose(): void };
+    /** The review shown now (its parts move and redraw it); null when there is none of the plugin's. */
+    currentReview(): ReviewHandle | null;
   };
   /** Needs `index.read`. */
   index?: {

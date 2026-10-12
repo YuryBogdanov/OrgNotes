@@ -98,6 +98,38 @@
         "scope": "review"
       },
       {
+        "id": "hello.review2",
+        "title": "Привет: разбор с заметками",
+        "synonyms": [
+          "пример",
+          "разбор"
+        ]
+      },
+      {
+        "id": "hello.reviewNote",
+        "title": "Разбор «Привет»: Записать заметку",
+        "keys": [
+          "⌘↩"
+        ],
+        "scope": "review"
+      },
+      {
+        "id": "hello.reviewNext",
+        "title": "Разбор «Привет»: Следующая",
+        "keys": [
+          "⌘]"
+        ],
+        "scope": "review"
+      },
+      {
+        "id": "hello.ownSheet",
+        "title": "Привет: свой лист…",
+        "synonyms": [
+          "пример",
+          "лист"
+        ]
+      },
+      {
         "id": "hello.show",
         "title": "Навигатор: Привет",
         "keys": [

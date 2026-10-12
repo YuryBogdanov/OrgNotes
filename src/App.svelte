@@ -292,7 +292,7 @@
 <!-- the agenda builder is a sheet over the whole window: the window stays visible under it but takes no input -->
 <!-- full screen with the menu bar shown: the toolbar grows by it (its buttons stay just below it), the traffic lights
      come into the toolbar -->
-<div class="win" inert={!!store.builder || store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!goals.goalAdd || !!goals.goalForm || !!goals.goalReport || !!goals.goalCarry} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
+<div class="win" inert={!!store.builder || store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq || !!goals.goalAdd || !!goals.goalForm || !!goals.goalReport || !!goals.goalCarry} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px">
   <Dialogs />
   <!-- keyed: "Сохранить всё" opens one sheet after another, each with its own note's name -->
   {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
