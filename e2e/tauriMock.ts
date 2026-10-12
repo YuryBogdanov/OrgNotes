@@ -159,6 +159,18 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           }
           if (cmd === 'read_project_config') return disk['/mock/.orgnotes/config.json'] ?? null;
           // a feature's own settings in the notes folder (roadmap 0.6)
+          // the installed plugins (roadmap 1.2): folders under /config/plugins/<dir>/
+          if (cmd === 'list_plugins') {
+            const dirs = [...new Set(Object.keys(disk).filter((k) => k.startsWith('/config/plugins/')).map((k) => k.split('/')[3]))].sort();
+            return dirs.map((dir) => ({ dir, manifest: disk[`/config/plugins/${dir}/manifest.json`] ?? null }));
+          }
+          if (cmd === 'read_plugin_file') {
+            if (String(args.file).split('/').includes('..')) throw 'a plugin reads only its own folder';
+            const t = disk[`/config/plugins/${args.dir}/${args.file}`];
+            if (t === undefined) throw 'No such file';
+            return t;
+          }
+          if (cmd === 'open_plugins_folder') return null;
           if (cmd === 'read_feature_file') return disk[(root() ?? '/mock') + '/.orgnotes/plugins/' + args.id + '.json'] ?? null;
           if (cmd === 'write_feature_file') {
             disk[(root() ?? '/mock') + '/.orgnotes/plugins/' + args.id + '.json'] = args.text;

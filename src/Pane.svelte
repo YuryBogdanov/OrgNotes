@@ -3,6 +3,7 @@
   import { headingAt } from './org';
   import Editor from './Editor.svelte';
   import Agenda from './Agenda.svelte';
+  import { plugins } from './api/host.svelte';
   import { viewOf } from './views';
   import RichMenu from './RichMenu.svelte';
   import FindBar from './FindBar.svelte';
@@ -28,7 +29,7 @@
   });
   const core = (k: string) => k === 'file' || k === 'agenda' || k === 'untitled';
   /** A feature's tab: its view's name; a kind nobody registers (the feature is off): the name it had. */
-  const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : t.kind === 'file' ? displayName(t.path ?? '') : (viewOf(t.kind)?.label(t) ?? t.label ?? 'Функция выключена'));
+  const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : t.kind === 'file' ? displayName(t.path ?? '') : (viewOf(t.kind)?.label(t) ?? t.label ?? plugins.pluginOfView(t.kind)?.manifest?.contributes.views.find((v) => v.id === t.kind)?.title ?? 'Функция выключена'));
   // a puzzle piece: the tab of a feature that is off
   const OFF_ICON = 'M8 3h4v2.5a1.5 1.5 0 0 0 3 0V3h2v5h-2.5a1.5 1.5 0 0 0 0 3H17v6H3V11h2.5a1.5 1.5 0 0 0 0-3H3V3h5z';
   // a file deleted on disk stays open: an italic name, and the tooltip says why
@@ -320,10 +321,19 @@
     {#if v}
       <div class="content"><v.component {tab} pane={pi} /></div>
     {:else}
+      {@const pe = plugins.pluginOfView(tab.kind)}
       <div class="content off" role="status">
         <svg width="28" height="28" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={OFF_ICON} /></svg>
-        <b>Функция выключена</b>
-        <span>Вкладка «{label(tab)}» появится снова, когда функцию включат.</span>
+        {#if pe?.manifest}
+          <b>Плагин «{pe.manifest.name}» выключен</b>
+          {#if pe.problems.length}<span>{pe.problems[0]}</span>
+          {:else if plugins.failed.has(pe.manifest.id)}<span>После ошибки: {plugins.failed.get(pe.manifest.id)}</span>
+          {:else}<span>Вкладка «{label(tab)}» вернётся, когда плагин включат.</span>
+            <button class="on" onclick={() => void plugins.setEnabled(pe.manifest!.id, true)}>Включить</button>{/if}
+        {:else}
+          <b>Функция выключена</b>
+          <span>Вкладка «{label(tab)}» появится снова, когда функцию включат.</span>
+        {/if}
       </div>
     {/if}
   {:else if file && tab}
@@ -460,4 +470,5 @@
   .empty .sub { font-size: 12px; color: var(--fg3); }
   .off { align-items: center; justify-content: center; gap: 8px; color: var(--fg2); text-align: center; padding: 24px; }
   .off b { color: var(--fg); font-size: 15px; }
+  .off .on { margin-top: 6px; height: 30px; padding: 0 14px; border: 0; border-radius: 7px; background: var(--acc); color: var(--onacc); font-weight: 600; }
 </style>
