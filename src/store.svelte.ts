@@ -20,6 +20,7 @@ import {
   type GoalSource, type NewGoal, type Quarter, type SourceGoals,
 } from './goals';
 import { byDay, entriesIn, hasDated, isoDay, type CalEntry, type Layer } from './calIndex';
+import { DEFAULT_CAL, insertEntry, moveEntry, readCal, withCal, type CalSettings, type NewEntry } from './calEdit';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
 
@@ -359,6 +360,7 @@ class Store {
     this.inboxCfg = readInbox(parsed?.inbox);
     this.goalSources = readGoals(parsed?.goals);
     this.goalSettings = readGoalSettings(parsed?.goalSettings);
+    this.calCfg = readCal(parsed?.calendar);
     // only the statuses make the notes be read again; agendas alone do not
     const same = JSON.stringify(config) === JSON.stringify(this.config);
     this.config = config;
@@ -1919,8 +1921,71 @@ class Store {
   }
   /** ⌘3: the calendar in the active pane; the navigator shows its layers and files. */
   showCalendarHere() {
-    openCalendar(this.layout, this.layout.active);
+    openCalendar(this.layout, this.layout.active, this.calCfg.view);
     this.setNavMode('calendar');
+  }
+  // ---- «Настройки → Календарь» (`calendar` in config.json), moving and making entries -----------------------------
+  calCfg = $state.raw<CalSettings>(DEFAULT_CAL);
+  async setCal(c: Partial<CalSettings>) {
+    const next = { ...this.calCfg, ...c };
+    this.calCfg = next;
+    return this.updateConfig((raw) => withCal(raw, next));
+  }
+  /** What the calendar changed in this session, for ⌘Z in it. */
+  private calUndo: { path: string; before: string; after: string }[][] = [];
+  /** An entry dropped on a day (and a time in the week): its date is changed in the file, on disk at once. */
+  async calMove(e: { path: string; line: number; layer: Layer | 'undated' }, to: Date, time?: string | null): Promise<boolean> {
+    const f = this.files.find((x) => x.path === e.path);
+    if (!f) return false;
+    const text = moveEntry(f.text, e.line, e.layer, to, weekdayNames(f.text), { time, keepDeadline: this.calCfg.keepDeadline });
+    if (text === f.text) return false;
+    const done = await this.writeSteps([{ path: f.path, text }]);
+    if (!done) return false;
+    this.calUndo.push(done);
+    this.note('Дата изменена', [{ label: 'Отменить', run: () => void this.undoCal() }]);
+    return true;
+  }
+  /** ⌘Z in the calendar: the last move or new entry is taken back (if the file was not changed since). */
+  async undoCal(): Promise<boolean> {
+    const step = this.calUndo.pop();
+    if (!step) return false;
+    if (await this.undoStep(step)) return true;
+    this.calUndo.push(step);
+    return false;
+  }
+  /** Where a new task or event goes: the file as set (or the last one / the Inbox) and the heading. */
+  calTarget(kind: 'task' | 'event'): { file: NoteFile | undefined; heading: string } {
+    const c = this.calCfg;
+    const set = kind === 'task' ? c.taskFile : c.eventFile;
+    const last = c.pick === 'last' ? c.last[kind] : null;
+    const byName = (n: string | null) => (n ? this.files.find((x) => x.name === n) : undefined);
+    return { file: byName(last) ?? byName(set) ?? this.inboxFile, heading: kind === 'task' ? c.taskHeading : c.eventHeading };
+  }
+  /** What is being dragged in the calendar (a chip, an event, a task of «Без даты»); the grab's offset in an event. */
+  calDrag = $state<{ path: string; line: number; layer: Layer | 'undated'; repeat: boolean; title: string; dy: number } | null>(null);
+  /** «+ Задача» / «+ Событие»: the quick entry of the calendar (null: closed). */
+  calNew = $state<{ kind: 'task' | 'event'; date: string; n: number } | null>(null);
+  openCalNew(kind: 'task' | 'event', date: string) {
+    this.calNew = { kind, date, n: Date.now() };
+  }
+  /** A new entry written into `file` (relative) as the settings say; on disk at once, ⌘Z in the calendar undoes it. */
+  async calCreate(e: Omit<NewEntry, 'status' | 'dateKind' | 'minutes'>, file: string): Promise<boolean> {
+    const f = this.files.find((x) => x.name === file);
+    if (!f || !e.title.trim()) return false;
+    const c = this.calCfg;
+    const open = f.wf.sequences.flatMap((s) => s.states.map((x) => x.name));
+    const status =
+      e.kind === 'task'
+        ? c.taskStatus && f.wf.open.includes(c.taskStatus) ? c.taskStatus : startOf(sequenceFor(f.wf, null))
+        : c.eventStatus && open.includes(c.eventStatus) ? c.eventStatus : null;
+    const heading = e.kind === 'task' ? c.taskHeading : c.eventHeading;
+    const add = f === this.inboxFile ? this.inboxCfg.add : 'end';
+    const r = insertEntry(f.text, heading || null, { ...e, status, dateKind: c.dateKind, minutes: c.minutes }, weekdayNames(f.text), add);
+    const done = await this.writeSteps([{ path: f.path, text: r.text }]);
+    if (!done) return false;
+    this.calUndo.push(done);
+    if (c.last[e.kind] !== file) await this.setCal({ last: { ...c.last, [e.kind]: file } });
+    return true;
   }
   // ---- the calendar (ТЗ 24): layers and files shown, on this Mac -------------------------------------------------
   calLayers = $state<Layer[]>(readLayers());

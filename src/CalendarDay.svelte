@@ -22,6 +22,14 @@
   const wfOf = (e: CalEntry) => store.files.find((f) => f.path === e.path)?.wf;
   const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
   const WD = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+  /** «work › Календарь»: where a new entry goes. */
+  const place = (kind: 'task' | 'event') => {
+    const t = store.calTarget(kind);
+    if (!t.file) return null;
+    return [t.file.name.replace(/\.org$/, '').split('/').join(' › '), t.heading].filter(Boolean).join(' › ');
+  };
+  const tPlace = $derived(place('task'));
+  const ePlace = $derived(place('event'));
   const when = (iso: string) => {
     const d = fromIso(iso);
     return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}, ${WD[d.getDay()]}`;
@@ -48,6 +56,20 @@
       <p class="none">На этот день ничего нет</p>
     {/each}
   </div>
+  <div class="add">
+    <button onclick={() => c && store.openCalNew('task', c.date)}><b>+</b> Задача</button>
+    <button onclick={() => c && store.openCalNew('event', c.date)}><b>+</b> Событие</button>
+  </div>
+  <div class="where">
+    {#if !tPlace && !ePlace}
+      Файл для новых записей не выбран
+    {:else if tPlace === ePlace || store.calCfg.pick === 'ask'}
+      Создаётся в {tPlace ?? ePlace}
+    {:else}
+      Задачи — в {tPlace ?? 'Inbox'}, события — в {ePlace ?? 'Inbox'}
+    {/if}
+    · <button class="link" onclick={() => store.openSettings('Календарь')}>Изменить в настройках</button>
+  </div>
   {#if ahead.length}
     <div class="sep"></div>
     <div class="cap">ВПЕРЕДИ</div>
@@ -73,6 +95,11 @@
   .pr { color: var(--wait); }
   .w { font-size: 11.5px; color: var(--fg2); }
   .none { margin: 0; color: var(--fg2); font-size: 12.5px; }
+  .add { display: flex; gap: 6px; margin-top: 10px; }
+  .add button { flex: 1; height: 28px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); font-size: 12.5px; font-weight: 500; }
+  .add b { color: var(--acc); font-weight: 700; }
+  .where { font-size: 11.5px; color: var(--fg2); line-height: 1.45; }
+  .link { border: 0; padding: 0; background: transparent; color: var(--acc); font-size: 11.5px; }
   .sep { height: 1px; background: var(--line); margin: 8px 0; }
   .ah { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 4px 0; border: 0; background: transparent; color: var(--fg); text-align: left; }
 </style>

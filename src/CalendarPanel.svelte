@@ -31,15 +31,20 @@
   {:else}
     <p class="hint">Дат в файлах пока нет.</p>
   {/each}
+  {#if store.calCfg.undated}
   <div class="cap">БЕЗ ДАТЫ</div>
   {#each tasks as t (t.path + t.line)}
-    <button class="ud" title="{t.title} — {base(t.file)}" onclick={() => store.openCalEntry(t)}>
+    <button class="ud" title="{t.title} — {base(t.file)}" onclick={() => store.openCalEntry(t)} draggable="true"
+      ondragstart={(e) => { store.calDrag = { path: t.path, line: t.line, layer: 'undated', repeat: false, title: t.title, dy: 0 }; e.dataTransfer?.setData('text/plain', t.title); }}
+      ondragend={() => (store.calDrag = null)}>
       <span class="kw tone-chip" style={wfOf(t.path) ? toneStyle(toneFor(t.keyword, wfOf(t.path)!)) : ''}>{t.keyword}</span>
       <span class="t">{t.priority ? `[#${t.priority}] ` : ''}{t.title}</span>
     </button>
   {:else}
     <p class="hint">Все открытые задачи с датой.</p>
   {/each}
+  {#if tasks.length}<p class="hint drag">Перетащите задачу на нужный день</p>{/if}
+  {/if}
 </nav>
 
 <style>
@@ -54,4 +59,6 @@
   .kw { flex: 0 0 auto; padding: 1px 5px; border-radius: 4px; font-size: 10px; font-weight: 700; }
   .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .hint { margin: 0; padding: 2px 4px; font-size: 11.5px; color: var(--fg2); }
+  .hint.drag { padding-top: 6px; color: var(--fg3); }
+  .ud[draggable='true'] { cursor: grab; }
 </style>

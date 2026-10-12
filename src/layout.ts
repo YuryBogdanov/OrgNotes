@@ -116,14 +116,14 @@ export function openAgenda(L: Layout, pi: number): Tab {
 }
 
 /** «Календарь» (ТЗ 24): the calendar tab of the pane (made if there is none), as the agenda: one per pane. */
-export function openCalendar(L: Layout, pi: number): Tab {
+export function openCalendar(L: Layout, pi: number, view: 'month' | 'week' = 'month'): Tab {
   const p = L.panes[pi];
   const i = p.tabs.findIndex((t) => t.kind === 'calendar');
   if (i >= 0) {
     p.active = i;
     return p.tabs[i];
   }
-  const t = calendarTab();
+  const t = calendarTab(view);
   insertAfterActive(p, t);
   return t;
 }
@@ -131,7 +131,7 @@ const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
-export const calendarTab = (): Tab => ({ ...newTab('calendar'), calendar: { view: 'month', date: today() } });
+export const calendarTab = (view: 'month' | 'week' = 'month'): Tab => ({ ...newTab('calendar'), calendar: { view, date: today() } });
 
 /** «Цели»: the goals tab of the pane shows `key` (made if there is none). */
 export function openGoals(L: Layout, pi: number, key: string): Tab {
