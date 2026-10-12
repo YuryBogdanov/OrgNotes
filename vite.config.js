@@ -5,7 +5,12 @@ import { fileURLToPath } from 'node:url';
 export default defineConfig({
   plugins: [svelte()],
   // the plugins' API (ТЗ 26): the only module a plugin imports
-  resolve: { alias: { '@panopticon/api': fileURLToPath(new URL('./src/api/index.ts', import.meta.url)) } },
+  resolve: {
+    alias: [
+      { find: /^@panopticon\/api$/, replacement: fileURLToPath(new URL('./src/api/index.ts', import.meta.url)) },
+      { find: /^@panopticon\/api\/org$/, replacement: fileURLToPath(new URL('./src/api/org.ts', import.meta.url)) },
+    ],
+  },
   test: { include: ['src/**/*.test.ts'] },
   clearScreen: false,
   server: {

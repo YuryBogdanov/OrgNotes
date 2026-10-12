@@ -22,7 +22,8 @@
   const cal0 = start === 'calendar' ? store.calReq : null;
   let step: Step = $state(
     cal0 ? calStep(cal0, () => cal0.plate ?? null)
-    : start === 'goto' ? gotoStep() : start === 'newFile' ? nameStep(ctx, 'file') : start === 'newFolder' ? nameStep(ctx, 'folder') : start && start !== 'calendar' ? headingStep(ctx, start) : mainStep(ctx),
+    : start === 'step' && store.stepReq ? store.stepReq
+    : start === 'goto' ? gotoStep() : start === 'newFile' ? nameStep(ctx, 'file') : start === 'newFolder' ? nameStep(ctx, 'folder') : start && start !== 'calendar' && start !== 'step' ? headingStep(ctx, start) : mainStep(ctx),
   );
   let q = $state(step.initial ?? '');
   let sel = $state(0); // an index into the selectable rows

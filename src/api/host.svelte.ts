@@ -8,9 +8,10 @@ import { untrack } from 'svelte';
 import { store } from '../store.svelte';
 import { openView } from '../layout';
 import { register as registerPalette } from '../commands';
-import { registerAction, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf } from '../views';
+import { registerAction, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf, viewOf } from '../views';
+import { fuzzy } from '../fuzzy';
 import { runAgenda, statusKey, type Agenda, type Cond as CoreCond } from '../agendas';
-import { DEFAULT_SEQUENCE, type Heading, type WorkflowDef } from '../org';
+import { DEFAULT_SEQUENCE, DEFAULT_WORKFLOW, namedFor, type Heading, type WorkflowDef } from '../org';
 import { parseTheme, type Theme } from '../themes';
 import { displayName } from '../names';
 import type { Tx as CoreTx } from '../journal';
@@ -18,7 +19,7 @@ import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSc
 import { builtinEntries, declareKeys, entries, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, REVIEW_SCOPE, type Entry, type Listed } from './declare';
 import PluginsSettings from '../PluginsSettings.svelte';
 import { hostAllowed, hostOf, type Manifest, type ManifestSettings } from './manifest';
-import type { Ctx, Dispose, EventName, FormSpec, HeadingInfo, HeadingRef, Place, Plugin, Query, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
+import type { Ctx, Dispose, Named, SheetSpec, EventName, FormSpec, HeadingInfo, HeadingRef, Place, Plugin, Query, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
 import PluginNav from '../PluginNav.svelte';
 import PluginReview from '../PluginReview.svelte';
@@ -82,6 +83,8 @@ class Host {
   form = $state<FormReq | null>(null);
   place = $state<PlaceReq | null>(null);
   review = $state<ReviewRun | null>(null);
+  sheetReq = $state<{ plugin: string; spec: SheetSpec; resolve: (button: string | null) => void } | null>(null);
+  menuReq = $state<{ plugin: string; x: number; y: number; items: { label: string; action: () => void; danger?: boolean; disabled?: boolean }[] } | null>(null);
   private dynamic = new SvelteMap<string, { options?(v: Values): CoreOpt[]; hint?(v: Values): string }>();
   private disposers = new Map<string, Dispose[]>();
   private plugins = new Map<string, Plugin>();
@@ -155,7 +158,7 @@ class Host {
       fileOf: () => this.reviewHeading()?.file.path,
       onGone: () => this.endReview(false, true),
     });
-    store.addSheet(() => !!(this.form || this.place));
+    store.addSheet(() => !!(this.form || this.place || this.sheetReq));
   }
 
   // ---- the review -------------------------------------------------------------------------------------------------
@@ -395,6 +398,8 @@ class Host {
     untrack(() => {
       if (this.form?.plugin === id) (this.form.resolve(null), (this.form = null));
       if (this.place?.plugin === id) (this.place.resolve(null), (this.place = null));
+      if (this.sheetReq?.plugin === id) this.sheetReq.resolve(null);
+      if (this.menuReq?.plugin === id) this.menuReq = null;
       if (this.review?.plugin === id) this.endReview(false);
       for (const d of (this.disposers.get(id) ?? []).reverse()) {
         try {
@@ -432,12 +437,41 @@ class Host {
     const declared = (kind: string, ok: boolean, x: string) => {
       if (!ok) throw new Error(`${kind} «${x}» нет в манифесте`);
     };
+    // the command handlers, and which are not available now (ТЗ 27: «Новая цель…» while there are no goals)
+    const handlers = new Map<string, () => void>();
+    const offs = new Map<string, () => void>();
+    const off_ = new Set<string>();
+    let sets: Dispose[] = [];
     const ctx: Ctx = {
       id,
       commands: {
         on: (cmd, run) => {
           declared('команды', m.contributes.commands.some((c) => c.id === cmd), cmd);
-          return keep(registerAction(cmd, () => this.guard(id, () => run(), undefined)));
+          const act = () => this.guard(id, () => run(), undefined);
+          handlers.set(cmd, act);
+          let off = off_.has(cmd) ? () => {} : registerAction(cmd, act);
+          offs.set(cmd, () => off());
+          return keep(() => {
+            off();
+            handlers.delete(cmd);
+            off = () => {};
+          });
+        },
+        setAvailable: (cmd, on) => {
+          declared('команды', m.contributes.commands.some((c) => c.id === cmd), cmd);
+          if (on === !off_.has(cmd)) return;
+          if (on) {
+            off_.delete(cmd);
+            const act = handlers.get(cmd);
+            if (act) {
+              const off = registerAction(cmd, act);
+              offs.set(cmd, off);
+              keep(off);
+            }
+          } else {
+            off_.add(cmd);
+            offs.get(cmd)?.();
+          }
         },
         run: async (cmd, arg) => {
           if (m.contributes.commands.some((c) => c.id === cmd)) return void actionOf(cmd)?.();
@@ -499,10 +533,51 @@ class Host {
             this.review = { plugin: id, spec, refs: spec.items.map((r) => ({ ...r })), cur: 0, done: 0, resolved: false, resolve };
             openView(store.layout, store.layout.active, REVIEW_KIND, () => ({}), (t) => this.redraw.set(t.id, (this.redraw.get(t.id) ?? 0) + 1));
           }),
+        sheet: (spec) =>
+          new Promise((resolve) => {
+            this.sheetReq?.resolve(null);
+            this.sheetReq = { plugin: id, spec, resolve: (b) => ((this.sheetReq = null), resolve(b)) };
+          }),
+        menu: (items, at) => {
+          this.menuReq = { plugin: id, x: at.x, y: at.y, items: items.map((it) => ({ label: it.label, danger: it.danger, disabled: it.disabled, action: () => this.guard(id, () => it.run(), undefined) })) };
+        },
+        choose: (o) =>
+          new Promise((resolve) => {
+            let done = false;
+            const NOTHING = { id: 'none', group: '', title: 'Ничего не найдено' };
+            store.openStep({
+              placeholder: o.placeholder ?? o.title,
+              plate: () => ({ kind: 'text', text: o.title }),
+              rows: (q) => {
+                const rows = o.items
+                  .map((it) => ({ it, m: q.trim() ? fuzzy(q, it.label) : null }))
+                  .filter((x) => !q.trim() || x.m)
+                  .map(({ it, m }) => ({ id: 'choose:' + it.id, group: o.title.toUpperCase(), title: it.label, at: m?.at, hint: it.hint, run: () => void ((done = true), resolve(it.id)) }));
+                return rows.length ? rows : [NOTHING];
+              },
+            });
+            const stop = watch(() => store.palette, (p) => {
+              if (p) return;
+              stop();
+              if (!done) resolve(null);
+            });
+          }),
+        close: (v) => {
+          declared('вида', m.contributes.views.some((x) => x.id === v), v);
+          for (let pi = store.layout.panes.length - 1; pi >= 0; pi--)
+            for (let ti = store.layout.panes[pi].tabs.length - 1; ti >= 0; ti--) if (store.layout.panes[pi]?.tabs[ti]?.kind === v) void store.closeTab(pi, ti);
+        },
         notify: (text, actions) => store.note(text, actions?.map((a) => ({ label: a.label, run: () => this.guard(id, () => a.run(), undefined) })), actions?.length ? 8000 : 4000),
       },
       storage: { folder: this.storeOf(id, 'folder', 'data', keep), local: this.storeOf(id, 'local', 'data', keep) },
       events: { on: (e, fn) => keep(this.listen(id, e, fn)) },
+      statusSets: {
+        set: (defs) => {
+          for (const d of sets) d();
+          sets = defs.map((d) => keep(store.registerStatusSet(id, { name: String(d.name), states: d.states.map((x) => ({ name: String(x.name), done: !!x.done })) }, () => this.live(id))));
+          store.refreshStatusSets();
+        },
+      },
       settings: {
         values: () => this.settingsValues(m),
         onChange: (fn) => keep(watch(() => this.settingsValues(m), (v) => this.guard(id, () => fn(v), undefined))),
@@ -540,6 +615,14 @@ class Host {
           return f ? f.headings.map((h) => infoOf(f, h)) : [];
         },
         files: async () => store.files.map((f) => ({ path: f.name, title: displayName(f.name) })),
+        statusTone: async (kw, path) => {
+          const f = fileOf(path);
+          return f && kw ? (namedFor(kw, f.wf) as Named) : null;
+        },
+        workflow: async (path) => {
+          const f = fileOf(path);
+          return { open: [...(f?.wf.open ?? DEFAULT_WORKFLOW.open)], done: [...(f?.wf.done ?? DEFAULT_WORKFLOW.done)] };
+        },
       };
     if (can('files.read') || can('files.edit'))
       ctx.files = {
@@ -551,13 +634,14 @@ class Host {
       };
     if (can('files.edit'))
       ctx.edit = {
-        transaction: async (label, build) => {
+        transaction: async (label, build, o = {}) => {
           let t: CoreTx | null = null;
           const ev: Changed[] = [];
+          const onUndo = o.onUndo ? () => this.guard(id, () => o.onUndo!(), undefined) : undefined;
           const step = await store.transaction(label, (tx) => {
             t = tx;
             build(apiTx(tx, ev));
-          });
+          }, onUndo);
           const tx = t as CoreTx | null;
           if (step) {
             for (const [r, w] of ev) this.headingChanged(r, w);
@@ -778,6 +862,17 @@ function coreCommand(cmd: string, arg: unknown) {
     }
     case 'agenda.open':
       return store.showAgendaHere();
+    case 'heading.status': {
+      // the palette's statuses for the heading: the caret goes to it in the tab shown (its file must be the tab's)
+      const f = a.ref ? fileOf(a.ref.path) : undefined;
+      const h = f && a.ref ? findHeading(f.headings, a.ref) : undefined;
+      const t = store.tab;
+      if (!f || !h || !t) throw new Error('заголовок не найден');
+      const shown = t.kind === 'file' ? t.path : viewOf(t.kind)?.fileOf?.(t);
+      if (shown !== f.path) throw new Error('файл заголовка не показан во вкладке');
+      store.setTabCursor(t, h.line, 0);
+      return store.openPalette('status');
+    }
   }
   throw new Error(`нет команды «${cmd}»`);
 }
@@ -797,6 +892,16 @@ function apiTx(tx: CoreTx, ev: Changed[]) {
     replaceBody: (h: HeadingRef, org: string) => (tx.replaceBody(coreRef(h), org), ev.push([h, 'body'])),
     move: (h: HeadingRef, to: { under: HeadingRef } | { file: string }) => (tx.move(coreRef(h), 'under' in to ? { under: coreRef(to.under) } : { file: corePath(to.file) }), ev.push([h, 'moved'])),
     remove: (h: HeadingRef) => (tx.remove(coreRef(h)), ev.push([h, 'removed'])),
+    update: (path: string, fn: (text: string) => string | null) =>
+      tx.update(corePath(path), (t) => {
+        try {
+          const r = fn(t);
+          return typeof r === 'string' ? r : null;
+        } catch (err) {
+          tx.error = err instanceof Error ? err.message : String(err);
+          return null;
+        }
+      }),
   };
 }
 
