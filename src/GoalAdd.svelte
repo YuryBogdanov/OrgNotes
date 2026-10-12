@@ -1,16 +1,15 @@
 <script lang="ts">
   import { goals } from './features/goals.svelte';
-  import { tick } from 'svelte';
   import { store } from './store.svelte';
-  import { better, fuzzy } from './fuzzy';
+  import PlacePicker from './PlacePicker.svelte';
   import { SOURCE_HEADING, avatarColor, findSource, initials, readSource, sourceKey, sourceSummary, goalsWord } from './goals';
 
-  // «Добавить цели» (ТЗ 23, 2.3): a file, then its level-1 heading where the goals are; the name in the navigator,
-  // «Это мои цели». The same sheet changes the heading of a source («Сменить заголовок…»).
+  // «Добавить цели» (ТЗ 23, 2.3): a file, then its level-1 heading where the goals are — the core's choice of a place
+  // (PlacePicker, the columns); the name in the navigator, «Это мои цели». The same sheet changes the heading of a
+  // source («Сменить заголовок…»).
   const req = goals.goalAdd!;
   const NEW = '\u0000new';
 
-  let q = $state('');
   let file = $state<string | null>(req.file ?? null); // relative name
   let head = $state<string | null>(null);
   let name = $state('');
@@ -21,16 +20,13 @@
 
   const mineNow = $derived(goals.goalSources.find((s) => s.me));
   const base = (n: string) => n.split('/').pop()!.replace(/\.org$/, '');
-  const files = $derived(
-    store.files
-      .map((f) => ({ f, m: q.trim() ? fuzzy(q, f.name) : null }))
-      .filter((x) => !q.trim() || x.m)
-      .sort((a, b) => (a.m && b.m ? (better(a.m, b.m) ? -1 : better(b.m, a.m) ? 1 : 0) : a.f.name.localeCompare(b.f.name, 'ru')))
-      .map((x) => x.f),
-  );
   const noteOf = (rel: string) => {
     const s = goals.goalSources.filter((x) => x.file === rel && sourceKey(x) !== req.replace);
     return s.some((x) => x.me) ? 'мои цели' : s.length ? 'уже в целях' : 'не добавлен';
+  };
+  const fileNote = (rel: string) => {
+    const text = noteOf(rel);
+    return { text, dim: text !== 'не добавлен' };
   };
   const cur = $derived(store.files.find((f) => f.name === file));
   const heads = $derived(cur ? cur.headings.map((h, i) => ({ h, i })).filter((x) => x.h.level === 1) : []);
@@ -83,20 +79,11 @@
   }
   const close = () => (goals.goalAdd = null);
 
-  // ---- keyboard: ↑↓ in the list in focus, ↩ adds, ⎋ closes -----------------------------------------------------
-  let col = $state<'file' | 'head'>(req.replace || req.file ? 'head' : 'file');
-  function move(d: 1 | -1) {
-    if (col === 'file') {
-      const i = files.findIndex((f) => f.name === file);
-      const n = files[Math.max(0, Math.min(files.length - 1, i + d))];
-      if (n) pickFile(n.name);
-    } else {
-      const opts = [...heads.map((x) => x.h.title), ...(canNew ? [NEW] : [])];
-      const i = opts.indexOf(head ?? '');
-      head = opts[Math.max(0, Math.min(opts.length - 1, i + d))] ?? head;
-    }
-    void tick().then(() => document.querySelector('.gadd .sel')?.scrollIntoView({ block: 'nearest' }));
-  }
+  // ---- keyboard: ↑↓ in the list in focus (the picker's), ↩ adds, ⎋ closes ------------------------------------------
+  let picker: PlacePicker | undefined = $state();
+  $effect(() => {
+    if (picker) picker.focusList(req.replace || req.file ? 'head' : 'file');
+  });
   function key(e: KeyboardEvent) {
     if (confirmMe) {
       if (e.key === 'Escape') {
@@ -113,11 +100,9 @@
       void add();
     } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && (e.target as HTMLElement).dataset.list !== 'no') {
       e.preventDefault();
-      move(e.key === 'ArrowDown' ? 1 : -1);
+      picker?.move(e.key === 'ArrowDown' ? 1 : -1);
     }
   }
-  let search: HTMLInputElement | undefined = $state();
-  void tick().then(() => search?.focus());
 </script>
 
 <div class="scrim" aria-hidden="true"></div>
@@ -128,42 +113,9 @@
     <span>Выберите файл и заголовок первого уровня, под которым хранятся цели человека</span>
   </header>
   <div class="body">
-    <div class="cols">
-      <div class="col" class:focus={col === 'file'}>
-        <span class="cap">1. ФАЙЛ</span>
-        <label class="search">
-          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5" /><path d="M13.2 13.2L17 17" /></svg>
-          <input bind:this={search} bind:value={q} placeholder="Файл…" aria-label="Файл" spellcheck="false" autocomplete="off" onfocus={() => (col = 'file')} />
-        </label>
-        <div class="list" role="listbox" aria-label="Файлы">
-          {#each files as f (f.path)}
-            {@const note = noteOf(f.name)}
-            <button role="option" aria-selected={file === f.name} class:sel={file === f.name} class:dim={note !== 'не добавлен'}
-              onclick={() => { col = 'file'; pickFile(f.name); }}>
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" /></svg>
-              <b>{base(f.name)}</b><span class="path">{f.name.split('/').slice(0, -1).join(' › ')}</span><span class="nt">{note}</span>
-            </button>
-          {:else}
-            <span class="empty">Ничего не найдено</span>
-          {/each}
-        </div>
-      </div>
-      <div class="col" class:focus={col === 'head'}>
-        <span class="cap">2. ЗАГОЛОВОК 1-ГО УРОВНЯ{cur ? ` · ${base(cur.name)}` : ''}</span>
-        <div class="list" role="listbox" aria-label="Заголовки первого уровня">
-          {#if !cur}<span class="empty">Сначала выберите файл</span>{/if}
-          {#each heads as x (x.i)}
-            {@const sum = sourceSummary(cur!.text, cur!.headings, x.i)}
-            <button role="option" aria-selected={head === x.h.title} class:sel={head === x.h.title} onclick={() => { col = 'head'; head = x.h.title; }}>
-              <span class="lv" aria-hidden="true"></span><span class="ht">{x.h.title}</span><span class="nt">{sum}</span>
-            </button>
-          {/each}
-          {#if canNew}
-            <button role="option" aria-selected={head === NEW} class="new" class:sel={head === NEW} onclick={() => { col = 'head'; head = NEW; }}>+ Создать «{SOURCE_HEADING}» в конце файла</button>
-          {/if}
-        </div>
-      </div>
-    </div>
+    <PlacePicker bind:this={picker} variant="columns" levels={[1]} {file} heading={head} headCap="2. ЗАГОЛОВОК 1-ГО УРОВНЯ" {fileNote}
+      headNote={(f, i) => sourceSummary(f.text, f.headings, i)} extra={canNew ? { id: NEW, label: `+ Создать «${SOURCE_HEADING}» в конце файла` } : null}
+      onfile={(rel) => pickFile(rel)} onhead={(id) => (head = id)} />
     <div class="more">
       <div class="left">
         <label class="fld">
@@ -217,26 +169,6 @@
   header b { font-size: 15px; }
   header span { font-size: 12px; color: var(--fg2); }
   .body { flex: 1 1 0; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
-  .cols { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--line); min-height: 260px; }
-  .col { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 14px 14px 12px; }
-  .col + .col { border-left: 1px solid var(--line); }
-  .cap { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; color: var(--fg2); }
-  .search { display: flex; align-items: center; gap: 7px; height: 28px; box-sizing: border-box; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; color: var(--fg3); }
-  .search:focus-within { border-color: var(--acc); }
-  .search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--fg); font-size: 13px; padding: 0; -webkit-user-select: text; user-select: text; }
-  .list { display: flex; flex-direction: column; gap: 1px; max-height: 300px; overflow: auto; }
-  .list button { flex: 0 0 30px; display: flex; align-items: center; gap: 8px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--fg); text-align: left; font-size: 13px; }
-  .list button.dim { color: var(--fg2); }
-  .list button.sel { background: var(--acc); color: var(--onacc); }
-  .col:not(.focus) .list button.sel { background: var(--sel); color: var(--fg); }
-  .list button:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
-  .path { flex: 1; min-width: 0; font-size: 12px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .nt { font-size: 11px; opacity: 0.85; white-space: nowrap; }
-  .ht { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lv { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 2px; background: var(--h1); }
-  .sel .lv { background: currentColor; }
-  .list .new { margin-top: 4px; border: 1px dashed var(--line); color: var(--acc); }
-  .empty { padding: 6px 8px; color: var(--fg3); font-size: 12.5px; }
   .more { display: flex; flex-wrap: wrap; gap: 16px; padding: 14px 20px; }
   .left, .right { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
   .right { gap: 6px; }
