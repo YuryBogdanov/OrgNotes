@@ -20,8 +20,8 @@ import {
   type GoalSource, type NewGoal, type Quarter, type SourceGoals,
 } from './goals';
 import { byDay, entriesIn, hasDated, isoDay, type CalEntry, type Layer } from './calIndex';
-import { effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
-import { BUILTIN, type Appearance, type AppearanceChoice, type Theme } from './themes';
+import { cachedTheme, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
+import { BUILTIN, DEFAULT_THEME, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
 import { DEFAULT_CAL, insertEntry, moveEntry, readCal, withCal, type CalSettings, type NewEntry } from './calEdit';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
@@ -1934,15 +1934,105 @@ class Store {
   /** macOS is dark (for «Системное»); followed while the app runs. */
   systemDark = $state(isSystemDark());
   themeNames = $state<Record<Appearance, string>>(readThemeNames());
-  /** Every theme to choose from: the built-in ones (own themes come in part 2). */
+  /** Own themes: `themes/*.json` in the app's config folder (ТЗ 25 §4). */
+  ownThemes = $state.raw<Theme[]>([]);
+  /** Every theme to choose from: the built-in ones, then the own ones by name. */
   get themes(): Theme[] {
-    return BUILTIN;
+    return [...BUILTIN, ...this.ownThemes];
+  }
+  /** The own themes have been read (till then a chosen own theme is the one cached at the last run). */
+  themesRead = $state(false);
+  async loadThemes() {
+    if (!isTauri) return void (this.themesRead = true);
+    const texts = await invoke<string[]>('list_themes').catch(() => [] as string[]);
+    const seen = new Set<string>();
+    this.ownThemes = texts
+      .map(parseTheme)
+      .filter((t): t is Theme => !!t && !BUILTIN.some((b) => b.name === t.name) && !seen.has(t.name) && !!seen.add(t.name))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    this.themesRead = true;
+  }
+  private async saveTheme(t: Theme): Promise<boolean> {
+    try {
+      if (isTauri) await invoke('write_theme', { file: themeFile(t.name), text: themeJson(t) });
+      return true;
+    } catch (e) {
+      this.say('Не удалось сохранить тему: ' + e);
+      return false;
+    }
+  }
+  private putTheme(t: Theme, replace?: string) {
+    this.ownThemes = [...this.ownThemes.filter((x) => x.name !== t.name && x.name !== replace), t].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  }
+  /** «+ Новая тема», «Дублировать», editing a built-in one: an own copy, saved and chosen for its appearance. */
+  async copyTheme(t: Theme): Promise<Theme | null> {
+    const c = copyOf(t, this.themes.map((x) => x.name));
+    if (!(await this.saveTheme(c))) return null;
+    this.putTheme(c);
+    this.setThemeName(c.appearance, c.name);
+    return c;
+  }
+  /** «Переименовать»: the file follows the name; a taken name gets «(2)». Null: nothing to do. */
+  async renameTheme(t: Theme, to: string): Promise<string | null> {
+    const name = to.trim().slice(0, 80);
+    if (t.builtin || !name || name === t.name) return null;
+    const n = uniqueName(name, this.themes.filter((x) => x.name !== t.name).map((x) => x.name));
+    const next = { ...t, name: n };
+    if (!(await this.saveTheme(next))) return null;
+    if (themeFile(n) !== themeFile(t.name) && isTauri) await invoke('delete_theme', { file: themeFile(t.name) }).catch(() => {});
+    this.putTheme(next, t.name);
+    for (const a of ['light', 'dark'] as const) if (this.themeNames[a] === t.name) this.setThemeName(a, n);
+    return n;
+  }
+  /** «Удалить» (own themes only): a chosen one gives way to the built-in Panopticon theme of its appearance. */
+  async deleteTheme(t: Theme) {
+    if (t.builtin) return;
+    try {
+      if (isTauri) await invoke('delete_theme', { file: themeFile(t.name) });
+    } catch (e) {
+      return this.say('Не удалось удалить тему: ' + e);
+    }
+    this.ownThemes = this.ownThemes.filter((x) => x.name !== t.name);
+    for (const a of ['light', 'dark'] as const) if (this.themeNames[a] === t.name) this.setThemeName(a, DEFAULT_THEME[a]);
+  }
+  /** «Экспорт…»: the theme's file where the system save panel says. */
+  async exportTheme(t: Theme) {
+    if (!isTauri) return;
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const path = await save({ title: 'Экспорт темы', defaultPath: themeFile(t.name), filters: [{ name: 'Тема Panopticon', extensions: ['json'] }] });
+    if (!path) return;
+    try {
+      await invoke('export_text', { path, text: themeJson({ ...t, builtin: false }) });
+      this.note(`Тема «${t.name}» сохранена`);
+    } catch (e) {
+      this.say('Не удалось сохранить тему: ' + e);
+    }
+  }
+  /** «Импорт…»: a theme file of this format becomes an own theme (a taken name gets «(2)»). */
+  async importTheme() {
+    if (!isTauri) return;
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const path = await open({ title: 'Импорт темы', multiple: false, directory: false, filters: [{ name: 'Тема Panopticon', extensions: ['json'] }] });
+    if (typeof path !== 'string') return;
+    let t: Theme | null = null;
+    try {
+      t = parseTheme(await invoke<string>('import_text', { path }));
+    } catch (e) {
+      return this.say('Не удалось прочитать файл: ' + e);
+    }
+    if (!t) return this.say('Это не тема Panopticon: нужен файл .json с "format": "panopticon-theme"');
+    const it = { ...t, name: uniqueName(t.name, this.themes.map((x) => x.name)) };
+    if (!(await this.saveTheme(it))) return;
+    this.putTheme(it);
+    this.note(`Тема «${it.name}» добавлена — ${it.appearance === 'dark' ? 'для тёмного оформления' : 'для светлого оформления'}`);
   }
   get appearance(): Appearance {
     return effective(this.appearanceChoice, this.systemDark);
   }
   themeFor(a: Appearance): Theme {
-    return themeNamed(this.themeNames[a], a, this.themes);
+    const name = this.themeNames[a];
+    if (!this.themesRead && !this.themes.some((t) => t.name === name)) return cachedTheme(a, name) ?? themeNamed(name, a);
+    return themeNamed(name, a, this.themes);
   }
   /** The editor theme in effect now. */
   get theme(): Theme {

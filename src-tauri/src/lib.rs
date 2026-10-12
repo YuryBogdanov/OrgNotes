@@ -936,6 +936,69 @@ fn save_new_file(state: State<AppState>, parent: String, name: String, text: Str
     save_new_in(&root_of(&state)?, &parent, &name, &text, overwrite)
 }
 
+// ---- editor themes (ТЗ 25): own themes are `<name>.json` in the app's config folder, `themes/` -----------------
+
+fn themes_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?.join("themes");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+/// A theme's file name as the page made it: a plain `<name>.json`, nothing that leaves the folder.
+fn theme_file(dir: &Path, file: &str) -> Result<PathBuf, String> {
+    if file.is_empty() || file.starts_with('.') || file.contains(['/', '\\', ':']) || !file.ends_with(".json") {
+        return Err("bad theme file name".into());
+    }
+    Ok(dir.join(file))
+}
+
+/// The text of every own theme.
+#[tauri::command]
+fn list_themes(app: AppHandle) -> Vec<String> {
+    let Ok(dir) = themes_dir(&app) else { return vec![] };
+    let Ok(rd) = fs::read_dir(dir) else { return vec![] };
+    let mut out: Vec<(String, String)> = rd
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "json"))
+        .filter_map(|p| Some((p.file_name()?.to_string_lossy().into_owned(), fs::read_to_string(&p).ok()?)))
+        .collect();
+    out.sort();
+    out.into_iter().map(|(_, t)| t).collect()
+}
+
+#[tauri::command]
+fn write_theme(app: AppHandle, file: String, text: String) -> Result<(), String> {
+    let p = theme_file(&themes_dir(&app)?, &file)?;
+    let tmp = p.with_extension("json.tmp");
+    fs::write(&tmp, text).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, &p).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_theme(app: AppHandle, file: String) -> Result<(), String> {
+    let p = theme_file(&themes_dir(&app)?, &file)?;
+    match fs::remove_file(&p) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
+        _ => Ok(()),
+    }
+}
+
+/// «Экспорт…»: the path comes from the system save panel.
+#[tauri::command]
+fn export_text(path: String, text: String) -> Result<(), String> {
+    fs::write(path, text).map_err(|e| e.to_string())
+}
+
+/// «Импорт…»: the path comes from the system open panel; a theme is small, anything big is refused.
+#[tauri::command]
+fn import_text(path: String) -> Result<String, String> {
+    let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
+    if meta.len() > 256 * 1024 {
+        return Err("файл слишком большой".into());
+    }
+    fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
 /// Quit after the page has asked about unsaved tabs.
 #[tauri::command]
 fn quit_app(app: AppHandle) {
@@ -1052,7 +1115,12 @@ pub fn run() {
             move_entry,
             trash_entry,
             set_capture_shortcut,
-            show_main_window
+            show_main_window,
+            list_themes,
+            write_theme,
+            delete_theme,
+            export_text,
+            import_text
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

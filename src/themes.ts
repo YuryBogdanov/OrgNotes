@@ -160,3 +160,54 @@ export function asNamed(c: unknown): Named | undefined {
   if (/^#[0-9a-f]{6}$/i.test(c)) return nearestNamed(c);
   return undefined;
 }
+
+// ---- own themes: the file format of ТЗ 25 §4 ----------------------------------------------------------------------
+
+const COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const KEYS = ['bg', 'fg', 'dim', 'curLine', 'selection', 'cursor', 'h1', 'h2', 'h3', 'h4', 'date', 'tag', 'link', 'meta', 'code'] as const;
+const DEEP = ['h5', 'h6', 'h7', 'h8', 'h9'] as const;
+/** `#rgb` → `#rrggbb`, lower case. */
+const full = (c: string) => (c.length === 4 ? '#' + [...c.slice(1)].map((x) => x + x).join('') : c).toLowerCase();
+
+/** A theme from its file: unknown keys ignored, missing colours from the Panopticon theme of its appearance; null
+ *  when it is not a Panopticon theme at all. */
+export function parseTheme(text: string): Theme | null {
+  let v: any;
+  try {
+    v = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!v || typeof v !== 'object' || v.format !== 'panopticon-theme' || typeof v.name !== 'string' || !v.name.trim()) return null;
+  const c = v.colors && typeof v.colors === 'object' ? v.colors : {};
+  const ok = (x: unknown): x is string => typeof x === 'string' && COLOR.test(x);
+  const appearance: Appearance = v.appearance === 'dark' || v.appearance === 'light' ? v.appearance : ok(c.bg) && lum(full(c.bg)) < 0.18 ? 'dark' : 'light';
+  const base = builtinFor(appearance).colors;
+  const colors: ThemeColors = { ...base, palette: { ...base.palette } };
+  for (const k of KEYS) if (ok(c[k])) colors[k] = full(c[k]);
+  for (const k of DEEP) if (ok(c[k])) colors[k] = full(c[k]);
+  for (const n of NAMED) if (ok(c.palette?.[n])) colors.palette[n] = full(c.palette[n]);
+  return { name: v.name.trim().slice(0, 80), appearance, builtin: false, basedOn: typeof v.basedOn === 'string' ? v.basedOn : undefined, colors };
+}
+/** The file text of a theme. */
+export function themeJson(t: Theme): string {
+  const colors: Record<string, unknown> = {};
+  for (const k of KEYS) colors[k] = t.colors[k];
+  for (const k of DEEP) if (t.colors[k]) colors[k] = t.colors[k];
+  colors.palette = { ...t.colors.palette };
+  return JSON.stringify({ format: 'panopticon-theme', version: 1, name: t.name, appearance: t.appearance, ...(t.basedOn ? { basedOn: t.basedOn } : {}), colors }, null, 2) + '\n';
+}
+/** The file of an own theme: its name with the characters a file name cannot have replaced. */
+export const themeFile = (name: string) => name.replace(/[/\\:]/g, '-').replace(/^\.+/, '').trim() + '.json';
+/** A name no other theme has: «<name>», else «<name> (2)», «<name> (3)»… */
+export function uniqueName(name: string, taken: string[]): string {
+  const low = new Set(taken.map((x) => themeFile(x).toLowerCase()));
+  if (!low.has(themeFile(name).toLowerCase())) return name;
+  const base = name.replace(/ \(\d+\)$/, '');
+  for (let i = 2; ; i++) if (!low.has(themeFile(`${base} (${i})`).toLowerCase())) return `${base} (${i})`;
+}
+/** A copy of a theme to make one's own: «Nord — моя», based on the theme copied. */
+export function copyOf(t: Theme, taken: string[]): Theme {
+  const name = uniqueName(t.builtin ? `${t.name} — моя` : t.name, taken);
+  return { name, appearance: t.appearance, builtin: false, basedOn: t.builtin ? t.name : (t.basedOn ?? t.name), colors: { ...t.colors, palette: { ...t.colors.palette } } };
+}

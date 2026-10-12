@@ -94,6 +94,30 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             const name = args.path.split('/').pop();
             return { name, path: args.path, shown: args.path.replace(/^\/Users\/[^/]+/, '~'), org, folders: dirs.size, other: keys.length - org, capped: !!w.__big, big: !!w.__big };
           }
+          // own editor themes (ТЗ 25): files under /config/themes/; the save panel answers from __savePicks
+          if (cmd === 'list_themes') return Object.keys(disk).filter((k) => k.startsWith('/config/themes/')).sort().map((k) => disk[k]);
+          if (cmd === 'write_theme') {
+            disk['/config/themes/' + args.file] = args.text;
+            w.__log.push(['write_theme', args.file]);
+            return;
+          }
+          if (cmd === 'delete_theme') {
+            delete disk['/config/themes/' + args.file];
+            w.__log.push(['delete_theme', args.file]);
+            return;
+          }
+          if (cmd === 'export_text') {
+            disk[args.path] = args.text;
+            return;
+          }
+          if (cmd === 'import_text') {
+            if (!(args.path in disk)) throw 'нет такого файла';
+            return disk[args.path];
+          }
+          if (cmd === 'plugin:dialog|save') {
+            w.__log.push(['save_panel', args.options]);
+            return (w.__savePicks ?? []).shift() ?? null;
+          }
           if (cmd === 'plugin:dialog|open') {
             w.__log.push(['pick', args.options]);
             return (w.__picks ?? []).shift() ?? null;

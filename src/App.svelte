@@ -35,12 +35,16 @@
   // window of the app (the quick entry) takes a change made in this one
   $effect(() => applyAppearance(store.appearanceChoice, store.appearance, store.theme));
   onMount(() => {
+    void store.loadThemes(); // own themes: a chosen one shows once they are read
     const mq = matchMedia('(prefers-color-scheme: dark)');
     const sys = () => (store.systemDark = mq.matches);
     mq.addEventListener('change', sys);
     const other = (e: StorageEvent) => {
       if (e.key === 'appearance') store.appearanceChoice = readChoice();
-      else if (e.key?.startsWith('theme:')) store.themeNames = readThemeNames();
+      else if (e.key?.startsWith('theme:')) {
+        store.themeNames = readThemeNames();
+        void store.loadThemes(); // a theme made in the other window
+      }
     };
     window.addEventListener('storage', other);
     return () => {

@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { store } from './store.svelte';
+  import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import type { Appearance, AppearanceChoice, Theme } from './themes';
 
   // «Настройки → Оформление» (ТЗ 25): the appearance of the app, and the editor theme for the light and for the
@@ -33,7 +35,62 @@
     store.setThemeName(a, list[i].name);
     queueMicrotask(() => document.querySelector<HTMLElement>(`[data-theme-card="${a}:${list[i].name}"]`)?.focus());
   }
+
+  // ---- own themes (part 2): «+ Новая тема», the menu of a card, renaming in place, deleting --------------------------
+  let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  let renaming = $state<string | null>(null); // the theme whose name is edited
+  let draft = $state('');
+  let confirmDel = $state<Theme | null>(null);
+  async function rename(t: Theme) {
+    renaming = t.name;
+    draft = t.name;
+    await tick();
+    const el = document.querySelector<HTMLInputElement>('input.rn');
+    el?.focus();
+    el?.select();
+  }
+  async function commitRename() {
+    const t = store.themes.find((x) => x.name === renaming);
+    renaming = null;
+    if (t) await store.renameTheme(t, draft);
+  }
+  async function newTheme(a: Appearance) {
+    const c = await store.copyTheme(store.themeFor(a));
+    if (c) await rename(c);
+  }
+  async function duplicate(t: Theme) {
+    const c = await store.copyTheme(t);
+    if (c) await rename(c);
+  }
+  function openMenu(e: MouseEvent, t: Theme) {
+    e.preventDefault();
+    menu = {
+      x: e.clientX, y: e.clientY,
+      items: [
+        { label: 'Дублировать', action: () => void duplicate(t) },
+        { label: 'Переименовать', action: () => void rename(t), disabled: t.builtin },
+        { label: 'Экспорт…', action: () => void store.exportTheme(t) },
+        'sep',
+        { label: 'Удалить', action: () => (confirmDel = t), danger: true, disabled: t.builtin },
+      ],
+    };
+  }
+  /** The sheet is moved by a transform, which would hold `position: fixed` inside it: the menu and the dialog go to
+   *  the body. */
+  function portal(node: HTMLElement) {
+    document.body.appendChild(node);
+    return { destroy: () => node.remove() };
+  }
+  // ⎋ closes what is open here first, not the whole settings sheet
+  function escFirst(e: KeyboardEvent) {
+    if (e.key !== 'Escape' || !(menu || renaming || confirmDel)) return;
+    e.preventDefault();
+    if (renaming && !menu) renaming = null;
+    if (confirmDel && !menu) confirmDel = null;
+  }
 </script>
+
+<svelte:window onkeydowncapture={escFirst} />
 
 {#snippet win(w: typeof WIN.light)}
   <span class="half" style="background:{w.bg}">
@@ -71,22 +128,51 @@
         {#each list as t (t.name)}
           {@const on = t.name === cur}
           {@const c = t.colors}
-          <button class="card" role="radio" aria-checked={on} aria-label={t.name} class:on data-theme-card="{s.a}:{t.name}" tabindex={on ? 0 : -1} onclick={() => store.setThemeName(s.a, t.name)}>
-            <span class="pv" style="background:{c.bg}">
-              <span style="color:{c.h1};font-weight:700">* Q4 2026</span>
-              <span style="padding-left:1.2ch;color:{c.h2};font-weight:700">* <span style="color:{c.palette.red}">TODO</span> Бюджет</span>
-              <span style="padding-left:3.2ch;color:{c.dim}">SCHED <span style="color:{c.date}">&lt;10-14&gt;</span></span>
-              <span style="padding-left:2.2ch;color:{c.h3};font-weight:700">* <span style="color:{c.palette.green}">DONE</span> Заявки</span>
-              <span style="padding-left:3.2ch;color:{c.fg}">Текст <span style="color:{c.link};text-decoration:underline">ссылка</span></span>
-              {#if on}<span class="check" aria-hidden="true">✓</span>{/if}
-            </span>
-            <span class="nm"><span class="tn">{t.name}</span><span class="tag">{t.builtin ? 'встроенная' : 'своя'}</span></span>
-          </button>
+          <div class="cell" oncontextmenu={(e) => openMenu(e, t)} role="presentation">
+            <button class="card" role="radio" aria-checked={on} aria-label={t.name} class:on data-theme-card="{s.a}:{t.name}" tabindex={on ? 0 : -1} onclick={() => store.setThemeName(s.a, t.name)}>
+              <span class="pv" style="background:{c.bg}">
+                <span style="color:{c.h1};font-weight:700">* Q4 2026</span>
+                <span style="padding-left:1.2ch;color:{c.h2};font-weight:700">* <span style="color:{c.palette.red}">TODO</span> Бюджет</span>
+                <span style="padding-left:3.2ch;color:{c.dim}">SCHED <span style="color:{c.date}">&lt;10-14&gt;</span></span>
+                <span style="padding-left:2.2ch;color:{c.h3};font-weight:700">* <span style="color:{c.palette.green}">DONE</span> Заявки</span>
+                <span style="padding-left:3.2ch;color:{c.fg}">Текст <span style="color:{c.link};text-decoration:underline">ссылка</span></span>
+                {#if on}<span class="check" aria-hidden="true">✓</span>{/if}
+              </span>
+            </button>
+            {#if renaming === t.name}
+              <input class="rn" aria-label="Название темы" bind:value={draft} spellcheck="false" maxlength="80"
+                onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void commitRename(); } }} onblur={() => void commitRename()} />
+            {:else}
+              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+              <span class="nm" onclick={() => store.setThemeName(s.a, t.name)} ondblclick={() => !t.builtin && rename(t)}><span class="tn">{t.name}</span><span class="tag">{t.builtin ? 'встроенная' : 'своя'}</span></span>
+            {/if}
+          </div>
         {/each}
+        <button class="new" onclick={() => void newTheme(s.a)} title="Копия «{cur}» — её можно переименовать и изменить"><span class="plus">+</span><span>Новая тема</span></button>
+      </div>
+      <div class="acts">
+        <button class="ghost" onclick={() => void store.importTheme()}>Импорт…</button>
+        <span class="hint">Правый клик по теме — дублировать, переименовать, экспорт, удалить</span>
       </div>
     </div>
   {/each}
 </section>
+
+{#if menu}<div use:portal><ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} /></div>{/if}
+{#if confirmDel}
+  {@const t = confirmDel}
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <div class="modal" use:portal onmousedown={() => (confirmDel = null)}>
+    <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Удаление темы" tabindex="-1" onmousedown={(e) => e.stopPropagation()}>
+      <h2>Удалить тему «{t.name}»?</h2>
+      <p>Файл темы удаляется из папки тем. {store.themeFor(t.appearance).name === t.name ? `Редактор вернётся к теме «${t.appearance === 'dark' ? 'Panopticon тёмная' : 'Panopticon светлая'}».` : ''}</p>
+      <div class="btns">
+        <button onclick={() => (confirmDel = null)}>Отмена</button>
+        <button class="danger-b" onclick={() => { const x = t; confirmDel = null; void store.deleteTheme(x); }}>Удалить</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .look { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
@@ -108,14 +194,29 @@
   .wtext { flex: 1; padding: 8% 7%; display: flex; flex-direction: column; gap: 9%; }
   .wtext i { height: 7%; min-height: 3px; border-radius: 2px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; outline: none; }
-  .card { display: flex; flex-direction: column; gap: 6px; padding: 0; border: 0; background: transparent; color: var(--fg); text-align: left; min-width: 0; }
+  .cell { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .card { display: flex; flex-direction: column; padding: 0; border: 0; background: transparent; color: var(--fg); text-align: left; min-width: 0; }
+  .rn { height: 22px; margin: -1px 0; padding: 0 6px; border: 1.5px solid var(--acc); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; -webkit-user-select: text; user-select: text; outline: none; }
+  .new { min-height: 102px; box-sizing: border-box; border: 1.5px dashed var(--line); border-radius: 9px; background: transparent; color: var(--acc); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; align-self: start; aspect-ratio: auto; }
+  .new .plus { font-size: 20px; line-height: 1; }
+  .new:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  .acts { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
+  .ghost { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
+  .hint { font-size: 11.5px; color: var(--fg3); }
+  .modal { position: fixed; inset: 0; z-index: 110; background: rgba(0, 0, 0, 0.28); display: flex; align-items: flex-start; justify-content: center; padding-top: 14vh; }
+  .dlg { width: 420px; max-width: calc(100% - 32px); padding: 18px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); outline: none; }
+  .dlg h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  .dlg p { margin: 0 0 14px; color: var(--fg2); line-height: 1.45; font-size: 12.5px; }
+  .btns { display: flex; justify-content: flex-end; gap: 8px; }
+  .btns button { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--field); color: var(--fg); }
+  .btns .danger-b { background: var(--todo); color: var(--onacc); font-weight: 600; }
   .pv { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 9px 10px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 9px; font: 10px/14px var(--mono); white-space: nowrap; overflow: hidden; }
   .card.on .pv { border: 2px solid var(--acc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 22%, transparent); padding: 8px 9px; }
   .card:focus-visible { outline: none; }
   .card:focus-visible .pv { box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 45%, transparent); }
   .check { position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; border-radius: 8px; background: var(--acc); color: var(--onacc); font: 700 10px var(--ui); display: flex; align-items: center; justify-content: center; }
   /* the mark goes under the name when both do not fit */
-  .nm { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; padding: 0 2px; }
+  .nm { cursor: default; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; padding: 0 2px; }
   .tn { flex: 1 0 auto; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; }
   .card.on .tn { font-weight: 600; }
   .tag { font-size: 11px; color: var(--fg3); }
