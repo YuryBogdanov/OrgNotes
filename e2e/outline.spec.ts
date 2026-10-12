@@ -71,16 +71,20 @@ test('Option+Shift+Enter starts the new heading as a task', async ({ page }) => 
   await expect.poll(async () => doc(page)).toContain('* Gamma\n* TODO Plan\n');
 });
 
-test('Option+Left/Right promote and demote the heading with its whole subtree', async ({ page }) => {
+test('Option+Left/Right promote and demote the heading alone; with Shift, the whole subtree', async ({ page }) => {
   await open(page);
   await place(page, 'Alpha one', 'end');
   // "Alpha one" matches "Alpha one deep" too: pick the exact level-2 line
   await page.locator('.cm-line', { hasText: /^\*\* Alpha one$/ }).click();
   await page.keyboard.press('End');
-  await page.keyboard.press('Alt+ArrowRight');
+  await page.keyboard.press('Alt+ArrowRight'); // the heading alone: «Alpha one deep» stays at level 3
+  await expect.poll(async () => doc(page)).toContain('*** Alpha one\none body\n*** Alpha one deep\n** Alpha two');
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect.poll(async () => doc(page)).toContain('** Alpha one\none body\n*** Alpha one deep\n** Alpha two');
+  await page.keyboard.press('Alt+Shift+ArrowRight'); // with its subtree
   await expect.poll(async () => doc(page)).toContain('*** Alpha one\none body\n**** Alpha one deep\n** Alpha two');
-  await page.keyboard.press('Alt+ArrowLeft');
-  await page.keyboard.press('Alt+ArrowLeft');
+  await page.keyboard.press('Alt+Shift+ArrowLeft');
+  await page.keyboard.press('Alt+Shift+ArrowLeft');
   await expect.poll(async () => doc(page)).toContain('* Alpha one\none body\n** Alpha one deep\n** Alpha two');
   // a level-1 heading cannot go higher: nothing happens, no word jump either
   const before = await doc(page);
@@ -276,4 +280,15 @@ test.describe('status rotation', () => {
     await expect(page.locator('.cm-line', { hasText: 'текс' })).toHaveText('тексX'); // the selected last letter was replaced
     expect(await firstLine(page)).toBe('* Заметка');
   });
+});
+
+test('the bug: a new heading after «1-1 meetings», then ⌥→ — the meetings below stay its siblings', async ({ page }) => {
+  await installTauriMock(page, { '/mock/Keys.org': '* Employee\n** 1-1 meetings\n*** Second 1-1 meeting\n*** First 1-1 meeting\n' });
+  await page.goto('/');
+  await page.locator('.cm-line', { hasText: '1-1 meetings' }).click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Alt+Enter');
+  await page.keyboard.type('Third 1-1 meeting');
+  await page.keyboard.press('Alt+ArrowRight');
+  await expect.poll(async () => doc(page)).toBe('* Employee\n** 1-1 meetings\n*** Third 1-1 meeting\n*** Second 1-1 meeting\n*** First 1-1 meeting\n');
 });

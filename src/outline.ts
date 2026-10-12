@@ -106,7 +106,7 @@ export function insertHeading(text: string, caret: number, opts: { todo?: string
   return { changes: [{ from: caret, to: caret, insert: '\n' + prefix }], caret: caret + 1 + prefix.length };
 }
 
-// ---- M-left / M-right (whole subtree) ------------------------------------------
+// ---- M-left / M-right: the heading alone; M-S-left / M-S-right: with its subtree ----------
 
 /** Promote (delta -1) or demote (+1) the heading under the caret together with everything below it. */
 export function shiftSubtree(text: string, caret: number, delta: -1 | 1): Result | null {
@@ -122,6 +122,16 @@ export function shiftSubtree(text: string, caret: number, delta: -1 | 1): Result
     changes.push(delta > 0 ? { from: s, to: s, insert: '*' } : { from: s, to: s + 1, insert: '' });
   }
   return { changes, caret: Math.max(c.starts[ln], caret + delta) };
+}
+
+/** Promote (-1) or demote (+1) only the heading under the caret, as org-do-promote: what is below it stays. */
+export function shiftHeading(text: string, caret: number, delta: -1 | 1): Result | null {
+  const c = ctx(text);
+  const ln = lineAt(c, caret);
+  if (!c.real.has(ln)) return null;
+  if (delta < 0 && levelOf(c, ln) === 1) return null;
+  const s = c.starts[ln];
+  return { changes: [delta > 0 ? { from: s, to: s, insert: '*' } : { from: s, to: s + 1, insert: '' }], caret: Math.max(s, caret + delta) };
 }
 
 // ---- M-up / M-down --------------------------------------------------------------
