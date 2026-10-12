@@ -79,6 +79,95 @@ export default definePlugin({
       ctx.ui.notify(`Разбор «Привет»: ${res.done} из ${res.total}${res.finished ? '' : ', не закончен'}`);
     });
 
+    // ТЗ 27 §2.3 (roadmap 2.1 B): a review of its own on the core's frame — the header, the quick buttons, a panel with
+    // a note being written (saved before the card changes), its own «Следующая» and summary
+    ctx.commands.on('hello.review2', async () => {
+      const tasks = await openTasks(ctx);
+      let draft = '';
+      let notes = 0;
+      const writeNote = async (h: HeadingInfo) => {
+        const text = draft.trim();
+        if (!text) return false;
+        const r = await ctx.edit!.transaction('Привет: заметка в разборе', (tx) =>
+          tx.update(h.ref.path, (t) => {
+            const lines = t.split('\n');
+            const hd = parseHeadings(t, { open: [], done: [] }).find((x) => x.line === h.ref.line);
+            if (!hd) return null;
+            lines.splice(hd.line + 1, 0, `- ${text}`);
+            return lines.join('\n');
+          }), { onUndo: () => (notes = Math.max(0, notes - 1)) });
+        if (r !== 'ok') return false;
+        draft = '';
+        notes++;
+        return true;
+      };
+      const res = await ctx.ui.review({
+        title: 'Разбор с заметками',
+        items: tasks.map((t) => t.ref),
+        width: 1000,
+        noSkip: true,
+        head: (root, card) => void root.append(
+          el('span', { className: 'hello-av' }, card.heading.title.slice(0, 1)),
+          el('b', { className: 'hello-rh' }, `${card.heading.title} · ${card.index + 1} из ${card.total}`),
+          el('span', { className: 'hello-pill' }, card.heading.keyword ?? '—'),
+        ),
+        quick: (root, card) => void root.append(el('button', { type: 'button', onclick: () => void ctx.commands.run('heading.status', { ref: card.heading.ref }) }, el('span', {}, 'Статус'), el('span', { className: 'hello-qv' }, card.heading.keyword ?? '—'))),
+        aside: (root, card) => {
+          const area = el('div', { className: 'hello-aside' });
+          root.append(el('div', { className: 'hello-cap' }, 'ЗАМЕТКА'), area);
+          const w = ctx.ui.widget(area, { type: 'textarea', key: 'n', label: 'Заметка', placeholder: 'Что обсудили…' }, draft, (v) => {
+            draft = String(v ?? '');
+            ctx.ui.currentReview()?.update(); // «Записать заметку» on or off
+          });
+          void card;
+          return () => w.dispose();
+        },
+        beforeStep: async (h) => void (await writeNote(h)),
+        actions: [
+          { id: 'note', label: 'Записать заметку', kind: 'primary', command: 'hello.reviewNote', disabled: () => !draft.trim(), run: async (h) => ((await writeNote(h)), 'stay' as const) },
+          { id: 'done', label: 'Выполнено', sub: 'DONE', kind: 'ok', command: 'hello.reviewDone', disabled: (h) => h.done, run: async (h) => ((await ctx.edit!.transaction('Привет: выполнено', (tx) => tx.setStatus(h.ref, 'DONE'))) === 'ok' ? 'next' : 'stay') },
+          { id: 'next', label: 'Следующая', command: 'hello.reviewNext', run: () => 'next' },
+        ],
+        summary: (root, r) => void root.append(
+          el('p', { className: 'hello-sum' }, `Заметок: ${notes}, разобрано ${r.done} из ${r.total}`),
+          el('button', { type: 'button', className: 'hello-end', onclick: () => r.end() }, 'Готово'),
+        ),
+      });
+      ctx.ui.notify(`Разбор с заметками: ${notes} заметок, ${res.finished ? 'закончен' : 'не закончен'}`);
+    });
+
+    // a sheet drawn whole by the plugin, with a calendar of the core in it
+    ctx.commands.on('hello.ownSheet', async () => {
+      const r = await ctx.ui.sheet({
+        title: 'Свой лист',
+        bare: true,
+        render: (root, sheet) => {
+          let day: unknown = null;
+          const box = el('div', { className: 'hello-sheet' });
+          box.setAttribute('role', 'dialog');
+          box.setAttribute('aria-label', 'Свой лист');
+          box.tabIndex = -1;
+          const cal = el('div', { className: 'hello-cal' });
+          const said = el('p', { className: 'hello-day' }, 'День не выбран');
+          box.append(el('h3', {}, 'Свой лист'), cal, said,
+            el('div', { className: 'hello-foot' },
+              el('button', { type: 'button', onclick: () => sheet.close() }, 'Отмена'),
+              el('button', { type: 'button', className: 'pri', onclick: () => sheet.close(String(day ?? 'none')) }, 'Готово')));
+          box.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') (e.preventDefault(), sheet.close());
+          });
+          root.append(box);
+          const w = ctx.ui.widget(cal, { type: 'date', key: 'd', label: 'День', look: 'inline' }, null, (v) => {
+            day = v;
+            said.textContent = `День: ${v}`;
+          });
+          box.focus();
+          return () => w.dispose();
+        },
+      });
+      ctx.ui.notify('Свой лист: ' + (r ?? 'отмена'));
+    });
+
     // ТЗ 27 (roadmap 2.1 A): the core's extension points for plugins with their own structure in a file
     // a set of statuses from code
     ctx.statusSets.set([{ name: 'Идеи', states: [{ name: 'IDEA', done: false }, { name: 'DOING', done: false }, { name: 'SHIPPED', done: true }] }]);

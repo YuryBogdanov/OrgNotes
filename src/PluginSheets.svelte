@@ -77,7 +77,7 @@
     const d = plugins.guard(r.plugin, () => r.spec.render(node, { close: (b?: string) => r.resolve(b ?? null) }), undefined);
     void tick().then(() => {
       // ⎋ and ↩ reach the sheet: its primary button takes the focus (as a macOS sheet), else the sheet itself
-      if (!node.contains(document.activeElement)) ((node.parentElement?.querySelector('footer .pri') ?? node.parentElement) as HTMLElement | null)?.focus();
+      if (!r.spec.bare && !node.contains(document.activeElement)) ((node.parentElement?.querySelector('footer .pri') ?? node.parentElement) as HTMLElement | null)?.focus();
     });
     return () => {
       plugins.guard(r.plugin, () => d?.(), undefined);
@@ -87,7 +87,7 @@
   // on the window: the focus may come back to the editor after the palette that opened the sheet
   function sheetKey(e: KeyboardEvent) {
     const r = plugins.sheetReq;
-    if (!r || plugins.form || plugins.trustReq) return;
+    if (!r || r.spec.bare || plugins.form || plugins.trustReq) return; // a bare sheet keeps its own keys
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
@@ -158,6 +158,10 @@
 {/if}
 {#each plugins.sheetReq ? [plugins.sheetReq] : [] as r (r)}
   <div class="scrim" aria-hidden="true"></div>
+  {#if r.spec.bare}
+    <!-- the plugin draws the whole sheet (its dialog, header, footer, keys) -->
+    <div class="bare" bind:this={sheetBody}></div>
+  {:else}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div class="pform psheet" role="dialog" aria-modal="true" aria-label={r.spec.title} tabindex="-1">
     <header><b>{r.spec.title}</b><span class="who">{plugins.name(r.plugin)}</span></header>
@@ -169,6 +173,7 @@
       </footer>
     {/if}
   </div>
+  {/if}
 {/each}
 {#if plugins.menuReq}
   <ContextMenu x={plugins.menuReq.x} y={plugins.menuReq.y} items={plugins.menuReq.items} onclose={() => (plugins.menuReq = null)} />
@@ -213,6 +218,8 @@
   footer button { height: 30px; padding: 0 14px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); }
   footer .pri { border: 0; background: var(--acc); color: var(--onacc); font-weight: 600; }
   .trust { z-index: 81; }
+  .bare { position: fixed; inset: 0; z-index: 81; pointer-events: none; }
+  .bare > :global(*) { pointer-events: auto; }
   .trust .body p { margin: 0; font-size: 13px; line-height: 1.5; }
   .trust .fine { color: var(--fg2); font-size: 12px; }
 </style>

@@ -5,9 +5,12 @@
   import { REVIEW_SCOPE } from './api/declare';
   import { store } from './store.svelte';
   import type { Tab } from './layout';
+  import type { CardRender, ReviewCard } from './api/index';
 
   // A plugin's review (ТЗ 26 §5.2, `ui.review`): the core's review by cards — one heading at a time, narrowed, the
-  // plugin's actions in the bar and on their keys (its commands in «"scope": "review"»), «Назад», the summary.
+  // plugin's actions in the bar and on their keys (its commands in «"scope": "review"»), «Назад», the summary. ТЗ 27
+  // §2.3: the plugin may draw the card's header, its quick buttons, a panel right of the editor and the summary, and
+  // fold lines of the editor — a review of its own on the core's frame (the goals' 1-1).
   let { tab }: { tab: Tab; pane: number } = $props();
 
   const r = $derived(plugins.review);
@@ -15,6 +18,12 @@
   const total = $derived(r?.refs.length ?? 0);
   const kbd = (cmd?: string) => (cmd ? store.keyHint(cmd) : '');
   const header = $derived(r && c && r.spec.header ? plugins.guard(r.plugin, () => r.spec.header!(c.info), '') : '');
+  const narrow = $derived(r && c && r.spec.narrow ? plugins.guard(r.plugin, () => r.spec.narrow!(c.info), {}) : {});
+  const off = (dis: ((h: never) => boolean) | undefined) => {
+    void plugins.reviewBar;
+    void plugins.reviewRedraw;
+    return !!(r && c && dis && plugins.guard(r.plugin, () => dis(c.info as never), false));
+  };
   const keys = {
     active: () => store.tab?.kind === REVIEW_KIND && !store.sheetOpen,
     run: (id: string) => {
@@ -24,6 +33,27 @@
       return true;
     },
   };
+  /** A card's part of the plugin: drawn for each card, and again when an action stays or the plugin asks. */
+  function part(node: HTMLElement, which: () => CardRender | undefined) {
+    let done: (() => void) | void;
+    const clean = $effect.root(() => {
+      $effect(() => {
+        void plugins.reviewRedraw;
+        const run = plugins.review;
+        const cur = plugins.reviewHeading();
+        const render = which();
+        if (!run || !cur || !render) return;
+        const card: ReviewCard = { heading: cur.info, index: run.cur, total: run.refs.length };
+        done = plugins.guard(run.plugin, () => render(node, card), undefined);
+        return () => {
+          if (done) plugins.guard(run.plugin, () => done!(), undefined);
+          done = undefined;
+          node.replaceChildren();
+        };
+      });
+    });
+    return { destroy: clean };
+  }
 
   // something of the plugin under the card: drawn again for each card
   let belowEl = $state<HTMLElement>();
@@ -38,23 +68,47 @@
       node.replaceChildren();
     };
   });
+
+  // the plugin's summary
+  let sumEl = $state<HTMLElement>();
+  $effect(() => {
+    const node = sumEl;
+    const run = plugins.review;
+    if (!node || !run?.spec.summary || run.cur >= 0) return;
+    const d = plugins.guard(run.plugin, () => run.spec.summary!(node, { total: run.refs.length, done: run.done, finished: true, end: () => plugins.endReview(true) }), undefined);
+    return () => {
+      plugins.guard(run.plugin, () => d?.(), undefined);
+      node.replaceChildren();
+    };
+  });
 </script>
 
-<CardReview cls="preview" scope={REVIEW_SCOPE} {keys}
+<CardReview cls="preview" scope={REVIEW_SCOPE} {keys} width={r?.spec.width ?? 820}
   state={r && r.cur >= 0 && c ? 'card' : r && r.cur < 0 ? 'summary' : 'empty'}
   cardKey={r && c ? r.cur + '|' + c.info.ref.path + '|' + c.info.ref.title : ''}
-  back={r ? { disabled: r.cur <= 0, run: () => plugins.reviewStep(-1), key: '' } : null}>
+  back={r ? { disabled: r.cur === 0, run: () => void plugins.reviewStep(-1), key: '' } : null}>
   {#snippet head()}
     {#if r && c}
-      <b>{r.spec.title} · {r.cur + 1} из {total}</b>
-      <span class="file">{c.file.name.split('/').pop()}</span>
-      {#if header}<span class="hd">{header}</span>{/if}
+      {#if r.spec.head}
+        <div class="ph" use:part={() => r.spec.head}></div>
+      {:else}
+        <b>{r.spec.title} · {r.cur + 1} из {total}</b>
+        <span class="file">{c.file.name.split('/').pop()}</span>
+        {#if header}<span class="hd">{header}</span>{/if}
+      {/if}
     {/if}
+  {/snippet}
+  {#snippet quick()}
+    {#if r?.spec.quick && c}<div class="pq" use:part={() => r.spec.quick}></div>{/if}
   {/snippet}
   {#snippet body()}
     {#if r && c}
-      <div class="ed">
-        <NarrowEditor file={c.file} line={c.heading.line} end={c.heading.end} {tab} fileKey={'preview|' + r.cur + '|' + c.file.path} />
+      <div class="cols" class:with={!!r.spec.aside}>
+        <div class="ed">
+          <NarrowEditor file={c.file} line={c.heading.line} end={c.heading.end} {tab} fileKey={'preview|' + r.cur + '|' + c.file.path}
+            folded={narrow.fold ?? []} lineNote={narrow.note ?? null} />
+        </div>
+        {#if r.spec.aside}<aside class="pa" use:part={() => r.spec.aside}></aside>{/if}
       </div>
     {/if}
   {/snippet}
@@ -64,20 +118,24 @@
   {#snippet actions()}
     {#if r && c}
       {#each r.spec.actions as a (a.id)}
-        <button class="a" onclick={() => void plugins.reviewAct(a.id)}>{a.label}{#if kbd(a.command)}<kbd>{kbd(a.command)}</kbd>{/if}</button>
+        <button class="a" class:pri={a.kind === 'primary'} class:ok={a.kind === 'ok'} disabled={off(a.disabled as never)} onclick={() => void plugins.reviewAct(a.id)}>{a.label}{#if a.sub}<span class="h">{a.sub}</span>{/if}{#if kbd(a.command)}<kbd>{kbd(a.command)}</kbd>{/if}</button>
       {/each}
-      <button class="a" onclick={() => plugins.reviewStep(1)}>Пропустить</button>
+      {#if !r.spec.noSkip}<button class="a" onclick={() => void plugins.reviewStep(1)}>Пропустить</button>{/if}
     {/if}
   {/snippet}
   {#snippet summary()}
     {#if r}
-      <p class="sum">Разобрано {r.done} из {total}. Всё уже записано в файлы.</p>
-      <button class="pri" onclick={() => plugins.endReview(true)}>Закончить</button>
+      {#if r.spec.summary}
+        <div class="psum" bind:this={sumEl}></div>
+      {:else}
+        <p class="sum">Разобрано {r.done} из {total}. Всё уже записано в файлы.</p>
+        <button class="pri" onclick={() => plugins.endReview(true)}>Закончить</button>
+      {/if}
     {/if}
   {/snippet}
   {#snippet empty()}
     {#if r && r.cur >= 0}
-      <div class="none">Заголовок «{r.refs[r.cur].title}» не найден: его переименовали или перенесли. <button onclick={() => plugins.reviewStep(1)}>Следующий</button></div>
+      <div class="none">Заголовок «{r.refs[r.cur].title}» не найден: его переименовали или перенесли. <button onclick={() => void plugins.reviewStep(1)}>Следующий</button></div>
     {:else}
       <div class="none">Разбор закончен.</div>
     {/if}
@@ -87,10 +145,19 @@
 <style>
   .file { color: var(--fg2); }
   .hd { margin-left: auto; color: var(--fg2); }
-  .ed { min-height: 240px; display: flex; flex-direction: column; }
+  .ph { display: contents; }
+  .pq { display: contents; }
+  .cols { display: flex; min-height: 240px; }
+  .cols.with { min-height: 360px; }
+  .ed { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .pa { flex: 0 0 340px; min-width: 0; border-left: 1px solid var(--line); display: flex; flex-direction: column; }
   .sum { margin: 0; color: var(--fg2); }
   .pri { height: 32px; padding: 0 16px; border: 0; border-radius: 7px; background: var(--acc); color: var(--onacc); font-weight: 600; }
   .none { margin-top: 40px; color: var(--fg2); }
   .none button { margin-left: 8px; }
   .below { width: 100%; max-width: 820px; margin-top: 14px; }
+  .psum { display: contents; }
+  :global(.preview .acts .a.pri) { background: var(--acc); color: var(--onacc); border-color: transparent; }
+  :global(.preview .acts .a.ok) { color: var(--done); }
+  :global(.preview .acts .a .h) { font-weight: 400; color: var(--fg2); font-size: 11.5px; }
 </style>

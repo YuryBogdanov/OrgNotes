@@ -23,6 +23,7 @@ import type { Ctx, Dispose, Named, SheetSpec, EventName, FormSpec, HeadingInfo, 
 import PluginView from '../PluginView.svelte';
 import PluginNav from '../PluginNav.svelte';
 import PluginReview from '../PluginReview.svelte';
+import { mountWidget } from './widgets.svelte';
 
 const isTauri = '__TAURI_INTERNALS__' in window;
 const invoke = async <T,>(cmd: string, args?: Record<string, unknown>) => (await import('@tauri-apps/api/core')).invoke<T>(cmd, args);
@@ -52,6 +53,8 @@ export interface ReviewRun {
   /** The card shown; -1: the summary. */
   cur: number;
   done: number;
+  /** The cards an action moved on from (a card gone back to counts once). */
+  doneAt: Set<number>;
   resolved: boolean;
   resolve: (r: ReviewResult) => void;
 }
@@ -175,6 +178,7 @@ class Host {
     const c = this.reviewHeading();
     const a = r?.spec.actions.find((x) => x.id === actionId);
     if (!r || !c || !a || this.failed.has(r.plugin)) return;
+    if (a.disabled && this.guard(r.plugin, () => a.disabled!(c.info), false)) return;
     let res: 'next' | 'stay' = 'stay';
     try {
       res = await a.run(c.info);
@@ -186,13 +190,33 @@ class Host {
     const now = this.reviewHeading();
     if (now) r.refs[r.cur] = now.info.ref; // it may have moved: the card keeps it
     if (res === 'next') {
-      r.done++;
-      this.reviewStep(1);
-    }
+      r.doneAt.add(r.cur);
+      r.done = r.doneAt.size;
+      await this.reviewStep(1);
+    } else this.reviewRedraw++;
   }
-  reviewStep(d: number) {
+  /** The card drawn again (the plugin's parts read the file anew). */
+  reviewRedraw = $state(0);
+  /** The bar read again (the actions' `disabled`). */
+  reviewBar = $state(0);
+  /** Another card; what the plugin is writing is saved first (`beforeStep`). */
+  async reviewStep(d: number) {
     const r = this.review;
     if (!r) return;
+    const c = this.reviewHeading();
+    if (c && r.spec.beforeStep) {
+      try {
+        await r.spec.beforeStep(c.info);
+      } catch (err) {
+        this.fail(r.plugin, err);
+        return;
+      }
+    }
+    if (this.review !== r) return;
+    if (r.cur < 0) {
+      if (d < 0) r.cur = r.refs.length - 1; // «Назад» from the summary
+      return;
+    }
     const n = r.cur + d;
     if (n < 0) return;
     r.cur = n < r.refs.length ? n : -1;
@@ -530,7 +554,7 @@ class Host {
           new Promise((resolve) => {
             this.endReview(false);
             if (!spec.items.length) return resolve({ total: 0, done: 0, finished: true });
-            this.review = { plugin: id, spec, refs: spec.items.map((r) => ({ ...r })), cur: 0, done: 0, resolved: false, resolve };
+            this.review = { plugin: id, spec, refs: spec.items.map((r) => ({ ...r })), cur: 0, done: 0, doneAt: new Set<number>(), resolved: false, resolve };
             openView(store.layout, store.layout.active, REVIEW_KIND, () => ({}), (t) => this.redraw.set(t.id, (this.redraw.get(t.id) ?? 0) + 1));
           }),
         sheet: (spec) =>
@@ -567,6 +591,11 @@ class Host {
           for (let pi = store.layout.panes.length - 1; pi >= 0; pi--)
             for (let ti = store.layout.panes[pi].tabs.length - 1; ti >= 0; ti--) if (store.layout.panes[pi]?.tabs[ti]?.kind === v) void store.closeTab(pi, ti);
         },
+        widget: (el, field, value, onChange) => mountWidget(id, el, field, value, onChange, (err) => this.fail(id, err)),
+        currentReview: () =>
+          this.review?.plugin === id
+            ? { step: (d) => this.reviewStep(d), redraw: () => void this.reviewRedraw++, update: () => void this.reviewBar++ }
+            : null,
         notify: (text, actions) => store.note(text, actions?.map((a) => ({ label: a.label, run: () => this.guard(id, () => a.run(), undefined) })), actions?.length ? 8000 : 4000),
       },
       storage: { folder: this.storeOf(id, 'folder', 'data', keep), local: this.storeOf(id, 'local', 'data', keep) },
