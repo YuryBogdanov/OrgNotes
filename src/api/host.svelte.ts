@@ -4,7 +4,7 @@
 // off until the restart and takes back all it registered.
 
 import { SvelteMap } from 'svelte/reactivity';
-import { untrack } from 'svelte';
+import { untrack, type Component } from 'svelte';
 import { store } from '../store.svelte';
 import { openView } from '../layout';
 import { register as registerPalette } from '../commands';
@@ -71,6 +71,8 @@ class Host {
   private declared = new Set<string>();
   /** The palette keeps its commands; one that has no action now is not offered. */
   private inPalette = new Set<string>();
+  /** A palette's row of a plugin is running: a `ui.choose` of it becomes the palette's next step. */
+  private stepCapture: { step: import('../commands').Step | null } | null = null;
   /** What the declared plugins still read (their themes). */
   private loading: Promise<void>[] = [];
   /** Turned off after an error (until the restart): the reason. */
@@ -87,7 +89,7 @@ class Host {
   place = $state<PlaceReq | null>(null);
   review = $state<ReviewRun | null>(null);
   sheetReq = $state<{ plugin: string; spec: SheetSpec; resolve: (button: string | null) => void } | null>(null);
-  menuReq = $state<{ plugin: string; x: number; y: number; items: { label: string; action: () => void; danger?: boolean; disabled?: boolean }[] } | null>(null);
+  menuReq = $state<{ plugin: string; x: number; y: number; items: ({ label: string; action: () => void; danger?: boolean; disabled?: boolean } | 'sep')[] } | null>(null);
   private dynamic = new SvelteMap<string, { options?(v: Values): CoreOpt[]; hint?(v: Values): string }>();
   private disposers = new Map<string, Dispose[]>();
   private plugins = new Map<string, Plugin>();
@@ -157,7 +159,7 @@ class Host {
     // the core's tab of a plugin's review; its sheets wait the window's keys
     registerView({
       kind: REVIEW_KIND, icon: 'M4 4h12v12H4zM7 8h6M7 11h4', component: PluginReview, transient: true, single: true,
-      label: () => this.review?.spec.title ?? 'Разбор', crumbs: () => [this.review?.spec.title ?? 'Разбор'],
+      label: () => this.review?.spec.title ?? 'Разбор', crumbs: () => this.review?.spec.crumbs ?? [this.review?.spec.title ?? 'Разбор'],
       fileOf: () => this.reviewHeading()?.file.path,
       onGone: () => this.endReview(false, true),
     });
@@ -254,17 +256,32 @@ class Host {
   private declareOne(m: Manifest) {
     const id = m.id;
     this.declared.add(id);
-    store.registerStorage(id);
+    if (!store.hasStorage(id)) store.registerStorage(id); // a migration from an old place may have registered it (ТЗ 27)
     if (store.loaded) void store.readFeatureFile(id); // declared after the folder was read (installed, turned on)
-    for (const c of m.contributes.commands.filter((x) => x.scope !== 'review' && !this.inPalette.has(x.id))) {
+    // not in the palette: a review's keys, and «Навигатор: …» (as the core's own sections)
+    const navKeys = new Set(m.contributes.navSections.map((n) => n.key).filter(Boolean));
+    for (const c of m.contributes.commands.filter((x) => x.scope !== 'review' && !navKeys.has(x.id) && !this.inPalette.has(x.id))) {
       this.inPalette.add(c.id);
       registerPalette({
         id: c.id, title: c.title, icon: 'plug', group: 'general', synonyms: c.synonyms,
-        when: () => !!actionOf(c.id), run: () => void setTimeout(() => actionOf(c.id)?.()), // once the palette is closed
+        when: () => !!actionOf(c.id),
+        run: () => {
+          // a command that asks in the palette: run now, its choice is the palette's next step (no gap to type into)
+          if (c.step) {
+            this.stepCapture = { step: null };
+            try {
+              actionOf(c.id)?.();
+              return this.stepCapture.step ?? undefined;
+            } finally {
+              this.stepCapture = null;
+            }
+          }
+          setTimeout(() => actionOf(c.id)?.()); // once the palette is closed (it gives the focus back)
+        },
       });
     }
     m.contributes.navSections.forEach((n, i) => {
-      this.keep(id, registerNav({ id: n.id, label: n.title, icon: n.icon, key: n.key, order: 100 + i, component: PluginNav }));
+      this.keep(id, registerNav({ id: n.id, label: n.title, icon: n.icon, key: n.key, order: 100 + i, component: PluginNav as unknown as Component }));
       if (n.key) this.keep(id, registerAction(n.key, () => this.showNav(n.id)));
     });
     for (const v of m.contributes.views) {
@@ -315,7 +332,7 @@ class Host {
     if (this.started) return;
     this.started = true;
     if (isTauri) await this.listInstalled();
-    for (const e of this.entries) if (e.enabled) await this.activate(e);
+    await Promise.all(this.entries.filter((e) => e.enabled).map((e) => this.activate(e))); // one slow to start keeps no other waiting
     await Promise.all(this.loading.splice(0)); // the plugins' themes are in
     store.pluginsReady = true;
     store.resetMissingThemes();
@@ -481,6 +498,7 @@ class Host {
             off = () => {};
           });
         },
+        keyOf: (cmd) => store.keyHint(cmd),
         setAvailable: (cmd, on) => {
           declared('команды', m.contributes.commands.some((c) => c.id === cmd), cmd);
           if (on === !off_.has(cmd)) return;
@@ -538,7 +556,8 @@ class Host {
           new Promise((resolve) => {
             let picked = false;
             store.openCalendar({
-              kind: 'DATE', initial: o.initial ?? new Date(), current: null, names: [], plate: { kind: 'text', text: o.title ?? 'Выбор даты' },
+              kind: o.kind ?? 'DATE', initial: o.initial ?? new Date(), current: o.current ?? null, names: o.names ?? [],
+              ...(o.title || !o.kind ? { plate: { kind: 'text' as const, text: o.title ?? 'Выбор даты' } } : {}),
               pick: (d) => {
                 picked = true;
                 resolve(new Date(d));
@@ -552,9 +571,9 @@ class Host {
           }),
         review: (spec) =>
           new Promise((resolve) => {
-            this.endReview(false);
+            this.endReview(false, true); // the earlier review answers; its tab is reused (closing it would race the new one)
             if (!spec.items.length) return resolve({ total: 0, done: 0, finished: true });
-            this.review = { plugin: id, spec, refs: spec.items.map((r) => ({ ...r })), cur: 0, done: 0, doneAt: new Set<number>(), resolved: false, resolve };
+            this.review = { plugin: id, spec, refs: spec.items.map((r) => ({ ...r })), cur: Math.min(Math.max(0, spec.start ?? 0), spec.items.length - 1), done: 0, doneAt: new Set<number>(), resolved: false, resolve };
             openView(store.layout, store.layout.active, REVIEW_KIND, () => ({}), (t) => this.redraw.set(t.id, (this.redraw.get(t.id) ?? 0) + 1));
           }),
         sheet: (spec) =>
@@ -563,23 +582,28 @@ class Host {
             this.sheetReq = { plugin: id, spec, resolve: (b) => ((this.sheetReq = null), resolve(b)) };
           }),
         menu: (items, at) => {
-          this.menuReq = { plugin: id, x: at.x, y: at.y, items: items.map((it) => ({ label: it.label, danger: it.danger, disabled: it.disabled, action: () => this.guard(id, () => it.run(), undefined) })) };
+          this.menuReq = {
+            plugin: id, x: at.x, y: at.y,
+            items: items.map((it) => (it === 'sep' ? 'sep' : { label: it.label, danger: it.danger, disabled: it.disabled, action: () => this.guard(id, () => it.run(), undefined) })),
+          };
         },
         choose: (o) =>
           new Promise((resolve) => {
             let done = false;
             const NOTHING = { id: 'none', group: '', title: 'Ничего не найдено' };
-            store.openStep({
+            const step = {
               placeholder: o.placeholder ?? o.title,
               plate: () => ({ kind: 'text', text: o.title }),
-              rows: (q) => {
+              rows: (q: string) => {
                 const rows = o.items
                   .map((it) => ({ it, m: q.trim() ? fuzzy(q, it.label) : null }))
                   .filter((x) => !q.trim() || x.m)
                   .map(({ it, m }) => ({ id: 'choose:' + it.id, group: o.title.toUpperCase(), title: it.label, at: m?.at, hint: it.hint, run: () => void ((done = true), resolve(it.id)) }));
                 return rows.length ? rows : [NOTHING];
               },
-            });
+            };
+            if (this.stepCapture) this.stepCapture.step = step as never;
+            else store.openStep(step as never);
             const stop = watch(() => store.palette, (p) => {
               if (p) return;
               stop();
@@ -601,9 +625,14 @@ class Host {
       storage: { folder: this.storeOf(id, 'folder', 'data', keep), local: this.storeOf(id, 'local', 'data', keep) },
       events: { on: (e, fn) => keep(this.listen(id, e, fn)) },
       statusSets: {
-        set: (defs) => {
+        set: (defs, o = {}) => {
           for (const d of sets) d();
-          sets = defs.map((d) => keep(store.registerStatusSet(id, { name: String(d.name), states: d.states.map((x) => ({ name: String(x.name), done: !!x.done })) }, () => this.live(id))));
+          sets = defs.map((d) => {
+            const def = { name: String(d.name), states: d.states.map((x) => ({ name: String(x.name), done: !!x.done, ...(x.color ? { color: x.color } : {}) })) };
+            // `ifMissing`: only while no set of the project knows its first status (the project's own goals' set wins)
+            const when = (all: WorkflowDef[]) => this.live(id) && (!o.ifMissing || !all.some((w) => !w.feature && w.states.some((x) => x.name === def.states[0]?.name)));
+            return keep(store.registerStatusSet(id, def, when));
+          });
           store.refreshStatusSets();
         },
       },
@@ -764,7 +793,13 @@ class Host {
         this.headingListeners.add(send);
         return () => this.headingListeners.delete(send);
       case 'tab.active':
-        return watch(() => store.tab?.id, () => send({ kind: store.tab?.kind ?? null, path: store.tab?.kind === 'file' ? store.file?.name ?? null : null }));
+        const now = () => {
+          const t = store.tab;
+          const own = !!t && !!this.manifest(id)?.contributes.views.some((v) => v.id === t.kind);
+          send({ kind: t?.kind ?? null, path: t?.kind === 'file' ? (store.file?.name ?? null) : null, state: own ? clone(t!.data) : undefined });
+        };
+        queueMicrotask(now); // the tab shown now, then each change
+        return watch(() => [store.tab?.id, store.tab?.data], now);
       case 'folder.changed':
         return watch(() => store.dir, (d) => send({ folder: d }));
       case 'theme.changed': {
@@ -881,7 +916,7 @@ function coreCommand(cmd: string, arg: unknown) {
     case 'file.open': {
       const i = store.files.findIndex((f) => f.name === a.path);
       if (i < 0) throw new Error(`нет файла «${a.path}»`);
-      return store.open(i);
+      return store.open(i, Math.max(0, Number((arg as { line?: number })?.line) || 0));
     }
     case 'heading.reveal': {
       const i = a.ref ? store.files.findIndex((f) => f.name === a.ref!.path) : -1;

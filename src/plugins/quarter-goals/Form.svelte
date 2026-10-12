@@ -1,13 +1,8 @@
 <script lang="ts">
-  import { goals } from './features/goals.svelte';
+  import { goals } from './state.svelte';
   import { tick } from 'svelte';
-  import { store } from './store.svelte';
-  import Calendar from './Calendar.svelte';
-  import { parseDate, weekdayNames } from './edits';
-  import { busyDays, longDate, shiftDate } from './calendar';
-  import { listEnter, listIndent } from './textList';
+  import { parseDate, weekdayNames, longDate, shiftDate, listEnter, listIndent } from '@panopticon/api/org';
   import { GOAL_STATES, defaultQuarter, quarterLabel, quarterTitle, qEnd, shiftQuarter, cmpQuarter, type Quarter } from './goals';
-  import type { CalSpec } from './commands';
 
   // «Новая цель» (ТЗ 23, 3.2): whose, the title, «Что будешь делать», «Ожидаемый результат» (lists as in the editor),
   // the deadline (as text or ⇧ + arrows: the calendar of ТЗ 20), the quarter. ⌘↩ creates, ⎋ keeps a draft.
@@ -16,7 +11,8 @@
   const ls = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
   const lsSet = (k: string, v: string | null) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* none */ } };
 
-  const req = goals.goalForm!;
+  let { key: reqKey, close }: { key: string | null; close: () => void } = $props();
+  const req = { key: reqKey };
   // the team by name, «Мои цели» at the end (as the people in the overview)
   const people = $derived([...goals.goalPeople.filter((p) => p.found)].sort((a, b) => Number(!!a.src.me) - Number(!!b.src.me) || a.name.localeCompare(b.name, 'ru')));
   const draft = (() => { try { return JSON.parse(ls(DRAFT) ?? 'null'); } catch { return null; } })();
@@ -40,8 +36,19 @@
   const exists = $derived(!!person?.data.quarters.some((x) => cmpQuarter(x.q, quarter) === 0));
   const ready = $derived(!!person && !!title.trim() && !bad);
   const names = $derived(weekdayNames(person?.file?.text ?? ''));
-  const spec = $derived<CalSpec>({ kind: 'DEADLINE', initial: date ?? new Date(), current: null, names, pick: (d) => setDate(d) });
-  const busyMap = $derived(busyDays(store.files));
+  // the calendar of three months under the deadline: the core's (a widget), «Вставится: DEADLINE: <…>» as before
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const fromIso = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(+v.slice(0, 4), +v.slice(5, 7) - 1, +v.slice(8, 10)) : null);
+  function calendarWidget(el: HTMLElement) {
+    const w = goals.ctx.ui.widget(el, { type: 'date', key: 'd', label: 'Срок', look: 'inline', stamp: { kind: 'DEADLINE', names } }, date ? iso(date) : null, (v) => {
+      const d = fromIso(v);
+      if (d) setDate(d);
+    });
+    const stop = $effect.root(() => {
+      $effect(() => w.set(date ? iso(date) : null));
+    });
+    return { destroy: () => (stop(), w.dispose()) };
+  }
 
   function setDate(d: Date) {
     date = d;
@@ -122,12 +129,12 @@
     lsSet(LAST, who);
     lsSet(DRAFT, null);
     goals.goalsQuarter = quarter;
-    goals.goalForm = null;
+    close();
   }
   function cancel() {
     // something typed: kept until the next time, as the quick entry of the Inbox
     lsSet(DRAFT, title.trim() || plan.trim() || result.trim() ? JSON.stringify({ who, title, plan, result }) : null);
-    goals.goalForm = null;
+    close();
   }
 
   // ⌃⇥ / ⌃⇧⇥ between the fields (⇥ in the long ones is for lists), ⌘↩ creates, ⎋ closes
@@ -151,7 +158,6 @@
   void tick().then(() => titleEl?.focus());
 </script>
 
-<div class="scrim" aria-hidden="true"></div>
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="gform" role="dialog" aria-modal="true" aria-label="Новая цель" tabindex="-1" bind:this={sheet} onkeydown={key}>
   <header>
@@ -199,7 +205,7 @@
       <span class="hint">{bad ? 'Не похоже на дату' : `${date ? longDate(date) + ' · ' : ''}Текстом («30 ноя», «+6н») или ⇧ + стрелки — календарь на 3 месяца`}</span>
     </label>
     {#if cal && date}
-      <div class="calbox"><Calendar {spec} sel={date} {view} {bad} busy={busyMap} onselect={setDate} onpick={(d) => { setDate(d); cal = false; }} onturn={(n) => (view = shiftDate(view, 'month', n))} /></div>
+      <div use:calendarWidget></div>
     {/if}
     {#if person}
       <div class="where">Запишется в <b>{person.src.file.split('/').pop()} › {person.src.heading} › {quarterTitle(quarter)}</b> как <code>*** ACTIVE …</code>{date ? ' с DEADLINE' : ''} и подзаголовками «Что буду делать», «Ожидаемый результат», «Отметки».{exists ? '' : ' Квартала ещё нет — будет создан'}</div>
@@ -213,7 +219,6 @@
 </div>
 
 <style>
-  .scrim { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.42); }
   .gform { position: fixed; z-index: 71; left: 50%; top: 36px; bottom: 36px; transform: translateX(-50%); width: min(720px, calc(100% - 48px)); display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5); overflow: hidden; outline: none; }
   header { flex: 0 0 52px; display: flex; align-items: center; gap: 10px; padding: 0 20px; background: var(--bar); border-bottom: 1px solid var(--line); }
   header b { font-size: 15px; }

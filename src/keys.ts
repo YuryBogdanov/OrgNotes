@@ -318,14 +318,22 @@ export function withKeys(s: KeyState, id: string, keys: string[]): KeyState {
   else overrides[id] = list;
   return { ...s, overrides };
 }
+/** Commands renamed (the goals of the quarter became the plugin «quarter-goals», ТЗ 27): a changed shortcut follows. */
+const RENAMED: Record<string, string> = {
+  navGoals: 'quarter-goals.nav', newGoal: 'quarter-goals.new', goalsOverview: 'quarter-goals.overview',
+  goalMark: 'quarter-goals.mark', goalDone: 'quarter-goals.done', goalShift: 'quarter-goals.shift',
+  goalBack: 'quarter-goals.back', goalNext: 'quarter-goals.next',
+};
 export function parseState(raw: string | null): KeyState {
   try {
     const v = JSON.parse(raw ?? '');
     const preset: Preset = v?.preset === 'mac' ? 'mac' : 'emacs';
     const overrides: Record<string, string[]> = {};
-    for (const [id, keys] of Object.entries(v?.overrides ?? {}))
+    for (const [old, keys] of Object.entries(v?.overrides ?? {})) {
+      const id = RENAMED[old] ?? old;
       // a plugin's command («hello.greet») is kept while the plugin is off: its keys come back with it
       if ((commandById.has(id) || id.includes('.')) && Array.isArray(keys)) overrides[id] = keys.filter((k): k is string => typeof k === 'string').map((k) => pressesOf(k).map(normPress).join(' '));
+    }
     return { preset, overrides };
   } catch {
     return { ...DEFAULT_STATE };

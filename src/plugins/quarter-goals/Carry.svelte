@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { goals } from './features/goals.svelte';
+  import { goals } from './state.svelte';
   import { SvelteMap } from 'svelte/reactivity';
-  import { store } from './store.svelte';
   import { quarterLabel, shiftQuarter, shortDay, cmpQuarter, quarterOf } from './goals';
 
   // «Перенести незакрытые» (ТЗ 23, 6.2): the open goals of the quarter, all ticked; the ticked ones go under the next
   // quarter, a deadline of the old quarter becomes the last day of the new one, and each gets a mark «Перенесена из …».
-  const req = goals.goalCarry!;
+  let { key: reqKey, close }: { key: string; close: () => void } = $props();
+  const req = { key: reqKey };
   const q = goals.goalsQuarter;
   const to = shiftQuarter(q, 1);
   const people = goals.goalPeople
@@ -19,19 +19,19 @@
   async function go() {
     busy = true;
     const chosen = new Map(people.map((x) => [x.p.key, x.goals.filter((g) => ticked.get(x.p.key + '|' + g.title)).map((g) => g.title)]));
-    await goals.carryGoals(chosen);
+    const n = await goals.carryGoals(chosen);
     busy = false;
+    if (n) close();
   }
   const word = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? 'цель' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'цели' : 'целей');
   function key(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       e.preventDefault();
-      goals.goalCarry = null;
+      close();
     }
   }
 </script>
 
-<div class="scrim" aria-hidden="true"></div>
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="carry" role="dialog" aria-modal="true" aria-label="Перенести незакрытые" tabindex="-1" onkeydown={key}>
   <header>
@@ -57,13 +57,12 @@
     {/each}
   </div>
   <footer>
-    <button onclick={() => (goals.goalCarry = null)}>Отмена</button>
+    <button onclick={close}>Отмена</button>
     <button class="pri" disabled={!count || busy} onclick={go}>Перенести {count} {word(count)}</button>
   </footer>
 </div>
 
 <style>
-  .scrim { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.42); }
   .carry { position: fixed; z-index: 71; left: 50%; top: 48px; max-height: calc(100% - 96px); transform: translateX(-50%); width: min(640px, calc(100% - 48px)); display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5); overflow: hidden; outline: none; }
   header { display: flex; flex-direction: column; gap: 3px; padding: 14px 20px; background: var(--bar); border-bottom: 1px solid var(--line); }
   header b { font-size: 15px; }

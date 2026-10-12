@@ -129,7 +129,7 @@ export type FormField =
   /** Lines; ↩ goes on a «- » list, ⇥ moves its item. */
   | { type: 'textarea'; key: string; label: string; hint?: string; placeholder?: string }
   /** A day as «yyyy-mm-dd» (null: none): the calendar of three months in the form, or a chip that opens it. */
-  | { type: 'date'; key: string; label: string; hint?: string; look: 'inline' | 'chip'; clear?: string }
+  | { type: 'date'; key: string; label: string; hint?: string; look: 'inline' | 'chip'; clear?: string; stamp?: { kind: 'SCHEDULED' | 'DEADLINE'; names: string[] } }
   /** A file and its heading, in two columns: { path, heading } (heading null: only the file chosen; `create: true`:
    *  the heading `create` offered). */
   | {
@@ -189,7 +189,7 @@ export interface ChooseItem {
 export type Named = 'red' | 'orange' | 'yellow' | 'green' | 'teal' | 'blue' | 'purple' | 'gray';
 export interface StatusSet {
   name: string;
-  states: { name: string; done: boolean }[];
+  states: { name: string; done: boolean; color?: Named }[];
 }
 /** A place: a file, or a heading in it. */
 export type Place = { path: string } | HeadingRef;
@@ -230,16 +230,25 @@ export interface ReviewSpec {
   quick?: CardRender;
   /** A panel right of the narrowed editor. */
   aside?: CardRender;
-  /** Lines folded in the narrowed editor, and a note at the end of a line («3 — справа»). */
-  narrow?(h: HeadingInfo): { fold?: number[]; note?: { line: number; text: string } | null };
+  /** Lines folded in the narrowed editor, a note at the end of a line («3 — справа»), a line to show (a new `n`
+   *  each time: the caret goes there). */
+  narrow?(h: HeadingInfo): { fold?: number[]; note?: { line: number; text: string } | null; reveal?: { line: number; n: number } | null };
+  /** A class of the plugin's on the review's frame (its own styles, as the goals' «greview»). */
+  cls?: string;
+  /** The toolbar's path while the review is shown (else its title). */
+  crumbs?: string[];
   /** The summary instead of «Разобрано N из M» (under «Разбор закончен»); `end()` closes the review. */
   summary?: (el: HTMLElement, r: ReviewResult & { end(): void }) => Dispose | void;
   /** No «Пропустить» (the plugin has its own «Следующая»). */
   noSkip?: boolean;
+  /** The command (`"scope": "review"`) whose keys go «Назад». */
+  backCommand?: string;
   /** Before the card changes (an action's «next», «Назад», a key): what is being written is saved. */
   beforeStep?(h: HeadingInfo): void | Promise<void>;
   /** The card's widest, px (820). */
   width?: number;
+  /** The card shown first (the cards before it are reached by «Назад»). */
+  start?: number;
 }
 /** The review shown (from `ui.review`): move it, draw the card again. */
 export interface ReviewHandle {
@@ -273,7 +282,9 @@ export interface Ctx {
     on(id: string, run: (arg?: unknown) => void | Promise<void>): Dispose;
     /** Not offered in the palette, its keys do nothing, while off. */
     setAvailable(id: string, on: boolean): void;
-    /** A command of the plugin, or of the core: `file.open` {path}, `heading.reveal` {ref}, `agenda.open`,
+    /** The first shortcut of a command as set now («⌘↩»), '' none: for the plugin's own hints. */
+    keyOf(id: string): string;
+    /** A command of the plugin, or of the core: `file.open` {path, line?}, `heading.reveal` {ref}, `agenda.open`,
      *  `heading.status` {ref} (the palette's statuses for it; the heading's file is the one shown). */
     run(id: string, arg?: unknown): Promise<void>;
   };
@@ -290,20 +301,34 @@ export interface Ctx {
     /** The choice of a file and a heading in it (or the file alone). */
     pickPlace(o?: { kind?: 'file' | 'heading'; title?: string; levels?: number[] }): Promise<Place | null>;
     /** The calendar of three months, as for SCHEDULED. */
-    pickDate(o?: { initial?: Date; title?: string }): Promise<Date | null>;
+    pickDate(o?: {
+      initial?: Date;
+      title?: string;
+      /** What the date is for, as the core's calendar says it («Дедлайн», «День отметки»), with the stamp's day names
+       *  of the file and the date it has now (a dashed frame). */
+      kind?: 'SCHEDULED' | 'DEADLINE' | 'MARK';
+      names?: string[];
+      current?: Date | null;
+    }): Promise<Date | null>;
     /** A review by cards in a tab: one heading at a time, narrowed; it ends when the queue is through or closed. */
     review(spec: ReviewSpec): Promise<ReviewResult>;
     /** The core's sheet with the plugin's content; the button pressed (null: ⎋). */
     sheet(spec: SheetSpec): Promise<string | null>;
     /** The core's context menu at a point of the window. */
-    menu(items: MenuItem[], at: { x: number; y: number }): void;
+    menu(items: (MenuItem | 'sep')[], at: { x: number; y: number }): void;
     /** A choice from a list in the palette; null: ⎋. */
     choose(o: { title: string; placeholder?: string; items: ChooseItem[] }): Promise<string | null>;
     /** Close the tabs of a view of the plugin. */
     close(viewId: string): void;
     /** A control of the core in the plugin's element: the calendar of three months, the choice of a place in
      *  columns, lines with lists — as the form's fields. `set` changes its value from outside. */
-    widget(el: HTMLElement, field: FormField, value: unknown, onChange: (v: unknown) => void): { set(v: unknown): void; dispose(): void };
+    widget(el: HTMLElement, field: FormField, value: unknown, onChange: (v: unknown) => void): {
+      set(v: unknown): void;
+      dispose(): void;
+      /** The choice of a place: ↑↓ in the list in focus, which list takes them. */
+      move(d: 1 | -1): void;
+      focusList(which: 'file' | 'head'): void;
+    };
     /** The review shown now (its parts move and redraw it); null when there is none of the plugin's. */
     currentReview(): ReviewHandle | null;
   };
@@ -332,7 +357,7 @@ export interface Ctx {
   /** Needs `net`: only to the hosts of the manifest's `net` («jira.company.ru», «*.company.ru»); 30 s, 10 MB. */
   net?: { fetch(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<NetResponse> };
   /** Sets of statuses from code (they replace the plugin's earlier ones; [] none); the manifest's stay. */
-  statusSets: { set(defs: StatusSet[]): void };
+  statusSets: { set(defs: StatusSet[], o?: { ifMissing?: boolean }): void };
   /** The values of the settings the manifest declares. */
   settings: {
     values(): Values;

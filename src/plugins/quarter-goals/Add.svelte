@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { goals } from './features/goals.svelte';
-  import { store } from './store.svelte';
-  import PlacePicker from './PlacePicker.svelte';
+  import { goals } from './state.svelte';
+  import { core } from './core.svelte';
   import { SOURCE_HEADING, avatarColor, findSource, initials, readSource, sourceKey, sourceSummary, goalsWord } from './goals';
 
   // «Добавить цели» (ТЗ 23, 2.3): a file, then its level-1 heading where the goals are — the core's choice of a place
   // (PlacePicker, the columns); the name in the navigator, «Это мои цели». The same sheet changes the heading of a
   // source («Сменить заголовок…»).
-  const req = goals.goalAdd!;
+  let { me: reqMe, replace, file: reqFile, close }: { me?: boolean; replace?: string; file?: string; close: () => void } = $props();
+  const req = { me: reqMe, replace, file: reqFile };
   const NEW = '\u0000new';
 
   let file = $state<string | null>(req.file ?? null); // relative name
@@ -28,7 +28,7 @@
     const text = noteOf(rel);
     return { text, dim: text !== 'не добавлен' };
   };
-  const cur = $derived(store.files.find((f) => f.name === file));
+  const cur = $derived(core.files.find((f) => f.name === file));
   const heads = $derived(cur ? cur.headings.map((h, i) => ({ h, i })).filter((x) => x.h.level === 1) : []);
   const canNew = $derived(!!cur && findSource(cur.headings, SOURCE_HEADING) < 0);
   const titleOf = (text: string, rel: string) => /^#\+TITLE:\s*(.+)$/im.exec(text)?.[1].trim() || base(rel);
@@ -36,7 +36,7 @@
   /** A file picked: the heading that looks like a source (or «Квартальные задачи»), the name from #+TITLE. */
   function pickFile(rel: string) {
     file = rel;
-    const f = store.files.find((x) => x.name === rel);
+    const f = core.files.find((x) => x.name === rel);
     if (!f) return;
     const looks = heads.find((x) => sourceSummary(f.text, f.headings, x.i));
     const named0 = f.headings.find((h) => h.level === 1 && h.title.toLowerCase() === SOURCE_HEADING.toLowerCase());
@@ -73,17 +73,36 @@
     const ok = await goals.addGoalSource(src, { create: head === NEW, replace: req.replace });
     busy = false;
     if (!ok) return;
-    goals.goalAdd = null;
-    store.setNavMode('goals');
+    close();
+    void goals.ctx.commands.run('quarter-goals.nav'); // the navigator shows the goals
     goals.openGoals(sourceKey(src));
   }
-  const close = () => (goals.goalAdd = null);
 
   // ---- keyboard: ↑↓ in the list in focus (the picker's), ↩ adds, ⎋ closes ------------------------------------------
-  let picker: PlacePicker | undefined = $state();
-  $effect(() => {
-    if (picker) picker.focusList(req.replace || req.file ? 'head' : 'file');
-  });
+  // the choice of a place: the core's columns (a widget); ↑↓ of the sheet move in it
+  let picker: ReturnType<typeof goals.ctx.ui.widget> | null = null;
+  function placeWidget(el: HTMLElement) {
+    const w = goals.ctx.ui.widget(el, {
+      type: 'place', key: 'at', label: 'Файл и заголовок', levels: [1], headCap: '2. ЗАГОЛОВОК 1-ГО УРОВНЯ',
+      note: (rel) => fileNote(rel),
+      headNote: (rel, title) => {
+        const f = core.files.find((x) => x.name === rel);
+        const i = f ? f.headings.findIndex((h) => h.level === 1 && h.title === title) : -1;
+        return f && i >= 0 ? sourceSummary(f.text, f.headings, i) : '';
+      },
+      create: (rel) => (rel === file && canNew ? `+ Создать «${SOURCE_HEADING}» в конце файла` : null),
+    }, null, (v) => {
+      const x = v as { path: string; heading: string | null; create?: boolean };
+      if (x.path !== file) pickFile(x.path);
+      else head = x.create ? NEW : x.heading;
+    });
+    picker = w;
+    const stop = $effect.root(() => {
+      $effect(() => w.set(file ? { path: file, heading: head === NEW ? null : head, ...(head === NEW ? { create: true } : {}) } : null));
+    });
+    queueMicrotask(() => w.focusList(req.replace || req.file ? 'head' : 'file'));
+    return { destroy: () => (stop(), w.dispose(), (picker = null)) };
+  }
   function key(e: KeyboardEvent) {
     if (confirmMe) {
       if (e.key === 'Escape') {
@@ -105,7 +124,6 @@
   }
 </script>
 
-<div class="scrim" aria-hidden="true"></div>
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="gadd" role="dialog" aria-modal="true" aria-label="Добавить цели" tabindex="-1" onkeydown={key}>
   <header>
@@ -113,9 +131,7 @@
     <span>Выберите файл и заголовок первого уровня, под которым хранятся цели человека</span>
   </header>
   <div class="body">
-    <PlacePicker bind:this={picker} variant="columns" levels={[1]} {file} heading={head} headCap="2. ЗАГОЛОВОК 1-ГО УРОВНЯ" {fileNote}
-      headNote={(f, i) => sourceSummary(f.text, f.headings, i)} extra={canNew ? { id: NEW, label: `+ Создать «${SOURCE_HEADING}» в конце файла` } : null}
-      onfile={(rel) => pickFile(rel)} onhead={(id) => (head = id)} />
+    <div class="pick" use:placeWidget></div>
     <div class="more">
       <div class="left">
         <label class="fld">
@@ -163,12 +179,14 @@
 </div>
 
 <style>
-  .scrim { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.42); }
   .gadd { position: fixed; z-index: 71; left: 50%; top: 48px; bottom: 48px; transform: translateX(-50%); width: min(880px, calc(100% - 48px)); display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5); overflow: hidden; outline: none; }
   header { flex: 0 0 58px; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 0 20px; background: var(--bar); border-bottom: 1px solid var(--line); }
   header b { font-size: 15px; }
   header span { font-size: 12px; color: var(--fg2); }
   .body { flex: 1 1 0; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+  /* the core's columns as they were in this sheet: no frame of their own, a line under them */
+  .pick :global(.place) { border: 0; border-radius: 0; }
+  .pick :global(.place .c-cols) { border-bottom: 1px solid var(--line); }
   .more { display: flex; flex-wrap: wrap; gap: 16px; padding: 14px 20px; }
   .left, .right { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
   .right { gap: 6px; }

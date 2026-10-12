@@ -1036,7 +1036,11 @@ fn read_plugin_file(app: AppHandle, dir: String, file: String) -> Result<String,
 // ---- permissions (ТЗ 26 §6, roadmap 1.3): checked here by the manifest Rust reads itself, not by what the window says
 
 /// The built-in plugins' manifests, as built into the app.
-const BUILTIN_MANIFESTS: &[&str] = &[include_str!("../../src/plugins/hello/manifest.json"), include_str!("../../src/plugins/theme-pack/manifest.json")];
+const BUILTIN_MANIFESTS: &[&str] = &[
+    include_str!("../../src/plugins/hello/manifest.json"),
+    include_str!("../../src/plugins/quarter-goals/manifest.json"),
+    include_str!("../../src/plugins/theme-pack/manifest.json"),
+];
 
 /// A plugin's manifest: a built-in one, else `plugins/<id>/manifest.json`.
 fn plugin_manifest(app: &AppHandle, id: &str) -> Result<serde_json::Value, String> {
@@ -1423,6 +1427,6 @@ mod plugin_tests {
     #[test]
     fn the_builtin_manifests_are_read() {
         let ids: Vec<String> = BUILTIN_MANIFESTS.iter().map(|m| serde_json::from_str::<serde_json::Value>(m).unwrap()["id"].as_str().unwrap().to_string()).collect();
-        assert_eq!(ids, ["hello", "theme-pack"]);
+        assert_eq!(ids, ["hello", "quarter-goals", "theme-pack"]);
     }
 }

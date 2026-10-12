@@ -2,7 +2,7 @@
 // place in columns, lines with lists — the very fields of the form (FormField.svelte), mounted where the plugin
 // asks, its value in and out.
 
-import { mount, unmount } from 'svelte';
+import { mount, unmount, untrack } from 'svelte';
 import FormField from '../FormField.svelte';
 import { WIDE, type Field } from '../settingsSchema';
 import type { FormField as ApiField } from './index';
@@ -15,7 +15,7 @@ export function mountWidget(plugin: string, el: HTMLElement, field: ApiField, va
     id: `pw-${plugin}-${++seq}`,
     values: { [field.key]: value } as Record<string, unknown>,
     set: (k: string, v: unknown) => {
-      props.values = { ...props.values, [k]: v };
+      props.values = { ...untrack(() => props.values), [k]: v };
       try {
         onChange(v);
       } catch (err) {
@@ -23,9 +23,12 @@ export function mountWidget(plugin: string, el: HTMLElement, field: ApiField, va
       }
     },
   });
-  const app = mount(FormField, { target: el, props });
+  const app = mount(FormField, { target: el, props }) as { move(d: 1 | -1): void; focusList(w: 'file' | 'head'): void };
   return {
-    set: (v: unknown) => void (props.values = { ...props.values, [field.key]: v }),
+    // from a plugin's effect too: what is there is read without making that effect depend on it
+    set: (v: unknown) => void (props.values = { ...untrack(() => props.values), [field.key]: v }),
     dispose: () => void unmount(app),
+    move: (d: 1 | -1) => app.move(d),
+    focusList: (w: 'file' | 'head') => app.focusList(w),
   };
 }

@@ -3,7 +3,7 @@
 // «Цели на квартал», and the fields of a goal level 4: «Что буду делать», «Ожидаемый результат», «Отметки». Pure
 // functions on the text, so the navigator, the views and the tests share them.
 
-import type { Heading } from './org';
+import type { Heading } from '@panopticon/api/org';
 
 export const GOAL_STATES = { backlog: 'BACKLOG', active: 'ACTIVE', done: 'COMPLETED' } as const;
 export const GOALS_WORKFLOW = {

@@ -1,19 +1,16 @@
 <script lang="ts">
-  import { goals, type GoalPerson } from './features/goals.svelte';
-  import { store, } from './store.svelte';
-  import { toneFor } from './org';
-  import { toneStyle } from './colors';
+  import { goals, type GoalPerson } from './state.svelte';
+  import { openAdd, openCarry, openForm, openReport, startReview } from './actions';
   import {
     GOAL_STATES, GOAL_TONES, goalNote, goalsIn, isDone, quarterLabel, quarterOf, cmpQuarter, quarterSub, quarterTitle, resultLine, shiftQuarter, shortDay,
     qEnd, days, activeWord, type Goal,
   } from './goals';
-  import type { Tab } from './layout';
 
   // «Цели» in a pane (ТЗ 23): «Обзор квартала» (every source) or the goals of one person. A summary of four tiles
   // (a click filters), a group per person, a row per goal: status, title and «Результат: …», deadline, last mark.
-  let { tab }: { tab: Tab } = $props();
+  let { who }: { who: string | null } = $props();
 
-  const key = $derived((tab.data as string | undefined) ?? '*');
+  const key = $derived(who ?? '*');
   const q = $derived(goals.goalsQuarter);
   const all = $derived(key === '*');
   const people = $derived.by(() => {
@@ -62,7 +59,7 @@
   const past = $derived(cmpQuarter(q, quarterOf(new Date())) < 0);
   const openLeft = $derived(people.some((p) => goals.openGoalsOf(p).length));
   const chip = (kw: string | null, p: GoalPerson) =>
-    !kw ? '' : GOAL_TONES[kw] ? `color:${GOAL_TONES[kw]};background:color-mix(in srgb, ${GOAL_TONES[kw]} 15%, transparent)` : toneStyle(toneFor(kw, p.file!.wf));
+    !kw ? '' : GOAL_TONES[kw] ? `color:${GOAL_TONES[kw]};background:color-mix(in srgb, ${GOAL_TONES[kw]} 15%, transparent)` : goals.toneStyle(kw, p.file!.path);
 </script>
 
 <div class="goals">
@@ -76,17 +73,17 @@
       <span class="cur">{quarterLabel(q)}</span>
       <button aria-label="Следующий квартал" onclick={() => (goals.goalsQuarter = shiftQuarter(q, 1))}>Q{shiftQuarter(q, 1).q} ›</button>
     </div>
-    <button class="pri" disabled={!goals.goalPeople.length} onclick={() => goals.openGoalForm(person?.key ?? null)}>+ Новая цель</button>
-    {#if person}<button class="sec" disabled={!person.found} onclick={() => goals.startGoalReview(person.key)}>Разобрать цели</button>{/if}
-    <button class="sec" disabled={!goals.goalPeople.length} onclick={() => goals.openGoalReport(person?.key ?? '*')}>Отчёт за квартал</button>
-    {#if past && openLeft}<button class="sec" onclick={() => goals.openGoalCarry(person?.key ?? '*')}>Перенести незакрытые в {quarterLabel(shiftQuarter(q, 1))}</button>{/if}
+    <button class="pri" disabled={!goals.goalPeople.length} onclick={() => openForm(person?.key ?? null)}>+ Новая цель</button>
+    {#if person}<button class="sec" disabled={!person.found} onclick={() => startReview(person.key)}>Разобрать цели</button>{/if}
+    <button class="sec" disabled={!goals.goalPeople.length} onclick={() => openReport(person?.key ?? '*')}>Отчёт за квартал</button>
+    {#if past && openLeft}<button class="sec" onclick={() => openCarry(person?.key ?? '*')}>Перенести незакрытые в {quarterLabel(shiftQuarter(q, 1))}</button>{/if}
   </header>
 
   {#if !goals.goalPeople.length}
     <div class="empty">
       <p>Целей пока нет. Укажите файл и заголовок, под которым хранятся цели — свои или тимлида.</p>
-      <button class="pri" onclick={() => goals.openGoalAdd({ me: true })}>Указать, где мои цели</button>
-      <button onclick={() => goals.openGoalAdd()}>Добавить цели человека</button>
+      <button class="pri" onclick={() => openAdd({ me: true })}>Указать, где мои цели</button>
+      <button onclick={() => openAdd()}>Добавить цели человека</button>
     </div>
   {:else}
     <div class="tiles">
@@ -105,13 +102,13 @@
               <span class="av" style="background:{p.color}" aria-hidden="true">{p.ini}</span>
               <span class="gn">{p.name}</span><span class="gs">{p.src.file.split('/').pop()} › {p.src.heading}</span>
               <span class="sum">{p.found ? summary(p) : ''}</span>
-              {#if all && p.found}<button class="rv" onclick={() => goals.startGoalReview(p.key)}>Разобрать цели</button>{/if}
-              <button class="plus" aria-label="Новая цель: {p.name}" title="Новая цель" disabled={!p.found} onclick={() => goals.openGoalForm(p.key)}>+</button>
+              {#if all && p.found}<button class="rv" onclick={() => startReview(p.key)}>Разобрать цели</button>{/if}
+              <button class="plus" aria-label="Новая цель: {p.name}" title="Новая цель" disabled={!p.found} onclick={() => openForm(p.key)}>+</button>
             </div>
             {#if !p.found}
               <div class="lost">
                 {p.file ? `Заголовок «${p.src.heading}» не найден в ${p.src.file}` : `Файл ${p.src.file} не найден`}. Цели в файле не потеряны.
-                <button onclick={() => goals.openGoalAdd({ replace: p.key, file: p.src.file, me: p.src.me })}>Выбрать заново</button>
+                <button onclick={() => openAdd({ replace: p.key, file: p.src.file, me: p.src.me })}>Выбрать заново</button>
               </div>
             {:else if !gs.length}
               <div class="none">В {quarterLabel(q)} целей нет</div>
@@ -120,7 +117,7 @@
                 {@const closed = isDone(g, done(p))}
                 {@const soon = goals.goalSoon(g, done(p))}
                 {@const silent = goals.goalSilent(g)}
-                <button class="row" title="⌥-клик — разобрать с этой цели" onclick={(e) => (e.altKey && !closed ? goals.startGoalReview(p.key, g.title) : goals.openGoalFile(p.key, g.line))}>
+                <button class="row" title="⌥-клик — разобрать с этой цели" onclick={(e) => (e.altKey && !closed ? startReview(p.key, g.title) : goals.openGoalFile(p.key, g.line))}>
                   <span class="st" class:tone-chip={!!g.keyword && !GOAL_TONES[g.keyword]} style={chip(g.keyword, p)}>{g.keyword ?? '—'}</span>
                   <span class="tt"><span class="t" class:closed>{g.title}</span>{#if resultLine(g)}<span class="res">Результат: {resultLine(g)}</span>{/if}</span>
                   {#if closed && g.closed}

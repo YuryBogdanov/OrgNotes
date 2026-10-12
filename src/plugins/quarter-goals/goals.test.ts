@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SEQUENCE, fromSequences, parseHeadings } from './org';
+import { DEFAULT_SEQUENCE, fromSequences, parseHeadings } from '../../org'; // the test may use the core (the boundary is for the plugin's code)
 import {
   GOALS_WORKFLOW, addSourceHeading, avatarColor, defaultQuarter, goalNote, initials, insertGoal, isSilent, parseQuarter, quarterSub,
   readGoals, readSource, resultLine, sourcesJson, shiftQuarter, sourceSummary, withGoals, deadlineSoon, reviewQueue, markLines, markDayLabel, dayLabel, addMark, moveGoal,

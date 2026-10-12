@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, pluginsReady } from './tauriMock';
 
 // The command palette (ТЗ «Командная палитра»).
 const WORK = '#+TITLE: Работа\n\n* Q4 2026\n** TODO [#A] Подготовить бюджет 2027 :budget:finance:\nDEADLINE: <2026-10-24 Сб> SCHEDULED: <2026-10-14 Ср>\nСвести заявки.\n*** DONE Собрать заявки\n** NEXT План найма\n';
@@ -13,6 +13,7 @@ const open = async (page: Page, files: Record<string, string> = FILES()) => {
   await installTauriMock(page, files);
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
+  await pluginsReady(page); // «Добавить цели…» of the goals' plugin is in the list
   await page.locator('.nav .row[data-key="/mock/work.org"]').click();
   await expect(page.locator('.cm-content').first()).toContainText('Q4 2026');
 };
@@ -78,7 +79,7 @@ test.describe('modes', () => {
     await expect(plate).toContainText('[#A] Подготовить бюджет 2027');
     await expect(plate.locator('.right')).toHaveText('work · строка 4');
     expect(await groups(page)).toEqual(['К ЗАГОЛОВКУ', 'ОБЩИЕ']);
-    expect(await titles(page)).toEqual(['Сменить статус…', 'Запланировать…', 'Поставить дедлайн…', 'Изменить теги…', 'Перенести в другой файл…', 'Создать файл…', 'Создать папку…', 'Новая задача', 'Перейти к файлу…', 'Показать структуру файла', 'Оформленный текст', 'Навигатор: свернуть всё', 'Навигатор: развернуть всё', 'Добавить цели…', 'Календарь', 'Настройки…']);
+    expect(await titles(page)).toEqual(['Сменить статус…', 'Запланировать…', 'Поставить дедлайн…', 'Изменить теги…', 'Перенести в другой файл…', 'Создать файл…', 'Создать папку…', 'Новая задача', 'Перейти к файлу…', 'Показать структуру файла', 'Оформленный текст', 'Навигатор: свернуть всё', 'Навигатор: развернуть всё', 'Календарь', 'Настройки…', 'Добавить цели…']); // a plugin's command after the core's
     await expect(selected(page)).toHaveText('Сменить статус…');
   });
 
@@ -158,7 +159,7 @@ test.describe('modes', () => {
     await page.keyboard.press('Meta+w');
     await palette(page);
     await expect(pal(page).locator('.plate')).toHaveCount(0);
-    expect(await titles(page)).toEqual(['Создать файл…', 'Создать папку…', 'Перейти к файлу…', 'Оформленный текст', 'Навигатор: свернуть всё', 'Навигатор: развернуть всё', 'Добавить цели…', 'Календарь', 'Настройки…']);
+    expect(await titles(page)).toEqual(['Создать файл…', 'Создать папку…', 'Перейти к файлу…', 'Оформленный текст', 'Навигатор: свернуть всё', 'Навигатор: развернуть всё', 'Календарь', 'Настройки…', 'Добавить цели…']); // a plugin's command after the core's
   });
 });
 
@@ -221,7 +222,7 @@ test.describe('keyboard and mouse', () => {
     await at(page, 'Подготовить бюджет');
     await palette(page);
     await page.keyboard.press('ArrowUp'); // round to the last
-    await expect(selected(page)).toHaveText('Настройки…');
+    await expect(selected(page)).toHaveText('Добавить цели…'); // the goals' plugin's, after the core's
     await page.keyboard.press('ArrowDown');
     await expect(selected(page)).toHaveText('Сменить статус…');
     for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowDown');

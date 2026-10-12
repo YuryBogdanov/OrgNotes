@@ -44,7 +44,7 @@ test('the goals: sources of config.json read and moved on a change; their status
   await page.keyboard.press('Meta+a');
   await page.keyboard.type('Я');
   await page.keyboard.press('Enter');
-  await expect.poll(async () => (await json(page, '/mock/.orgnotes/plugins/goals.json'))?.sources?.[1]?.title).toBe('Я');
+  await expect.poll(async () => (await json(page, '/mock/.orgnotes/plugins/quarter-goals.json'))?.data?.sources?.[1]?.title).toBe('Я');
   await expect.poll(async () => (await json(page, CFG)).goals).toBeUndefined();
 });
 

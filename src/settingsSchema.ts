@@ -33,7 +33,7 @@ export type Field =
   /** Lines of text; ↩ goes on a «- » list, ⇥ / ⇧⇥ move its item. */
   | (Base & { type: 'textarea'; placeholder?: string })
   /** A day, «yyyy-mm-dd» (null: none): the calendar of three months in the form, or a chip that opens it. */
-  | (Base & { type: 'date'; look: 'inline' | 'chip'; clear?: string })
+  | (Base & { type: 'date'; look: 'inline' | 'chip'; clear?: string; stamp?: { kind: 'SCHEDULED' | 'DEADLINE'; names: string[] } })
   /** A file and its heading (the columns of the choice of a place): { path, heading } — heading null: the file;
    *  `create` offers a heading that is not there yet. */
   | (Base & {

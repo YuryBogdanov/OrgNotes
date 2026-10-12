@@ -100,3 +100,10 @@ export function registerAction(id: string, run: () => void) {
   return () => void (actions.get(id) === run && actions.delete(id));
 }
 export const actionOf = (id: string) => actions.get(id);
+
+/** A kind of tab renamed (a feature became a plugin, ТЗ 27): the old name read as the new; '' — not kept. */
+const kindAliases = new Map<string, string>();
+export function registerKindAlias(from: string, to: string) {
+  kindAliases.set(from, to);
+}
+export const kindAlias = (kind: string) => (kindAliases.has(kind) ? kindAliases.get(kind)! : kind);

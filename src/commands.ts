@@ -4,7 +4,6 @@
 // palette window (a list to pick from, or a text to type).
 import { store, type NoteFile } from './store.svelte';
 import { inboxReview } from './features/review.svelte';
-import { goals } from './features/goals.svelte';
 import { calendar } from './features/calendar.svelte';
 import { fuzzy, better, type Match } from './fuzzy';
 import { displayName } from './names';
@@ -202,35 +201,6 @@ register({
 register({
   id: 'navExpand', title: 'Навигатор: развернуть всё', icon: 'folder', group: 'general', synonyms: ['дерево', 'папки', 'развернуть'],
   when: () => store.files.length > 0, run: () => store.navTree('expand'),
-});
-register({
-  id: 'newGoal', title: 'Новая цель…', icon: 'goal', group: 'general', synonyms: ['цель', 'квартал', 'goal'],
-  when: () => goals.goalPeople.some((p) => p.found), hint: () => (goals.goalKeyOfFile() ? `для ${goals.goalPeople.find((p) => p.key === goals.goalKeyOfFile())!.name}` : ''),
-  run: () => void setTimeout(() => goals.openGoalForm(goals.goalKeyOfFile())), // once the palette is closed
-});
-register({
-  id: 'goalReview', title: 'Разобрать цели…', icon: 'goal', group: 'general', keyId: '', synonyms: ['разбор', '1-1', 'цели', 'отметки'],
-  when: () => goals.goalPeople.some((p) => p.found),
-  run: () => ({
-    placeholder: 'Чьи цели разобрать',
-    plate: () => ({ kind: 'text', text: 'Разбор целей квартала на 1-1' }),
-    rows: (q) => {
-      const rows: Row[] = goals.goalPeople
-        .filter((p) => p.found)
-        .map((p) => ({ p, m: q.trim() ? fuzzy(q, p.name) : null }))
-        .filter((x) => !q.trim() || x.m)
-        .map(({ p, m }) => ({ id: 'goal:' + p.key, group: 'ЛЮДИ', title: p.name, at: m?.at, icon: 'goal' as Icon, hint: p.src.file.split('/').pop(), run: () => goals.startGoalReview(p.key) }));
-      return rows.length ? rows : [NOTHING];
-    },
-  }),
-});
-register({
-  id: 'goalsOverview', title: 'Цели: обзор квартала', icon: 'goal', group: 'general', synonyms: ['цели', 'квартал'],
-  when: () => goals.goalSources.length > 0, run: () => goals.openGoals('*'),
-});
-register({
-  id: 'goalsAdd', title: 'Добавить цели…', icon: 'goal', group: 'general', keyId: '', synonyms: ['цели', 'источник', 'тимлид'],
-  when: () => store.files.length > 0, run: () => void setTimeout(() => goals.openGoalAdd()),
 });
 register({
   id: 'calendar', title: 'Календарь', icon: 'cal', group: 'general', synonyms: ['месяц', 'неделя', 'события'],

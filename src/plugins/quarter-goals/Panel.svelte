@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { goals, type GoalPerson } from './features/goals.svelte';
-  import { store, } from './store.svelte';
-  import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
+  import { goals, type GoalPerson } from './state.svelte';
+  import { openAdd } from './actions';
   import { GOAL_STATES, goalsIn, quarterLabel, activeWord } from './goals';
 
   // The navigator in the «Цели» mode (ТЗ 23): «Мои цели» pinned on top, «Обзор квартала», the team, «Добавить ещё
@@ -9,7 +8,7 @@
   const q = $derived(goals.goalsQuarter);
   const mine = $derived(goals.goalPeople.find((p) => p.src.me));
   const team = $derived(goals.goalPeople.filter((p) => !p.src.me));
-  const shown = $derived(store.tab?.kind === 'goals' ? ((store.tab.data as string | undefined) ?? '*') : null);
+  const shown = $derived(goals.shownKey);
   const stat = (p: GoalPerson) => {
     const gs = goalsIn(p.data, q);
     return { n: gs.length, active: gs.filter((g) => g.keyword === GOAL_STATES.active).length, silent: gs.some((g) => goals.goalSilent(g)) };
@@ -17,20 +16,16 @@
   const total = $derived(goals.goalPeople.reduce((s, p) => s + goalsIn(p.data, q).length, 0));
 
   // ---- right click: open, rename, another heading, remove ------------------------------------------------------
-  let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   let renaming = $state<string | null>(null);
   function personMenu(e: MouseEvent, p: GoalPerson) {
     e.preventDefault();
-    menu = {
-      x: e.clientX, y: e.clientY,
-      items: [
-        { label: 'Открыть файл', disabled: !p.file, action: () => goals.openGoalFile(p.key) },
-        { label: 'Переименовать…', disabled: !!p.src.me, action: () => (renaming = p.key) },
-        { label: 'Сменить заголовок…', action: () => goals.openGoalAdd({ replace: p.key, file: p.src.file, me: p.src.me }) },
-        'sep',
-        { label: 'Удалить из целей', danger: true, action: () => void goals.removeGoalSource(p.key) },
-      ],
-    };
+    goals.ctx.ui.menu([
+      { label: 'Открыть файл', disabled: !p.file, run: () => goals.openGoalFile(p.key) },
+      { label: 'Переименовать…', disabled: !!p.src.me, run: () => (renaming = p.key) },
+      { label: 'Сменить заголовок…', run: () => openAdd({ replace: p.key, file: p.src.file, me: p.src.me }) },
+      'sep',
+      { label: 'Удалить из целей', danger: true, run: () => void goals.removeGoalSource(p.key) },
+    ], { x: e.clientX, y: e.clientY });
   }
   function focusSelect(el: HTMLInputElement) {
     el.focus();
@@ -62,7 +57,7 @@
         {#if st.silent}<span class="dot" title="Есть цели без отметок больше 2 недель"></span>{/if}
       </button>
     {:else}
-      <button class="setmine" onclick={() => goals.openGoalAdd({ me: true })}>Указать, где мои цели</button>
+      <button class="setmine" onclick={() => openAdd({ me: true })}>Указать, где мои цели</button>
     {/if}
   </div>
   <div class="lst">
@@ -87,7 +82,7 @@
         </button>
       {/if}
     {/each}
-    <button class="add" onclick={() => goals.openGoalAdd()}>
+    <button class="add" onclick={() => openAdd()}>
       <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
       Добавить ещё цели
     </button>
@@ -95,7 +90,6 @@
   <p class="hint">Цели хранятся в файле под выбранным заголовком 1-го уровня: кварталы — 2-й уровень, цели — 3-й. Всё создаётся отсюда.</p>
 </nav>
 
-{#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
 
 <style>
   .goals { flex: 1; min-height: 0; display: flex; flex-direction: column; }

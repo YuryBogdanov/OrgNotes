@@ -4,7 +4,7 @@
 
 export { parseHeadings, setKeyword, setPriority, headingLines, inactiveStamp, type Heading, type Workflow, type OrgDate } from '../org';
 export { setPlanning, setTags, splitTags, parseDate, weekdayNames } from '../edits';
-export { stampText } from '../calendar';
+export { stampText, shiftDate, longDate } from '../calendar';
 export { listEnter, listIndent, type Edit } from '../textList';
 export { setProperty, insertHeading, replaceBody, treeOf } from '../orgOps';
 export { relevel, place, moveTo, moveWithin } from '../refile';

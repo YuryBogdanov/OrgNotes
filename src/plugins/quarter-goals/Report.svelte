@@ -1,12 +1,13 @@
 <script lang="ts">
-  import { goals } from './features/goals.svelte';
-  import { store } from './store.svelte';
+  import { goals } from './state.svelte';
+  import { openCarry } from './actions';
   import { GOAL_TONES, dayLabel, finalMark, goalsIn, lastMarks, quarterLabel, reportText, shiftQuarter, shortDay, statusWords, cmpQuarter, quarterOf } from './goals';
 
   // «Отчёт за квартал» (ТЗ 23, 6.1): every person or one; for each goal the status, the deadline, the expected result
   // in full, the last three marks and the final one. Copied as text or Markdown, «Название / Что делал / Результат /
   // Срок / Статус», to paste on the platform.
-  const req = goals.goalReport!;
+  let { key: reqKey, close }: { key: string; close: () => void } = $props();
+  const req = { key: reqKey };
   const q = goals.goalsQuarter;
   let who = $state(req.key);
   const people = $derived(
@@ -18,22 +19,21 @@
   async function copy(format: 'text' | 'md') {
     const t = reportText(rows.map((r) => ({ name: r.p.name, goals: r.goals, done: r.done })), q, format);
     try {
-      await navigator.clipboard.writeText(t);
-      store.note(format === 'md' ? 'Отчёт скопирован как Markdown' : 'Отчёт скопирован', undefined, 2000);
+      await goals.ctx.clipboard!.write(t);
+      goals.ctx.ui.notify(format === 'md' ? 'Отчёт скопирован как Markdown' : 'Отчёт скопирован');
     } catch (e) {
-      store.say('Не удалось скопировать: ' + e);
+      goals.ctx.ui.notify('Не удалось скопировать: ' + e);
     }
   }
   const chip = (kw: string | null) => (kw && GOAL_TONES[kw] ? `color:${GOAL_TONES[kw]};background:color-mix(in srgb, ${GOAL_TONES[kw]} 15%, transparent)` : '');
   function key(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       e.preventDefault();
-      goals.goalReport = null;
+      close();
     }
   }
 </script>
 
-<div class="scrim" aria-hidden="true"></div>
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="rep" role="dialog" aria-modal="true" aria-label="Отчёт за квартал" tabindex="-1" onkeydown={key}>
   <header>
@@ -69,14 +69,13 @@
     {/each}
   </div>
   <footer>
-    {#if past && openLeft}<button onclick={() => goals.openGoalCarry(who)}>Перенести незакрытые в {quarterLabel(shiftQuarter(q, 1))}</button>{/if}
+    {#if past && openLeft}<button onclick={() => { close(); setTimeout(() => openCarry(who)); }}>Перенести незакрытые в {quarterLabel(shiftQuarter(q, 1))}</button>{/if}
     <span class="sp"></span>
-    <button class="pri" onclick={() => (goals.goalReport = null)}>Готово</button>
+    <button class="pri" onclick={close}>Готово</button>
   </footer>
 </div>
 
 <style>
-  .scrim { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.42); }
   .rep { position: fixed; z-index: 71; left: 50%; top: 36px; bottom: 36px; transform: translateX(-50%); width: min(880px, calc(100% - 48px)); display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5); overflow: hidden; outline: none; }
   header { flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 20px; background: var(--bar); border-bottom: 1px solid var(--line); }
   header b { font-size: 15px; }

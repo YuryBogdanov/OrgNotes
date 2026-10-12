@@ -40,12 +40,22 @@
     if (chosen) view = chosen;
   });
   const busy = $derived(f.type === 'date' ? busyDays(store.files) : new Map());
-  const spec = { kind: 'DATE' as const, initial: new Date(), current: null, names: [], pick: () => {} };
+  // «Вставится: DEADLINE: <…>» when the plugin says what it writes (the goal form)
+  const spec = $derived(f.type === 'date' && f.stamp ? { kind: f.stamp.kind, initial: new Date(), current: null, names: f.stamp.names, pick: () => {} } : { kind: 'DATE' as const, initial: new Date(), current: null, names: [], pick: () => {} });
 
   // ---- a place --------------------------------------------------------------------------------------------------
   const place = $derived((values[f.key] ?? null) as PlaceValue | null);
   const NEW = '\u0000new';
   const created = $derived(f.type === 'place' && place?.path && f.create ? f.create(place.path) : null);
+
+  // the choice of a place moved by the sheet's keys (a plugin's own sheet, ТЗ 27)
+  let picker: PlacePicker | undefined = $state();
+  export function move(d: 1 | -1) {
+    picker?.move(d);
+  }
+  export function focusList(which: 'file' | 'head') {
+    picker?.focusList(which);
+  }
 
   // ---- the plugin's own ----------------------------------------------------------------------------------------
   let own = $state<HTMLElement>();
@@ -102,7 +112,7 @@
   {/if}
 {:else if f.type === 'place'}
   <div class="place" role="group" aria-labelledby={id}>
-    <PlacePicker variant="columns" levels={f.levels} file={place?.path ?? null} heading={place?.create ? NEW : (place?.heading ?? null)}
+    <PlacePicker bind:this={picker} variant="columns" levels={f.levels} file={place?.path ?? null} heading={place?.create ? NEW : (place?.heading ?? null)}
       fileCap={f.fileCap} headCap={f.headCap}
       fileNote={f.note ? (rel) => ({ dim: false, ...f.note!(rel) }) : undefined}
       headNote={f.headNote ? (file, i) => f.headNote!(file.name, file.headings[i].title) : undefined}

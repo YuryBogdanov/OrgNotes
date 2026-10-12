@@ -15,6 +15,8 @@ export interface ManifestCommand {
   synonyms?: string[];
   /** «review»: the keys of an action of the plugin's review (work while its tab is shown). */
   scope?: 'review';
+  /** From the palette it asks in the palette (`ui.choose` at once): the next step of the same window. */
+  step?: boolean;
 }
 export interface ManifestNav {
   id: string;
@@ -126,7 +128,7 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
     const ok = keys.filter((k) => !RESERVED_KEYS.includes(k));
     for (const k of keys) if (!ok.includes(k)) warnings.push(`${k} у «${String(x.title)}» занято приложением`);
     if (x.scope !== undefined && x.scope !== 'review') problems.push(`команда «${x.id}»: scope — только review`);
-    commands.push({ id: x.id as string, title: String(x.title ?? ''), keys: ok, synonyms: arr(x.synonyms).filter(isStr), ...(x.scope === 'review' ? { scope: 'review' as const } : {}) });
+    commands.push({ id: x.id as string, title: String(x.title ?? ''), keys: ok, synonyms: arr(x.synonyms).filter(isStr), ...(x.scope === 'review' ? { scope: 'review' as const } : {}), ...(x.step === true ? { step: true } : {}) });
   }
   const navSections: ManifestNav[] = [];
   for (const x of arr(c.navSections).map(obj)) {

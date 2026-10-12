@@ -27,6 +27,10 @@
   const keys = {
     active: () => store.tab?.kind === REVIEW_KIND && !store.sheetOpen,
     run: (id: string) => {
+      if (id && id === plugins.review?.spec.backCommand) {
+        if (plugins.review.cur !== 0) void plugins.reviewStep(-1);
+        return true;
+      }
       const a = plugins.review?.spec.actions.find((x) => x.command === id);
       if (!a || !plugins.reviewHeading()) return false;
       void plugins.reviewAct(a.id);
@@ -83,10 +87,10 @@
   });
 </script>
 
-<CardReview cls="preview" scope={REVIEW_SCOPE} {keys} width={r?.spec.width ?? 820}
+<CardReview cls={'preview' + (r?.spec.cls ? ' ' + r.spec.cls : '')} scope={REVIEW_SCOPE} {keys} width={r?.spec.width ?? 820}
   state={r && r.cur >= 0 && c ? 'card' : r && r.cur < 0 ? 'summary' : 'empty'}
   cardKey={r && c ? r.cur + '|' + c.info.ref.path + '|' + c.info.ref.title : ''}
-  back={r ? { disabled: r.cur === 0, run: () => void plugins.reviewStep(-1), key: '' } : null}>
+  back={r ? { disabled: r.cur === 0, run: () => void plugins.reviewStep(-1), key: r.spec.backCommand ?? '' } : null}>
   {#snippet head()}
     {#if r && c}
       {#if r.spec.head}
@@ -105,8 +109,8 @@
     {#if r && c}
       <div class="cols" class:with={!!r.spec.aside}>
         <div class="ed">
-          <NarrowEditor file={c.file} line={c.heading.line} end={c.heading.end} {tab} fileKey={'preview|' + r.cur + '|' + c.file.path}
-            folded={narrow.fold ?? []} lineNote={narrow.note ?? null} />
+          <NarrowEditor file={c.file} line={c.heading.line} end={c.heading.end} {tab} fileKey={'preview|' + r.cur + '|' + c.file.path + '|' + (narrow.fold ?? []).join(',')}
+            folded={narrow.fold ?? []} lineNote={narrow.note ?? null} reveal={narrow.reveal ? { line: narrow.reveal.line, n: narrow.reveal.n, focus: true } : null} />
         </div>
         {#if r.spec.aside}<aside class="pa" use:part={() => r.spec.aside}></aside>{/if}
       </div>
