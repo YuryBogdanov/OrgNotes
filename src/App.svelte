@@ -167,7 +167,10 @@
     menu.setEnabled('copyPath', t?.kind === 'file');
     menu.setChecked('rich', store.rich);
   });
-  // closing the «Разбор Inbox» tab ends the review (everything is on disk already)
+  // closing the «Разбор Inbox» tab ends the review (everything is on disk already); so for the goals
+  $effect(() => {
+    if (store.goalReview && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'goalReview'))) store.goalReview = null;
+  });
   $effect(() => {
     if (store.review && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'review'))) store.review = null;
   });
@@ -300,6 +303,9 @@
     <div class="path">
       {#if store.mode === 'agenda'}
         {#if store.agenda}<span>Агенда</span><span class="sep">›</span><span class="last">{store.agenda.name}</span>{:else}<span class="last">Агенда</span>{/if}
+      {:else if store.tab?.kind === 'goalReview'}
+        {@const gk = store.tab.goals}
+        <span>Цели</span><span class="sep">›</span><span class="last">Разбор · {store.goalPeople.find((p) => p.key === gk)?.name ?? ''}</span>
       {:else if store.tab?.kind === 'goals'}
         {@const gk = store.tab.goals}
         <span>Цели</span><span class="sep">›</span><span class="last">{!gk || gk === '*' ? 'Обзор квартала' : (store.goalPeople.find((p) => p.key === gk)?.name ?? 'Цели')}</span>

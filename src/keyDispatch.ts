@@ -26,13 +26,14 @@ export function menuMayRun(press: string | undefined) {
   return true;
 }
 
-type Ctx = { review: typeof store.reviewKeys; editor: EditorKeys | null; window: (id: string) => boolean };
+type Ctx = { review: typeof store.reviewKeys; goals: typeof store.goalReviewKeys; editor: EditorKeys | null; window: (id: string) => boolean };
 
 function scopesNow(c: Ctx): Scope[] {
-  return [...(c.review ? (['review'] as Scope[]) : []), ...(c.editor ? (['heading', 'editor'] as Scope[]) : []), 'window', 'global'];
+  return [...(c.goals ? (['goalReview'] as Scope[]) : []), ...(c.review ? (['review'] as Scope[]) : []), ...(c.editor ? (['heading', 'editor'] as Scope[]) : []), 'window', 'global'];
 }
 function runOne(id: string, scope: Scope, c: Ctx): boolean {
   if (scope === 'review') return c.review!.run(id);
+  if (scope === 'goalReview') return c.goals!.run(id);
   if (scope === 'heading' && (PALETTE.has(id) || id === 'refile')) {
     if (!contextOf().heading || store.sheetOpen) return false;
     if (id === 'refile') store.startRefile('palette');
@@ -60,7 +61,7 @@ export function keyHandler(window: (id: string) => boolean) {
     if (store.keyRecording) return; // the settings are recording a shortcut
     const press = pressOf(e);
     if (!press) return;
-    const c: Ctx = { review: store.reviewKeys?.active() ? store.reviewKeys : null, editor: focusedEditor(), window };
+    const c: Ctx = { review: store.reviewKeys?.active() ? store.reviewKeys : null, goals: store.goalReviewKeys?.active() ? store.goalReviewKeys : null, editor: focusedEditor(), window };
     const consume = () => {
       e.preventDefault();
       e.stopPropagation();

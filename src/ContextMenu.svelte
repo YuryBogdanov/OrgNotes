@@ -3,7 +3,7 @@
     | {
         label: string; action: () => void; danger?: boolean; disabled?: boolean; shortcut?: string;
         // the tab list of a pane: a check at the active one, the tab's icon, a dot at an unsaved one
-        checked?: boolean; icon?: 'file' | 'agenda' | 'untitled' | 'review' | 'goals'; dot?: boolean; italic?: boolean;
+        checked?: boolean; icon?: 'file' | 'agenda' | 'untitled' | 'review' | 'goals' | 'goalReview'; dot?: boolean; italic?: boolean;
       }
     | 'sep';
 </script>
@@ -40,7 +40,7 @@
         {/if}
         {#if it.icon}
           <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray={it.icon === 'untitled' ? '2.2 2' : undefined} aria-hidden="true">
-            {#if it.icon === 'agenda'}<rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2.5v3M13 2.5v3" />{:else if it.icon === 'review'}<path d="M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4" />{:else if it.icon === 'goals'}<path d="M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" />{:else}<path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" />{/if}
+            {#if it.icon === 'agenda'}<rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2.5v3M13 2.5v3" />{:else if it.icon === 'review'}<path d="M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4" />{:else if it.icon === 'goals' || it.icon === 'goalReview'}<path d="M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" />{:else}<path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" />{/if}
           </svg>
         {/if}
         <span class="lb" class:it={it.italic}>{it.label}</span>

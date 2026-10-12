@@ -35,7 +35,11 @@
   <div class="res" aria-live="polite">
     <span class="long">{longDate(sel)}</span>
     <span class="rel">{bad ? 'Не похоже на дату' : rel}</span>
-    <span class="raw"><span class="lbl">Вставится:</span>{' '}<span class="kw">{spec.kind}:</span>{' '}<span class="ts">{stampText(sel, spec.names, spec.old)}</span></span>
+    {#if spec.kind === 'MARK'}
+      <span class="raw"><span class="lbl">Отметка:</span>{' '}<span class="ts">{stampText(sel, spec.names).replace(/^<(.*)>$/, '[$1]')}</span></span>
+    {:else}
+      <span class="raw"><span class="lbl">Вставится:</span>{' '}<span class="kw">{spec.kind}:</span>{' '}<span class="ts">{stampText(sel, spec.names, spec.old)}</span></span>
+    {/if}
   </div>
   <div class="months" {onwheel}>
     {#each months as mo, mi (mo.y + '-' + mo.m)}

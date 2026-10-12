@@ -73,6 +73,7 @@
       <button aria-label="Следующий квартал" onclick={() => (store.goalsQuarter = shiftQuarter(q, 1))}>Q{shiftQuarter(q, 1).q} ›</button>
     </div>
     <button class="pri" disabled={!store.goalPeople.length} onclick={() => store.openGoalForm(person?.key ?? null)}>+ Новая цель</button>
+    {#if person}<button class="sec" disabled={!person.found} onclick={() => store.startGoalReview(person.key)}>Разобрать цели</button>{/if}
   </header>
 
   {#if !store.goalPeople.length}
@@ -98,6 +99,7 @@
               <span class="av" style="background:{p.color}" aria-hidden="true">{p.ini}</span>
               <span class="gn">{p.name}</span><span class="gs">{p.src.file.split('/').pop()} › {p.src.heading}</span>
               <span class="sum">{p.found ? summary(p) : ''}</span>
+              {#if all && p.found}<button class="rv" onclick={() => store.startGoalReview(p.key)}>Разобрать цели</button>{/if}
               <button class="plus" aria-label="Новая цель: {p.name}" title="Новая цель" disabled={!p.found} onclick={() => store.openGoalForm(p.key)}>+</button>
             </div>
             {#if !p.found}
@@ -112,7 +114,7 @@
                 {@const closed = isDone(g, done(p))}
                 {@const soon = deadlineSoon(g, done(p))}
                 {@const silent = isSilent(g)}
-                <button class="row" onclick={() => store.openGoalFile(p.key, g.line)}>
+                <button class="row" title="⌥-клик — разобрать с этой цели" onclick={(e) => (e.altKey && !closed ? store.startGoalReview(p.key, g.title) : store.openGoalFile(p.key, g.line))}>
                   <span class="st" class:tone-chip={!!g.keyword && !GOAL_TONES[g.keyword]} style={chip(g.keyword, p)}>{g.keyword ?? '—'}</span>
                   <span class="tt"><span class="t" class:closed>{g.title}</span>{#if resultLine(g)}<span class="res">Результат: {resultLine(g)}</span>{/if}</span>
                   {#if closed && g.closed}
@@ -145,6 +147,8 @@
   .qs .cur { height: 24px; padding: 0 10px; display: flex; align-items: center; border-radius: 5px; background: var(--segon); box-shadow: var(--shadow); font-size: 12.5px; font-weight: 600; }
   .pri { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: var(--acc); color: var(--onacc); font-weight: 600; }
   .pri:disabled { opacity: 0.5; }
+  .sec { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); }
+  .rv { height: 24px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12px; }
   .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 0 24px 14px; }
   .tile { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: 9px; background: var(--side); border: 1px solid var(--line); text-align: left; color: var(--fg); }
   .tile.on { border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); }
