@@ -17,7 +17,7 @@ import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, them
 import { navOf, viewOf } from './views';
 import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
-import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
+import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow, type WorkflowDef } from './org';
 
 export interface NoteFile {
   name: string; // relative path inside the notes folder
@@ -337,8 +337,9 @@ class Store {
     return Object.values(bundledConfig)[0] ?? null;
   }
 
-  /** The project config as parsed last, for the features' own keys (`onConfig`). */
-  private parsedConfig: any = null;
+  /** The project config as parsed last, for the features' own keys (`onConfig`, and their settings saved there
+   *  before roadmap 0.6). */
+  private parsedConfig = $state.raw<any>(null);
   private configHooks: ((parsed: any) => void)[] = [];
   /** A feature reads its keys of config.json: now, and every time it is read again. */
   onConfig(fn: (parsed: any) => void) {
@@ -360,11 +361,111 @@ class Store {
     this.inboxCfg = readInbox(parsed?.inbox);
     this.parsedConfig = parsed;
     for (const fn of this.configHooks) fn(parsed);
+    this.baseConfig = config;
+    const withSets = this.withFeatureSets(config);
     // only the statuses make the notes be read again; agendas alone do not
-    const same = JSON.stringify(config) === JSON.stringify(this.config);
-    this.config = config;
+    const same = JSON.stringify(withSets) === JSON.stringify(this.config);
+    this.config = withSets;
     if (warnings.length) this.say('.orgnotes/config.json: ' + warnings[0] + (warnings.length > 1 ? ` (и ещё ${warnings.length - 1})` : ''));
     return !same;
+  }
+
+  // ---- what features keep and register (roadmap 0.6) -----------------------------------------------------------
+  /** Sets of statuses of the features (the goals' «Цели на квартал»): in memory while the feature is on, never
+   *  written to config.json; `when` says whether the project needs it (no set knows ACTIVE yet, say). */
+  private featureSets: { id: string; def: WorkflowDef; when?: (defs: WorkflowDef[]) => boolean }[] = [];
+  registerStatusSet(id: string, def: WorkflowDef, when?: (defs: WorkflowDef[]) => boolean) {
+    this.featureSets.push({ id, def, when });
+  }
+  /** The project's config as written (the features' sets not added). */
+  private baseConfig: ProjectConfig = EMPTY_CONFIG;
+  /** A feature's `when` may have changed (goals added): the sets again, the notes read again if they did. */
+  refreshStatusSets() {
+    const next = this.withFeatureSets(this.baseConfig);
+    if (JSON.stringify(next) === JSON.stringify(this.config)) return;
+    this.config = next;
+    this.rebuildAll();
+  }
+  private withFeatureSets(c: ProjectConfig): ProjectConfig {
+    const add = this.featureSets.filter((x) => !x.when || x.when(c.workflows)).map((x) => ({ ...x.def, feature: x.id }));
+    if (!add.length) return c;
+    // a project without sets of its own works with «Задачи»: it stays the first (the default one)
+    return { ...c, workflows: [...(c.workflows.length ? c.workflows : [DEFAULT_SEQUENCE]), ...add] };
+  }
+
+  /**
+   * A feature's own settings (roadmap 0.6): what describes the files and the team's ways (the goals' sources, the
+   * calendar's files) in the notes folder, `.orgnotes/plugins/<id>.json`, going along with the files; what is
+   * personal on this Mac. Before 0.6 they were keys of config.json: read from there until written anew.
+   */
+  private storages = new Map<string, StorageSpec>();
+  /** The folder's files of the features, as read (undefined: there is none yet). */
+  private featureFiles = $state<Record<string, unknown>>({});
+  registerStorage(id: string, o: StorageSpec = {}) {
+    this.storages.set(id, o);
+  }
+  /** config.json still has the feature's old keys (its file is not written yet). */
+  hasLegacy(id: string) {
+    return (this.storages.get(id)?.legacyKeys ?? []).some((k) => this.parsedConfig && k in this.parsedConfig);
+  }
+  /** The feature's settings in the notes folder (its file, else what config.json had before 0.6). */
+  folderData(id: string): unknown {
+    return id in this.featureFiles ? this.featureFiles[id] : this.storages.get(id)?.legacy?.(this.parsedConfig);
+  }
+  async setFolderData(id: string, value: unknown): Promise<boolean> {
+    const text = JSON.stringify(value, null, 2) + '\n';
+    try {
+      if (isTauri) await invoke('write_feature_file', { id, text });
+    } catch (e) {
+      this.say('Не удалось сохранить настройки: ' + e);
+      return false;
+    }
+    this.featureFiles = { ...this.featureFiles, [id]: value };
+    this.refreshStatusSets();
+    // moved: the old keys leave config.json (the file is the place now)
+    const keys = (this.storages.get(id)?.legacyKeys ?? []).filter((k) => this.parsedConfig && k in this.parsedConfig);
+    if (keys.length)
+      await this.updateConfig((raw) => {
+        try {
+          const p = raw ? JSON.parse(raw) : {};
+          for (const k of keys) delete p[k];
+          return JSON.stringify(p, null, 2) + '\n';
+        } catch {
+          return raw ?? '';
+        }
+      });
+    return true;
+  }
+  private async readFeatureFiles() {
+    const out: Record<string, unknown> = {};
+    if (isTauri)
+      for (const id of this.storages.keys()) {
+        try {
+          const t = await invoke<string | null>('read_feature_file', { id });
+          if (t !== null) out[id] = JSON.parse(t);
+        } catch {
+          /* unreadable: as if there were none */
+        }
+      }
+    this.featureFiles = out;
+  }
+  /** The feature's personal settings on this Mac (else what `legacy` gives: config.json before 0.6). */
+  localData(id: string): unknown {
+    void this.localTick;
+    const raw = lsGet('feature:' + id);
+    if (raw !== null) {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        /* the default */
+      }
+    }
+    return this.storages.get(id)?.localLegacy?.(this.parsedConfig);
+  }
+  private localTick = $state(0);
+  setLocalData(id: string, value: unknown) {
+    lsSet('feature:' + id, JSON.stringify(value));
+    this.localTick++;
   }
 
   /** Re-parse every note with the current project config (unsaved edits stay). */
@@ -772,6 +873,7 @@ class Store {
     // and anything the user does after that must not be overwritten by the tail of this function
     const list = this.sorted(await this.listFiles());
     this.configRaw = null;
+    await this.readFeatureFiles(); // first: a feature's set of statuses may depend on them
     this.takeConfig(await this.readConfig());
     const cfg = this.config;
     const files = list.map((l) => fromDisk(l, cfg));
@@ -2074,6 +2176,15 @@ class Store {
 
 export const DEFAULT_CAPTURE_KEY = 'Shift+CmdOrCtrl+KeyI';
 /** What a feature does around a move it asked for. */
+/** Where a feature keeps its settings and where they were before roadmap 0.6 (config.json). */
+export interface StorageSpec {
+  /** Its folder's settings as config.json had them. */
+  legacy?: (parsed: any) => unknown;
+  /** The keys of config.json dropped once the feature's file is written. */
+  legacyKeys?: string[];
+  /** Its settings of this Mac as config.json had them. */
+  localLegacy?: (parsed: any) => unknown;
+}
 /** What a feature's tab does with the keys of its scope. */
 export interface ScopeKeys {
   active: () => boolean;

@@ -63,6 +63,7 @@ export interface WorkflowDef {
   name: string;
   states: WorkflowState[];
   initial?: string; // the status a new task gets; an open state of this workflow (default: the first open one)
+  feature?: string; // a set a feature registered (roadmap 0.6): in memory, not written to config.json
 }
 
 export interface Workflow {

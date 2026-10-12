@@ -242,3 +242,11 @@ describe('whole-draft validation and output', () => {
     expect(toJson(a, d)).toBe(a);
   });
 });
+
+describe('a feature\'s set (roadmap 0.6)', () => {
+  it('is not in the editor of the statuses', () => {
+    const c = cfg({ workflows: [{ name: 'A', states: [{ name: 'ONE' }, { name: 'END', done: true }] }, { name: 'B', states: [{ name: 'ACTIVE' }, { name: 'X', done: true }] }] });
+    const d = fromConfig({ ...c, workflows: c.workflows.map((w) => (w.name === 'B' ? { ...w, feature: 'goals' } : w)) });
+    expect(d.workflows.map((w) => w.name)).toEqual(['A']);
+  });
+});

@@ -909,6 +909,31 @@ fn write_project_config(state: State<AppState>, text: String) -> Result<(), Stri
 }
 
 
+// ---- a feature's own settings in the notes folder (roadmap 0.6): `.orgnotes/plugins/<id>.json` ------------------
+
+fn feature_file(root: &Path, id: &str) -> Result<PathBuf, String> {
+    if id.is_empty() || id.len() > 64 || !id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+        return Err("bad feature id".into());
+    }
+    Ok(root.join(CONFIG_DIR).join("plugins").join(format!("{id}.json")))
+}
+
+#[tauri::command]
+fn read_feature_file(state: State<AppState>, id: String) -> Result<Option<String>, String> {
+    let p = feature_file(&root_of(&state)?, &id)?;
+    Ok(fs::read_to_string(p).ok())
+}
+
+#[tauri::command]
+fn write_feature_file(state: State<AppState>, id: String, text: String) -> Result<(), String> {
+    let p = feature_file(&root_of(&state)?, &id)?;
+    let dir = p.parent().ok_or("no folder")?;
+    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let tmp = p.with_extension("json.tmp");
+    fs::write(&tmp, text).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, &p).map_err(|e| e.to_string())
+}
+
 /// "Сохранить как…" for a tab that has no file yet. `.org` is added unless the name already has an
 /// extension; an existing file is only replaced when `overwrite` is set (the user confirmed "Заменить").
 fn save_new_in(root: &Path, parent: &str, name: &str, text: &str, overwrite: bool) -> Result<String, String> {
@@ -1120,7 +1145,9 @@ pub fn run() {
             write_theme,
             delete_theme,
             export_text,
-            import_text
+            import_text,
+            read_feature_file,
+            write_feature_file
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

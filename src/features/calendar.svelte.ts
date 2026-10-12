@@ -8,7 +8,7 @@ import { startOf, sequenceFor } from '../org';
 import { weekdayNames } from '../edits';
 import { bareTitle } from '../refile';
 import { byDay, entriesIn, hasDated, isoDay, type CalEntry, type Layer } from '../calIndex';
-import { DEFAULT_CAL, insertEntry, moveEntry, readCal, withCal, type CalSettings, type NewEntry } from '../calEdit';
+import { CAL_FOLDER_KEYS, CAL_LOCAL_KEYS, calPart, insertEntry, moveEntry, readCal, type CalSettings, type NewEntry } from '../calEdit';
 import type { Step } from '../journal';
 
 const lsGet = (k: string) => {
@@ -36,12 +36,21 @@ function readLayers(): Layer[] {
 }
 
 class Calendar {
-  // ---- «Настройки → Календарь» (`calendar` in config.json) -----------------------------------------------------
-  cfg = $state.raw<CalSettings>(DEFAULT_CAL);
+  // ---- «Настройки → Календарь»: what new entries go to and get in the notes folder (`.orgnotes/plugins/
+  // calendar.json`), the look and the moves on this Mac -------------------------------------------------------------
+  cfg = $derived<CalSettings>(
+    readCal({ ...((store.folderData('calendar') as object | undefined) ?? {}), ...((store.localData('calendar') as object | undefined) ?? {}) }),
+  );
   async setCfg(c: Partial<CalSettings>) {
     const next = { ...this.cfg, ...c };
-    this.cfg = next;
-    return store.updateConfig((raw) => withCal(raw, next));
+    store.setLocalData('calendar', calPart(next, CAL_LOCAL_KEYS));
+    if (Object.keys(c).some((k) => (CAL_FOLDER_KEYS as readonly string[]).includes(k)) || this.legacy())
+      return store.setFolderData('calendar', calPart(next, CAL_FOLDER_KEYS));
+    return true;
+  }
+  /** Its settings still in config.json (before roadmap 0.6): the first change moves them. */
+  private legacy() {
+    return store.hasLegacy('calendar');
   }
 
   // ---- the tab -----------------------------------------------------------------------------------------------
@@ -160,4 +169,5 @@ class Calendar {
 }
 
 export const calendar = new Calendar();
-store.onConfig((parsed) => (calendar.cfg = readCal(parsed?.calendar)));
+// before roadmap 0.6 all of it was `calendar` in config.json
+store.registerStorage('calendar', { legacy: (parsed) => parsed?.calendar, legacyKeys: ['calendar'], localLegacy: (parsed) => parsed?.calendar });

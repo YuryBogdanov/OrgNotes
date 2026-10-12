@@ -177,7 +177,17 @@ export function readCal(raw: unknown): CalSettings {
     last: { task: str(v.last?.task), event: str(v.last?.event) },
   };
 }
-/** The config text with the settings: only what differs from the defaults is written. */
+/** Where each setting lives (roadmap 0.6): what new entries go to and get — the folder's; the look and the moves —
+ *  this Mac's. */
+export const CAL_FOLDER_KEYS = ['pick', 'taskFile', 'taskHeading', 'eventFile', 'eventHeading', 'taskStatus', 'eventStatus', 'dateKind', 'minutes', 'last'] as const;
+export const CAL_LOCAL_KEYS = ['view', 'from', 'to', 'weekNumbers', 'weekends', 'undated', 'keepDeadline', 'askRepeat'] as const;
+/** The settings of `keys` that differ from the defaults. */
+export function calPart(c: CalSettings, keys: readonly (keyof CalSettings)[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of keys) if (JSON.stringify(c[k]) !== JSON.stringify(DEFAULT_CAL[k])) out[k] = c[k];
+  return out;
+}
+/** The config text with the settings: only what differs from the defaults is written (before roadmap 0.6). */
 export function withCal(raw: string | null, c: CalSettings): string {
   let base: Record<string, unknown> = {};
   try {

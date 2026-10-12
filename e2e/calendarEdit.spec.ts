@@ -17,6 +17,9 @@ async function open(page: Page, files: Record<string, string> = FILES(), cfg: ob
 const cal = (page: Page) => page.locator('section.pane.active .cal');
 const cell = (page: Page, day: string) => cal(page).locator(`.cell[data-day="${day}"]`);
 const disk = (page: Page, p = WORK) => page.evaluate((p) => (window as any).__disk[p] as string, p);
+/** The calendar's settings: the folder's file and this Mac's (roadmap 0.6). */
+const calFolder = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/plugins/calendar.json'] ?? 'null'));
+const calLocal = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('feature:calendar') ?? 'null'));
 const config = (page: Page) => page.evaluate((p) => JSON.parse((window as any).__disk[p] ?? 'null'), CFG);
 
 /** Playwright cannot start a native drag in WebKit: the HTML5 drag events are dispatched directly. */
@@ -130,12 +133,12 @@ test('«Спрашивать»: the file is chosen in the sheet, and remembered 
   await sheet.getByLabel('Заголовок').fill('Сдать отчёт');
   await sheet.getByLabel('Заголовок').press('Enter');
   await expect.poll(() => disk(page, '/mock/finance.org')).toContain('\n* TODO Сдать отчёт\nSCHEDULED: <2026-10-12 Пн>\n');
-  await expect.poll(async () => (await config(page)).calendar.last).toEqual({ task: 'finance.org', event: null });
+  await expect.poll(async () => (await calFolder(page))?.last).toEqual({ task: 'finance.org', event: null });
   await page.getByRole('region', { name: 'Выбранный день' }).getByRole('button', { name: '+ Задача' }).click();
   await expect(page.getByRole('dialog', { name: 'Новая задача' }).getByLabel('Файл')).toHaveValue('finance.org');
 });
 
-test('«Настройки → Календарь»: written to config.json; the view, hours, week numbers, weekends, «Без даты» follow', async ({ page }) => {
+test('«Настройки → Календарь»: what new entries go to in the folder\'s file, the look on this Mac; the view, hours, week numbers, weekends, «Без даты» follow', async ({ page }) => {
   await open(page);
   await expect(cal(page).locator('.row .wk').first()).toHaveText('40');
   await page.keyboard.press('Meta+,');
@@ -153,7 +156,9 @@ test('«Настройки → Календарь»: written to config.json; the
   await page.getByRole('dialog', { name: 'Файл для событий' }).getByPlaceholder('Найти файл').fill('journal');
   await page.keyboard.press('Enter');
   await expect(s.getByTestId('cal-event-file')).toHaveText('journal.org');
-  await expect.poll(async () => (await config(page)).calendar).toEqual({ taskHeading: 'Календарь', eventFile: 'journal.org', view: 'week', from: 9, weekNumbers: false, weekends: false, undated: false });
+  await expect.poll(async () => calFolder(page)).toEqual({ taskHeading: 'Календарь', eventFile: 'journal.org' });
+  expect(await calLocal(page)).toEqual({ view: 'week', from: 9, weekNumbers: false, weekends: false, undated: false });
+  expect((await config(page)).calendar).toBeUndefined(); // moved out of config.json
   await s.getByRole('button', { name: 'Готово' }).click();
   await expect(cal(page).locator('.row .wk')).toHaveCount(0);
   await expect(cal(page).locator('.wd span')).toHaveText(['Пн', 'Вт', 'Ср', 'Чт', 'Пт']);
