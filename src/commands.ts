@@ -191,6 +191,14 @@ register({
   when: () => true, hint: () => (store.rich ? 'включён' : 'выключен'), run: () => store.setRich(!store.rich),
 });
 register({
+  id: 'navCollapse', title: 'Навигатор: свернуть всё', icon: 'folder', group: 'general', synonyms: ['дерево', 'папки', 'свернуть'],
+  when: () => store.files.length > 0, run: () => store.navTree('collapse'),
+});
+register({
+  id: 'navExpand', title: 'Навигатор: развернуть всё', icon: 'folder', group: 'general', synonyms: ['дерево', 'папки', 'развернуть'],
+  when: () => store.files.length > 0, run: () => store.navTree('expand'),
+});
+register({
   id: 'settings', title: 'Настройки…', icon: 'gear', group: 'general', synonyms: ['параметры', 'клавиши', 'сочетания', 'preferences'],
   when: () => true, run: () => void setTimeout(() => store.openSettings()), // once the palette is closed
 });

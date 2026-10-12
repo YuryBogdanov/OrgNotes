@@ -415,6 +415,13 @@ class Store {
   });
   /** A shortcut is being recorded in the settings: the window's keys wait. */
   keyRecording = $state(false);
+  /** «Навигатор: свернуть / развернуть всё» from the palette or a key: the tree of «Файлы» does it. */
+  navTreeReq = $state<{ kind: 'collapse' | 'expand'; n: number } | null>(null);
+  navTree(kind: 'collapse' | 'expand') {
+    this.showNav = true;
+    this.setNavMode('files');
+    this.navTreeReq = { kind, n: Date.now() };
+  }
   /** The first shortcut of a command, for tooltips and hints («⇧⌘O»); '' if it has none. */
   keyHint(id: string) {
     return this.bindings.get(id)?.[0] ?? '';

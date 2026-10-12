@@ -263,3 +263,11 @@ export async function openSettingsSheet(page: import('@playwright/test').Page, s
   await expect(page.getByRole('dialog', { name: 'Настройки' })).toBeVisible();
   await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab', { name: section, exact: true }).click();
 }
+
+/** «Развернуть всё» in the navigator: the tree is folded by default (ТЗ 02); tests that click deep rows open it. */
+export async function expandTree(page: import('@playwright/test').Page) {
+  const { expect } = await import('@playwright/test');
+  const b = page.getByRole('button', { name: 'Развернуть всё' });
+  await expect(b).toBeVisible();
+  if (await b.isEnabled()) await b.click();
+}

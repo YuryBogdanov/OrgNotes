@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, expandTree } from './tauriMock';
 
 // ТЗ «Перенос заголовка в другой файл (файл → заголовок)».
 const W = '/mock/work.org';
@@ -305,6 +305,7 @@ test.describe('nothing is lost', () => {
 
   test('the target open with unsaved edits: they are saved first, the editor takes the move without a conflict', async ({ page }) => {
     await open(page);
+    await expandTree(page); // folded by default (ТЗ 02)
     await page.locator('.nav .row[data-key="' + F + '"]').click();
     await page.locator('section.pane .cm-line', { hasText: 'Аудит 2026' }).click();
     await page.keyboard.press('End');

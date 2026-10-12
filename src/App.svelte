@@ -89,6 +89,8 @@
     newFolder: () => store.canManageFiles && store.openPalette('newFolder'),
     outline: () => store.showOutline(),
     captureHere: () => store.openCapture(),
+    navCollapse: () => store.navTree('collapse'),
+    navExpand: () => store.navTree('expand'),
     newFile: () => {
       if (!store.canManageFiles) return;
       const dir = store.file && store.file.name.includes('/') ? store.file.name.slice(0, store.file.name.lastIndexOf('/')) : '';

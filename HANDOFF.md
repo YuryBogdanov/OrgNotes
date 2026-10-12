@@ -95,6 +95,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 | `links.ts` | Link extraction line by line (uniorg per candidate line, cached by line text; a whole-file parse was ~9 s on 50k lines), resolution, backlinks, rewrite on rename. |
 | `App.svelte` | Window shell: toolbar (grid, centred path), `NavPanel`, panes, inspector, sheets/overlays, menu actions (the menu is rebuilt from the shortcuts), the window's key handler. `#capture` hash = the quick-entry panel. |
 | `NavPanel.svelte` | Navigator mode bar (Файлы, Inbox, Задачи*, Агенда, Теги*, Поиск*; * = disabled) → `Navigator` / `InboxPanel` / `AgendaList`. ⌃⌘1/2/3. |
+| `Navigator.svelte`, `navTree.ts` | The file tree (ТЗ 02): folded by default, an explicit set of open keys per notes folder (`nav:open:<dir>`); the path to the current file and heading opens when it changes. «Свернуть всё» keeps only that path, «Развернуть всё» opens all (headings left closed over `EXPAND_CAP` = 2000 nodes). ⌥-click / ⌥→ ⌥← on a subtree. Keys: `folder/`, file path, `path#Title › Sub` for headings. |
 | `JumpBar.svelte` | Toolbar path, Xcode style; ⌃⌘J keyboard; segment menu = everything in the segment's folder (folders, separator, files); filter. |
 | `Palette.svelte` + `commands.ts` + `fuzzy.ts` | Command palette (⇧⌘P), goto file (⇧⌘O), new file (⇧⌘N), `#` headings. |
 | `Agenda.svelte`, `AgendaList.svelte`, `AgendaBuilder.svelte`, `agendas.ts` | Built-in agenda + custom agendas (blocks of conditions, stored in config.json); the builder is a modal sheet. `agendas.ts` is the pure engine. |
@@ -132,7 +133,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 - **App config (Rust):** the notes dir and its bookmark, in the app config dir. Identifier `dev.local.panopticon`.
 - **localStorage (per Mac):**
   - `layout:<dir>`, `lastFile:<dir>`, `saveAsDir:…`;
-  - `nav:mode`, `nav:headings`, `inspector:tab`, `editor:levels`, `editor:drawers` ('0' = drawers open on open), `editor:rich`, `editor:richNumbers`, `find:cs`, `find:word`, `search:recent`;
+  - `nav:mode`, `nav:headings`, `nav:open:<dir>` (open nodes of the tree), `inspector:tab`, `editor:levels`, `editor:drawers` ('0' = drawers open on open), `editor:rich`, `editor:richNumbers`, `find:cs`, `find:word`, `search:recent`;
   - `capture:key`, `capture:global`, `capture:draft`, `capture:file`;
   - `keys` {preset: emacs|mac, overrides: {commandId: [shortcuts]}}, `settings:section`.
 
