@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { inboxReview } from './features/review.svelte';
   import { goals } from './features/goals.svelte';
   import { calendar } from './features/calendar.svelte';
   import { onMount, untrack } from 'svelte';
@@ -175,7 +176,7 @@
     navInbox: () => store.setNavMode('inbox'),
     navAgendas: () => store.setNavMode('agendas'),
     capture: () => store.openCapture(),
-    review: () => store.startReview(),
+    review: () => inboxReview.startReview(),
     rich: () => store.setRich(!store.rich),
     find: () => store.askFind('open'),
     findAll: () => store.openSearch(window.getSelection()?.toString() ?? ''),
@@ -207,7 +208,7 @@
     if (goals.goalReview && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'goalReview'))) goals.goalReview = null;
   });
   $effect(() => {
-    if (store.review && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'review'))) store.review = null;
+    if (inboxReview.review && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'review'))) inboxReview.review = null;
   });
 
   // the panel of the quick entry knows the Inbox file's name from here

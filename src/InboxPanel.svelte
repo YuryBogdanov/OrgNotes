@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { inbox } from './features/inbox.svelte';
+  import { inboxReview } from './features/review.svelte';
   import { tick } from 'svelte';
   import { store } from './store.svelte';
   import { ago, type InboxItem } from './inbox';
@@ -10,7 +12,7 @@
   // date, done, delete. Not set up yet (or the file is gone): a stub to choose or create the file.
   const cfg = $derived(store.inboxCfg);
   const file = $derived(store.inboxFile);
-  const items = $derived(store.inboxList);
+  const items = $derived(inbox.list);
   const missing = $derived(!!cfg.file && !file);
 
   let sel = $state(0);
@@ -29,7 +31,7 @@
     leaving = it.line;
     await new Promise((r) => setTimeout(r, 180));
     leaving = null;
-    await store.inboxDone(it);
+    await inbox.done(it);
     list?.focus();
   }
   let confirmDel = $state<InboxItem | null>(null);
@@ -39,14 +41,14 @@
       return;
     }
     confirmDel = null;
-    await store.inboxDelete(it);
+    await inbox.remove(it);
     list?.focus();
   }
-  const refile = (it: InboxItem) => store.startRefile('inbox', it);
+  const refile = (it: InboxItem) => inbox.refile(it);
 
   // ---- «Разбор» ---------------------------------------------------------------------------------------------
-  const review = $derived(store.review);
-  const pending = $derived(file ? store.reviewPending : []);
+  const review = $derived(inboxReview.review);
+  const pending = $derived(file ? inboxReview.reviewPending : []);
   const oldest = $derived(Math.max(0, ...pending.map((x) => ageDays(x.created) ?? 0)));
   const handled = $derived(review ? review.items.filter((x) => x.result && x.result !== 'skip').length : 0);
   const skippedN = $derived(review ? review.items.filter((x) => x.result === 'skip').length : 0);
@@ -58,7 +60,7 @@
   function showCard(i: number) {
     const at = store.layout.panes.flatMap((p, pi) => p.tabs.map((t, ti) => ({ t, pi, ti }))).find((x) => x.t.kind === 'review');
     if (at) store.activateTab(at.pi, at.ti);
-    store.reviewShow(i);
+    inboxReview.reviewShow(i);
   }
 
   // ---- the date popover ----------------------------------------------------------------------------------------
@@ -81,7 +83,7 @@
   async function setDate(d: Date | null) {
     const p = datePop;
     datePop = null;
-    if (p) await store.inboxDate(p.it, p.kind, d);
+    if (p) await inbox.date(p.it, p.kind, d);
   }
   const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -94,7 +96,7 @@
       void tick().then(() => list?.querySelector('.row.sel')?.scrollIntoView({ block: 'nearest' }));
     } else if (e.key === 'Enter' && it) {
       e.preventDefault();
-      store.openInboxItem(it);
+      inbox.openItem(it);
     }
   }
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
@@ -105,7 +107,7 @@
     menu = {
       x: e.clientX, y: e.clientY,
       items: [
-        { label: 'Открыть', action: () => store.openInboxItem(it) },
+        { label: 'Открыть', action: () => inbox.openItem(it) },
         { label: 'Перенести…', action: () => refile(it) },
         { label: 'Дата…', action: () => openDate(at, it) },
         { label: 'Готово', action: () => void done(it) },
@@ -120,10 +122,10 @@
   <div class="head">
     <span class="title" title={file?.name}>{file ? `INBOX · ${items.length}` : 'INBOX'}</span>
     {#if file && review}
-      <button class="rv stop" onclick={() => store.endReview()}>
+      <button class="rv stop" onclick={() => inboxReview.endReview()}>
         <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h10v10H5z" /></svg>Закончить</button>
     {:else if file}
-      <button class="rv" disabled={!pending.length} title={pending.length ? store.titled('Разобрать Inbox', 'review') : 'Нечего разбирать'} onclick={() => store.startReview()}>
+      <button class="rv" disabled={!pending.length} title={pending.length ? store.titled('Разобрать Inbox', 'review') : 'Нечего разбирать'} onclick={() => inboxReview.startReview()}>
         <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4.5l9 5.5-9 5.5z" /></svg>Разобрать</button>
     {/if}
     <button class="plus" aria-label={store.titled('Новая задача в Inbox', 'capture')} title={store.titled('Новая задача в Inbox', 'capture')} onclick={() => store.openCapture()}>
@@ -175,8 +177,8 @@
     <div class="list" bind:this={list} role="listbox" tabindex="0" aria-label="Задачи Inbox" aria-activedescendant="ib-{sel}" onkeydown={key}>
       {#each items as it, i (it.line + ':' + it.title)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="row" class:sel={i === sel} class:leaving={leaving === it.line || store.inboxLeaving === it.line} id="ib-{i}" role="option" aria-selected={i === sel} data-line={it.line}
-          onclick={() => { sel = i; list?.focus(); }} ondblclick={() => store.openInboxItem(it)} oncontextmenu={(e) => context(e, it, i)}>
+        <div class="row" class:sel={i === sel} class:leaving={leaving === it.line || inbox.leaving === it.line} id="ib-{i}" role="option" aria-selected={i === sel} data-line={it.line}
+          onclick={() => { sel = i; list?.focus(); }} ondblclick={() => inbox.openItem(it)} oncontextmenu={(e) => context(e, it, i)}>
           <button class="check" aria-label="Готово: {it.title}" title="Готово" onclick={(e) => { e.stopPropagation(); void done(it); }}></button>
           <div class="main">
             <div class="line1">

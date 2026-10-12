@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { inboxReview } from './features/review.svelte';
   import { calendar } from './features/calendar.svelte';
   import { onMount } from 'svelte';
   import { store } from './store.svelte';
@@ -12,7 +13,7 @@
   // dashed frame, and the task is «— эта задача» in the list of the day. No dragging: dates are set by the card.
   let { task }: { task: { path: string; line: number; date: Date | null } } = $props();
 
-  const open = $derived(store.reviewCal);
+  const open = $derived(inboxReview.reviewCal);
   // the month of the task's date, else this month; leafing holds until the next card
   let month = $state(new Date());
   let shownFor = '';
@@ -64,7 +65,7 @@
 </script>
 
 <div class="rcal">
-  <button class="toggle" aria-expanded={open} onclick={() => (store.reviewCal = !open)} title="{open ? 'Скрыть' : 'Показать'} календарь{store.keyHint('reviewCalendar') ? ' · ' + store.keyHint('reviewCalendar') : ''}">
+  <button class="toggle" aria-expanded={open} onclick={() => (inboxReview.reviewCal = !open)} title="{open ? 'Скрыть' : 'Показать'} календарь{store.keyHint('reviewCalendar') ? ' · ' + store.keyHint('reviewCalendar') : ''}">
     <svg class="chev" class:open width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2l4 4-4 4" /></svg>
     <span class="tl">{open ? 'Скрыть календарь' : 'Показать календарь'}</span>
     <span class="sub">{monthTitle(month)} · {entriesWord(inMonth)}</span>

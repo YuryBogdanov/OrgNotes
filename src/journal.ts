@@ -12,6 +12,8 @@ export interface HeadingRef {
   line: number;
   title: string;
 }
+/** The reference of a heading as it is now. */
+export const refOf = (f: { path: string }, h: { line: number; title: string }): HeadingRef => ({ path: f.path, line: h.line, title: h.title });
 export interface Change {
   path: string;
   before: string;

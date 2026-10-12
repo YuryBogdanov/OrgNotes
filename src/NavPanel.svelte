@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { inbox } from './features/inbox.svelte';
   import { store } from './store.svelte';
   import Navigator from './Navigator.svelte';
   import AgendaList from './AgendaList.svelte';
@@ -23,7 +24,7 @@
     { id: 'search', label: 'Поиск по заметкам', icon: 'M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM13.5 13.5L17 17', on: 'search', key: 'navSearch' },
   ];
   // the number of unsorted Inbox tasks on its button (0: none; more than 99: «99+»)
-  const count = $derived(store.inboxCfg.counter ? store.inboxList.length : 0);
+  const count = $derived(store.inboxCfg.counter ? inbox.list.length : 0);
 </script>
 
 <div class="panel">
