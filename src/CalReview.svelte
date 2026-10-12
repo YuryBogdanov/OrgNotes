@@ -152,7 +152,6 @@
   .num { align-self: flex-end; min-width: 20px; height: 20px; padding: 0 4px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 500; }
   .num.today { background: var(--acc); color: var(--onacc); font-weight: 700; }
   .ch { --tc: var(--tl, var(--next)); flex: 0 0 18px; height: 18px; width: 100%; display: flex; align-items: center; gap: 4px; padding: 0 5px; border: 0; border-radius: 4px; background: color-mix(in srgb, var(--tc) 14%, transparent); color: var(--fg); font-size: 11px; overflow: hidden; white-space: nowrap; text-align: left; }
-  @media (prefers-color-scheme: dark) { .ch { --tc: var(--td, var(--next)); } }
   .ch .dot { flex: 0 0 6px; width: 6px; height: 6px; border-radius: 3px; background: var(--tc); }
   .ch.deadline { --tc: var(--todo); }
   .ch.event { background: color-mix(in srgb, var(--acc) 18%, transparent); }

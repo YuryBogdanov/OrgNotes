@@ -20,6 +20,8 @@ import {
   type GoalSource, type NewGoal, type Quarter, type SourceGoals,
 } from './goals';
 import { byDay, entriesIn, hasDated, isoDay, type CalEntry, type Layer } from './calIndex';
+import { effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
+import { BUILTIN, type Appearance, type AppearanceChoice, type Theme } from './themes';
 import { DEFAULT_CAL, insertEntry, moveEntry, readCal, withCal, type CalSettings, type NewEntry } from './calEdit';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow } from './org';
@@ -1927,6 +1929,33 @@ class Store {
     openCalendar(this.layout, this.layout.active, this.calCfg.view);
     this.setNavMode('calendar');
   }
+  // ---- «Настройки → Оформление» (ТЗ 25): the appearance of the app and the editor theme of each, on this Mac ------
+  appearanceChoice = $state<AppearanceChoice>(readChoice());
+  /** macOS is dark (for «Системное»); followed while the app runs. */
+  systemDark = $state(isSystemDark());
+  themeNames = $state<Record<Appearance, string>>(readThemeNames());
+  /** Every theme to choose from: the built-in ones (own themes come in part 2). */
+  get themes(): Theme[] {
+    return BUILTIN;
+  }
+  get appearance(): Appearance {
+    return effective(this.appearanceChoice, this.systemDark);
+  }
+  themeFor(a: Appearance): Theme {
+    return themeNamed(this.themeNames[a], a, this.themes);
+  }
+  /** The editor theme in effect now. */
+  get theme(): Theme {
+    return this.themeFor(this.appearance);
+  }
+  setAppearance(c: AppearanceChoice) {
+    this.appearanceChoice = c;
+    saveChoice(c);
+  }
+  setThemeName(a: Appearance, name: string) {
+    this.themeNames = { ...this.themeNames, [a]: name };
+    saveThemeName(a, name);
+  }
   // ---- «Настройки → Календарь» (`calendar` in config.json), moving and making entries -----------------------------
   calCfg = $state.raw<CalSettings>(DEFAULT_CAL);
   async setCal(c: Partial<CalSettings>) {
@@ -2534,7 +2563,7 @@ export interface GoalPerson {
   color: string;
   name: string; // «Мои цели» for mine
 }
-export const SECTIONS = ['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши'] as const;
+export const SECTIONS = ['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши'] as const;
 export type SettingsSection = (typeof SECTIONS)[number];
 export type NavMode = 'files' | 'inbox' | 'agendas' | 'goals' | 'calendar' | 'search';
 /** The search in every file: up to this many matches are listed. */

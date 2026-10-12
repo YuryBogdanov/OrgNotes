@@ -252,16 +252,16 @@ describe('project workflows', () => {
   });
   it('colours states by their colour, then by well-known name, then by open/done', () => {
     const wf = resolveWorkflow('', 'x.org', config);
-    expect(toneFor('IN-PROGRESS', wf)).toEqual({ light: '#0a58c2', dark: '#6cb4ff' }); // blue
-    expect(toneFor('FINISHED', wf)).toEqual({ light: '#1d7f3a', dark: '#6fd58a' }); // done: green
-    expect(toneFor('MEETING', wf)).toEqual({ light: '#c4262e', dark: '#ff7b80' }); // open: red
-    expect(toneFor('TODO', DEFAULT_WORKFLOW).light).toBe('#c4262e');
-    expect(toneFor('CANCELLED', DEFAULT_WORKFLOW).light).toBe('#5f5f66');
+    expect(toneFor('IN-PROGRESS', wf)).toEqual({ light: 'var(--p-blue)', dark: 'var(--p-blue)' });
+    expect(toneFor('FINISHED', wf).light).toBe('var(--p-green)'); // done
+    expect(toneFor('MEETING', wf).light).toBe('var(--p-red)'); // open
+    expect(toneFor('TODO', DEFAULT_WORKFLOW).light).toBe('var(--p-red)');
+    expect(toneFor('CANCELLED', DEFAULT_WORKFLOW).light).toBe('var(--p-gray)');
   });
-  it('reads colours as palette ids or hex and ignores anything else', () => {
+  it('reads colours as named ones: an old pink or hex as the nearest, anything else ignored', () => {
     const r = parseProjectConfig(JSON.stringify({ workflows: [{ name: 'A', states: [
-      { name: 'ONE', color: 'teal' }, { name: 'TWO', color: '#A1B2C3' }, { name: 'THREE', color: 'chartreuse' } ] }] }));
-    expect(r.config.workflows[0].states.map((s) => s.color)).toEqual(['teal', '#A1B2C3', undefined]);
+      { name: 'ONE', color: 'teal' }, { name: 'TWO', color: '#1E7F3C' }, { name: 'THREE', color: 'chartreuse' }, { name: 'FOUR', color: 'yellow' } ] }] }));
+    expect(r.config.workflows[0].states.map((s) => s.color)).toEqual(['teal', 'green', undefined, 'yellow']);
   });
   it('starts a new task in the chosen initial status, else the first open one', () => {
     const r = parseProjectConfig(JSON.stringify({ workflows: [

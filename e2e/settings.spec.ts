@@ -183,9 +183,9 @@ test.describe('table', () => {
     await expect(rows(page).last().locator('input.kw')).toBeFocused();
   });
 
-  test('sections are in the order of the mockup, including Календарь and Клавиши', async ({ page }) => {
+  test('sections are in the order of the mockup, including Оформление, Календарь and Клавиши', async ({ page }) => {
     await openSettings(page);
-    expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши']);
+    expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши']);
   });
 });
 
@@ -396,26 +396,31 @@ test.describe('colour picker', () => {
     await expect(pop(page)).toBeVisible();
     await expect(pop(page).locator('.hd')).toContainText('Цвет статуса');
     await expect(pop(page).locator('.hd')).toContainText('Синий');
-    expect(await pop(page).getByRole('radio').allInnerTexts()).toEqual(['Серый', 'Красный', 'Оранжевый', 'Зелёный', 'Бирюзовый', 'Синий', 'Фиолетовый', 'Розовый']);
+    expect(await pop(page).getByRole('radio').allInnerTexts()).toEqual(['Красный', 'Оранжевый', 'Жёлтый', 'Зелёный', 'Голубой', 'Синий', 'Фиолетовый', 'Серый']);
     await expect(pop(page).getByRole('radio', { name: 'Синий' })).toHaveAttribute('aria-checked', 'true');
     await expect(pop(page).locator('.dot.sel svg')).toHaveCount(1);
     await expect(pop(page).getByText('Так будет выглядеть')).toBeVisible();
     expect(await pop(page).locator('.plate').count()).toBe(2);
-    await expect(pop(page).getByRole('button', { name: 'Другой цвет…' })).toBeVisible();
-    await expect(pop(page).getByText('Цвета подбираются отдельно для светлой и тёмной темы')).toBeVisible();
+    await expect(pop(page).getByRole('button', { name: 'Другой цвет…' })).toHaveCount(0); // ТЗ 25: named colours only
+    await expect(pop(page).getByText('Оттенок цвета задаёт тема редактора')).toBeVisible();
+    // the previews: the shade of blue on the ground of the light and of the dark editor theme
+    const plates = pop(page).locator('.plate');
+    expect(await plates.nth(0).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(255, 255, 255)');
+    expect(await plates.nth(1).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(30, 30, 34)');
+    expect(await plates.nth(1).locator('.chip').evaluate((el) => getComputedStyle(el).color)).toBe('rgb(108, 180, 255)');
     expect(Math.round((await pop(page).boundingBox())!.width)).toBe(268);
   });
 
   test('a choice applies at once, saves, and the popover stays open for the preview', async ({ page }) => {
     await openSettings(page);
     await rows(page).nth(2).locator('.swatch').click();
-    await pop(page).getByRole('radio', { name: 'Бирюзовый' }).click();
+    await pop(page).getByRole('radio', { name: 'Голубой' }).click();
     await expect(pop(page)).toBeVisible();
-    await expect(pop(page).locator('.hd')).toContainText('Бирюзовый');
+    await expect(pop(page).locator('.hd')).toContainText('Голубой');
     await expect.poll(async () => (await config(page)).workflows[0].states[2].color).toBe('teal');
-    // the chain chip uses the new colour (light value of teal)
+    // the chain chip uses the new colour: the theme's shade of teal
     const chip = page.locator('.flow .fchip').nth(2);
-    expect(await chip.evaluate((el) => getComputedStyle(el).getPropertyValue('--tl').trim())).toBe('#0b7a6f');
+    expect(await chip.evaluate((el) => getComputedStyle(el).color)).toBe('rgb(11, 122, 111)');
   });
 
   test('closes on Esc, on a click outside and on a second click on the swatch', async ({ page }) => {
@@ -439,43 +444,21 @@ test.describe('colour picker', () => {
     await expect(pop(page)).toBeVisible();
     await expect(pop(page).getByRole('radio', { name: 'Синий' })).toBeFocused(); // current colour
     await page.keyboard.press('ArrowLeft');
-    await expect(pop(page).getByRole('radio', { name: 'Бирюзовый' })).toBeFocused();
+    await expect(pop(page).getByRole('radio', { name: 'Голубой' })).toBeFocused();
     await page.keyboard.press('ArrowUp');
-    await expect(pop(page).getByRole('radio', { name: 'Серый' })).toBeFocused(); // 4 columns: one row up
+    await expect(pop(page).getByRole('radio', { name: 'Красный' })).toBeFocused(); // 4 columns: one row up
     await page.keyboard.press('ArrowRight');
-    await expect(pop(page).getByRole('radio', { name: 'Красный' })).toBeFocused();
+    await expect(pop(page).getByRole('radio', { name: 'Оранжевый' })).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect.poll(async () => (await config(page)).workflows[0].states[2].color).toBe('red');
+    await expect.poll(async () => (await config(page)).workflows[0].states[2].color).toBe('orange');
     await page.keyboard.press('Escape');
     await expect(pop(page)).toHaveCount(0);
   });
 
-  test('the system colour picker is anchored to the "Другой цвет…" button, not to the popover title', async ({ page }) => {
-    await openSettings(page);
-    await rows(page).nth(2).locator('.swatch').click();
-    const btn = (await pop(page).getByRole('button', { name: 'Другой цвет…' }).boundingBox())!;
-    const input = (await pop(page).locator('input[type=color]').boundingBox())!;
-    expect(Math.abs(input.x - btn.x)).toBeLessThanOrEqual(1);
-    expect(Math.abs(input.y - btn.y)).toBeLessThanOrEqual(1);
-    expect(Math.abs(input.width - btn.width)).toBeLessThanOrEqual(1);
-    expect(Math.abs(input.height - btn.height)).toBeLessThanOrEqual(1);
-    const title = (await pop(page).locator('.hd').boundingBox())!;
-    expect(input.y).toBeGreaterThan(title.y + title.height); // well below the title
-  });
-
-  test('"Другой цвет…" stores a hex; the dark variant keeps the contrast; it appears as a ninth swatch', async ({ page }) => {
-    await openSettings(page);
-    await rows(page).nth(2).locator('.swatch').click();
-    await pop(page).locator('input[type=color]').evaluate((el: HTMLInputElement) => {
-      el.value = '#2a2a8a';
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    await expect.poll(async () => (await config(page)).workflows[0].states[2].color).toBe('#2a2a8a');
-    await expect(pop(page).getByRole('radio')).toHaveCount(9);
-    await expect(pop(page).getByRole('radio', { name: 'Другой цвет' })).toHaveAttribute('aria-checked', 'true');
-    const dark = await page.locator('.flow .fchip').nth(2).evaluate((el) => getComputedStyle(el).getPropertyValue('--td').trim());
-    expect(dark).not.toBe('#2a2a8a');
-    expect(dark).toMatch(/^#[0-9a-f]{6}$/);
+  test('an old pink or hex in config.json is shown as the nearest named colour', async ({ page }) => {
+    await openSettings(page, { '/mock/Work.org': NOTES, '/mock/.orgnotes/config.json': JSON.stringify({ version: 1, workflows: [{ name: 'Задачи', states: [{ name: 'TODO', color: '#0a58c2' }, { name: 'MAYBE', color: 'pink' }, { name: 'DONE', done: true }] }] }) });
+    await expect(rows(page).nth(0).locator('.swatch')).toHaveAttribute('aria-label', /Синий/);
+    await expect(rows(page).nth(1).locator('.swatch')).toHaveAttribute('aria-label', /Красный|Фиолетовый/);
   });
 });
 
@@ -557,11 +540,13 @@ test.describe('sheet', () => {
     await openSettings(page);
     const sheet = page.getByRole('dialog', { name: 'Настройки' });
     const on = sheet.getByRole('tab', { selected: true });
-    await expect(sheet.getByRole('tab')).toHaveText(['Основные', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши']);
+    await expect(sheet.getByRole('tab')).toHaveText(['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши']);
     await expect(on).toHaveText('Статусы');
     await page.keyboard.press('Meta+BracketRight');
     await expect(on).toHaveText('Агенды'); // «Теги» is not made yet
     await page.keyboard.press('Meta+BracketLeft');
+    await page.keyboard.press('Meta+BracketLeft');
+    await expect(on).toHaveText('Оформление');
     await page.keyboard.press('Meta+BracketLeft');
     await expect(on).toHaveText('Основные');
     await expect(sheet.locator('.t2')).toHaveText('Основные');
@@ -574,7 +559,7 @@ test.describe('sheet', () => {
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Meta+Comma');
-    await expect(on).toHaveText('Статусы');
+    await expect(on).toHaveText('Оформление');
   });
 
   test('«Основные» leads to «Клавиши»; a status added is understood by the window at once', async ({ page }) => {
