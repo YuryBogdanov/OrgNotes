@@ -198,6 +198,10 @@ register({
   when: () => store.files.length > 0, run: () => store.navTree('expand'),
 });
 register({
+  id: 'miniOpen', title: 'Мини-окно: открыть текущую заметку', icon: 'window', group: 'general', keyId: 'miniOpen', synonyms: ['мини', 'поверх', 'созвон', 'zoom'],
+  when: (c) => !!c.file && '__TAURI_INTERNALS__' in window, hint: (c) => (c.heading ? c.heading.title : 'весь файл'), run: () => void setTimeout(() => store.openInMini()),
+});
+register({
   id: 'miniShow', title: 'Мини-окно: показать', icon: 'window', group: 'general', synonyms: ['мини', 'поверх', 'созвон', 'zoom'],
   when: () => '__TAURI_INTERNALS__' in window, hint: () => '⌃⌥⌘M', run: () => void setTimeout(() => store.toggleMini()),
 });

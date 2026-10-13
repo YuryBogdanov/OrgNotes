@@ -1404,6 +1404,17 @@ fn set_mini_shortcut(app: AppHandle, accelerator: String) -> Result<(), String> 
 fn mini_toggle(app: AppHandle) {
     toggle_mini(&app);
 }
+/// ⇧⌘M: the note in the mini window, shown with the keys in it.
+#[tauri::command]
+fn mini_open(app: AppHandle, note: Option<serde_json::Value>) {
+    make_mini_window(&app);
+    #[cfg(target_os = "macos")]
+    on_main(&app, || unsafe { mini_native::mini_show(true) });
+    if let Some(n) = note {
+        let _ = app.emit_to(MINI, "mini-open", n);
+    }
+    let _ = app.emit_to(MINI, "mini-focus", ());
+}
 #[tauri::command]
 fn mini_hide(app: AppHandle) {
     #[cfg(target_os = "macos")]
@@ -1475,6 +1486,7 @@ pub fn run() {
             set_capture_shortcut,
             set_mini_shortcut,
             mini_toggle,
+            mini_open,
             mini_hide,
             mini_typed,
             mini_pin,

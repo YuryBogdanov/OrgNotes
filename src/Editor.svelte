@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Compartment, EditorState, MapMode, RangeSetBuilder, StateField, Transaction, type Range, type StateEffect } from '@codemirror/state';
+  import { Compartment, EditorState, MapMode, RangeSetBuilder, StateEffect, StateField, Transaction, type Range } from '@codemirror/state';
   import { Decoration, EditorView, ViewPlugin, WidgetType, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
   import { codeFolding, foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
@@ -14,9 +14,10 @@
   import { findExtension, findField, foundInfo, moveFind, setFind, type FindQuery } from './findView';
   import { registerEditor } from './editorKeys';
 
-  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
+  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
     levels?: LevelView; // «Структурный вид»: one star per level, text moved by level
     drawers?: boolean; // drawers folded when a file opens and when the app adds one (:PROPERTIES:, :LOGBOOK:)
+    gutter?: boolean; // the line numbers and the fold markers on the left (none in the mini window, ТЗ 31)
     rich?: boolean; // «Оформленный текст»: drawn like org-modern (implies the structural view)
     richNumbers?: boolean; // line numbers while drawn
     onrich?: (p: RichPick) => void; // a click on a status, a priority or a date that asks for a choice
@@ -330,7 +331,7 @@
 
   // ---- the look: the structural view, or «Оформленный текст» (which includes it) ----------------------------
   const viewKey = () => JSON.stringify([levels, rich, richNumbers]);
-  const numbersExt = () => (rich && !richNumbers ? [] : lineNumbers());
+  const numbersExt = () => (!gutter || (rich && !richNumbers) ? [] : lineNumbers());
   function structureExt(words: Workflow) {
     if (!rich) return orgIndent(levels, headingSet);
     return orgRich({
@@ -354,12 +355,20 @@
     if (r.to < st.doc.length) out.push(Decoration.replace({ block: true }).range(r.to + 1, st.doc.length));
     return Decoration.set(out);
   };
+  /** The heading's lines again (it grew or moved by a change from elsewhere: the mini window, ТЗ 31). */
+  const setNarrow = StateEffect.define<{ line: number; end: number }>();
+  let narrowField: StateField<{ from: number; to: number }> | null = null;
   function narrowing(n: { line: number; end: number }) {
     const field = StateField.define<{ from: number; to: number }>({
       create: (st) => narrowRange(st.doc, n),
-      // typing at either edge stays inside
-      update: (r, tr) => (tr.docChanged ? { from: tr.changes.mapPos(r.from, -1), to: tr.changes.mapPos(r.to, 1) } : r),
+      update: (r, tr) => {
+        const reset = tr.effects.find((e) => e.is(setNarrow));
+        if (reset) return narrowRange(tr.state.doc, reset.value as { line: number; end: number });
+        // typing at either edge stays inside
+        return tr.docChanged ? { from: tr.changes.mapPos(r.from, -1), to: tr.changes.mapPos(r.to, 1) } : r;
+      },
     });
+    narrowField = field;
     return [
       field,
       EditorView.decorations.compute([field], (st) => hiddenOutside(st, st.field(field))),
@@ -464,7 +473,7 @@
             return el;
           },
         }),
-        foldGutter(), plugin, selectionClass, note.of(noteExt(lineNote)), structure.of(structureExt(words)),
+        ...(gutter ? [foldGutter()] : []), plugin, selectionClass, note.of(noteExt(lineNote)), structure.of(structureExt(words)),
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         EditorView.domEventHandlers({
@@ -585,6 +594,17 @@
       }
     }
   }
+
+  // the heading's lines as the file has them now: a line added under it from elsewhere is shown (only when the
+  // editor and the file agree: never against what is being typed)
+  $effect(() => {
+    const n = narrow;
+    const t = text;
+    if (!view || !n || !narrowField || view.state.doc.toString() !== t) return;
+    const want = narrowRange(view.state.doc, n);
+    const now = view.state.field(narrowField);
+    if (want.from !== now.from || want.to !== now.to) view.dispatch({ effects: setNarrow.of({ line: n.line, end: n.end }) });
+  });
 
   $effect(() => {
     const k = viewKey();

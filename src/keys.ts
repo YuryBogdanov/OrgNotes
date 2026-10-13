@@ -82,6 +82,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('paneLeft', 'Перейти в левую панель', 'view', 'window', ['⌥⌘←']),
   C('paneRight', 'Перейти в правую панель', 'view', 'window', ['⌥⌘→']),
   C('nav', 'Навигатор', 'view', 'window', ['⌘0'], { synonyms: ['боковая панель'] }),
+  C('miniOpen', 'Открыть в мини-окне', 'view', 'window', ['⇧⌘M'], { synonyms: ['мини-окно', 'поверх', 'созвон'] }),
   C('insp', 'Инспектор', 'view', 'window', ['⌥⌘0']),
   C('navFiles', 'Навигатор: файлы', 'view', 'window', ['⌃⌘1']),
   C('navAgendas', 'Навигатор: агенды', 'view', 'window', ['⌃⌘3']),
