@@ -1,20 +1,18 @@
 <script lang="ts">
-  import { calendar } from './features/calendar.svelte';
+  import { cal as calendar } from './state.svelte';
   import { onMount } from 'svelte';
-  import { store } from './store.svelte';
-  import { toneFor } from './org';
-  import { toneStyle } from './colors';
-  import CalDayList from './CalDayList.svelte';
+  import CalDayList from './DayList.svelte';
   import {
-    fromIso, isoDay, layoutEvents, monthSub, monthTitle, monthWeeks, weekDays, weekNumber, weekSub, weekdayShort, type CalEntry,
-  } from './calIndex';
-  import type { Tab } from './layout';
+    fromIso, isoDay, layoutEvents, monthSub, monthTitle, monthWeeks, toneVars, weekDays, weekNumber, weekSub, weekdayShort, type CalEntry,
+  } from '@panopticon/api/org';
+  import type { CalState } from './state.svelte';
 
   // «Календарь» (ТЗ 24): a month or a week of every dated entry. The layers and the files are in the navigator, the
   // chosen day in the inspector. A cell shows what fits (three at least), the rest is behind «… ещё N».
-  let { tab }: { tab: Tab } = $props();
-
-  const cal = $derived((tab.data as { view: 'month' | 'week'; date: string } | undefined) ?? { view: 'month' as const, date: isoDay(new Date()) });
+  // the tab's state is ours: drawn once by the core, changed here and kept with the layout (`setState`)
+  let { initial, setState }: { initial: CalState; setState: (s: CalState) => void } = $props();
+  // svelte-ignore state_referenced_locally
+  let cal = $state<CalState>(initial);
   const sel = $derived(fromIso(cal.date));
   const today = $derived(isoDay(new Date()));
   const cfg = $derived(calendar.cfg);
@@ -27,7 +25,10 @@
   const days = $derived(calendar.days(range[0], range[1]));
   const at = (d: Date) => days.get(isoDay(d)) ?? [];
 
-  const set = (c: Partial<{ view: 'month' | 'week'; date: string }>) => calendar.setTab(tab, c);
+  const set = (c: Partial<CalState>) => {
+    cal = { ...cal, ...c };
+    setState(cal);
+  };
   const pick = (d: Date) => set({ date: isoDay(d) });
   /** A double click on a day (not on an entry): «+ Задача» on it. */
   function dbl(ev: MouseEvent, d: Date) {
@@ -107,8 +108,8 @@
   }
 
   // ---- the look of an entry ----------------------------------------------------------------------------------------
-  const wfOf = (e: CalEntry) => store.files.find((f) => f.path === e.path)?.wf;
-  const toneOf = (e: CalEntry) => (e.keyword && wfOf(e) ? toneStyle(toneFor(e.keyword, wfOf(e)!)) : '');
+  const wfOf = (e: CalEntry) => calendar.files.find((f) => f.path === e.path)?.wf;
+  const toneOf = (e: CalEntry) => (e.keyword && wfOf(e) ? toneVars(e.keyword, wfOf(e)!) : '');
   const past = (e: CalEntry) => e.day < today;
   const title = (e: CalEntry) => (e.layer === 'deadline' ? `Дедлайн: ${e.title}` : `${e.priority ? `[#${e.priority}] ` : ''}${e.title}`);
   const hours = $derived(Array.from({ length: cfg.to - cfg.from }, (_, i) => cfg.from + i));
@@ -296,7 +297,7 @@
 {/if}
 
 <style>
-  .cal { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--bg); outline: none; }
+  .cal { flex: 1; height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--bg); outline: none; } /* the whole tab of a plugin's view */
   header { flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
   .ttl { display: flex; flex-direction: column; }
   h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }

@@ -2,9 +2,11 @@
 // it with itself (so it stays with an isolated plugin too) and uses it where it works on its own structure in a file:
 // inside `tx.update(path, fn)`, or on the text of `files.read`. The core uses the same code.
 
-export { parseHeadings, setKeyword, setPriority, headingLines, inactiveStamp, sequenceFor, type Heading, type Workflow, type OrgDate } from '../org';
+export { parseHeadings, setKeyword, setPriority, headingLines, inactiveStamp, sequenceFor, startOf, type Heading, type Workflow, type OrgDate } from '../org';
+import { toneFor, type Workflow } from '../org';
+import { toneStyle } from '../colors';
 export { setPlanning, setTags, splitTags, parseDate, weekdayNames } from '../edits';
-export { stampText, shiftDate, longDate } from '../calendar';
+export { stampText, shiftDate, longDate, relWords } from '../calendar';
 export { listEnter, listIndent, type Edit } from '../textList';
 export { setProperty, insertHeading, replaceBody, treeOf } from '../orgOps';
 export { relevel, place, moveTo, moveWithin } from '../refile';
@@ -14,9 +16,13 @@ export {
   dayTitle, dayShort, weekdayShort, entriesWord, layoutEvents, type Layer, type CalFile, type CalEntry,
 } from '../calIndex';
 
-/** The workflow `parseHeadings` needs, from the keywords of `index.workflow(path)` (and its sets, for `sequenceFor`). */
-export const workflow = (w: { open: string[]; done: string[]; sets?: { name: string; states: { name: string; done: boolean }[] }[] }) => ({
+/** The workflow `parseHeadings` needs, from the keywords of `index.workflow(path)` (and its sets, for `sequenceFor`
+ *  and the statuses' colours). */
+export const workflow = (w: { open: string[]; done: string[]; sets?: { name: string; states: { name: string; done: boolean; color?: string }[] }[] }) => ({
   open: [...w.open],
   done: [...w.done],
-  ...(w.sets?.length ? { sequences: w.sets.map((s) => ({ name: s.name, states: s.states.map((x) => ({ name: x.name, done: !!x.done })) })) } : {}),
+  ...(w.sets?.length ? { sequences: w.sets.map((s) => ({ name: s.name, states: s.states.map((x) => ({ name: x.name, done: !!x.done, ...(x.color ? { color: x.color } : {}) })) })) } : {}),
 });
+/** The colour of a status as the core draws it, for an element with the class `tone-chip` or `var(--tl)` / `var(--td)`
+ *  (its light and dark shades): «--tl:…;--td:…». */
+export const toneVars = (keyword: string, wf: Workflow) => toneStyle(toneFor(keyword, wf));

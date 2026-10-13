@@ -424,7 +424,10 @@ class Store {
   }
   /** The feature's settings in the notes folder (its file, else what config.json had before 0.6). */
   folderData(id: string): unknown {
-    return id in this.featureFiles ? this.featureFiles[id] : this.storages.get(id)?.legacy?.(this.parsedConfig);
+    const s = this.storages.get(id);
+    if (!(id in this.featureFiles)) return s?.legacy?.(this.parsedConfig);
+    const v = this.featureFiles[id];
+    return s?.upgrade ? s.upgrade(v, 'folder') : v;
   }
   async setFolderData(id: string, value: unknown): Promise<boolean> {
     const text = JSON.stringify(value, null, 2) + '\n';
@@ -477,14 +480,16 @@ class Store {
   localData(id: string): unknown {
     void this.localTick;
     const raw = lsGet('feature:' + id);
+    const s = this.storages.get(id);
     if (raw !== null) {
       try {
-        return JSON.parse(raw);
+        const v = JSON.parse(raw);
+        return s?.upgrade ? s.upgrade(v, 'local') : v;
       } catch {
         /* the default */
       }
     }
-    return this.storages.get(id)?.localLegacy?.(this.parsedConfig);
+    return s?.localLegacy?.(this.parsedConfig);
   }
   private localTick = $state(0);
   setLocalData(id: string, value: unknown) {
@@ -2244,6 +2249,9 @@ export interface StorageSpec {
   legacyKeys?: string[];
   /** Its settings of this Mac as config.json had them. */
   localLegacy?: (parsed: any) => unknown;
+  /** Its file or its settings of this Mac as written before, read in their new shape (the calendar became a plugin:
+   *  its flat settings → `{ settings, data }`); the next write keeps the new one. */
+  upgrade?: (v: unknown, where: 'folder' | 'local') => unknown;
 }
 /** What a feature's tab does with the keys of its scope. */
 export interface ScopeKeys {

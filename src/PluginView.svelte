@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { plugins } from './api/host.svelte';
   import { store } from './store.svelte';
   import type { Tab } from './layout';
@@ -19,7 +20,8 @@
     if (!node || !entry || off) return;
     const t = tab;
     const handle = { id: t.id, setState: (s: unknown) => void (t.data = JSON.parse(JSON.stringify(s ?? null))) };
-    const dispose = plugins.guard(entry.plugin, () => entry.spec.render(node, t.data, handle), undefined);
+    const data = untrack(() => t.data); // its own `setState` does not draw it again
+    const dispose = plugins.guard(entry.plugin, () => entry.spec.render(node, data, handle), undefined);
     return () => {
       plugins.guard(entry.plugin, () => dispose?.(), undefined);
       node.replaceChildren();

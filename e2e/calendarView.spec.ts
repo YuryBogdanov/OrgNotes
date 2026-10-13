@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, pluginsReady } from './tauriMock';
 import { FILES, NOW } from './calendarFixture';
 
 // ТЗ 24, part 1: the calendar tab — a month and a week of every dated entry, the layers and files in the navigator,
@@ -11,6 +11,7 @@ async function open(page: Page) {
   await installTauriMock(page, FILES());
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
+  await pluginsReady(page); // the calendar is a plugin (ТЗ 29)
   await page.keyboard.press('Meta+3');
   await expect(cal(page)).toBeVisible();
 }
@@ -46,6 +47,7 @@ test('layers and files in the navigator filter the entries and are kept', async 
   await expect(cell(page, '2026-10-16').locator('.ch.wait')).toHaveCount(1); // the WAIT one is on
   await expect(cell(page, '2026-10-16')).not.toContainText('Продлить пропуск'); // inbox is off
   await page.reload();
+  await pluginsReady(page);
   await page.keyboard.press('Meta+3');
   await expect(page.getByRole('checkbox', { name: 'События' })).not.toBeChecked();
   await expect(page.getByRole('checkbox', { name: 'inbox' })).not.toBeChecked();

@@ -1037,6 +1037,7 @@ fn read_plugin_file(app: AppHandle, dir: String, file: String) -> Result<String,
 
 /// The built-in plugins' manifests, as built into the app.
 const BUILTIN_MANIFESTS: &[&str] = &[
+    include_str!("../../src/plugins/calendar/manifest.json"),
     include_str!("../../src/plugins/hello/manifest.json"),
     include_str!("../../src/plugins/inbox/manifest.json"),
     include_str!("../../src/plugins/quarter-goals/manifest.json"),
@@ -1428,6 +1429,6 @@ mod plugin_tests {
     #[test]
     fn the_builtin_manifests_are_read() {
         let ids: Vec<String> = BUILTIN_MANIFESTS.iter().map(|m| serde_json::from_str::<serde_json::Value>(m).unwrap()["id"].as_str().unwrap().to_string()).collect();
-        assert_eq!(ids, ["hello", "inbox", "quarter-goals", "theme-pack"]);
+        assert_eq!(ids, ["calendar", "hello", "inbox", "quarter-goals", "theme-pack"]);
     }
 }

@@ -6,7 +6,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { untrack, type Component } from 'svelte';
 import { store } from '../store.svelte';
-import { newTab, openFile, openView } from '../layout';
+import { newTab, openFile, openFromAgenda, openView } from '../layout';
 import { register as registerPalette } from '../commands';
 import { registerAction, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf, viewOf } from '../views';
 import { fuzzy } from '../fuzzy';
@@ -95,7 +95,7 @@ class Host {
   review = $state<ReviewRun | null>(null);
   sheetReq = $state<{ plugin: string; spec: SheetSpec; resolve: (button: string | null) => void } | null>(null);
   menuReq = $state<{ plugin: string; x: number; y: number; items: ({ label: string; action: () => void; danger?: boolean; disabled?: boolean } | 'sep')[] } | null>(null);
-  private dynamic = new SvelteMap<string, { options?(v: Values): CoreOpt[]; hint?(v: Values): string }>();
+  private dynamic = new SvelteMap<string, { options?(v: Values): CoreOpt[] | [CoreOpt[], CoreOpt[]]; hint?(v: Values): string; show?(path: string | null): string; clean?(text: string): string }>();
   private disposers = new Map<string, Dispose[]>();
   private plugins = new Map<string, Plugin>();
   private started = false;
@@ -335,7 +335,7 @@ class Host {
     }
     m.contributes.settings.forEach((s, i) => {
       const schema = this.schemaOf(m, s, i);
-      if (s.section) this.keep(id, registerSettings({ id: s.section, icon: s.icon ?? PLUG, order: 90 + i, schema }));
+      if (s.section) this.keep(id, registerSettings({ id: s.section, icon: s.icon ?? PLUG, order: 81 + i, schema })); // after the core's, before «Плагины»
       else if (s.block) this.keep(id, registerSettingsBlock({ section: s.block, order: 50 + i, schema }));
     });
     if (m.contributes.themes.length) this.loading.push(this.declareThemes(m));
@@ -420,6 +420,7 @@ class Host {
       this.plugins.set(m.id, p);
       await p.activate(this.ctxOf(m));
       if (this.declared.has(m.id)) this.active.set(m.id, true);
+      else this.dropLate(m.id); // turned off while it started: what it registered after that goes too
     } catch (err) {
       this.fail(m.id, err);
     }
@@ -485,6 +486,23 @@ class Host {
   /** Why it was turned off, in full (the list of plugins' «Подробнее»). */
   stack = new SvelteMap<string, string>();
   /** Everything the plugin registered taken back; its code told to stop. */
+  /** A plugin turned off while its `activate` ran: what it registered meanwhile is taken back, it is deactivated. */
+  private dropLate(id: string) {
+    untrack(() => {
+      for (const d of (this.disposers.get(id) ?? []).reverse()) {
+        try {
+          d();
+        } catch {
+          /* taken back as far as it goes */
+        }
+      }
+      this.disposers.delete(id);
+      for (const [k, v] of this.views) if (v.plugin === id) this.views.delete(k);
+      for (const [k, v] of this.navs) if (v.plugin === id) this.navs.delete(k);
+      void Promise.resolve(this.plugins.get(id)?.deactivate?.()).catch(() => {});
+      this.plugins.delete(id);
+    });
+  }
   private teardown(id: string) {
     const m = this.manifest(id);
     this.declared.delete(id);
@@ -776,12 +794,13 @@ class Host {
           return f && kw ? (namedFor(kw, f.wf) as Named) : null;
         },
         inbox: async () => ({ path: store.inboxFile?.name ?? null, chosen: store.inboxCfg.file, add: store.inboxCfg.add }),
+        folder: async () => store.dir ?? null,
         workflow: async (path) => {
           const f = fileOf(path);
           const seqs = f?.wf.sequences ?? store.config.workflows;
           return {
             open: [...(f?.wf.open ?? DEFAULT_WORKFLOW.open)], done: [...(f?.wf.done ?? DEFAULT_WORKFLOW.done)],
-            sets: seqs.map((q) => ({ name: q.name, states: q.states.map((x) => ({ name: x.name, done: !!x.done })) })),
+            sets: seqs.map((q) => ({ name: q.name, states: q.states.map((x) => ({ name: x.name, done: !!x.done, ...(x.color ? { color: x.color as Named } : {}) })) })),
           };
         },
       };
@@ -854,16 +873,19 @@ class Host {
     for (const f of this.fields(m)) for (const k of f.type === 'pair' ? [f.key, f.key2] : [f.key]) if (k in patch) by[f.where][k] = patch[k];
     for (const where of ['folder', 'local'] as const)
       if (Object.keys(by[where]).length) await this.put(m.id, where, 'settings', { ...((this.whole(m.id, where).settings ?? {}) as Values), ...by[where] });
+    // the first change moves what config.json still has (a feature's settings of before) to the plugin's file
+    if (store.hasLegacy(m.id)) await store.setFolderData(m.id, this.whole(m.id, 'folder'));
   }
   private schemaOf(m: Manifest, s: ManifestSettings, i: number): Schema {
     const dyn = (key: string) => this.dynamic.get(m.id + ':' + key);
     const field = (f: Field): Field => {
       const hint = (v: Values) => this.guard(m.id, () => dyn(f.key)?.hint?.(v), undefined) ?? (typeof f.hint === 'string' ? f.hint : '');
-      if (f.type === 'choice') return { ...f, hint, options: (v) => this.guard(m.id, () => dyn(f.key)?.options?.(v), undefined) ?? (Array.isArray(f.options) ? f.options : []) };
-      if (f.type === 'file') return { ...f, hint, show: (rel) => rel ?? 'Не выбран' };
+      if (f.type === 'choice') return { ...f, hint, options: (v) => (this.guard(m.id, () => dyn(f.key)?.options?.(v), undefined) as CoreOpt[] | undefined) ?? (Array.isArray(f.options) ? f.options : []) };
+      if (f.type === 'file') return { ...f, hint, show: (rel) => this.guard(m.id, () => dyn(f.key)?.show?.(rel), undefined) ?? rel ?? 'Не выбран' };
+      if (f.type === 'text') return { ...f, hint, clean: (t) => this.guard(m.id, () => dyn(f.key)?.clean?.(t), undefined) ?? t };
       if (f.type === 'pair') {
         const both = (f as unknown as { options?: [CoreOpt[], CoreOpt[]] }).options;
-        return { ...f, hint, options: () => (Array.isArray(both) ? both : [[], []]) };
+        return { ...f, hint, options: (v) => (this.guard(m.id, () => dyn(f.key)?.options?.(v), undefined) as [CoreOpt[], CoreOpt[]] | undefined) ?? (Array.isArray(both) ? both : [[], []]) };
       }
       return { ...f, hint };
     };
@@ -1022,8 +1044,14 @@ function coreCommand(cmd: string, arg: unknown) {
     case 'file.open': {
       const i = store.files.findIndex((f) => f.name === a.path);
       if (i < 0) throw new Error(`нет файла «${a.path}»`);
-      const o = (arg ?? {}) as { line?: number; beside?: boolean; focus?: boolean };
+      const o = (arg ?? {}) as { line?: number; beside?: boolean; focus?: boolean; neighbour?: boolean };
       const line = Math.max(0, Number(o.line) || 0);
+      if (o.neighbour) {
+        // as from an agenda: the other pane (made on the left when there is none), the focus stays here
+        const t = openFromAgenda(store.layout, store.layout.active, store.files[i].path, line, '', 'neighbor');
+        t.fromAgenda = null;
+        return;
+      }
       if (!o.beside) return store.open(i, line, o.focus !== false);
       // in the other editor (a new tab when there is one), what is shown here stays in front
       const L = store.layout;
@@ -1042,6 +1070,8 @@ function coreCommand(cmd: string, arg: unknown) {
     }
     case 'agenda.open':
       return store.showAgendaHere();
+    case 'settings.open':
+      return store.openSettings(typeof (arg as { section?: unknown })?.section === 'string' ? ((arg as { section: string }).section as never) : undefined);
     case 'capture.open':
       return store.openCapture();
     case 'inbox.pickFile':

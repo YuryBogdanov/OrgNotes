@@ -113,7 +113,7 @@ Ids команд, разделов и вкладок начинаются с `<i
 | `commands.on(id, run)` | Обработчик команды из манифеста. |
 | `commands.setAvailable(id, on)` | Скрыть команду: её нет в палитре, клавиши не работают. |
 | `commands.keyOf(id)` | Текущее сочетание команды — для подсказок в интерфейсе плагина. |
-| `commands.run(id, arg)` | Своя команда или команда приложения:<br>• `file.open {path, line?, beside?, focus?}` — `beside` открывает в соседнем редакторе, текущая вкладка остаётся впереди;<br>• `heading.reveal {ref}`;<br>• `heading.status`, `heading.schedule`, `heading.deadline`, `heading.tags`, `heading.priority` `{ref}` — шаг палитры для заголовка, его файл должен быть открыт во вкладке;<br>• `agenda.open`;<br>• `capture.open` — быстрый ввод;<br>• `inbox.pickFile`, `inbox.createFile`. |
+| `commands.run(id, arg)` | Своя команда или команда приложения:<br>• `file.open {path, line?, beside?, focus?, neighbour?}` — `beside` открывает в соседнем редакторе, текущая вкладка остаётся впереди; `neighbour` — как из агенды: в другой панели, если её нет — слева;<br>• `heading.reveal {ref}`;<br>• `heading.status`, `heading.schedule`, `heading.deadline`, `heading.tags`, `heading.priority` `{ref}` — шаг палитры для заголовка, его файл должен быть открыт во вкладке;<br>• `agenda.open`;<br>• `capture.open` — быстрый ввод;<br>• `inbox.pickFile`, `inbox.createFile`;<br>• `settings.open {section?}` — настройки на разделе. |
 
 **Интерфейс**
 
@@ -142,11 +142,12 @@ Ids команд, разделов и вкладок начинаются с `<i
 | `index.heading(ref)`, `index.outline(path)`, `index.files()` | Один заголовок, заголовки файла, файлы папки. |
 | `index.workflow(path)`, `index.statusTone(keyword, path)` | Статусы файла и его наборы (`sets`); цвет статуса — рисуйте через `var(--p-<цвет>)`. |
 | `index.inbox()` | Файл Inbox (настройка приложения; туда пишет быстрый ввод): `path`, `chosen` — что выбрано, если файла нет, `add` — новые задачи в начало или в конец. |
+| `index.folder()` | Рабочая папка (путь на этом Mac): то, что плагин хранит на Mac отдельно для каждой папки. |
 | `files.read(path)` | Текст файла папки заметок. |
 | `edit.undo()` | Отменить последний шаг журнала (кнопка «Отменить» в уведомлении). |
 | `edit.transaction(label, tx => …, { onUndo? })` | Одна правка — один шаг ⌘Z. Операции `tx`: `setStatus`, `setPlanning`, `setTags`, `setProperty`, `insertHeading`, `replaceBody`, `move`, `remove`, `update(path, text => …)` — своя функция над текстом файла (для своей структуры в файле). |
 | `storage.folder`, `storage.local` | Свои данные: `get`, `set`, `onChange`. В папке заметок — `.orgnotes/plugins/<id>.json`; на этом Mac — локально. |
-| `settings.values()`, `settings.onChange`, `settings.dynamic(key, { options?, hint? })` | Значения настроек из манифеста; варианты и подсказки, которые зависят от значений. |
+| `settings.values()`, `settings.onChange`, `settings.dynamic(key, { options?, hint?, show?, clean? })` | Значения настроек из манифеста; варианты (у `pair` — оба списка) и подсказки, которые зависят от значений; как показать выбранный файл; как привести введённый текст. |
 | `statusSets.set(defs, { ifMissing? })` | Наборы статусов из кода. |
 | `events.on(...)` | События: `file.changed {path, by}`, `heading.changed`, `tab.active {kind, path, state}`, `folder.changed`, `inbox.changed {path}`, `day.changed`, `theme.changed`. |
 

@@ -1,9 +1,7 @@
 <script lang="ts">
-  import { calendar } from './features/calendar.svelte';
+  import { cal as calendar } from './state.svelte';
   import { onMount } from 'svelte';
-  import { store } from './store.svelte';
-  import { dayShort, fromIso } from './calIndex';
-  import { displayName } from './names';
+  import { dayShort, fromIso } from '@panopticon/api/org';
 
   // «+ Задача» / «+ Событие» of the calendar (ТЗ 24, 2.7): the quick entry of the Inbox with the day filled in. Where
   // it goes and what it gets come from «Настройки → Календарь»; «Спрашивать» and «Как в прошлый раз» let the file
@@ -22,7 +20,7 @@
   onMount(() => titleEl?.focus());
 
   const choose = cfg.pick !== 'default';
-  const files = $derived([...store.files].sort((a, b) => a.name.localeCompare(b.name, 'ru')));
+  const files = $derived([...calendar.files].sort((a, b) => a.name.localeCompare(b.name, 'ru')));
   const heading = kind === 'task' ? cfg.taskHeading : cfg.eventHeading;
   const placeOf = (n: string) => [n.replace(/\.org$/, '').split('/').join(' › '), heading].filter(Boolean).join(' › ');
   const valid = $derived(/^\d{4}-\d{2}-\d{2}$/.test(day));
@@ -38,7 +36,8 @@
     const ok = await calendar.create({ kind, title, date: fromIso(day), time: /^\d{2}:\d{2}$/.test(time) ? time : null }, file);
     busy = false;
     if (!ok) return;
-    store.note(`${kind === 'task' ? 'Задача добавлена' : 'Событие добавлено'} в «${displayName(file)}»`, [{ label: 'Отменить', run: () => void store.undo(ok) }]);
+    const name = file.split('/').pop()!.replace(/\.org$/, '');
+    calendar.ctx.ui.notify(`${kind === 'task' ? 'Задача добавлена' : 'Событие добавлено'} в «${name}»`, [{ label: 'Отменить', run: () => void calendar.ctx.edit!.undo() }]);
     onclose();
   }
   function key(e: KeyboardEvent) {
@@ -83,7 +82,7 @@
       <span class="warn">Файл не выбран: укажите его в настройках календаря или Inbox</span>
     {/if}
     <span class="sp"></span>
-    <button class="link" onclick={() => { onclose(); store.openSettings('Календарь'); }}>Изменить в настройках</button>
+    <button class="link" onclick={() => { onclose(); calendar.settings(); }}>Изменить в настройках</button>
   </div>
   <div class="keys">↩ создать  ·  esc отмена<span class="sp"></span><button class="primary" onclick={() => void create()} disabled={busy || !file}>Создать</button></div>
 </div>

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { calendar } from './features/calendar.svelte';
   import { store, type SettingsSection } from './store.svelte';
   import { allSettings, blocksOf, settingsOf } from './views';
   import SchemaSettings from './SchemaSettings.svelte';

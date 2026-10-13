@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
 import { FILES } from './reviewFixture';
 
 // ТЗ 28 (roadmap 3.1 B): the Inbox and its review are the built-in plugin «inbox». Its settings of config.json, the
@@ -17,6 +17,7 @@ async function open(page: Page, files: Record<string, string>, init: Record<stri
   await installTauriMock(page, files);
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
+  await pluginsReady(page);
 }
 
 test('the old settings of config.json, a changed shortcut and the mode are the plugin\'s; a change moves the settings', async ({ page }) => {
@@ -59,9 +60,11 @@ test('turned off: no section, no review, no block of settings; ⇧⌘I still wri
   await page.keyboard.type('разобрать inbox');
   await expect(page.getByRole('dialog', { name: 'Командная палитра' })).not.toContainText('Разобрать Inbox');
   await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Командная палитра' })).toHaveCount(0);
   await page.keyboard.press('Shift+Meta+i');
-  await page.keyboard.type('Без раздела');
-  await page.keyboard.press('Enter');
+  const title = page.getByRole('dialog', { name: 'Новая задача в Inbox' }).getByLabel('Заголовок задачи');
+  await title.fill('Без раздела');
+  await title.press('Enter');
   await expect.poll(async () => (await disk(page))[IB]).toContain('* TODO Без раздела');
   await openSettingsSheet(page, 'Плагины');
   await card.getByRole('switch').click();

@@ -1,8 +1,7 @@
 // The calendar's edits (ТЗ 24, part 2): an entry moved to another day (or time) by the mouse, and a new task or
-// event made on a day. Pure: the text in, the text out; the store writes it as any edit of a file.
+// event made on a day. Pure: the text in, the text out; the plugin writes it as a transaction (`tx.update`).
 
-import { headingLines } from './org';
-import type { Layer } from './calIndex';
+import { headingLines, type Layer } from '@panopticon/api/org';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const STAMP = /<(\d{4})-(\d{2})-(\d{2})(\s+[^\s\d>]+)?(?:\s+(\d{1,2}):(\d{2})(?:-(\d{1,2}):(\d{2}))?)?([^>]*)>/;
@@ -130,7 +129,7 @@ export function insertEntry(text: string, heading: string | null, e: NewEntry, n
   return { text: lines.join('\n'), line: end };
 }
 
-// ---- «Настройки → Календарь» (`calendar` in config.json) ---------------------------------------------------------
+// ---- «Настройки → Календарь» (the plugin's settings, its manifest) ------------------------------------------------
 
 export interface CalSettings {
   pick: 'default' | 'ask' | 'last'; // the file of a new entry: as set, asked each time, as the last time
@@ -176,31 +175,4 @@ export function readCal(raw: unknown): CalSettings {
     keepDeadline: bool(v.keepDeadline, d.keepDeadline), askRepeat: bool(v.askRepeat, d.askRepeat),
     last: { task: str(v.last?.task), event: str(v.last?.event) },
   };
-}
-/** Where each setting lives (roadmap 0.6): what new entries go to and get — the folder's; the look and the moves —
- *  this Mac's. */
-export const CAL_FOLDER_KEYS = ['pick', 'taskFile', 'taskHeading', 'eventFile', 'eventHeading', 'taskStatus', 'eventStatus', 'dateKind', 'minutes', 'last'] as const;
-export const CAL_LOCAL_KEYS = ['view', 'from', 'to', 'weekNumbers', 'weekends', 'undated', 'keepDeadline', 'askRepeat'] as const;
-/** The settings of `keys` that differ from the defaults. */
-export function calPart(c: CalSettings, keys: readonly (keyof CalSettings)[]): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const k of keys) if (JSON.stringify(c[k]) !== JSON.stringify(DEFAULT_CAL[k])) out[k] = c[k];
-  return out;
-}
-/** The config text with the settings: only what differs from the defaults is written (before roadmap 0.6). */
-export function withCal(raw: string | null, c: CalSettings): string {
-  let base: Record<string, unknown> = {};
-  try {
-    const p = raw ? JSON.parse(raw) : null;
-    if (p && typeof p === 'object' && !Array.isArray(p)) base = p;
-  } catch {
-    /* replaced */
-  }
-  const out: Record<string, unknown> = { version: base.version ?? 1, ...base };
-  const keep: Record<string, unknown> = {};
-  for (const k of Object.keys(DEFAULT_CAL) as (keyof CalSettings)[])
-    if (JSON.stringify(c[k]) !== JSON.stringify(DEFAULT_CAL[k])) keep[k] = c[k];
-  if (Object.keys(keep).length) out.calendar = keep;
-  else delete out.calendar;
-  return JSON.stringify(out, null, 2) + '\n';
 }

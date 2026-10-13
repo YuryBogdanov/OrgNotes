@@ -309,8 +309,9 @@ export interface Ctx {
     setAvailable(id: string, on: boolean): void;
     /** The first shortcut of a command as set now («⌘↩»), '' none: for the plugin's own hints. */
     keyOf(id: string): string;
-    /** A command of the plugin, or of the core: `file.open` {path, line?, beside?, focus?}, `heading.reveal` {ref},
-     *  `agenda.open`, `heading.status` / `heading.schedule` / `heading.deadline` / `heading.tags` / `heading.priority`
+    /** A command of the plugin, or of the core: `file.open` {path, line?, beside?, focus?, neighbour?} (`neighbour`:
+     *  in the other pane, made on the left when there is none, as from an agenda), `heading.reveal` {ref},
+     *  `agenda.open`, `settings.open` {section?}, `heading.status` / `heading.schedule` / `heading.deadline` / `heading.tags` / `heading.priority`
      *  {ref} (the palette's step for it; the heading's file is the one shown), `capture.open` (the quick entry),
      *  `inbox.pickFile`, `inbox.createFile`. */
     run(id: string, arg?: unknown): Promise<void>;
@@ -377,6 +378,9 @@ export interface Ctx {
     /** The Inbox file (a setting of the core: the quick entry writes there); null — not chosen, or not there:
      *  `chosen` is the setting then (a file gone). `add`: where a new task goes in it. */
     inbox(): Promise<{ path: string | null; chosen: string | null; add: 'top' | 'end' }>;
+    /** The notes folder open now (its path on this Mac; null: none), as `folder.changed` gives it: what the plugin
+     *  keeps on this Mac per folder. */
+    folder(): Promise<string | null>;
     /** The statuses the file knows: open and done keywords (for `@panopticon/api/org`), and its sets in order. */
     workflow(path: string): Promise<{ open: string[]; done: string[]; sets: StatusSet[] }>;
   };
@@ -401,7 +405,8 @@ export interface Ctx {
   settings: {
     values(): Values;
     onChange(fn: (v: Values) => void): Dispose;
-    /** What a declared field shows that depends on the values: its options, its hint. */
-    dynamic(key: string, spec: { options?(v: Values): Opt[]; hint?(v: Values): string }): Dispose;
+    /** What a declared field shows that depends on the values: its options (a `pair`: both lists), its hint; a `file`
+     *  shown (null: not chosen); a `text` tidied when left. */
+    dynamic(key: string, spec: { options?(v: Values): Opt[] | [Opt[], Opt[]]; hint?(v: Values): string; show?(path: string | null): string; clean?(text: string): string }): Dispose;
   };
 }

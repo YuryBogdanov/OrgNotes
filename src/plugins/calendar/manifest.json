@@ -1,0 +1,73 @@
+{
+  "id": "calendar",
+  "name": "Календарь",
+  "version": "1.0.0",
+  "description": "Месяц и неделя всех записей с датами: слои и файлы в навигаторе, выбранный день в инспекторе, перенос мышью, «+ Задача» и «+ Событие».",
+  "author": "Panopticon",
+  "api": "^1.2",
+  "minAppVersion": "1.1.0",
+  "main": "main.js",
+  "permissions": ["index.read", "files.edit"],
+  "contributes": {
+    "commands": [
+      { "id": "calendar.nav", "title": "Навигатор: календарь", "keys": ["⌃⌘5"], "synonyms": ["слои"] },
+      { "id": "calendar.open", "title": "Календарь", "keys": ["⌘3"], "synonyms": ["месяц", "неделя", "события"] }
+    ],
+    "navSections": [
+      { "id": "calendar", "title": "Календарь", "icon": "M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3M7 12h.01M10 12h.01M13 12h.01", "key": "calendar.nav" }
+    ],
+    "views": [
+      { "id": "calendar.view", "title": "Календарь", "icon": "M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3M10 12.5h.01", "toolbar": true }
+    ],
+    "settings": [
+      {
+        "section": "Календарь",
+        "icon": "M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3",
+        "groups": [
+          {
+            "caption": "КУДА СОХРАНЯЮТСЯ НОВЫЕ ЗАПИСИ",
+            "fields": [
+              { "key": "pick", "type": "choice", "look": "segments", "where": "folder", "label": "Выбор файла", "hint": "Для кнопок «+ Задача» и «+ Событие» и двойного клика по дню", "default": "default",
+                "options": [{ "value": "default", "label": "По умолчанию" }, { "value": "ask", "label": "Спрашивать" }, { "value": "last", "label": "Как в прошлый раз" }] },
+              { "key": "taskFile", "type": "file", "where": "folder", "label": "Файл для задач", "clear": "как Inbox", "default": null },
+              { "key": "taskHeading", "type": "text", "where": "folder", "label": "Заголовок для задач", "placeholder": "Без заголовка", "default": "" },
+              { "key": "eventFile", "type": "file", "where": "folder", "label": "Файл для событий", "clear": "как Inbox", "default": null },
+              { "key": "eventHeading", "type": "text", "where": "folder", "label": "Заголовок для событий", "placeholder": "Без заголовка", "default": "" }
+            ],
+            "help": "Файл не выбран — записи идут в файл Inbox. Заголовок — первого уровня, без звёздочки."
+          },
+          {
+            "caption": "ЧТО СОЗДАЁТСЯ",
+            "fields": [
+              { "key": "taskStatus", "type": "choice", "look": "menu", "where": "folder", "label": "Статус новой задачи", "default": null, "options": [] },
+              { "key": "eventStatus", "type": "choice", "look": "menu", "where": "folder", "label": "Статус нового события", "default": "MEETING", "options": [] },
+              { "key": "dateKind", "type": "choice", "look": "segments", "where": "folder", "label": "Дата, если создаёте по дню", "default": "SCHEDULED",
+                "options": [{ "value": "SCHEDULED", "label": "SCHEDULED" }, { "value": "DEADLINE", "label": "DEADLINE" }, { "value": "plain", "label": "Просто дата" }] },
+              { "key": "minutes", "type": "choice", "look": "menu", "where": "folder", "label": "Длительность события", "default": 60,
+                "options": [{ "value": 30, "label": "30 минут" }, { "value": 60, "label": "1 час" }, { "value": 90, "label": "1,5 часа" }, { "value": 120, "label": "2 часа" }] }
+            ],
+            "help": "Статус события ставится, если он есть в наборах файла; иначе событие создаётся без статуса. Длительность — для события со временем."
+          },
+          {
+            "caption": "ВИД",
+            "fields": [
+              { "key": "view", "type": "choice", "look": "segments", "where": "local", "label": "Вид по умолчанию", "default": "month", "options": [{ "value": "month", "label": "Месяц" }, { "value": "week", "label": "Неделя" }] },
+              { "key": "from", "key2": "to", "type": "pair", "where": "local", "label": "Часы в недельном виде", "labels": ["С", "До"], "default": 8, "default2": 20 },
+              { "key": "weekNumbers", "type": "switch", "where": "local", "label": "Номера недель", "default": true },
+              { "key": "weekends", "type": "switch", "where": "local", "label": "Показывать выходные", "default": true },
+              { "key": "undated", "type": "switch", "where": "local", "label": "Блок «Без даты» в боковой панели", "default": true }
+            ]
+          },
+          {
+            "caption": "ПЕРЕНОС МЫШЬЮ",
+            "fields": [
+              { "key": "keepDeadline", "type": "switch", "where": "local", "label": "Не менять дедлайн при переносе задачи", "default": true },
+              { "key": "askRepeat", "type": "switch", "where": "local", "label": "Спрашивать при переносе повторяющейся записи", "hint": "Повтор переносится целиком: следующие пойдут от новой даты", "default": true }
+            ],
+            "help": "Перетащите плашку на другой день, в неделе — и на время. ⌘Z в календаре отменяет последний перенос."
+          }
+        ]
+      }
+    ]
+  }
+}
