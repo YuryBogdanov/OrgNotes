@@ -30,7 +30,7 @@ test.describe('the list', () => {
   test('every command by groups, with its shortcuts; the review row tells what ⌘1 does elsewhere', async ({ page }) => {
     await open(page);
     await keysSheet(page);
-    await expect(sheet(page).locator('.gt')).toHaveText(['ГЛОБАЛЬНЫЕ', 'ПРИЛОЖЕНИЕ И ОКНО', 'ФАЙЛ И ВКЛАДКИ', 'ПОИСК', 'ВИД И ПАНЕЛИ', 'ПЕРЕХОДЫ', 'ЗАГОЛОВКИ И ЗАДАЧИ', 'БЫСТРЫЙ ВВОД', 'МИНИ-ОКНО', 'КАЛЕНДАРЬ', 'ЦЕЛИ КВАРТАЛА', 'INBOX']); // the plugins' groups: their names, in the order of the plugins
+    await expect(sheet(page).locator('.gt')).toHaveText(['ГЛОБАЛЬНЫЕ', 'ПРИЛОЖЕНИЕ И ОКНО', 'ФАЙЛ И ВКЛАДКИ', 'ПОИСК', 'ВИД И ПАНЕЛИ', 'ПЕРЕХОДЫ', 'ЗАГОЛОВКИ И ЗАДАЧИ', 'БЫСТРЫЙ ВВОД', 'МИНИ-ОКНО', 'СЕГОДНЯ', 'КАЛЕНДАРЬ', 'ЦЕЛИ КВАРТАЛА', 'INBOX']); // the plugins' groups: their names, in the order of the plugins
     await expect(chips(page, 'capture')).toHaveText(['⇧⌘I']);
     await expect(chips(page, 'findNext')).toHaveText(['⌘G']);
     await expect(chips(page, 'searchPrev')).toHaveText(['⌥⇧⌘G']);

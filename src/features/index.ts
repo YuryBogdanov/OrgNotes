@@ -16,5 +16,8 @@ import './calendarMigration';
 // ---- the mini window (ТЗ 31): a part of the core; its settings' section
 import './mini';
 
+// ---- «Сегодня» (ТЗ 32): the morning's overview, a part of the core
+import './today.svelte';
+
 // the plugins that are on: what their manifests declare (roadmap 1.1); their code is started by App once drawn
 import '../api/host.svelte';

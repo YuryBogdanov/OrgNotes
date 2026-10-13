@@ -52,6 +52,7 @@
   });
   import { keyHandler, menuMayRun } from './keyDispatch';
   import { actionOf, allNavs, allViews, viewOf } from './views';
+  import { today } from './todayState.svelte';
   import { plugins } from './api/host.svelte';
   import PluginSheets from './PluginSheets.svelte';
 
@@ -168,6 +169,7 @@
     nav: () => (store.showNav = !store.showNav),
     miniOpen: () => store.openInMini(),
     miniShow: () => store.toggleMini(),
+    today: () => today.open(),
     navFiles: () => store.setNavMode('files'),
     navAgendas: () => store.setNavMode('agendas'),
     capture: () => store.openCapture(),

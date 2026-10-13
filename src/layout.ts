@@ -278,7 +278,7 @@ export const targetOf = (L: Layout, pi: number) => (pi + 1 < L.panes.length ? pi
 export function moveTab(L: Layout, pi: number, ti: number): boolean {
   const to = targetOf(L, pi);
   const t = L.panes[pi]?.tabs[ti];
-  if (to < 0 || !t) return false;
+  if (to < 0 || !t || isPinned(t)) return false;
   const target = L.panes[to];
   const same = target.tabs.findIndex((x) => sameContent(x, t) && x.kind !== 'untitled');
   closeTab(L, pi, ti); // may remove the source pane
@@ -293,7 +293,7 @@ export function moveTab(L: Layout, pi: number, ti: number): boolean {
 export function duplicateTab(L: Layout, pi: number, ti: number): boolean {
   const to = targetOf(L, pi);
   const t = L.panes[pi]?.tabs[ti];
-  if (to < 0 || !t || t.kind === 'untitled') return false;
+  if (to < 0 || !t || t.kind === 'untitled' || isPinned(t)) return false;
   const target = L.panes[to];
   const same = target.tabs.findIndex((x) => sameContent(x, t));
   if (same >= 0) target.active = same;
@@ -321,6 +321,36 @@ export function dropMissing(L: Layout, exists: (path: string) => boolean) {
     }
   }
   if (L.active >= L.panes.length) L.active = L.panes.length - 1;
+}
+
+/** A tab that stays first in the left pane («Сегодня», ТЗ 32): its kind says so (views.ts). */
+export const isPinned = (t: Tab) => !!viewOf(t.kind)?.pinned;
+
+/** The pinned tab is the first one of the left pane, whatever was done to the panes (a swap, a merge). */
+export function pinFirst(L: Layout) {
+  for (let pi = 0; pi < L.panes.length; pi++) {
+    const p = L.panes[pi];
+    const ti = p.tabs.findIndex(isPinned);
+    if (ti < 0 || (pi === 0 && ti === 0)) continue;
+    const t = p.tabs[ti];
+    const wasActive = p.active === ti;
+    p.tabs.splice(ti, 1);
+    if (ti < p.active) p.active -= 1;
+    p.active = Math.max(0, Math.min(p.active, p.tabs.length - 1));
+    if (!p.tabs.length && L.panes.length > 1) {
+      L.panes.splice(pi, 1);
+      L.active = 0;
+    }
+    const first = L.panes[0];
+    first.tabs.unshift(t);
+    first.active = wasActive && pi === 0 ? 0 : first.tabs.length > 1 ? first.active + 1 : 0;
+    // a second one (two panes each had it): only the first stays
+    for (const q of L.panes) for (let i = q.tabs.length - 1; i >= 0; i--) if (isPinned(q.tabs[i]) && !(q === first && i === 0)) {
+      q.tabs.splice(i, 1);
+      if (i <= q.active) q.active = Math.max(0, q.active - 1);
+    }
+    return;
+  }
 }
 
 // ---- restoring after a restart -----------------------------------------------------------

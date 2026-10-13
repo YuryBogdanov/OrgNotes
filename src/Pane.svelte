@@ -11,7 +11,7 @@
   import type { RichPick } from './orgRich';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import { parseHeadings } from './org';
-  import { targetOf, type Tab } from './layout';
+  import { isPinned, targetOf, type Tab } from './layout';
   import { displayName, displayPath } from './names';
 
   // One editor pane: an accent bar when active (only with two panes: alone it is always the active one), its own tabs, and the content of the active tab.
@@ -128,8 +128,8 @@
       { label: 'Закрыть', shortcut: store.keyHint('closeTab'), action: () => store.closeTab(pi, idx(t)) },
       { label: 'Закрыть остальные', shortcut: store.keyHint('closeOthers'), disabled: pane.tabs.length < 2, action: () => store.closeOthers(pi, idx(t)) },
       'sep',
-      { label: 'Переместить в соседний редактор', shortcut: store.keyHint(to > pi ? 'moveRight' : 'moveLeft'), disabled: to < 0, action: () => store.moveTab(pi, idx(t)) },
-      { label: 'Продублировать в соседнем редакторе', shortcut: store.keyHint(to > pi ? 'dupRight' : 'dupLeft'), disabled: to < 0 || t.kind === 'untitled' || !!viewOf(t.kind)?.single, action: () => store.duplicateTab(pi, idx(t)) },
+      { label: 'Переместить в соседний редактор', shortcut: store.keyHint(to > pi ? 'moveRight' : 'moveLeft'), disabled: to < 0 || isPinned(t), action: () => store.moveTab(pi, idx(t)) },
+      { label: 'Продублировать в соседнем редакторе', shortcut: store.keyHint(to > pi ? 'dupRight' : 'dupLeft'), disabled: to < 0 || t.kind === 'untitled' || !!viewOf(t.kind)?.single || isPinned(t), action: () => store.duplicateTab(pi, idx(t)) },
     ];
     if (hasFile) {
       items.push('sep');
@@ -279,7 +279,7 @@
   <div class="strip" class:fl={fadeL} class:fr={fadeR} role="tablist" aria-label="Вкладки" bind:this={strip} ondblclick={stripDblClick} onscroll={() => { edges(); tipEnd(); }}>
     {#each pane.tabs as t, ti (t.id)}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <div class="tab" class:on={ti === pane.active} class:dirty={dirty(t)} class:untitled={t.kind === 'untitled'} class:gone={gone(t)} class:menu={menuTab === t.id}
+      <div class="tab" class:on={ti === pane.active} class:dirty={dirty(t)} class:untitled={t.kind === 'untitled'} class:gone={gone(t)} class:menu={menuTab === t.id} class:pinned={isPinned(t)}
         role="tab" aria-selected={ti === pane.active} tabindex={ti === pane.active ? 0 : -1} data-tab={t.id}
         onmouseenter={(e) => tipStart(e, t)} onmouseleave={tipEnd} onmousedown={tipEnd}
         onclick={(e) => { if (e.ctrlKey) return tabMenu(e, t, ti); store.activateTab(pi, ti); }}
@@ -296,6 +296,7 @@
           <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" /></svg>
         {/if}
         <span class="lbl">{label(t)}</span>
+        {#if isPinned(t)}<svg class="pin" width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-label="Закреплена"><path d="M7 3h6l-1 5 3 3H5l3-3zM10 11v6" /></svg>{/if}
         <span class="slot">
           <span class="dot" aria-hidden="true"></span>
           <button class="x" aria-label="Закрыть вкладку {label(t)}" title="Закрыть вкладку" tabindex="-1"
@@ -432,6 +433,10 @@
   .tab.on { background: var(--bg); border-color: var(--line); color: var(--fg2); }
   .pane.active .tab.on { color: var(--fg); }
   .tab:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
+  /* «Сегодня» (ТЗ 32): pinned first, a thicker divider after it */
+  .tab.pinned { flex: 0 0 auto; min-width: 0; margin-right: 8px; }
+  .tab.pinned::after { content: ''; position: absolute; right: -6px; top: 6px; bottom: 4px; width: 3px; border-radius: 1.5px; background: var(--line); }
+  .pin { flex: 0 0 auto; color: var(--fg3); }
   .ic { flex: 0 0 auto; color: var(--acc); }
   .tab:not(.on) .ic { color: var(--fg3); }
   .lbl { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
