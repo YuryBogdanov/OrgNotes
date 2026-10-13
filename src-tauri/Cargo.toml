@@ -10,6 +10,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[target.'cfg(target_os = "macos")'.build-dependencies]
+# the mini window's native panel is Swift (swift/MiniPanel), built and linked here (ТЗ 31)
+swift-rs = { version = "1.0.7", features = ["build"] }
+
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api"] }
 serde = { version = "1", features = ["derive"] }
@@ -24,6 +28,7 @@ window-vibrancy = "0.6"
 # a bookmark of the notes folder finds it again after it was renamed or moved
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSURL", "NSData", "NSError", "NSString", "NSArray", "NSGeometry"] }
+swift-rs = "1.0.7"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
