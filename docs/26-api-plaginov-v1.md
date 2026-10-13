@@ -353,6 +353,13 @@ net?: { fetch(url: string, init?: { method?; headers?; body?: string }): Promise
   - `currentReview()`: показать карточку (`show`), заменить очередь (`setItems`), закончить (`end`).
 - **Прочее:** `ui.refile { onUndo }`; наборы статусов файла в `index.workflow(path).sets`; `index.inbox().chosen`.
 
+## API v1.2 — для календаря (ТЗ 29)
+
+- **Инспектор вида:** `ViewSpec.inspector(el, state, tab)`.
+- **Кнопка на панели:** `"toolbar": true` у вида в манифесте — кнопка в «Открыть в панели» после кнопок приложения.
+- **Inbox:** `index.inbox().add` — куда быстрый ввод добавляет задачи.
+- **Индекс дат** (`calIndex`) — в `@panopticon/api/org`: записи по дням, сетки месяца и недели, подписи.
+
 ## Разбивка и приёмка
 
 | Задача | Что | Готово, когда |

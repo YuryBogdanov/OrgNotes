@@ -369,6 +369,11 @@
         <button aria-label="Календарь" title="Календарь" aria-pressed={pressed === 'calendar'} class:on={pressed === 'calendar'} onclick={() => calendar.toggleSecond()}>
           <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2.5v3M13 2.5v3" /><circle cx="10" cy="12.5" r="2" /></svg>
         </button>
+        {#each plugins.toolbarViews as v (v.id)}
+          <button aria-label={v.title} title={v.title} aria-pressed={pressed === v.id} class:on={pressed === v.id} onclick={() => plugins.toggleSecond(v.id)}>
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={v.icon} /></svg>
+          </button>
+        {/each}
       </div>
       <button class="ibtn" aria-label={store.titled('Настройки', 'settings')} title={store.titled('Настройки', 'settings')} onclick={() => store.openSettings()}>
         <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.5" /><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" /></svg>

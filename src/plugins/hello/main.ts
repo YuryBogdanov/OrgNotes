@@ -192,9 +192,10 @@ export default definePlugin({
     ctx.events.on('file.changed', () => void badge());
     let inboxPath: string | null = (await ctx.index!.inbox()).path;
     ctx.events.on('inbox.changed', (p) => void (inboxPath = (p as { path: string | null }).path));
-    ctx.commands.on('hello.inbox', () => {
+    ctx.commands.on('hello.inbox', async () => {
       const path = inboxPath;
-      ctx.ui.notify(path ? `Inbox: ${path}` : 'Файл Inbox не выбран', [
+      const { add } = await ctx.index!.inbox(); // ТЗ 29: where a new task goes in it
+      ctx.ui.notify(path ? `Inbox: ${path} · новые ${add === 'top' ? 'в начало' : 'в конец'}` : 'Файл Inbox не выбран', [
         { label: 'Выбрать…', run: () => void ctx.commands.run('inbox.pickFile') },
         { label: 'Записать', run: () => void ctx.commands.run('capture.open') },
       ]);
@@ -343,6 +344,10 @@ export default definePlugin({
         void tasks();
         const off = ctx.events.on('file.changed', () => void tasks());
         return off;
+      },
+      // ТЗ 29: the inspector of the tab — its state, drawn again when it changes
+      inspector(root, state) {
+        root.append(el('div', { className: 'hello-insp' }, el('div', { className: 'hello-cap' }, 'ДОСКА'), el('p', {}, `Нажатий на доске: ${state.clicks}`)));
       },
     });
   },

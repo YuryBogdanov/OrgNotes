@@ -36,7 +36,7 @@ test('the Inbox file and its change; the core\'s choice of it; a badge on the se
   await open(page);
   await expect(page.getByRole('tablist', { name: 'Режимы навигатора' }).locator('.badge[aria-label="Привет: 2"]')).toHaveText('2');
   await run(page, 'привет: про inbox');
-  await expect(toast(page)).toContainText('Inbox: inbox.org');
+  await expect(toast(page)).toContainText('Inbox: inbox.org · новые в начало');
   await toast(page).getByRole('button', { name: 'Выбрать…' }).click();
   await page.getByRole('dialog', { name: 'Файл Inbox' }).getByPlaceholder('Найти файл').fill('Дом');
   await page.keyboard.press('Enter');

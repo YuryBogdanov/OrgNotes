@@ -6,7 +6,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { untrack, type Component } from 'svelte';
 import { store } from '../store.svelte';
-import { openFile, openView } from '../layout';
+import { newTab, openFile, openView } from '../layout';
 import { register as registerPalette } from '../commands';
 import { registerAction, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf, viewOf } from '../views';
 import { fuzzy } from '../fuzzy';
@@ -21,6 +21,7 @@ import PluginsSettings from '../PluginsSettings.svelte';
 import { hostAllowed, hostOf, type Manifest, type ManifestSettings } from './manifest';
 import type { Ctx, Dispose, Named, SheetSpec, EventName, FormSpec, HeadingInfo, HeadingRef, Place, Plugin, Query, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
+import PluginInspector from '../PluginInspector.svelte';
 import PluginNav from '../PluginNav.svelte';
 import PluginReview from '../PluginReview.svelte';
 import { mountWidget } from './widgets.svelte';
@@ -323,7 +324,7 @@ class Host {
     for (const v of m.contributes.views) {
       const spec = () => this.views.get(v.id)?.spec;
       this.keep(id, registerView({
-        kind: v.id, icon: v.icon, component: PluginView,
+        kind: v.id, icon: v.icon, component: PluginView, inspector: PluginInspector, hasInspector: () => !!spec()?.inspector,
         label: (t) => this.guard(id, () => spec()?.title(t.data), v.title) ?? v.title,
         crumbs: (t) => this.guard(id, () => spec()?.crumbs?.(t.data), null) ?? [this.guard(id, () => spec()?.title(t.data), v.title) ?? v.title],
         restore: (raw) => {
@@ -356,6 +357,17 @@ class Host {
     const list = texts.map((t) => (t ? parseTheme(t) : null)).filter((t): t is Theme => !!t);
     if (list.length < texts.length) console.warn(`plugin ${m.id}: ${texts.length - list.length} theme file(s) unreadable`);
     this.keep(m.id, store.addThemes(m.id, list));
+  }
+  /** The views with a button in the toolbar's «Открыть в панели» (after the core's): of the plugins running. */
+  get toolbarViews() {
+    return this.entries.flatMap((e) => (e.enabled && e.manifest && !this.failed.has(e.manifest.id) ? e.manifest.contributes.views.filter((v) => v.toolbar) : []));
+  }
+  /** A view's toolbar button: in the second pane (a new tab's state `restore(null)`), or out of it. */
+  toggleSecond(kind: string) {
+    const spec = this.views.get(kind);
+    if (!spec) return;
+    store.toggleSecond(kind, () => ({ ...newTab(kind), data: this.guard(spec.plugin, () => spec.spec.restore?.(null), null) ?? null }));
+    store.persistLayout();
   }
   private showNav(id: string) {
     store.showNav = true;
@@ -763,7 +775,7 @@ class Host {
           const f = fileOf(path);
           return f && kw ? (namedFor(kw, f.wf) as Named) : null;
         },
-        inbox: async () => ({ path: store.inboxFile?.name ?? null, chosen: store.inboxCfg.file }),
+        inbox: async () => ({ path: store.inboxFile?.name ?? null, chosen: store.inboxCfg.file, add: store.inboxCfg.add }),
         workflow: async (path) => {
           const f = fileOf(path);
           const seqs = f?.wf.sequences ?? store.config.workflows;
