@@ -13,7 +13,7 @@
   // «Завершить день» (ТЗ 32 §3): what was done, what is left (moved or kept), the three tasks for tomorrow, a note to
   // tomorrow; ⌘↩ writes it all into the journal at once, ⎋ leaves.
   const day = today.day;
-  const files = store.files;
+  const files = store.agendaFiles;
   const cfg = today.folder;
   const WD = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
   const MON = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];

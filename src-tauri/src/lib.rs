@@ -276,7 +276,7 @@ fn collect(dir: &Path, root: &Path, out: &mut Vec<OrgFile>) {
         }
         if p.is_dir() {
             collect(&p, root, out);
-        } else if p.extension().map_or(false, |x| x == "org") {
+        } else if is_org(&p) {
             if let Ok(text) = fs::read_to_string(&p) {
                 let rel = p
                     .strip_prefix(root)
@@ -310,7 +310,7 @@ fn watch(app: &AppHandle, dir: &Path) -> Option<Debouncer<RecommendedWatcher>> {
                     .path
                     .file_name()
                     .map_or(false, |n| n.to_string_lossy().starts_with('.'));
-                let org = e.path.extension().map_or(false, |x| x == "org");
+                let org = is_org(&e.path);
                 // the project config (statuses, agendas): every window reads it again
                 let config = e.path.ends_with(Path::new(CONFIG_DIR).join(CONFIG_FILE));
                 // no extension: a folder was added, renamed or removed
@@ -493,20 +493,27 @@ fn list_org_files(state: State<AppState>) -> Result<Vec<OrgFile>, String> {
     Ok(out)
 }
 
+/// A note: an `.org` file, or its archive as Emacs makes them (`.org_archive`, ТЗ 33).
+fn is_org(p: &Path) -> bool {
+    matches!(p.extension().and_then(|x| x.to_str()), Some("org" | "org_archive"))
+}
+
 /// Atomic write (temp file + rename) restricted to .org files inside the notes folder.
 /// `base` is the text we last read from disk: if the file changed since, nothing is written
 /// and "conflict" is returned, so an edit made in another editor is never clobbered.
 fn save_checked(root: &Path, path: &str, text: &str, base: &str) -> Result<(), String> {
     let root = fs::canonicalize(root).map_err(|e| e.to_string())?;
     let target = fs::canonicalize(path).map_err(|e| e.to_string())?;
-    if !target.starts_with(&root) || target.extension().map_or(true, |x| x != "org") {
+    if !target.starts_with(&root) || !is_org(&target) {
         return Err("path outside notes folder".into());
     }
     let disk = fs::read_to_string(&target).map_err(|e| e.to_string())?;
     if disk != base {
         return Err("conflict".into());
     }
-    let tmp = target.with_extension("org.tmp");
+    let mut tmp_name = target.file_name().unwrap_or_default().to_os_string();
+    tmp_name.push(".tmp");
+    let tmp = target.with_file_name(tmp_name);
     fs::write(&tmp, text).map_err(|e| e.to_string())?;
     fs::rename(&tmp, &target).map_err(|e| e.to_string())
 }
@@ -673,6 +680,9 @@ mod tests {
         let inside = scan_in(&d.join("Команда"), Some(&d.to_string_lossy())).unwrap();
         assert_eq!(inside.shown, "~/Команда");
         assert!(emacs_service(".#x.org") && emacs_service("#x.org#") && emacs_service("x.org~") && !emacs_service("x.org"));
+        // a note: .org, or its archive as Emacs makes them (ТЗ 33)
+        assert!(is_org(Path::new("a.org")) && is_org(Path::new("a.org_archive")) && !is_org(Path::new("a.md")) && !is_org(Path::new("a.org.tmp")));
+        assert_eq!((with_org("a".into()), with_org("a.org".into()), with_org("a.org_archive".into())), ("a.org".into(), "a.org".into(), "a.org_archive".into()));
         let _ = fs::remove_dir_all(&d);
     }
 
@@ -751,7 +761,7 @@ fn as_known(root: &Path, canon: &Path) -> String {
 }
 
 fn with_org(name: String) -> String {
-    if name.ends_with(".org") {
+    if name.ends_with(".org") || name.ends_with(".org_archive") {
         name
     } else {
         format!("{name}.org")

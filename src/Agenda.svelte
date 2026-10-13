@@ -33,7 +33,7 @@
     const from = midnight;
     const horizon = new Date(from); horizon.setDate(horizon.getDate() + 30);
     const out: Item[] = [];
-    store.files.forEach((f, fi) => {
+    store.agendaFiles.forEach((f, fi) => {
       for (const h of f.headings) {
         const isOpen = !!h.keyword && f.wf.open.includes(h.keyword);
         const isEvent = !h.keyword && !!h.event;
@@ -84,7 +84,7 @@
   });
 
   // ---- a custom agenda: its blocks in order, each with its own heading -------------------------------------------
-  const customRun = $derived(custom ? runAgenda(custom, store.files, midnight) : []);
+  const customRun = $derived(custom ? runAgenda(custom, store.agendaFiles, midnight) : []);
   const mark = (d: OrgDate | undefined, word: string) => (d ? `${word} ${fmtDay(toJs(d))}` : '');
   const customSections = $derived.by(() => {
     const out: Section[] = [];

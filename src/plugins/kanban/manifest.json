@@ -95,6 +95,39 @@
           "поиск",
           "найти"
         ]
+      },
+      {
+        "id": "kanban.delete",
+        "title": "Удалить карточку",
+        "keys": [
+          "⌘⌫"
+        ],
+        "scope": "view",
+        "synonyms": [
+          "удалить",
+          "карточка"
+        ]
+      },
+      {
+        "id": "kanban.archive",
+        "title": "Карточку в архив",
+        "scope": "view",
+        "synonyms": [
+          "архив",
+          "archive"
+        ]
+      },
+      {
+        "id": "kanban.open",
+        "title": "Открыть карточку сбоку",
+        "keys": [
+          "↩"
+        ],
+        "scope": "view",
+        "synonyms": [
+          "карточка",
+          "сбоку"
+        ]
       }
     ],
     "fileViews": [

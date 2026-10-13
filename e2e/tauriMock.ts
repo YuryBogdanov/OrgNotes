@@ -140,7 +140,7 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             if (w.__gone) throw 'unavailable'; // the folder went away while the app runs
             const r = (root() ?? '/mock') + '/';
             const snapshot = Object.entries(disk)
-              .filter(([path]) => path.startsWith(r) && path.endsWith('.org') && !path.slice(r.length).split('/').some((p) => p.startsWith('.')))
+              .filter(([path]) => path.startsWith(r) && /\.org(_archive)?$/.test(path) && !path.slice(r.length).split('/').some((p) => p.startsWith('.')))
               .map(([path, text]) => ({ name: path.slice(r.length), path, text, mtime: mtime[path] ?? 0 }));
             if (listDelay) await new Promise((r) => setTimeout(r, listDelay));
             return snapshot;
@@ -205,7 +205,8 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           const exists = (p: string) => p in disk || folders.has(p.replace('/mock/', '')) || Object.keys(disk).some((k) => k.startsWith(p + '/'));
           if (cmd === 'create_entry') {
             if (badName(args.name)) throw 'bad name';
-            const n = args.isDir ? args.name.trim() : args.name.trim().replace(/(\.org)?$/, '.org');
+            // as the app: «.org» added, unless it is there or it is an archive («platform.org_archive»)
+            const n = args.isDir ? args.name.trim() : /\.org(_archive)?$/.test(args.name.trim()) ? args.name.trim() : args.name.trim() + '.org';
             const path = args.parent + '/' + n;
             if (exists(path)) throw 'exists';
             if (args.isDir) folders.add(path.replace('/mock/', ''));

@@ -4,7 +4,7 @@ import {
   newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
-import { displayName, noteName, withOrg } from './names';
+import { displayName, isArchive, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags, weekdayNames } from './edits';
 import { bareTitle, caretAfter, keyOf, moveTo, moveWithin } from './refile';
 import type { CalSpec, Plate } from './commands';
@@ -934,6 +934,9 @@ class Store {
       return [];
     }
   }
+  /** The files as the agenda, the calendar and «Сегодня» see them: an archive («.org_archive», ТЗ 33) has no headings
+   *  there. The same list as `files` (the indexes of one are the other's). */
+  agendaFiles = $derived(this.files.map((f) => (isArchive(f.name) ? { ...f, headings: [] } : f)));
   /** Today, for relative dates in agendas: it changes at midnight (checked every minute and on coming back). */
   today = $state(new Date());
   private tickDay() {

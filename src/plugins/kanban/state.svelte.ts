@@ -3,7 +3,8 @@
 
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Ctx, Named } from '@panopticon/api';
-import { parseHeadings, workflow, type Heading } from '@panopticon/api/org';
+import { parseHeadings, workflow, type Heading, type Workflow } from '@panopticon/api/org';
+import { archiveEntry, archivePath, categoryOf } from './archive';
 import { withBoard, type StatusSet } from './board';
 
 export const VIEW = 'kanban.board';
@@ -14,6 +15,7 @@ export interface BFile {
   headings: Heading[];
   sets: StatusSet[];
   done: string[];
+  wf: Workflow;
 }
 interface Folded {
   [path: string]: { [keyword: string]: boolean };
@@ -42,7 +44,8 @@ class Kanban {
   async read(path: string): Promise<BFile | null> {
     try {
       const [text, wf] = await Promise.all([this.ctx.files!.read(path), this.ctx.index!.workflow(path)]);
-      const f: BFile = { path, text, headings: parseHeadings(text, workflow(wf)), sets: wf.sets.map((s) => ({ name: s.name, states: s.states.map((x) => ({ name: x.name, done: x.done })) })), done: wf.done };
+      const w = workflow(wf);
+      const f: BFile = { path, text, wf: w, headings: parseHeadings(text, w), sets: wf.sets.map((s) => ({ name: s.name, states: s.states.map((x) => ({ name: x.name, done: x.done })) })), done: wf.done };
       this.files.set(path, f);
       return f;
     } catch {
@@ -82,7 +85,7 @@ class Kanban {
 
   // ---- the cards: where they go (ТЗ 33 §4) ----
   /** What the board shown is asked by a command: a new card in the chosen card's column, the filter. */
-  ask: ((a: { kind: 'new' | 'filter'; path: string }) => void) | null = null;
+  ask: ((a: { kind: 'new' | 'filter' | 'open'; path: string }) => void) | null = null;
   /** The card chosen on the board of a file (its key: «line:title»). */
   selected = $state<{ path: string; key: string } | null>(null);
   /** The board of each file shown now: its columns of cards in order (all of them, the filter aside) — what the
@@ -147,8 +150,12 @@ class Kanban {
     if (!card || !set) return;
     const i = set.states.findIndex((s) => s.name === card.keyword);
     const to = set.states[i + d]?.name;
-    if (!to) return;
-    const doneTo = set.states.some((s) => s.name === to && s.done);
+    if (to) await this.setStatus(path, card, to);
+  }
+  /** Another status, its place in the file kept (⇧← ⇧→, the menu of the card at the side). */
+  async setStatus(path: string, card: { line: number; title: string }, to: string) {
+    const set = this.shown.get(path)?.set;
+    const doneTo = !!set?.states.some((s) => s.name === to && s.done);
     const repeat = doneTo && this.repeats(path, card.line);
     const r = await this.ctx.edit!.transaction(`${to}: ${card.title}`, (tx) => tx.setStatus(this.ref(path, card), to));
     if (r !== 'ok') return;
@@ -193,6 +200,40 @@ class Kanban {
     await this.read(path);
     const m = made as { line: number; title: string };
     return `${m.line}:${m.title}`;
+  }
+
+  // ---- away from the board: deleted, or to the archive (ТЗ 33 §4) ----
+  /** The card and its subtree out of the file; «Карточка удалена · Отменить» for 8 s, ⌘Z too. */
+  async removeCard(path: string, card: { line: number; title: string }) {
+    const r = await this.ctx.edit!.transaction(`Удалить: ${card.title}`, (tx) => tx.remove(this.ref(path, card)));
+    if (r !== 'ok') return;
+    await this.read(path);
+    if (this.selected?.path === path) this.selected = null;
+    this.ctx.ui.notify('Карточка удалена', [{ label: 'Отменить', run: () => void this.ctx.edit!.undo().then(() => this.read(path)) }]);
+  }
+  /** Where the cards of a file go: its «_archive» (or «#+ARCHIVE:»). */
+  archiveOf(path: string) {
+    const f = this.files.get(path);
+    return f ? archivePath(f.text, path) : path + '_archive';
+  }
+  /** As `org-archive-subtree`: the subtree to the archive's top level with ARCHIVE_* (the file made when missing), out
+   *  of the file — one transaction over the two files; «Перенесено в архив · Отменить». */
+  async archiveCard(path: string, card: { line: number; title: string }) {
+    const f = this.files.get(path);
+    const h = f?.headings.find((x) => x.line === card.line && x.title === card.title);
+    if (!f || !h) return;
+    const to = archivePath(f.text, path);
+    if (to === path || !(await this.ctx.edit!.ensureFile(to))) return;
+    const folder = await this.ctx.index!.folder();
+    const entry = archiveEntry(f.text, h, f.wf, { now: new Date(), file: folder ? `${folder}/${path}` : path, category: categoryOf(f.text, path) });
+    const r = await this.ctx.edit!.transaction(`В архив: ${card.title}`, (tx) => {
+      tx.insertHeading({ file: to, position: 'end' }, entry);
+      tx.remove(this.ref(path, card));
+    });
+    if (r !== 'ok') return;
+    await this.read(path);
+    if (this.selected?.path === path) this.selected = null;
+    this.ctx.ui.notify('Перенесено в архив', [{ label: 'Отменить', run: () => void this.ctx.edit!.undo().then(() => this.read(path)) }]);
   }
 
   // ---- the workflow of a file ----
