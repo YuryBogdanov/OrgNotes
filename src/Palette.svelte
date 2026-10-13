@@ -49,11 +49,12 @@
   });
   onDestroy(() => {
     restoreTo = before;
-    // back to where it was (the caret too), at once so the next key lands there
-    if (store.tab?.id === tabBefore && before?.isConnected) return before.focus();
+    // back to where it was (the caret too), at once so the next key lands there; not scrolled: a focused editor would
+    // be brought into view from its top (#103)
+    if (store.tab?.id === tabBefore && before?.isConnected) return before.focus({ preventScroll: true });
     // a command opened another tab: its editor is not there yet
     requestAnimationFrame(() => {
-      if (!store.palette) document.querySelector<HTMLElement>('section.pane.active .cm-content')?.focus();
+      if (!store.palette) document.querySelector<HTMLElement>('section.pane.active .cm-content')?.focus({ preventScroll: true });
     });
   });
 

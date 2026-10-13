@@ -89,7 +89,7 @@
   }
   function closeFind() {
     fb.open = false;
-    (document.querySelector('.mini .cm-content') as HTMLElement | null)?.focus();
+    (document.querySelector('.mini .cm-content') as HTMLElement | null)?.focus({ preventScroll: true });
   }
   $effect(() => void call('mini_pin', { on: palette || fb.open })); // full while one is open
   let hint = $state('');
@@ -178,7 +178,7 @@
         Promise.all([
           listen('mini-focus', () => {
             if (!store.miniNote) palette = true;
-            else (document.querySelector('.mini .cm-content') as HTMLElement | null)?.focus();
+            else (document.querySelector('.mini .cm-content') as HTMLElement | null)?.focus({ preventScroll: true });
           }),
           // ⇧⌘M in the main window: its note here, in a new editor (the store took the note)
           listen('mini-open', () => {
