@@ -367,6 +367,13 @@ net?: { fetch(url: string, init?: { method?; headers?; body?: string }): Promise
   - цвета статусов в `index.workflow().sets`.
 - **Месяц под карточкой** (#99): `ui.setMonthFilter({ layers, hidden })` — календарь передаёт ядру свои слои и скрытые файлы.
 
+## API v1.3 — правки Org-уровня (ТЗ 30)
+
+- `tx.insertHeading` возвращает ссылку на созданный заголовок; новое место — `{ under, before }`.
+- `tx.ensureChild(under, title, { before? })` — найти подзаголовок по названию или создать его.
+- Чтение внутри транзакции: `tx.heading`, `tx.children`, `tx.body`.
+- `tx.update` остаётся запасным путём для своей структуры в файле.
+
 ## Разбивка и приёмка
 
 | Задача | Что | Готово, когда |

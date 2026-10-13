@@ -1112,6 +1112,21 @@ type Changed = [HeadingRef, Parameters<Host['headingChanged']>[1]];
 /** A reference of the API (a path in the notes folder) as the core's (the file's full path). */
 const coreRef = (h: HeadingRef): HeadingRef => ({ ...h, path: fileOf(h.path)?.path ?? h.path });
 const corePath = (rel: string) => fileOf(rel)?.path ?? rel;
+/** A reference of the core's (an absolute path) as the plugins have it (the path in the notes folder). */
+const apiRef = (h: HeadingRef | null): HeadingRef | null => (h ? { ...h, path: store.files.find((f) => f.path === h.path)?.name ?? h.path } : null);
+/** A heading of a transaction (its text now) as the plugins see it. */
+function txInfo(tx: CoreTx, ref: HeadingRef, h: Heading): HeadingInfo {
+  const f = store.files.find((x) => x.path === ref.path);
+  const hs = tx.headings(ref.path) ?? [];
+  const inherited = new Set<string>(f?.filetags ?? []);
+  for (let p = h.parent; p >= 0; p = hs[p].parent) for (const t of hs[p].tags) inherited.add(t);
+  const done = !!h.keyword && !!f?.wf.done.includes(h.keyword);
+  return {
+    ref: { path: f?.name ?? ref.path, line: h.line, title: h.title }, level: h.level, keyword: h.keyword, done, priority: h.priority, title: h.title,
+    tags: [...new Set([...h.tags, ...inherited])],
+    ...(h.scheduled ? { scheduled: { ...h.scheduled } } : {}), ...(h.deadline ? { deadline: { ...h.deadline } } : {}), ...(h.closed ? { closed: { ...h.closed } } : {}),
+  } as HeadingInfo;
+}
 /** The plugin's Tx over the core's (§5.4): the same operations; what changed in which heading, for the events. */
 function apiTx(tx: CoreTx, ev: Changed[]) {
   return {
@@ -1119,8 +1134,25 @@ function apiTx(tx: CoreTx, ev: Changed[]) {
     setPlanning: (h: HeadingRef, k: 'SCHEDULED' | 'DEADLINE', d: Date | null) => (tx.setPlanning(coreRef(h), k, d), ev.push([h, 'planning'])),
     setTags: (h: HeadingRef, tags: string[]) => (tx.setTags(coreRef(h), tags), ev.push([h, 'tags'])),
     setProperty: (h: HeadingRef, k: string, v: string | null) => (tx.setProperty(coreRef(h), k, v), ev.push([h, 'property'])),
-    insertHeading: (at: { under: HeadingRef; position: 'first' | 'last' } | { file: string; position: 'top' | 'end' }, org: string) =>
-      tx.insertHeading('under' in at ? { under: coreRef(at.under), position: at.position } : { file: corePath(at.file), position: at.position }, org),
+    insertHeading: (at: { under: HeadingRef; position: 'first' | 'last' } | { under: HeadingRef; before: HeadingRef } | { file: string; position: 'top' | 'end' }, org: string) =>
+      apiRef(
+        tx.insertHeading(
+          'under' in at ? ('before' in at ? { under: coreRef(at.under), before: coreRef(at.before) } : { under: coreRef(at.under), position: at.position }) : { file: corePath(at.file), position: at.position },
+          org,
+        ),
+      ),
+    ensureChild: (under: HeadingRef, title: string, at: { before?: HeadingRef } = {}) =>
+      apiRef(tx.ensureChild(coreRef(under), String(title), at.before ? { before: coreRef(at.before) } : {})),
+    heading: (h: HeadingRef) => {
+      const r = coreRef(h);
+      const x = tx.heading(r);
+      return x ? txInfo(tx, r, x) : null;
+    },
+    children: (h: HeadingRef) => {
+      const r = coreRef(h);
+      return tx.children(r).map((x) => txInfo(tx, r, x));
+    },
+    body: (h: HeadingRef) => tx.body(coreRef(h)),
     replaceBody: (h: HeadingRef, org: string) => (tx.replaceBody(coreRef(h), org), ev.push([h, 'body'])),
     move: (h: HeadingRef, to: { under: HeadingRef } | { file: string }) => (tx.move(coreRef(h), 'under' in to ? { under: coreRef(to.under) } : { file: corePath(to.file) }), ev.push([h, 'moved'])),
     remove: (h: HeadingRef) => (tx.remove(coreRef(h)), ev.push([h, 'removed'])),

@@ -55,3 +55,46 @@ describe('the journal', () => {
     expect(j.size).toBe(1);
   });
 });
+
+describe('the operations of Org level (ТЗ 30)', () => {
+  const T = '* Квартальные задачи\n** Квартал Q4 2026\n*** TODO Цель\n**** Отметки\n- [2026-10-01 Чт] раз\n- [2026-10-10 Сб] три\n\n** Квартал Q2 2026\n*** TODO Старая\n\n* Другое\n';
+  const P = '/f.org';
+  const tx = () => new Tx(files({ [P]: T }));
+  const src = { path: P, line: 0, title: 'Квартальные задачи' };
+  it('a heading made in the transaction is found by the next operation; the last child goes before the blank lines', () => {
+    const t = tx();
+    const q = t.insertHeading({ under: src, position: 'last' }, '* Квартал Q1 2026');
+    expect(q).toEqual({ path: P, line: 9, title: 'Квартал Q1 2026' }); // before the blank line ending the source's Q2
+    const g = t.insertHeading({ under: q!, position: 'last' }, '* TODO Новая\n** Отметки');
+    expect(g).toEqual({ path: P, line: 10, title: 'Новая' });
+    t.setPlanning(g!, 'DEADLINE', new Date(2026, 2, 31));
+    expect(t.result()[0].text).toContain('** Квартал Q1 2026\n*** TODO Новая\nDEADLINE: <2026-03-31');
+    expect(t.conflict).toBe(false);
+  });
+  it('before a subheading; ensureChild finds one (case aside) or makes it in its place', () => {
+    const t = tx();
+    const older = t.children(src).find((h) => h.title === 'Квартал Q2 2026')!;
+    const q3 = t.ensureChild(src, 'Квартал Q3 2026', { before: { path: P, line: older.line, title: older.title } });
+    expect(q3).toEqual({ path: P, line: 7, title: 'Квартал Q3 2026' });
+    expect(t.ensureChild(src, '  квартал q4 2026 ')).toEqual({ path: P, line: 1, title: 'Квартал Q4 2026' });
+    expect(t.children(src).map((h) => h.title)).toEqual(['Квартал Q4 2026', 'Квартал Q3 2026', 'Квартал Q2 2026']);
+    expect(t.result()[0].text).toContain('\n\n** Квартал Q3 2026\n** Квартал Q2 2026\n');
+  });
+  it('the body read and written in the same transaction; a move under a heading made there', () => {
+    const t = tx();
+    const marks = { path: P, line: 3, title: 'Отметки' };
+    expect(t.body(marks)).toBe('- [2026-10-01 Чт] раз\n- [2026-10-10 Сб] три');
+    t.replaceBody(marks, '- [2026-10-01 Чт] раз\n- [2026-10-05 Пн] два\n- [2026-10-10 Сб] три');
+    expect(t.body(marks)).toBe('- [2026-10-01 Чт] раз\n- [2026-10-05 Пн] два\n- [2026-10-10 Сб] три');
+    const q1 = t.ensureChild(src, 'Квартал Q1 2027')!;
+    t.move({ path: P, line: 8, title: 'Старая' }, { under: q1 });
+    expect(t.conflict).toBe(false);
+    expect(t.result()[0].text).toContain('** Квартал Q2 2026\n** Квартал Q1 2027\n*** TODO Старая\n\n* Другое');
+    expect(t.children(q1).map((h) => h.title)).toEqual(['Старая']);
+  });
+  it('a heading not there: a conflict, null', () => {
+    const t = tx();
+    expect(t.ensureChild({ path: P, line: 0, title: 'Нет такого' }, 'X')).toBeNull();
+    expect(t.conflict).toBe(true);
+  });
+});

@@ -60,19 +60,30 @@ export function treeOf(org: string): { lines: string[]; level: number } | null {
   return { lines, level };
 }
 
-/** A new heading under another one (its first or last child) or at the top or the end of a file. */
-export function insertHeading(text: string, at: { under: Heading; position: 'first' | 'last' } | { position: 'top' | 'end' }, org: string): string | null {
+/** Where a new heading goes: under another one (its first or last child, or right before one of its children), or
+ *  at the top or the end of a file. */
+export type InsertAt = { under: Heading; position: 'first' | 'last' } | { under: Heading; before: Heading } | { position: 'top' | 'end' };
+
+/** A new heading (with its subtree) and the line it is on now; null — not one heading. The last child goes before the
+ *  blank lines that end its parent's subtree, right after the text above it. */
+export function insertHeadingAt(text: string, at: InsertAt, org: string): { text: string; line: number } | null {
   const t = treeOf(org);
   if (!t) return null;
   if ('under' in at) {
     const tree = relevel(t.lines, t.level, at.under.level + 1);
-    if (at.position === 'last') return place(text, tree, at.under).text;
+    if ('before' in at) {
+      const lines = text.split('\n');
+      lines.splice(at.before.line, 0, ...tree);
+      return { text: lines.join('\n'), line: at.before.line };
+    }
+    if (at.position === 'last') return place(text, tree, at.under);
     const lines = text.split('\n');
-    lines.splice(firstChild(lines, at.under), 0, ...tree);
-    return lines.join('\n');
+    const i = firstChild(lines, at.under);
+    lines.splice(i, 0, ...tree);
+    return { text: lines.join('\n'), line: i };
   }
   const tree = relevel(t.lines, t.level, 1);
-  if (at.position === 'end') return place(text, tree, null).text;
+  if (at.position === 'end') return place(text, tree, null);
   // the top: after the file's header (#+ lines and the text before the first heading)
   const lines = text.split('\n');
   const heads = headingLines(lines);
@@ -80,7 +91,21 @@ export function insertHeading(text: string, at: { under: Heading; position: 'fir
   let i = first;
   if (first === lines.length) while (i > 0 && lines[i - 1].trim() === '') i--;
   lines.splice(i, 0, ...tree);
-  return lines.join('\n');
+  return { text: lines.join('\n'), line: i };
+}
+/** The text with a new heading; null — not one heading. */
+export function insertHeading(text: string, at: InsertAt, org: string): string | null {
+  return insertHeadingAt(text, at, org)?.text ?? null;
+}
+
+/** The heading's body as `replaceBody` changes it: after its planning and drawers, up to its first subheading, the
+ *  blank lines at its end left out. */
+export function bodyOf(text: string, h: Heading): string {
+  const lines = text.split('\n');
+  const from = afterMeta(lines, h);
+  let to = firstChild(lines, h);
+  while (to > from && lines[to - 1].trim() === '') to--;
+  return lines.slice(from, to).join('\n');
 }
 
 /** Replace the heading's body: the text after its planning and drawers, up to its first subheading. */
