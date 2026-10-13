@@ -89,6 +89,9 @@ class Host {
   redraw = new SvelteMap<string, number>();
   /** The numbers on the plugins' buttons of the navigator (`ui.setBadge`). */
   badges = new SvelteMap<string, number>();
+  /** What the core's month (under a review's card) shows, as a plugin set it (`ui.setMonthFilter`: the calendar's
+   *  layers and hidden files, #99); null — every dated entry. */
+  monthFilter = $state.raw<{ plugin: string; layers: string[]; hidden: string[] } | null>(null);
   /** The core's sheets a plugin asked for, and its review. */
   form = $state<FormReq | null>(null);
   place = $state<PlaceReq | null>(null);
@@ -705,6 +708,15 @@ class Host {
                 end: () => void (this.review === r && this.endReview(true)),
               }))(this.review)
             : null,
+        setMonthFilter: (f) => {
+          if (!f) {
+            if (this.monthFilter?.plugin === id) this.monthFilter = null;
+            return;
+          }
+          const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+          if (!this.monthFilter || this.monthFilter.plugin !== id) keep(() => void (this.monthFilter?.plugin === id && (this.monthFilter = null)));
+          this.monthFilter = { plugin: id, layers: strs(f.layers), hidden: strs(f.hidden) };
+        },
         setBadge: (nav, n) => {
           declared('раздела', m.contributes.navSections.some((x) => x.id === nav), nav);
           this.badges.set(nav, Math.max(0, Math.floor(Number(n) || 0)));

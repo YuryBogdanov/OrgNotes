@@ -92,9 +92,15 @@ class Calendar {
     this.layers = Array.isArray(d.layers) ? d.layers.filter((x): x is Layer => ALL.includes(x as Layer)) : DEFAULT_LAYERS;
     this.hiddenAll = d.hidden && typeof d.hidden === 'object' ? (d.hidden as Record<string, string[]>) : {};
     this.hiddenNow = this.hiddenAll[this.folder ?? ''] ?? [];
+    this.tell();
   }
   private saveLocal() {
     void this.ctx.storage.local.set({ layers: this.layers, hidden: this.hiddenAll });
+    this.tell();
+  }
+  /** The core's month under a review's card shows what the calendar shows (#99). */
+  private tell() {
+    this.ctx.ui.setMonthFilter({ layers: this.layers, hidden: this.hiddenNow });
   }
   setLayer(l: Layer, on: boolean) {
     this.layers = on ? [...new Set([...this.layers, l])] : this.layers.filter((x) => x !== l);

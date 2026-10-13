@@ -365,6 +365,7 @@ net?: { fetch(url: string, init?: { method?; headers?; body?: string }): Promise
   - `index.folder()`;
   - в `@panopticon/api/org`: `toneVars`, `relWords`, `startOf`;
   - цвета статусов в `index.workflow().sets`.
+- **Месяц под карточкой** (#99): `ui.setMonthFilter({ layers, hidden })` — календарь передаёт ядру свои слои и скрытые файлы.
 
 ## Разбивка и приёмка
 
