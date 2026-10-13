@@ -116,6 +116,26 @@ test.describe('the actions', () => {
     await expect(queue(page).nth(1).locator('.sub')).toHaveText('Сейчас на карточке');
   });
 
+  test('a task done already (⌘[ back to it): «Выполнено» is off and says so, without its fill (#105); ⌘1 does nothing', async ({ page }) => {
+    await start(page);
+    await page.keyboard.press('Meta+1');
+    await expect(card(page).locator('.k')).toHaveText('Задача 2 из 5');
+    await page.keyboard.press('Meta+BracketLeft');
+    await expect(title(page)).toContainText('DONE Продлить страховку авто');
+    const done = page.locator('.acts .a.done-b');
+    await expect(done).toBeDisabled();
+    await expect(done).toHaveAttribute('title', 'Уже DONE');
+    await expect(done).toContainText('DONE');
+    const bg = await done.evaluate((b) => getComputedStyle(b).backgroundColor);
+    const plain = await page.locator('.acts .a').nth(1).evaluate((b) => getComputedStyle(b).backgroundColor);
+    expect(bg).toBe(plain); // drawn as the plain buttons: it reads as off in both themes
+    await expect(page.locator('.acts .a').nth(1)).toBeEnabled(); // «Отменить» still can
+    const before = await disk(page);
+    await page.keyboard.press('Meta+1');
+    await page.waitForTimeout(300);
+    expect(await disk(page)).toBe(before);
+  });
+
   test('«Отложить…»: SCHEDULED on the chosen day, it stays in the Inbox and leaves the queue till then', async ({ page }) => {
     await start(page);
     await page.keyboard.press('Meta+4');

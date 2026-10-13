@@ -10,6 +10,10 @@
   const item = $derived(session.item);
   const doneKw = $derived(item ? data.closing(item, 'done') : null);
   const cancelKw = $derived(item ? data.closing(item, 'cancel') : null);
+  // the status it would write, shown on a button that is off because the task has it already (#105)
+  const doneShown = $derived(item ? data.closingOf(item, 'done') : null);
+  const cancelShown = $derived(item ? data.closingOf(item, 'cancel') : null);
+  const already = (kw: string | null) => !!item && !!kw && data.keywordOf(item) === kw;
   const kbd = (id: string) => data.ctx.commands.keyOf(id);
   const REFILE = 'M3 6a1.5 1.5 0 0 1 1.5-1.5H8l1.5 2h6A1.5 1.5 0 0 1 17 8v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5zM8 11h5M11 9l2 2-2 2';
 
@@ -48,11 +52,11 @@
   }
 </script>
 
-<button class="a done-b" disabled={!doneKw} onclick={() => session.act(() => session.close('done'))}>
-  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg>Выполнено<span class="hint">{doneKw}</span>{#if kbd('inbox.done')}<kbd>{kbd('inbox.done')}</kbd>{/if}
+<button class="a done-b" disabled={!doneKw} title={already(doneShown) ? `Уже ${doneShown}` : ''} onclick={() => session.act(() => session.close('done'))}>
+  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg>Выполнено<span class="hint">{doneShown ?? ''}</span>{#if kbd('inbox.done')}<kbd>{kbd('inbox.done')}</kbd>{/if}
 </button>
-<button class="a" disabled={!cancelKw} title={cancelKw ? '' : 'В наборе нет статуса для отмены'} onclick={() => session.act(() => session.close('cancel'))}>
-  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" /></svg>Отменить<span class="hint">{cancelKw ?? ''}</span>{#if kbd('inbox.cancel')}<kbd>{kbd('inbox.cancel')}</kbd>{/if}
+<button class="a" disabled={!cancelKw} title={cancelKw ? '' : already(cancelShown) ? `Уже ${cancelShown}` : 'В наборе нет статуса для отмены'} onclick={() => session.act(() => session.close('cancel'))}>
+  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" /></svg>Отменить<span class="hint">{cancelShown ?? ''}</span>{#if kbd('inbox.cancel')}<kbd>{kbd('inbox.cancel')}</kbd>{/if}
 </button>
 <button class="a move-b" onclick={() => session.act(() => session.move())}>
   <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={REFILE} /></svg>Перенести…{#if kbd('inbox.move')}<kbd>{kbd('inbox.move')}</kbd>{/if}
