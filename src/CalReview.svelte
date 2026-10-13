@@ -1,5 +1,6 @@
 <script lang="ts">
   import { allDays, openEntry } from './calOpen';
+  import { plugins } from './api/host.svelte';
   import { onMount } from 'svelte';
   import { store } from './store.svelte';
   import { toneFor } from './org';
@@ -7,8 +8,8 @@
   import CalDayList from './CalDayList.svelte';
   import { entriesWord, isoDay, monthTitle, monthWeeks, weekdayShort, type CalEntry } from './calIndex';
 
-  // The calendar under the card of the Inbox review (ТЗ 24, part 3): folded by default, a compact month of every dated
-  // entry (the calendar's layers and hidden files are its plugin's, ТЗ 29: tech debt #99), two in a cell and «… ещё N».
+  // The calendar under the card of the Inbox review (ТЗ 24, part 3): folded by default, a compact month of the dated
+  // entries in the calendar's layers and files (its plugin tells them, #99; all without it), two in a cell and «… ещё N».
   // The task's own date has a dashed frame, and the task is «— эта задача» in the list of the day. No dragging: dates are set by the card.
   // Shown by a review (the Inbox's, a plugin's through the widget «month»): folded or not is the review's — `open`,
   // `ontoggle`; `keyId` is the command whose key folds it (its hint).
@@ -110,7 +111,7 @@
           </div>
         {/each}
       </div>
-      <p class="foot">Показываются запланированные задачи, дедлайны и события из всех файлов.</p>
+      <p class="foot">Показываются запланированные задачи, дедлайны и события из всех файлов{plugins.monthFilter ? ' — как в основном календаре' : ''}.</p>
     </div>
   {/if}
 </div>

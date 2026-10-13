@@ -76,3 +76,19 @@ test('a new review starts folded again; ⌘K is in «Клавиши»', async ({
   await page.getByRole('tab', { name: 'Клавиши' }).click();
   await expect(page.getByRole('dialog', { name: 'Настройки' })).toContainText('Разбор: Показать / скрыть календарь');
 });
+
+test('the month shows what the calendar shows: its layers and its files (#99)', async ({ page }) => {
+  await start(page);
+  await toggle(page).click();
+  await expect(cell(page, '2026-10-14')).toContainText('Синк с CTO'); // an event of journal.org
+  await expect(cal(page).locator('.foot')).toContainText('как в основном календаре');
+  // the calendar's navigator: events off, then journal.org off
+  await page.keyboard.press('Control+Meta+5');
+  await page.getByRole('checkbox', { name: 'События' }).uncheck();
+  await expect(cell(page, '2026-10-14')).not.toContainText('Синк с CTO');
+  await expect(cell(page, '2026-10-02')).not.toContainText('1:1 с тимлидами');
+  await page.getByRole('checkbox', { name: 'События' }).check();
+  await expect(cell(page, '2026-10-14')).toContainText('Синк с CTO');
+  await page.getByRole('checkbox', { name: 'journal' }).uncheck();
+  await expect(cell(page, '2026-10-14')).not.toContainText('Синк с CTO');
+});

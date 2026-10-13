@@ -360,6 +360,9 @@ export interface Ctx {
     };
     /** The number on the plugin's button of the navigator (0: none). */
     setBadge(navId: string, n: number): void;
+    /** What the core's month under a review's card (the widget `month`) shows: the layers of entries ('task',
+     *  'deadline', 'event', 'wait', 'done') and the files left out — the calendar's choice; null: every dated entry. */
+    setMonthFilter(f: { layers: string[]; hidden: string[] } | null): void;
     /** The core's move of a heading to another place («Перенести в…»): where it went, null — cancelled. `before`:
      *  just before the write (a row's fade); `quiet`: the plugin tells of it, no toast of the core; `onUndo`: the
      *  move taken back (⌘Z, «Отменить»). */
