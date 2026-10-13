@@ -25,7 +25,7 @@
   const cfg = $derived(today.folder);
   const day = $derived(today.day);
   const now = $derived(today.now);
-  const files = $derived(store.files);
+  const files = $derived(store.agendaFiles);
   const tone = (kw: string, path: string) => {
     const f = files.find((x) => x.path === path);
     return f && kw ? toneStyle(toneFor(kw, f.wf)) : '';

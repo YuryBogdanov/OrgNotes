@@ -22,7 +22,7 @@ export function allDays(from: Date, to: Date): Map<string, CalEntry[]> {
   const f = plugins.monthFilter;
   const hidden = new Set(f?.hidden ?? []);
   const layers = f ? new Set(f.layers) : null;
-  const files = store.files.filter((x) => !hidden.has(x.name));
+  const files = store.agendaFiles.filter((x) => !hidden.has(x.name));
   const open = [...new Set(store.files.flatMap((x) => x.wf.open))];
   return byDay(entriesIn(files, from, to).filter((e) => !layers || layers.has(e.layer)), open);
 }

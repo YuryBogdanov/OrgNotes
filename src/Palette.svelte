@@ -72,7 +72,7 @@
       bad = false;
     }
   });
-  const busy = $derived(step.calendar ? busyDays(store.files) : new Map());
+  const busy = $derived(step.calendar ? busyDays(store.agendaFiles) : new Map());
   function typedDate() {
     if (!step.calendar) return;
     if (!q.trim()) return void (bad = false);

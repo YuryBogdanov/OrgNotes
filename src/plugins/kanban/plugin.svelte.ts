@@ -46,6 +46,15 @@ export default definePlugin({
     on('kanban.down', (p) => void kanban.stepPlace(p, 1));
     on('kanban.newCard', (p) => kanban.ask?.({ kind: 'new', path: p }));
     on('kanban.filter', (p) => kanban.ask?.({ kind: 'filter', path: p }));
+    on('kanban.open', (p) => kanban.ask?.({ kind: 'open', path: p }));
+    on('kanban.delete', (p) => {
+      const c = kanban.card(p);
+      if (c) void kanban.removeCard(p, c);
+    });
+    on('kanban.archive', (p) => {
+      const c = kanban.card(p);
+      if (c) void kanban.archiveCard(p, c);
+    });
     // only in a file's tab; «Показать как доску» — when it is the text
     $effect.root(() => {
       $effect(() => {

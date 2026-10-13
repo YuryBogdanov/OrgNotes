@@ -4,13 +4,14 @@
 // off until the restart and takes back all it registered.
 
 import { SvelteMap } from 'svelte/reactivity';
-import { untrack, type Component } from 'svelte';
+import { mount, unmount, untrack, type Component } from 'svelte';
 import { store } from '../store.svelte';
 import { newTab, openFile, openFromAgenda, openView } from '../layout';
 import { register as registerPalette } from '../commands';
 import { registerAction, registerFileView, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf, viewOf } from '../views';
 import { setLineLink } from '../lineLinks';
 import PluginFileView from '../PluginFileView.svelte';
+import PluginEditor from '../PluginEditor.svelte';
 import type { MenuItem as CoreMenuItem } from '../ContextMenu.svelte';
 import { registerTodayBlock } from '../todayBlocks';
 import PluginTodayBlock from '../PluginTodayBlock.svelte';
@@ -18,7 +19,7 @@ import { fuzzy } from '../fuzzy';
 import { runAgenda, statusKey, type Agenda, type Cond as CoreCond } from '../agendas';
 import { DEFAULT_SEQUENCE, DEFAULT_WORKFLOW, namedFor, type Heading, type WorkflowDef } from '../org';
 import { parseTheme, type Theme } from '../themes';
-import { displayName } from '../names';
+import { displayName, isArchive } from '../names';
 import type { Tx as CoreTx } from '../journal';
 import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSchema';
 import { builtinEntries, declareKeys, entries, viewScope, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, type Entry, type Listed } from './declare';
@@ -776,6 +777,14 @@ class Host {
             for (let ti = store.layout.panes[pi].tabs.length - 1; ti >= 0; ti--) if (store.layout.panes[pi]?.tabs[ti]?.kind === v) void store.closeTab(pi, ti);
         },
         widget: (el, field, value, onChange) => mountWidget(id, el, field, value, onChange, (err) => this.fail(id, err)),
+        editor: (el, h, o = {}) => {
+          const app = mount(PluginEditor, { target: el, props: { path: h.path, line: h.line, title: h.title, onref: (r: HeadingRef) => this.guard(id, () => o.onRef?.(r), undefined) } });
+          const off = () => {
+            void unmount(app);
+          };
+          keep(off);
+          return { focus: () => (el.querySelector('.cm-content') as HTMLElement | null)?.focus({ preventScroll: true }), dispose: off };
+        },
         currentReview: () =>
           this.review?.plugin === id
             ? ((r) => ({
@@ -886,7 +895,7 @@ class Host {
           const f = fileOf(path);
           return f ? f.headings.map((h) => infoOf(f, h)) : [];
         },
-        files: async () => store.files.map((f) => ({ path: f.name, title: displayName(f.name) })),
+        files: async () => store.files.filter((f) => !isArchive(f.name)).map((f) => ({ path: f.name, title: displayName(f.name) })), // not the archives: as the agenda
         statusTone: async (kw, path) => {
           const f = fileOf(path);
           return f && kw ? (namedFor(kw, f.wf) as Named) : null;
@@ -928,6 +937,7 @@ class Host {
           return tx?.conflict ? 'conflict' : tx && !tx.error && !tx.result().length ? 'ok' : 'error';
         },
         undo: () => store.undoLast(),
+        ensureFile: async (path: string) => !!(await store.ensureFile(String(path))),
       };
     return ctx;
   }
@@ -1127,7 +1137,7 @@ function query(q: Query): HeadingInfo[] {
     values: c.field === 'status' ? (c.values ?? []).flatMap((v) => (v.includes('\u001f') ? [v] : [...sets].map((s) => statusKey(s, v)))) : c.values,
   }));
   const a: Agenda = { id: 'q', name: 'q', sources: q.sources ?? [], blocks: [{ id: 'b', name: 'q', color: 'blue', conds, group: 'none', sort: q.sort ?? 'prio', limit: null }] };
-  const [r] = runAgenda(a, store.files, new Date(new Date().setHours(0, 0, 0, 0)));
+  const [r] = runAgenda(a, store.agendaFiles, new Date(new Date().setHours(0, 0, 0, 0)));
   if (!r) throw new Error('условие запроса не закончено');
   return r.groups.flatMap((g) => g.tasks).flatMap((t) => {
     const f = fileOf(t.path);

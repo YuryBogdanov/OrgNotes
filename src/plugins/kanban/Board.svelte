@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { kanban } from './state.svelte';
   import { boardFor, boardOf, headingsWord, titleHtml, type StatusSet } from './board';
   import { openSetup } from './setup';
@@ -83,9 +83,14 @@
   $effect(() => {
     if (board && set) kanban.shown.set(path, { set, columns: board.columns.map((c) => ({ keyword: c.keyword, cards: c.cards.map((k) => ({ key: k.key, line: k.line, title: k.heading })) })) });
   });
-  const ask = (a: { kind: 'new' | 'filter'; path: string }) => {
+  const ask = (a: { kind: 'new' | 'filter' | 'open'; path: string }) => {
     if (a.path !== path) return;
     if (a.kind === 'filter') return void (filterEl?.focus(), filterEl?.select());
+    if (a.kind === 'open') {
+      const c = kanban.card(path);
+      if (c) openPeek(c);
+      return;
+    }
     const c = kanban.card(path);
     startAdd(c && !set?.states.find((s) => s.name === c.keyword)?.done ? c.keyword : (set?.states.find((s) => !s.done)?.name ?? null));
   };
@@ -113,6 +118,12 @@
       if (key) {
         draft = '';
         select(key);
+        // ⌘↩: made and opened at the side
+        if (e.metaKey) {
+          adding = null;
+          const c = kanban.card(path);
+          if (c) openPeek(c);
+        }
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -127,7 +138,12 @@
   // ---- dragging a card: a tilted copy under the pointer, a dashed place where it goes ----
   type Pending = { key: string; line: number; title: string; kw: string; sx: number; sy: number; ox: number; oy: number; w: number; h: number; html: string; tags: string };
   let pending: Pending | null = null;
-  let drag = $state<(Pending & { x: number; y: number; over: { kw: string; index: number } | null }) | null>(null);
+  type Over = { kw: string; index: number } | { zone: 'archive' | 'delete' };
+  // the zones: 20 from the sides, 16 from the bottom of the board, while a card is dragged
+  let zones = $state({ left: 0, width: 0, top: 0 });
+  let drag = $state<(Pending & { x: number; y: number; over: Over | null }) | null>(null);
+  const overCol = (o: Over | null | undefined) => (o && 'kw' in o ? o : null);
+  const overZone = (o: Over | null | undefined) => (o && 'zone' in o ? o.zone : null);
   function down(e: PointerEvent, k: { key: string; line: number; title: string; heading: string; tags: string[] }, kw: string) {
     if (e.button !== 0) return;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -135,8 +151,11 @@
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up, { once: true });
   }
-  function targetAt(x: number, y: number, key: string): { kw: string; index: number } | null {
-    const colEl = document.elementsFromPoint(x, y).find((el) => (el as HTMLElement).dataset?.col) as HTMLElement | undefined;
+  function targetAt(x: number, y: number, key: string): Over | null {
+    const under = document.elementsFromPoint(x, y) as HTMLElement[];
+    const zone = under.find((el) => el.dataset?.zone)?.dataset.zone;
+    if (zone === 'archive' || zone === 'delete') return { zone };
+    const colEl = under.find((el) => el.dataset?.col);
     if (!colEl) return null;
     const cards = [...colEl.querySelectorAll<HTMLElement>('.kb-card')].filter((el) => el.dataset.key !== key);
     let index = cards.length;
@@ -153,6 +172,10 @@
     const p = pending;
     if (!p) return;
     if (!drag && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) < 4) return;
+    if (!drag && root) {
+      const r = root.getBoundingClientRect();
+      zones = { left: r.left + 20, width: r.width - 40, top: r.bottom - 16 - 60 };
+    }
     drag = { ...p, x: e.clientX, y: e.clientY, over: targetAt(e.clientX, e.clientY, p.key) };
   }
   function up() {
@@ -163,17 +186,23 @@
     drag = null;
     if (!p) return;
     if (!d) {
-      select(p.key); // a click: chosen
-      root?.focus({ preventScroll: true });
+      select(p.key); // a click: chosen and opened at the side
+      openPeek({ line: p.line, title: p.title });
       return;
     }
     select(p.key);
-    if (d.over) void kanban.moveCard(path, { key: p.key, line: p.line, title: p.title, keyword: p.kw }, d.over.kw, d.over.index);
+    const card = { key: p.key, line: p.line, title: p.title, keyword: p.kw };
+    const col = overCol(d.over);
+    const zone = overZone(d.over);
+    if (zone === 'delete') void kanban.removeCard(path, card);
+    else if (zone === 'archive') void kanban.archiveCard(path, card);
+    else if (col) void kanban.moveCard(path, card, col.kw, col.index);
   }
   onDestroy(() => window.removeEventListener('pointermove', move));
   /** A column's rows while a card is dragged over it: the cards, and the place where it would go. */
   function rowsOf(c: { keyword: string; cards: { key: string }[] }) {
-    const ph = drag?.over?.kw === c.keyword ? drag.over.index : -1;
+    const o = overCol(drag?.over);
+    const ph = o?.kw === c.keyword ? o.index : -1;
     const out: ({ ph: true } | { ph: false; i: number })[] = [];
     let n = 0;
     c.cards.forEach((k, i) => {
@@ -185,6 +214,54 @@
     });
     if (ph >= n) out.push({ ph: true });
     return out;
+  }
+
+  // ---- the card at the side: its subtree in an editor, edited right there ----
+  // the card opened (what the editor is made for) and where its heading is now (the editor says, as it is edited)
+  let opened = $state<{ line: number; title: string; n: number } | null>(null);
+  let peek = $state<{ line: number; title: string } | null>(null);
+  let peekEl: HTMLDivElement | undefined = $state();
+  let peekN = 0;
+  function openPeek(c: { line: number; title: string }) {
+    opened = { line: c.line, title: c.title, n: ++peekN };
+    peek = { line: c.line, title: c.title };
+  }
+  function closePeek() {
+    opened = null;
+    peek = null;
+    root?.focus({ preventScroll: true });
+  }
+  $effect(() => {
+    const el = peekEl;
+    const at = opened;
+    if (!el || !at) return;
+    const ed = untrack(() => kanban.ctx.ui.editor(el, { path, line: at.line, title: at.title }, { onRef: (r) => (peek = { line: r.line, title: r.title }) }));
+    queueMicrotask(() => ed.focus());
+    return () => ed.dispose();
+  });
+  const peekHeading = $derived(peek && file ? (file.headings.find((h) => h.line === peek!.line && h.title === peek!.title) ?? file.headings.find((h) => h.title === peek!.title)) : undefined);
+  function peekStatus(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const h = peekHeading;
+    if (!h || !set) return;
+    kanban.ctx.ui.menu(set.states.map((s) => ({ label: s.name, checked: s.name === h.keyword, run: () => void kanban.setStatus(path, h, s.name) })), { x: r.left, y: r.bottom + 4 });
+  }
+  function inFile() {
+    const h = peekHeading;
+    if (!h) return;
+    showText();
+    void kanban.ctx.commands.run('file.open', { path, line: h.line });
+  }
+  function peekKeys(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closePeek();
+    } else if (e.key === 'Enter' && e.metaKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      inFile();
+    }
   }
 
   // ---- the keys of the board itself: ← → ↑ ↓ choose a card, ⎋ lets it go (the rest are the plugin's commands) ----
@@ -251,7 +328,7 @@
       {#each board.columns as c (c.keyword)}
         {@const tone = kanban.tone(c.keyword, path)}
         {#if folded(c.keyword, c.done)}
-          <button class="kb-col folded" class:over={drag?.over?.kw === c.keyword} role="listitem" aria-label="{c.keyword}: {c.total}, свёрнута" title="Развернуть" data-col={c.keyword} onclick={() => kanban.setFolded(path, c.keyword, false)}>
+          <button class="kb-col folded" class:over={overCol(drag?.over)?.kw === c.keyword} role="listitem" aria-label="{c.keyword}: {c.total}, свёрнута" title="Развернуть" data-col={c.keyword} onclick={() => kanban.setFolded(path, c.keyword, false)}>
             <span class="kb-n">{c.total}</span><span class="kb-kw v" style:--c={tone}>{c.keyword}</span>
           </button>
         {:else}
@@ -304,8 +381,31 @@
   {:else}
     <div class="kb-stage"></div>
   {/if}
+  {#if opened && peek}
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div class="kb-peek" role="dialog" aria-label="Карточка" tabindex="-1" onkeydown={peekKeys}>
+      <div class="kb-ph2">
+        {#if peekHeading?.keyword}<button class="kb-kw kb-pk" style:--c={kanban.tone(peekHeading.keyword, path)} title="Сменить статус" onclick={peekStatus}>{peekHeading.keyword} ▾</button>{/if}
+        <span class="kb-pt">{(peekHeading?.title ?? peek.title).replace(/\s*\[(\d+%|\d+\/\d+)\]/, '')}</span>
+        <button class="kb-pl" onclick={inFile}>В файле ›</button>
+        <button class="kb-px" aria-label="Закрыть" title="Закрыть" onclick={closePeek}>×</button>
+      </div>
+      <div class="kb-pb" bind:this={peekEl}></div>
+      <div class="kb-pf">Редактируется прямо здесь · ⎋ закрыть · ⌘↩ открыть в файле</div>
+    </div>
+  {/if}
 </div>
 {#if drag}
+  <div class="kb-zones" aria-hidden="true" style:left="{zones.left}px" style:top="{zones.top}px" style:width="{zones.width}px">
+    <div class="kb-zone arch" class:on={overZone(drag.over) === 'archive'} data-zone="archive">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h14v4H3zM4.5 8v8h11V8M8 11h4" /></svg>
+      {#if overZone(drag.over) === 'archive'}Отпустите — карточка уйдёт в архив{:else}В архив<span class="kb-zw">{kanban.archiveOf(path).split('/').pop()}</span>{/if}
+    </div>
+    <div class="kb-zone del" class:on={overZone(drag.over) === 'delete'} data-zone="delete">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M5.5 6l1 10.5h7l1-10.5" /></svg>
+      {#if overZone(drag.over) === 'delete'}Отпустите — карточка и её содержимое удалятся из файла{:else}Удалить{/if}
+    </div>
+  </div>
   <div class="kb-drag" style:left="{drag.x - drag.ox}px" style:top="{drag.y - drag.oy}px" style:width="{drag.w}px" aria-hidden="true">
     <div class="kb-t">{@html drag.html}</div>
     {#if drag.tags}<div class="kb-meta"><span class="kb-tags">{drag.tags}</span></div>{/if}

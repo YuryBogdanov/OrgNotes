@@ -4,6 +4,8 @@
 /** "Команда/report.v2.org" → "report.v2": the last segment without its final ".org". */
 export const displayName = (rel: string) => noOrg(rel.split('/').pop() ?? rel);
 export const noOrg = (s: string) => s.replace(/\.org$/i, '');
+/** An archive of a note as Emacs makes them («platform.org_archive», ТЗ 33): in the navigator, not in the agenda. */
+export const isArchive = (rel: string) => /\.org_archive$/i.test(rel);
 /** "Команда/Рост/Сергей Белов.org" → ["Команда", "Рост", "Сергей Белов"]. */
 export const displayPath = (rel: string) => {
   const parts = rel.split('/');

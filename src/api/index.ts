@@ -407,6 +407,10 @@ export interface Ctx {
     /** A link at the end of the lines of the editor it names («Открыть доску ⌥⌘B» right of «#+BOARD»); the file does
      *  not change. Since 1.5. */
     editorLink(spec: { label(text: string, line: number): string | null; run(path: string, line: number): void }): Dispose;
+    /** A heading with its subtree, narrowed, in an editor in the plugin's element (the board's card at the side): edits
+     *  go to the file at once, the Org keys work. `onRef` — where the heading is now (its line, its title as edited).
+     *  Since 1.5. */
+    editor(el: HTMLElement, h: HeadingRef, o?: { onRef?(h: HeadingRef): void }): { focus(): void; dispose(): void };
   };
   /** Needs `index.read`. */
   index?: {
@@ -432,6 +436,9 @@ export interface Ctx {
     transaction(label: string, build: (tx: Tx) => void, o?: { onUndo?(): void }): Promise<'ok' | 'conflict' | 'error'>;
     /** Take back the last step of the journal (a toast's «Отменить»): false — there is none, or its files changed. */
     undo(): Promise<boolean>;
+    /** A file of the folder, made empty when it is not there yet (an archive, `<file>_archive`); false — not made.
+     *  Since 1.5. */
+    ensureFile(path: string): Promise<boolean>;
   };
   /** The plugin's own: in the notes folder (goes with the notes) and on this Mac. */
   storage: { folder: Store; local: Store };

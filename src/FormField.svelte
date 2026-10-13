@@ -40,7 +40,7 @@
   $effect(() => {
     if (chosen) view = chosen;
   });
-  const busy = $derived(f.type === 'date' ? busyDays(store.files) : new Map());
+  const busy = $derived(f.type === 'date' ? busyDays(store.agendaFiles) : new Map());
   // «Вставится: DEADLINE: <…>» when the plugin says what it writes (the goal form)
   const spec = $derived(f.type === 'date' && f.stamp ? { kind: f.stamp.kind, initial: new Date(), current: null, names: f.stamp.names, pick: () => {} } : { kind: 'DATE' as const, initial: new Date(), current: null, names: [], pick: () => {} });
 
