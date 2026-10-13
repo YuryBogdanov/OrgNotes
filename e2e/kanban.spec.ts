@@ -49,7 +49,7 @@ test('the filter by words and :tags: — the counts say how many of all; folding
   await expect(cards(page, 'TODO')).toHaveText(['Обновить Kafka до 3.8']);
   await expect(col(page, 'TODO').locator('.kb-n')).toHaveText('1 из 3');
   await board(page).getByLabel('Фильтр карточек').fill('');
-  await col(page, 'BACKLOG').getByRole('button', { name: /BACKLOG/ }).click();
+  await col(page, 'BACKLOG').getByRole('button', { name: 'BACKLOG 2' }).click();
   await expect(board(page).getByRole('listitem', { name: 'BACKLOG: 2, свёрнута' })).toBeVisible();
   await page.reload();
   await expect(board(page).getByRole('listitem', { name: 'BACKLOG: 2, свёрнута' })).toBeVisible();

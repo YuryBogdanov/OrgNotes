@@ -128,3 +128,46 @@ export function replaceBody(text: string, h: Heading, org: string): string {
   lines.splice(from, to - from, ...(body ? body.split('\n') : []));
   return lines.join('\n');
 }
+
+// ---- beside another heading (the board's order, ТЗ 33) -------------------------------------------------------------
+
+/** Lines spliced in at `at` of a file: at its very end, before the blank lines ending it (the file keeps its ending). */
+function spliceAt(lines: string[], at: number, tree: string[]) {
+  let i = at;
+  if (i >= lines.length) {
+    i = lines.length;
+    while (i > 0 && lines[i - 1].trim() === '') i--;
+  }
+  lines.splice(i, 0, ...tree);
+  return i;
+}
+/**
+ * The heading with its subtree moved right before or right after another one (after: after the other's subtree), at
+ * the other's level. The text and the heading's new line; the text as it was when they are the same heading.
+ */
+export function moveBeside(text: string, h: Heading, target: Heading, side: 'before' | 'after'): { text: string; line: number } {
+  if (target.line === h.line) return { text, line: h.line };
+  if (target.line > h.line && target.line < h.end) throw new Error('a heading cannot go inside itself');
+  const lines = text.split('\n');
+  let tree = lines.splice(h.line, h.end - h.line);
+  const n = tree.length;
+  // the last subtree of the file carries the file's ending blank lines: they stay at the end
+  if (h.end >= lines.length + n) {
+    let k = tree.length;
+    while (k > 1 && tree[k - 1].trim() === '') k--;
+    lines.push(...tree.slice(k));
+    tree = tree.slice(0, k);
+  }
+  const shift = (x: number) => (x <= h.line ? x : x - n);
+  const at = side === 'before' ? shift(target.line) : shift(target.end);
+  const line = spliceAt(lines, at, relevel(tree, h.level, target.level));
+  return { text: lines.join('\n'), line };
+}
+/** A new heading (org text of one heading) right after another one's subtree, at its level; null — not one heading. */
+export function insertAfter(text: string, target: Heading, org: string): { text: string; line: number } | null {
+  const t = treeOf(org);
+  if (!t) return null;
+  const lines = text.split('\n');
+  const line = spliceAt(lines, target.end, relevel(t.lines, t.level, target.level));
+  return { text: lines.join('\n'), line };
+}

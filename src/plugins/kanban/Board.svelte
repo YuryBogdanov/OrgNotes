@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { kanban } from './state.svelte';
   import { boardFor, boardOf, headingsWord, titleHtml, type StatusSet } from './board';
   import { openSetup } from './setup';
@@ -13,7 +13,12 @@
   const wfName = $derived(file ? boardOf(file.text) : null);
   const set = $derived(file && wfName ? (file.sets.find((s) => s.name === wfName) ?? null) : null);
   let filter = $state('');
-  let selected = $state<string | null>(null);
+  let root: HTMLDivElement | undefined = $state();
+  let filterEl: HTMLInputElement | undefined = $state();
+  const selected = $derived(kanban.selected?.path === path ? kanban.selected.key : null);
+  function select(key: string | null) {
+    kanban.selected = key ? { path, key } : null;
+  }
   const showOld = $derived(new Set([...kanban.showOld].filter((k) => k.startsWith(path + '\u0000')).map((k) => k.slice(path.length + 1))));
   const board = $derived(file && set ? boardFor(file.text, file.headings, set, { filter, doneDays: kanban.doneDays, showOld }) : null);
   const firstDone = $derived(set?.states.find((s) => s.done)?.name ?? null);
@@ -73,9 +78,145 @@
     else kanban.showOld.add(k);
   };
   const PRIO: Record<string, string> = { A: 'var(--todo)', B: 'var(--wait)', C: 'var(--fg2)' };
+
+  // ---- what the keys and the drops count against: the board as shown ----
+  $effect(() => {
+    if (board && set) kanban.shown.set(path, { set, columns: board.columns.map((c) => ({ keyword: c.keyword, cards: c.cards.map((k) => ({ key: k.key, line: k.line, title: k.heading })) })) });
+  });
+  const ask = (a: { kind: 'new' | 'filter'; path: string }) => {
+    if (a.path !== path) return;
+    if (a.kind === 'filter') return void (filterEl?.focus(), filterEl?.select());
+    const c = kanban.card(path);
+    startAdd(c && !set?.states.find((s) => s.name === c.keyword)?.done ? c.keyword : (set?.states.find((s) => !s.done)?.name ?? null));
+  };
+  onMount(() => {
+    kanban.ask = ask;
+  });
+  onDestroy(() => {
+    if (kanban.ask === ask) kanban.ask = null;
+    kanban.shown.delete(path);
+  });
+
+  // ---- a new card: a field at the bottom of the column; ↩ makes it (the field stays for the next), ⎋ or away — none ----
+  let adding = $state<string | null>(null);
+  let draft = $state('');
+  function startAdd(kw: string | null) {
+    if (!kw) return;
+    adding = kw;
+    draft = '';
+    if (folded(kw, false)) kanban.setFolded(path, kw, false);
+  }
+  async function addKey(e: KeyboardEvent, kw: string) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const key = await kanban.newCard(path, kw, draft);
+      if (key) {
+        draft = '';
+        select(key);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      adding = null;
+      draft = '';
+      root?.focus({ preventScroll: true });
+    }
+  }
+  const focusField = (el: HTMLInputElement) => el.focus();
+
+  // ---- dragging a card: a tilted copy under the pointer, a dashed place where it goes ----
+  type Pending = { key: string; line: number; title: string; kw: string; sx: number; sy: number; ox: number; oy: number; w: number; h: number; html: string; tags: string };
+  let pending: Pending | null = null;
+  let drag = $state<(Pending & { x: number; y: number; over: { kw: string; index: number } | null }) | null>(null);
+  function down(e: PointerEvent, k: { key: string; line: number; title: string; heading: string; tags: string[] }, kw: string) {
+    if (e.button !== 0) return;
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    pending = { key: k.key, line: k.line, title: k.heading, kw, sx: e.clientX, sy: e.clientY, ox: e.clientX - r.left, oy: e.clientY - r.top, w: r.width, h: r.height, html: titleHtml(k.title), tags: k.tags.length ? `:${k.tags.join(':')}:` : '' };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up, { once: true });
+  }
+  function targetAt(x: number, y: number, key: string): { kw: string; index: number } | null {
+    const colEl = document.elementsFromPoint(x, y).find((el) => (el as HTMLElement).dataset?.col) as HTMLElement | undefined;
+    if (!colEl) return null;
+    const cards = [...colEl.querySelectorAll<HTMLElement>('.kb-card')].filter((el) => el.dataset.key !== key);
+    let index = cards.length;
+    for (let i = 0; i < cards.length; i++) {
+      const r = cards[i].getBoundingClientRect();
+      if (y < r.top + r.height / 2) {
+        index = i;
+        break;
+      }
+    }
+    return { kw: colEl.dataset.col!, index };
+  }
+  function move(e: PointerEvent) {
+    const p = pending;
+    if (!p) return;
+    if (!drag && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) < 4) return;
+    drag = { ...p, x: e.clientX, y: e.clientY, over: targetAt(e.clientX, e.clientY, p.key) };
+  }
+  function up() {
+    window.removeEventListener('pointermove', move);
+    const p = pending;
+    const d = drag;
+    pending = null;
+    drag = null;
+    if (!p) return;
+    if (!d) {
+      select(p.key); // a click: chosen
+      root?.focus({ preventScroll: true });
+      return;
+    }
+    select(p.key);
+    if (d.over) void kanban.moveCard(path, { key: p.key, line: p.line, title: p.title, keyword: p.kw }, d.over.kw, d.over.index);
+  }
+  onDestroy(() => window.removeEventListener('pointermove', move));
+  /** A column's rows while a card is dragged over it: the cards, and the place where it would go. */
+  function rowsOf(c: { keyword: string; cards: { key: string }[] }) {
+    const ph = drag?.over?.kw === c.keyword ? drag.over.index : -1;
+    const out: ({ ph: true } | { ph: false; i: number })[] = [];
+    let n = 0;
+    c.cards.forEach((k, i) => {
+      if (k.key !== drag?.key) {
+        if (n === ph) out.push({ ph: true });
+        n++;
+      }
+      out.push({ ph: false, i });
+    });
+    if (ph >= n) out.push({ ph: true });
+    return out;
+  }
+
+  // ---- the keys of the board itself: ← → ↑ ↓ choose a card, ⎋ lets it go (the rest are the plugin's commands) ----
+  function keys(e: KeyboardEvent) {
+    if ((e.target as HTMLElement).closest('input, textarea') || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey || !board) return;
+    const cols = board.columns.filter((c) => !folded(c.keyword, c.done) && c.cards.length);
+    if (e.key === 'Escape' && selected) {
+      e.preventDefault();
+      select(null);
+      return;
+    }
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) || !cols.length) return;
+    e.preventDefault();
+    let ci = cols.findIndex((c) => c.cards.some((k) => k.key === selected));
+    if (ci < 0) {
+      select(cols[0].cards[0].key);
+      return;
+    }
+    let ki = cols[ci].cards.findIndex((k) => k.key === selected);
+    if (e.key === 'ArrowUp') ki = Math.max(0, ki - 1);
+    else if (e.key === 'ArrowDown') ki = Math.min(cols[ci].cards.length - 1, ki + 1);
+    else {
+      ci = Math.max(0, Math.min(cols.length - 1, ci + (e.key === 'ArrowLeft' ? -1 : 1)));
+      ki = Math.min(ki, cols[ci].cards.length - 1);
+    }
+    select(cols[ci].cards[ki].key);
+    queueMicrotask(() => root?.querySelector('.kb-card.sel')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
+  }
 </script>
 
-<div class="kanban">
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div class="kanban" class:dragging={!!drag} tabindex="0" bind:this={root} onkeydown={keys} role="application" aria-label="Доска {name}">
   <div class="kb-head">
     <span class="kb-name">{name}</span>
     {#if file && wfName}
@@ -85,7 +226,7 @@
     {#if board}
       <label class="kb-filter">
         <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5" /><path d="M13.2 13.2L17 17" /></svg>
-        <input bind:value={filter} placeholder="Фильтр: текст, :тег:" aria-label="Фильтр карточек" spellcheck="false" autocomplete="off" />
+        <input bind:this={filterEl} bind:value={filter} onkeydown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); filter = ''; root?.focus({ preventScroll: true }); } }} placeholder="Фильтр: текст, :тег:" aria-label="Фильтр карточек" spellcheck="false" autocomplete="off" />
       </label>
     {/if}
     <span class="kb-gap"></span>
@@ -110,20 +251,28 @@
       {#each board.columns as c (c.keyword)}
         {@const tone = kanban.tone(c.keyword, path)}
         {#if folded(c.keyword, c.done)}
-          <button class="kb-col folded" role="listitem" aria-label="{c.keyword}: {c.total}, свёрнута" title="Развернуть" onclick={() => kanban.setFolded(path, c.keyword, false)}>
+          <button class="kb-col folded" class:over={drag?.over?.kw === c.keyword} role="listitem" aria-label="{c.keyword}: {c.total}, свёрнута" title="Развернуть" data-col={c.keyword} onclick={() => kanban.setFolded(path, c.keyword, false)}>
             <span class="kb-n">{c.total}</span><span class="kb-kw v" style:--c={tone}>{c.keyword}</span>
           </button>
         {:else}
           <section class="kb-col" role="listitem" aria-label={c.keyword} data-col={c.keyword}>
-            <button class="kb-ch" title="Свернуть" onclick={() => kanban.setFolded(path, c.keyword, true)}>
-              <span class="kb-kw" style:--c={tone}>{c.keyword}</span>
-              <span class="kb-n">{filter.trim() ? `${c.matched} из ${c.total}` : c.total}</span>
-              {#if c.done && kanban.doneDays}<span class="kb-note">за {kanban.doneDays} дней</span>{/if}
-            </button>
+            <div class="kb-chw">
+              <button class="kb-ch" title="Свернуть" onclick={() => kanban.setFolded(path, c.keyword, true)}>
+                <span class="kb-kw" style:--c={tone}>{c.keyword}</span>
+                <span class="kb-n">{filter.trim() ? `${c.matched} из ${c.total}` : c.total}</span>
+                {#if c.done && kanban.doneDays}<span class="kb-note">за {kanban.doneDays} дней</span>{/if}
+              </button>
+              {#if !c.done}<button class="kb-plus" aria-label="Добавить карточку в {c.keyword}" title="Добавить карточку" onclick={() => startAdd(c.keyword)}>+</button>{/if}
+            </div>
             <div class="kb-cards">
-              {#each c.cards as k (k.key)}
+              {#each rowsOf(c) as row (row.ph ? 'ph' : c.cards[row.i].key)}
+                {#if row.ph}
+                  <div class="kb-ph" style:height="{drag?.h ?? 58}px" aria-hidden="true"></div>
+                {:else}
+                {@const k = c.cards[row.i]}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <div class="kb-card" class:done={k.done} class:sel={selected === k.key} role="button" tabindex="0" aria-label={k.title} data-line={k.line} onclick={() => (selected = k.key)}>
+                <div class="kb-card" class:done={k.done} class:sel={selected === k.key} class:ghost={drag?.key === k.key} role="button" tabindex="-1" aria-label={k.title} data-line={k.line} data-key={k.key}
+                  onpointerdown={(e) => down(e, k, c.keyword)}>
                   <div class="kb-t">{@html titleHtml(k.title)}</div>
                   {#if k.priority || k.date || k.progress || k.tags.length}
                     <div class="kb-meta">
@@ -134,7 +283,14 @@
                     </div>
                   {/if}
                 </div>
+                {/if}
               {/each}
+              {#if adding === c.keyword}
+                <input class="kb-new" use:focusField bind:value={draft} placeholder="Название карточки" aria-label="Новая карточка в {c.keyword}" spellcheck="false" autocomplete="off"
+                  onkeydown={(e) => void addKey(e, c.keyword)} onblur={() => { adding = null; draft = ''; }} />
+              {:else if !c.done}
+                <button class="kb-add" onclick={() => startAdd(c.keyword)}>+ Карточка</button>
+              {/if}
               {#if c.older}
                 <button class="kb-more" onclick={() => toggleOld(c.keyword)}>Ещё {c.older} {c.older % 10 === 1 && c.older % 100 !== 11 ? 'старая' : 'старых'} ›</button>
               {:else if showOld.has(c.keyword)}
@@ -149,3 +305,9 @@
     <div class="kb-stage"></div>
   {/if}
 </div>
+{#if drag}
+  <div class="kb-drag" style:left="{drag.x - drag.ox}px" style:top="{drag.y - drag.oy}px" style:width="{drag.w}px" aria-hidden="true">
+    <div class="kb-t">{@html drag.html}</div>
+    {#if drag.tags}<div class="kb-meta"><span class="kb-tags">{drag.tags}</span></div>{/if}
+  </div>
+{/if}

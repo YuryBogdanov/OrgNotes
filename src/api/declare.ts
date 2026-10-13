@@ -115,15 +115,32 @@ function declareReviewScope(m: Manifest) {
   registerScope({ id: reviewScope(m.id), name: `в разборе «${m.name}»`, over: ['window', 'editor', 'heading'], outside: { scopes: ['window', 'editor'], word: 'Вне разбора' }, rank: 30, alone: true });
 }
 
+/** The scope of the keys of a plugin's view of a file (the board, ТЗ 33): over the window and the editor, while a file
+ *  tab shows it; its own group of «Клавиши» («ДОСКА», «только на доске»). */
+export const viewScope = (id: string) => 'pluginView:' + id;
+const viewGroup = (id: string) => groupOf(id) + ':view';
+const viewWord = (m: Manifest) => m.contributes.fileViews[0]?.title ?? m.name;
+function declareViewScope(m: Manifest) {
+  registerScope({ id: viewScope(m.id), name: `в виде «${viewWord(m)}»`, over: ['window', 'editor', 'heading'], outside: { scopes: ['window', 'editor'], word: 'В остальном окне' }, rank: 25, alone: true });
+}
+
 /** A plugin's commands in the registry of keys (and its group of «Клавиши»). */
 export function declareKeys(m: Manifest) {
   if (!m.contributes.commands.length) return;
   registerGroup({ id: groupOf(m.id), title: m.name.toUpperCase(), note: 'плагин' });
   if (m.contributes.commands.some((c) => c.scope === 'review')) declareReviewScope(m);
-  registerKeys(m.contributes.commands.map((c) => C(c.id, c.title, groupOf(m.id), c.scope === 'review' ? reviewScope(m.id) : 'window', c.keys ?? [], { synonyms: c.synonyms })));
+  if (m.contributes.commands.some((c) => c.scope === 'view')) {
+    declareViewScope(m);
+    const w = viewWord(m);
+    registerGroup({ id: viewGroup(m.id), title: w.toUpperCase(), note: `только в виде «${w}»` });
+  }
+  registerKeys(m.contributes.commands.map((c) =>
+    C(c.id, c.title, c.scope === 'view' ? viewGroup(m.id) : groupOf(m.id), c.scope === 'review' ? reviewScope(m.id) : c.scope === 'view' ? viewScope(m.id) : 'window', c.keys ?? [], { synonyms: c.synonyms }),
+  ));
 }
 export function undeclareKeys(m: Manifest) {
   unregisterKeys(m.contributes.commands.map((c) => c.id), groupOf(m.id));
+  unregisterKeys([], viewGroup(m.id)); // its group of the view goes with its commands
 }
 
 for (const e of entries) if (e.enabled && e.manifest) declareKeys(e.manifest);

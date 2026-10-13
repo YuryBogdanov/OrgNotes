@@ -7,14 +7,103 @@
   "api": "^1.5",
   "minAppVersion": "1.4.0",
   "main": "main.js",
-  "permissions": ["index.read", "files.edit"],
+  "permissions": [
+    "index.read",
+    "files.edit"
+  ],
   "contributes": {
     "commands": [
-      { "id": "kanban.toggle", "title": "Показать как доску / текст", "keys": ["⌥⌘B"], "synonyms": ["канбан", "доска", "текст"] },
-      { "id": "kanban.show", "title": "Показать как доску", "synonyms": ["канбан", "доска", "board"] }
+      {
+        "id": "kanban.toggle",
+        "title": "Показать как доску / текст",
+        "keys": [
+          "⌥⌘B"
+        ],
+        "synonyms": [
+          "канбан",
+          "доска",
+          "текст"
+        ]
+      },
+      {
+        "id": "kanban.show",
+        "title": "Показать как доску",
+        "synonyms": [
+          "канбан",
+          "доска",
+          "board"
+        ]
+      },
+      {
+        "id": "kanban.statusPrev",
+        "title": "Статус влево",
+        "keys": [
+          "⇧←"
+        ],
+        "scope": "view",
+        "synonyms": [
+          "колонка",
+          "статус"
+        ]
+      },
+      {
+        "id": "kanban.statusNext",
+        "title": "Статус вправо",
+        "keys": [
+          "⇧→"
+        ],
+        "scope": "view",
+        "synonyms": [
+          "колонка",
+          "статус"
+        ]
+      },
+      {
+        "id": "kanban.up",
+        "title": "Переместить вверх в колонке",
+        "keys": [
+          "⌥↑"
+        ],
+        "scope": "view"
+      },
+      {
+        "id": "kanban.down",
+        "title": "Переместить вниз в колонке",
+        "keys": [
+          "⌥↓"
+        ],
+        "scope": "view"
+      },
+      {
+        "id": "kanban.newCard",
+        "title": "Доска: новая карточка",
+        "scope": "view",
+        "synonyms": [
+          "карточка",
+          "задача",
+          "добавить"
+        ]
+      },
+      {
+        "id": "kanban.filter",
+        "title": "Фильтр доски",
+        "keys": [
+          "⌘F"
+        ],
+        "scope": "view",
+        "synonyms": [
+          "поиск",
+          "найти"
+        ]
+      }
     ],
     "fileViews": [
-      { "id": "kanban.board", "title": "Доска", "icon": "M3 4h4v12H3zM8.5 4h4v8h-4zM14 4h3v5h-3z", "key": "kanban.toggle" }
+      {
+        "id": "kanban.board",
+        "title": "Доска",
+        "icon": "M3 4h4v12H3zM8.5 4h4v8h-4zM14 4h3v5h-3z",
+        "key": "kanban.toggle"
+      }
     ],
     "settings": [
       {
@@ -24,11 +113,41 @@
           {
             "caption": "ЗАВЕРШЁННЫЕ",
             "fields": [
-              { "key": "doneDays", "type": "choice", "look": "segments", "where": "local", "label": "Показывать завершённые за", "default": 14,
-                "options": [{ "value": 7, "label": "7 дней" }, { "value": 14, "label": "14 дней" }, { "value": 30, "label": "30 дней" }, { "value": 0, "label": "все" }],
-                "hint": "Старые — по «Ещё N старых ›» внизу колонки; карточки без CLOSED видны всегда" },
-              { "key": "collapseCancel", "type": "switch", "where": "local", "label": "Сворачивать колонки отмены", "default": true,
-                "hint": "Все завершающие колонки, кроме первой" }
+              {
+                "key": "doneDays",
+                "type": "choice",
+                "look": "segments",
+                "where": "local",
+                "label": "Показывать завершённые за",
+                "default": 14,
+                "options": [
+                  {
+                    "value": 7,
+                    "label": "7 дней"
+                  },
+                  {
+                    "value": 14,
+                    "label": "14 дней"
+                  },
+                  {
+                    "value": 30,
+                    "label": "30 дней"
+                  },
+                  {
+                    "value": 0,
+                    "label": "все"
+                  }
+                ],
+                "hint": "Старые — по «Ещё N старых ›» внизу колонки; карточки без CLOSED видны всегда"
+              },
+              {
+                "key": "collapseCancel",
+                "type": "switch",
+                "where": "local",
+                "label": "Сворачивать колонки отмены",
+                "default": true,
+                "hint": "Все завершающие колонки, кроме первой"
+              }
             ]
           }
         ]

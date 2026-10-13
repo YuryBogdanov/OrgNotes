@@ -76,3 +76,21 @@ describe('insertHeadingAt (ТЗ 30)', () => {
     expect(insertHeadingAt('* A\n\n', { position: 'end' }, '* B')!.text).toBe('* A\n\n* B\n');
   });
 });
+
+describe('beside another heading (ТЗ 33)', async () => {
+  const { moveBeside, insertAfter } = await import('./orgOps');
+  const { parseHeadings, DEFAULT_WORKFLOW } = await import('./org');
+  const T = '#+TITLE: x\n* TODO A\nтело A\n* TODO B\n** sub B\n* TODO C\n';
+  const hs = parseHeadings(T, DEFAULT_WORKFLOW);
+  const [a, b, , c] = hs;
+  it('before and after another one, the subtree with it; the file keeps its ending', () => {
+    expect(moveBeside(T, c, a, 'before').text).toBe('#+TITLE: x\n* TODO C\n* TODO A\nтело A\n* TODO B\n** sub B\n');
+    expect(moveBeside(T, a, c, 'after').text).toBe('#+TITLE: x\n* TODO B\n** sub B\n* TODO C\n* TODO A\nтело A\n');
+    expect(moveBeside(T, b, a, 'before')).toEqual({ text: '#+TITLE: x\n* TODO B\n** sub B\n* TODO A\nтело A\n* TODO C\n', line: 1 });
+    expect(moveBeside(T, a, a, 'after').text).toBe(T);
+  });
+  it('a new heading after another one\'s subtree, at its level', () => {
+    expect(insertAfter(T, b, '* TODO New')).toEqual({ text: '#+TITLE: x\n* TODO A\nтело A\n* TODO B\n** sub B\n* TODO New\n* TODO C\n', line: 5 });
+    expect(insertAfter(T, c, '* TODO Last')!.text).toBe('#+TITLE: x\n* TODO A\nтело A\n* TODO B\n** sub B\n* TODO C\n* TODO Last\n'); // before the file's ending
+  });
+});

@@ -5,7 +5,7 @@
 import { parseHeadings, setKeyword, type Heading, type Workflow } from './org';
 import { setPlanning, setTags } from './edits';
 import { remove } from './inbox';
-import { bodyOf, insertHeadingAt, replaceBody, setProperty } from './orgOps';
+import { bodyOf, insertAfter, insertHeadingAt, moveBeside, replaceBody, setProperty } from './orgOps';
 import { moveTo, moveWithin } from './refile';
 
 /** A heading as a feature knows it: lines move with every edit, so the title is checked too. */
@@ -153,8 +153,25 @@ export class Tx {
     else this.on(ref, (t, h) => setProperty(t, h, key, value));
   }
   /** A new heading; its reference (null: not made — a conflict or a wrong org text). */
-  insertHeading(at: { under: HeadingRef; position: 'first' | 'last' } | { under: HeadingRef; before: HeadingRef } | { file: string; position: 'top' | 'end' }, org: string): HeadingRef | null {
+  insertHeading(at: { under: HeadingRef; position: 'first' | 'last' } | { under: HeadingRef; before: HeadingRef } | { file: string; position: 'top' | 'end' } | { after: HeadingRef }, org: string): HeadingRef | null {
     const bad = 'нужен один заголовок с подзаголовками';
+    if ('after' in at) {
+      // right after another heading's subtree, at its level (a new card of the board, ТЗ 33)
+      const t = this.heading(at.after);
+      if (!t) {
+        this.conflict = true;
+        return null;
+      }
+      let line = -1;
+      this.update(at.after.path, (x) =>
+        this.orFail(() => {
+          const r = insertAfter(x, t, org);
+          if (r) line = r.line;
+          return r?.text ?? null;
+        }, bad),
+      );
+      return line >= 0 ? this.refAt(at.after.path, line) : null;
+    }
     const path = 'under' in at ? at.under.path : at.file;
     let line = -1;
     const put = (fn: (t: string) => { text: string; line: number } | null) =>
@@ -195,7 +212,19 @@ export class Tx {
     if (!h) this.conflict = true;
     else this.update(ref.path, (t) => this.orFail(() => replaceBody(t, h, org), 'в тексте под заголовком не может быть заголовков'));
   }
-  move(ref: HeadingRef, to: { under: HeadingRef } | { file: string }) {
+  move(ref: HeadingRef, to: { under: HeadingRef } | { file: string } | { before: HeadingRef } | { after: HeadingRef }) {
+    if ('before' in to || 'after' in to) {
+      // beside another heading of the same file, at its level (the board's order, ТЗ 33)
+      const other = 'before' in to ? to.before : to.after;
+      const h = this.heading(ref);
+      const t = this.heading(other);
+      if (!h || !t || other.path !== ref.path) {
+        this.conflict = true;
+        return;
+      }
+      this.update(ref.path, (x) => this.orFail(() => moveBeside(x, h, t, 'before' in to ? 'before' : 'after').text, 'заголовок нельзя перенести внутрь него самого'));
+      return;
+    }
     const h = this.heading(ref);
     const under = 'under' in to ? (this.heading(to.under) ?? null) : null;
     const dst = 'under' in to ? to.under.path : to.file;

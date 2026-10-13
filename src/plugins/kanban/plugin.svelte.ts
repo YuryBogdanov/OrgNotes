@@ -37,6 +37,15 @@ export default definePlugin({
     // ⌥⌘B: the board and back; «Показать как доску» in the palette
     ctx.commands.on('kanban.toggle', () => void ctx.ui.showAs(kanban.active.view === VIEW ? null : VIEW));
     ctx.commands.on('kanban.show', () => void ctx.ui.showAs(VIEW));
+    // the board's keys (only on it: the scope «view»)
+    const here = () => (kanban.active.view === VIEW ? kanban.active.path : null);
+    const on = (id: string, fn: (path: string) => void) => ctx.commands.on(id, () => void (here() && fn(here()!)));
+    on('kanban.statusPrev', (p) => void kanban.stepStatus(p, -1));
+    on('kanban.statusNext', (p) => void kanban.stepStatus(p, 1));
+    on('kanban.up', (p) => void kanban.stepPlace(p, -1));
+    on('kanban.down', (p) => void kanban.stepPlace(p, 1));
+    on('kanban.newCard', (p) => kanban.ask?.({ kind: 'new', path: p }));
+    on('kanban.filter', (p) => kanban.ask?.({ kind: 'filter', path: p }));
     // only in a file's tab; «Показать как доску» — when it is the text
     $effect.root(() => {
       $effect(() => {

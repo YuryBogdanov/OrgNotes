@@ -53,6 +53,7 @@ export interface Card {
   key: string;
   line: number;
   title: string; // without the status, the priority, the tags and a cookie
+  heading: string; // the heading's title as the file has it (a cookie too): what finds it again
   keyword: string;
   priority: string | null;
   tags: string[];
@@ -139,7 +140,7 @@ export function boardFor(text: string, hs: Heading[], set: StatusSet, o: { filte
     }
     const done = doneWords.includes(h.keyword);
     byKw.get(h.keyword)!.push({
-      key: `${h.line}:${h.title}`, line: h.line, title: h.title.replace(COOKIE, '').trim(), keyword: h.keyword, priority: h.priority, tags: h.tags, done,
+      key: `${h.line}:${h.title}`, line: h.line, title: h.title.replace(COOKIE, '').trim(), heading: h.title, keyword: h.keyword, priority: h.priority, tags: h.tags, done,
       date: cardDate(h, done, today), progress: progressOf(lines, hs, i, doneWords), closed: h.closed ? toDate(h.closed) : null,
     });
   });
