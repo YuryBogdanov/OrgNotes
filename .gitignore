@@ -7,3 +7,6 @@ test-results/
 playwright-report/
 dist-release/
 templates/plugin/dist/
+
+# the Swift package of the mini window builds here
+src-tauri/swift/*/.build/

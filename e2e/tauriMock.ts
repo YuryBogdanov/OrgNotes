@@ -280,6 +280,11 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             return null;
           }
           if (cmd.startsWith('plugin:event|')) return null;
+          // the mini window (ТЗ 31): its native panel is Rust's and Swift's; here only what the page asks
+          if (cmd === 'set_mini_shortcut' || cmd.startsWith('mini_')) {
+            w.__log.push([cmd, args ?? null]);
+            return null;
+          }
           if (cmd === 'set_capture_shortcut') {
             if (w.__shortcutTaken === args.accelerator) throw 'HotKey already registered';
             w.__log.push(['shortcut', args.accelerator, args.global]);

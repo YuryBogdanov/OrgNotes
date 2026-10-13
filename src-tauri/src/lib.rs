@@ -1282,18 +1282,156 @@ fn show_capture(app: &AppHandle) {
 /// of the app has it. An error says the shortcut is taken or not valid.
 #[tauri::command]
 fn set_capture_shortcut(app: AppHandle, accelerator: String, global: bool) -> Result<(), String> {
+    set_global(&app, &CAPTURE_KEY, if global { accelerator } else { String::new() }, show_capture)
+}
+
+/// The system-wide shortcuts of the app (the quick entry's, the mini window's): each one is put in place of its own
+/// earlier one, the others stay.
+static CAPTURE_KEY: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+static MINI_KEY: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+fn set_global(app: &AppHandle, slot: &std::sync::Mutex<String>, accelerator: String, run: fn(&AppHandle)) -> Result<(), String> {
     use tauri_plugin_global_shortcut::GlobalShortcutExt;
     let gs = app.global_shortcut();
-    let _ = gs.unregister_all();
-    if !global || accelerator.trim().is_empty() {
+    let mut was = slot.lock().unwrap();
+    if !was.is_empty() {
+        let _ = gs.unregister(was.as_str());
+        was.clear();
+    }
+    if accelerator.trim().is_empty() {
         return Ok(());
     }
-    gs.on_shortcut(accelerator.as_str(), |app, _shortcut, event| {
+    gs.on_shortcut(accelerator.as_str(), move |app, _shortcut, event| {
         if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-            show_capture(app);
+            run(app);
         }
     })
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+    *was = accelerator;
+    Ok(())
+}
+
+// ---- the mini window (ТЗ 31) --------------------------------------------------------------------------------------
+// A small window with one note over every program, full-screen ones too. It is the Tauri window «mini» (index.html
+// #mini) made a non-activating floating panel by the Swift package swift/MiniPanel: a click or typing in it neither
+// activates the app nor leaves a full-screen program; away from the pointer and not typed in, it fades.
+
+const MINI: &str = "mini";
+
+#[cfg(target_os = "macos")]
+mod mini_native {
+    use swift_rs::{swift, Bool};
+    swift!(pub fn mini_setup(window: *mut std::ffi::c_void, fullscreen: Bool, hide_from_capture: Bool));
+    swift!(pub fn mini_options(opacity: f64, linger: f64, smooth: Bool, fullscreen: Bool, hide_from_capture: Bool));
+    swift!(pub fn mini_show(focus: Bool));
+    swift!(pub fn mini_hide());
+    swift!(pub fn mini_is_key() -> Bool);
+    swift!(pub fn mini_is_visible() -> Bool);
+    swift!(pub fn mini_typed());
+    swift!(pub fn mini_pin(on: Bool));
+    swift!(pub fn mini_return_focus());
+}
+
+/// On the main thread, as AppKit wants it: at once when this is it (a sync command, a shortcut's handler), else
+/// sent there and waited for.
+fn on_main<R: Send + 'static>(app: &AppHandle, f: impl FnOnce() -> R + Send + 'static) -> Option<R> {
+    #[cfg(target_os = "macos")]
+    if objc2::MainThreadMarker::new().is_some() {
+        return Some(f());
+    }
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(f());
+    })
+    .ok()?;
+    rx.recv().ok()
+}
+
+fn make_mini_window(app: &AppHandle) {
+    if app.get_webview_window(MINI).is_some() {
+        return;
+    }
+    let Ok(w) = tauri::WebviewWindowBuilder::new(app, MINI, tauri::WebviewUrl::App("index.html#mini".into()))
+        .title("Мини-окно")
+        .inner_size(440.0, 330.0)
+        .min_inner_size(280.0, 180.0)
+        .decorations(false)
+        .transparent(true)
+        .resizable(true)
+        .skip_taskbar(true)
+        .visible(false)
+        .build()
+    else {
+        return;
+    };
+    #[cfg(target_os = "macos")]
+    if let Ok(ns) = w.ns_window() {
+        let ptr = ns as usize;
+        on_main(app, move || unsafe { mini_native::mini_setup(ptr as *mut std::ffi::c_void, true, true) });
+    }
+    // by default in the bottom right corner of the screen, 24 pt from its edges
+    if let Ok(Some(m)) = w.current_monitor() {
+        let s = m.scale_factor();
+        let size = m.size().to_logical::<f64>(s);
+        let pos = m.position().to_logical::<f64>(s);
+        let _ = w.set_position(tauri::LogicalPosition::new(pos.x + size.width - 440.0 - 24.0, pos.y + size.height - 330.0 - 24.0));
+    }
+}
+
+/// ⌃⌥⌘M: hidden — shown, the keys in it; shown, the keys elsewhere — the keys in it; the keys in it — back to the
+/// program before.
+fn toggle_mini(app: &AppHandle) {
+    make_mini_window(app);
+    #[cfg(target_os = "macos")]
+    {
+        let state = on_main(app, || unsafe { (mini_native::mini_is_visible(), mini_native::mini_is_key()) });
+        match state {
+            Some((true, true)) => {
+                on_main(app, || unsafe { mini_native::mini_return_focus() });
+            }
+            _ => {
+                on_main(app, || unsafe { mini_native::mini_show(true) });
+                let _ = app.emit_to(MINI, "mini-focus", ());
+            }
+        }
+    }
+}
+
+#[tauri::command]
+fn set_mini_shortcut(app: AppHandle, accelerator: String) -> Result<(), String> {
+    set_global(&app, &MINI_KEY, accelerator, toggle_mini)
+}
+#[tauri::command]
+fn mini_toggle(app: AppHandle) {
+    toggle_mini(&app);
+}
+#[tauri::command]
+fn mini_hide(app: AppHandle) {
+    #[cfg(target_os = "macos")]
+    on_main(&app, || unsafe { mini_native::mini_hide() });
+}
+/// A key typed in the mini window: it stays full for the pause set.
+#[tauri::command]
+fn mini_typed(app: AppHandle) {
+    #[cfg(target_os = "macos")]
+    on_main(&app, || unsafe { mini_native::mini_typed() });
+}
+/// The palette, the search or a menu of the mini window open: full until it closes.
+#[tauri::command]
+fn mini_pin(app: AppHandle, on: bool) {
+    #[cfg(target_os = "macos")]
+    on_main(&app, move || unsafe { mini_native::mini_pin(on.into()) });
+}
+/// ⎋ with nothing to close: the keys back to the program in front before.
+#[tauri::command]
+fn mini_return_focus(app: AppHandle) {
+    #[cfg(target_os = "macos")]
+    on_main(&app, || unsafe { mini_native::mini_return_focus() });
+}
+/// The settings of «Мини-окно» (ТЗ 31 §6), applied at once.
+#[tauri::command]
+fn mini_options(app: AppHandle, opacity: f64, linger: f64, smooth: bool, fullscreen: bool, hide_from_capture: bool) {
+    #[cfg(target_os = "macos")]
+    on_main(&app, move || unsafe { mini_native::mini_options(opacity, linger, smooth.into(), fullscreen.into(), hide_from_capture.into()) });
 }
 
 /// The panel asks the main window to show itself (e.g. «Выбрать файл…» when the Inbox is not set up).
@@ -1335,6 +1473,13 @@ pub fn run() {
             move_entry,
             trash_entry,
             set_capture_shortcut,
+            set_mini_shortcut,
+            mini_toggle,
+            mini_hide,
+            mini_typed,
+            mini_pin,
+            mini_return_focus,
+            mini_options,
             show_main_window,
             list_themes,
             write_theme,

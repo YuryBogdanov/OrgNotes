@@ -29,6 +29,7 @@ export const ICONS = {
   clear: 'M5 5l10 10M15 5L5 15',
   goal: 'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z',
   plug: 'M8 2.5v4M12 2.5v4M5.5 6.5h9v3a4.5 4.5 0 0 1-9 0zM10 14v3.5',
+  window: 'M3 4.5h14v11H3zM3 7.5h14M10.5 10.5h4.5v3.5h-4.5z', // a window with a small one in its corner
   gear: 'M10 7.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2zM10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6',
 };
 export type Icon = keyof typeof ICONS;
@@ -195,6 +196,10 @@ register({
 register({
   id: 'navExpand', title: 'Навигатор: развернуть всё', icon: 'folder', group: 'general', synonyms: ['дерево', 'папки', 'развернуть'],
   when: () => store.files.length > 0, run: () => store.navTree('expand'),
+});
+register({
+  id: 'miniShow', title: 'Мини-окно: показать', icon: 'window', group: 'general', synonyms: ['мини', 'поверх', 'созвон', 'zoom'],
+  when: () => '__TAURI_INTERNALS__' in window, hint: () => '⌃⌥⌘M', run: () => void setTimeout(() => store.toggleMini()),
 });
 register({
   id: 'settings', title: 'Настройки…', icon: 'gear', group: 'general', synonyms: ['параметры', 'клавиши', 'сочетания', 'preferences'],

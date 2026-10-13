@@ -802,6 +802,21 @@ class Store {
       return String(e);
     }
   }
+  /** The mini window's system-wide shortcut (ТЗ 31; ⌃⌥⌘M: ⌃⌥Space switches the input source on macOS). Fixed in the
+   *  prototype; «Клавиши» take it in PR B. */
+  async applyMiniKey(): Promise<string | null> {
+    if (!isTauri) return null;
+    try {
+      await invoke('set_mini_shortcut', { accelerator: 'Control+Alt+CmdOrCtrl+KeyM' });
+      return null;
+    } catch (e) {
+      return String(e);
+    }
+  }
+  /** «Мини-окно: показать»: shown with the keys in it (or the keys back to the program before). */
+  toggleMini() {
+    if (isTauri) void invoke('mini_toggle').catch(() => {});
+  }
   async setCaptureKey(key: string, global: boolean): Promise<string | null> {
     this.captureKey = key;
     this.captureGlobal = global;
@@ -1253,6 +1268,7 @@ class Store {
       this.pickInbox = Date.now();
     });
     void this.applyCaptureKey();
+    void this.applyMiniKey();
     await listen('quit-requested', () => this.quit()); // «Завершить» from the Dock
   }
 

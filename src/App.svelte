@@ -24,6 +24,7 @@
   import Picker from './Picker.svelte';
   import Refile from './Refile.svelte';
   import CaptureWindow from './CaptureWindow.svelte';
+  import MiniWindow from './MiniWindow.svelte';
   import { displayName as nameOf } from './names';
   import { toAccelerator } from './keys';
   import { applyAppearance, readChoice, readThemeNames } from './appearance';
@@ -56,6 +57,7 @@
 
   // the quick entry from another program: a panel of its own with only the entry (the main window does the writing)
   const isCaptureWindow = location.hash === '#capture';
+  const isMiniWindow = location.hash === '#mini'; // the mini window over other programs (ТЗ 31)
   const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
   const file = $derived(store.file);
   // toolbar path: the folders and the file of the active tab (the heading crumbs live in the pane)
@@ -201,7 +203,7 @@
   // the panel of the quick entry knows the Inbox file's name from here
   $effect(() => {
     const f = store.inboxFile;
-    if (isCaptureWindow) return;
+    if (isCaptureWindow || isMiniWindow) return;
     try {
       if (f) localStorage.setItem('capture:file', nameOf(f.name) + '.org');
       else localStorage.removeItem('capture:file');
@@ -236,7 +238,7 @@
     }]),
   );
   $effect(() => {
-    if (isCaptureWindow) return;
+    if (isCaptureWindow || isMiniWindow) return;
     const b = store.bindings;
     let stale = false;
     void installMenu(menuActions, (id) => toAccelerator(b.get(id)?.[0] ?? '')).then((m) => {
@@ -250,7 +252,7 @@
   });
 
   onMount(() => {
-    if (isCaptureWindow) return; // a thin panel: no files, no menu
+    if (isCaptureWindow || isMiniWindow) return; // a thin panel: no files, no menu
     store.load();
     store.listen();
     void plugins.start(); // the plugins' code (roadmap 1.1), once the window is up
@@ -284,6 +286,8 @@
 
 {#if isCaptureWindow}
   <CaptureWindow />
+{:else if isMiniWindow}
+  <MiniWindow />
 {:else}
 <!-- the agenda builder is a sheet over the whole window: the window stays visible under it but takes no input -->
 <!-- full screen with the menu bar shown: the toolbar grows by it (its buttons stay just below it), the traffic lights

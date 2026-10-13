@@ -3,7 +3,8 @@
   "identifier": "default",
   "windows": [
     "main",
-    "capture"
+    "capture",
+    "mini"
   ],
   "permissions": [
     "core:default",
