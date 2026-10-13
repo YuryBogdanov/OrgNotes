@@ -5,7 +5,7 @@
 import { parseHeadings, setKeyword, type Heading, type Workflow } from './org';
 import { setPlanning, setTags } from './edits';
 import { remove } from './inbox';
-import { insertHeading, replaceBody, setProperty } from './orgOps';
+import { bodyOf, insertHeadingAt, replaceBody, setProperty } from './orgOps';
 import { moveTo, moveWithin } from './refile';
 
 /** A heading as a feature knows it: lines move with every edit, so the title is checked too. */
@@ -75,13 +75,35 @@ export class Tx {
   text(path: string): string | undefined {
     return this.texts.get(path) ?? this.read(path)?.text;
   }
+  /** The file's headings as the transaction has it now. */
+  headings(path: string): Heading[] | undefined {
+    const f = this.read(path);
+    const t = this.text(path);
+    return f && t !== undefined ? parseHeadings(t, f.wf) : undefined;
+  }
   /** The heading now: at its line with its title, else the nearest one with that title. */
-  heading(ref: HeadingRef): Heading | undefined {
-    const f = this.read(ref.path);
-    const t = this.text(ref.path);
-    if (!f || t === undefined) return undefined;
-    const hs = parseHeadings(t, f.wf);
+  heading(ref: HeadingRef, hs = this.headings(ref.path)): Heading | undefined {
+    if (!hs) return undefined;
     return hs.find((h) => h.line === ref.line && h.title === ref.title) ?? hs.filter((h) => h.title === ref.title).sort((a, b) => Math.abs(a.line - ref.line) - Math.abs(b.line - ref.line))[0];
+  }
+  /** The direct subheadings of a heading now. */
+  children(ref: HeadingRef): Heading[] {
+    const hs = this.headings(ref.path);
+    const h = this.heading(ref, hs);
+    if (!hs || !h) return [];
+    const i = hs.indexOf(h);
+    return hs.filter((x) => x.parent === i);
+  }
+  /** The text under a heading now (as `replaceBody` changes it); null — not found. */
+  body(ref: HeadingRef): string | null {
+    const h = this.heading(ref);
+    const t = this.text(ref.path);
+    return h && t !== undefined ? bodyOf(t, h) : null;
+  }
+  /** The reference of the heading at a line now. */
+  private refAt(path: string, line: number): HeadingRef | null {
+    const h = this.headings(path)?.find((x) => x.line === line);
+    return h ? { path, line, title: h.title } : null;
   }
   /** Any change of a file's text (the feature's own pure function). null leaves the file as it is. */
   update(path: string, fn: (text: string, wf: Workflow) => string | null) {
@@ -130,13 +152,43 @@ export class Tx {
     if (!/^[A-Za-z0-9_-]+$/.test(key)) this.error = 'имя свойства — латиница, цифры, _ и -';
     else this.on(ref, (t, h) => setProperty(t, h, key, value));
   }
-  insertHeading(at: { under: HeadingRef; position: 'first' | 'last' } | { file: string; position: 'top' | 'end' }, org: string) {
+  /** A new heading; its reference (null: not made — a conflict or a wrong org text). */
+  insertHeading(at: { under: HeadingRef; position: 'first' | 'last' } | { under: HeadingRef; before: HeadingRef } | { file: string; position: 'top' | 'end' }, org: string): HeadingRef | null {
     const bad = 'нужен один заголовок с подзаголовками';
+    const path = 'under' in at ? at.under.path : at.file;
+    let line = -1;
+    const put = (fn: (t: string) => { text: string; line: number } | null) =>
+      this.update(path, (t) =>
+        this.orFail(() => {
+          const r = fn(t);
+          if (r) line = r.line;
+          return r?.text ?? null;
+        }, bad),
+      );
     if ('under' in at) {
       const h = this.heading(at.under);
-      if (!h) this.conflict = true;
-      else this.update(at.under.path, (t) => this.orFail(() => insertHeading(t, { under: h, position: at.position }, org), bad));
-    } else this.update(at.file, (t) => this.orFail(() => insertHeading(t, { position: at.position }, org), bad));
+      const b = 'before' in at ? this.heading(at.before) : undefined;
+      if (!h || ('before' in at && (!b || b.line <= h.line || b.line >= h.end))) {
+        this.conflict = true;
+        return null;
+      }
+      put((t) => insertHeadingAt(t, b ? { under: h, before: b } : { under: h, position: (at as { position: 'first' | 'last' }).position }, org));
+    } else put((t) => insertHeadingAt(t, { position: at.position }, org));
+    return line >= 0 ? this.refAt(path, line) : null;
+  }
+  /** The direct subheading of that title (case and the spaces around it aside), made when there is none — last, or
+   *  before a subheading. */
+  ensureChild(under: HeadingRef, title: string, at: { before?: HeadingRef } = {}): HeadingRef | null {
+    const h = this.heading(under);
+    if (!h) {
+      this.conflict = true;
+      return null;
+    }
+    const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
+    const have = this.children(under).find((x) => norm(x.title) === norm(title));
+    if (have) return { path: under.path, line: have.line, title: have.title };
+    const org = '* ' + title.trim();
+    return this.insertHeading(at.before ? { under, before: at.before } : { under, position: 'last' }, org);
   }
   replaceBody(ref: HeadingRef, org: string) {
     const h = this.heading(ref);

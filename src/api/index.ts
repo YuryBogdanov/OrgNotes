@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.2.0';
+export const API_VERSION = '1.3.0';
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;
@@ -94,18 +94,35 @@ export interface ViewSpec<S> {
    *  kind becomes active; the plugin follows its state itself. */
   inspector?: Render<S>;
 }
+/** A transaction: the operations change the files in memory, in order — each sees what the ones before it did; the
+ *  core writes them at once, one step of ⌘Z. A heading not found makes it a conflict (nothing is written). */
 export interface Tx {
   setStatus(h: HeadingRef, keyword: string | null): void;
   setPlanning(h: HeadingRef, kind: 'SCHEDULED' | 'DEADLINE', date: Date | null): void;
   setTags(h: HeadingRef, tags: string[]): void;
   setProperty(h: HeadingRef, key: string, value: string | null): void;
-  /** Org text of one heading with its subtree, its stars relevelled to the place. */
-  insertHeading(at: { under: HeadingRef; position: 'first' | 'last' } | { file: string; position: 'top' | 'end' }, org: string): void;
+  /** Org text of one heading with its subtree, its stars relevelled to the place: under a heading (its first or last
+   *  child — the last before the blank lines ending the parent — or right before one of its children), or at the top
+   *  or the end of a file. Its reference (1.3), for the next operations; null — not made. */
+  insertHeading(
+    at: { under: HeadingRef; position: 'first' | 'last' } | { under: HeadingRef; before: HeadingRef } | { file: string; position: 'top' | 'end' },
+    org: string,
+  ): HeadingRef | null;
+  /** The direct subheading of that title (case and spaces around aside), made when there is none: last, or before a
+   *  subheading (1.3). */
+  ensureChild(under: HeadingRef, title: string, at?: { before?: HeadingRef }): HeadingRef | null;
+  /** The heading as the transaction has it now (1.3). */
+  heading(h: HeadingRef): HeadingInfo | null;
+  /** Its direct subheadings now (1.3). */
+  children(h: HeadingRef): HeadingInfo[];
+  /** The text under it now, as `replaceBody` changes it (1.3); null — not found. */
+  body(h: HeadingRef): string | null;
   /** The text under the heading (after its planning and drawers), up to its first subheading. */
   replaceBody(h: HeadingRef, org: string): void;
   move(h: HeadingRef, to: { under: HeadingRef } | { file: string }): void;
   remove(h: HeadingRef): void;
-  /** The file changed by the plugin's own function (its own structure in the file, ТЗ 27): null leaves it. */
+  /** The file changed by the plugin's own function: null leaves it. A fallback for a structure of the plugin's own in
+   *  the file — the operations above are the core's to check and to merge (ТЗ 30). */
   update(path: string, fn: (text: string) => string | null): void;
 }
 export interface Store {

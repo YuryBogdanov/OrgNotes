@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
 
 // ТЗ 26 §4, §7 (roadmap 1.2): installed plugins from the app's folder of plugins — listed off, turned on and off at
 // once, a broken or incompatible one says why and leaves the others working; «Перезагрузить плагины»; a tab of a
@@ -74,13 +74,14 @@ test('a broken plugin is off with its reason, the others work; an incompatible o
     '/config/plugins/empty/readme.txt': 'нет манифеста',
   }, { jira: true, hello: true });
   await expect(toast(page)).toContainText('Плагин «Jira» выключен: нет токена');
+  await pluginsReady(page); // the others started
   await page.keyboard.press('Control+Meta+h'); // «Привет» works
   await expect(toast(page)).toContainText('Привет!');
   await openSettingsSheet(page, 'Плагины');
   await expect(card(page, 'Jira').getByRole('alert')).toContainText('Выключен после ошибки: нет токена');
   await card(page, 'Jira').getByRole('button', { name: 'Подробнее' }).click();
   await expect(card(page, 'Jira').locator('.stack')).toContainText('нет токена');
-  await expect(card(page, 'Из будущего')).toContainText('нужно API 2.0, в приложении 1.2.0');
+  await expect(card(page, 'Из будущего')).toContainText('нужно API 2.0, в приложении 1.3.0');
   await expect(card(page, 'Из будущего').getByRole('switch')).toBeDisabled();
   await expect(card(page, 'bad')).toContainText('manifest.json — не JSON');
   await expect(card(page, 'empty')).toContainText('в папке нет manifest.json');
@@ -110,6 +111,7 @@ test('«Перезагрузить плагины» finds a new folder; a built-
   await expect(modes.getByRole('tab', { name: 'Привет' })).toBeVisible();
   await page.keyboard.press('Shift+Meta+p');
   await page.keyboard.type('привет: доска');
+  await expect(page.getByRole('dialog', { name: 'Командная палитра' })).toContainText('Привет: доска'); // once its code runs
   await page.keyboard.press('Enter');
   await expect(page.locator('.hello-board')).toBeVisible();
   // off: the section goes, the tab stays as a placeholder with «Включить»

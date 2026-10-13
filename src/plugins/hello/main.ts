@@ -1,7 +1,7 @@
 // «Привет» (ТЗ 26 §9): an example plugin, built only on the public API — a command, a section of the navigator, a
 // tab and a setting. Off by default; a template for the authors of plugins.
 import { definePlugin, type Ctx, type HeadingInfo } from '@panopticon/api';
-import { insertHeading, parseHeadings, stampText, weekdayNames, workflow } from '@panopticon/api/org';
+import { parseHeadings } from '@panopticon/api/org';
 import './styles.css';
 
 interface Board {
@@ -247,16 +247,18 @@ export default definePlugin({
       });
       if (!v) return;
       const at = v.at as { path: string; heading: string | null; create?: boolean };
-      const wf = workflow(await ctx.index!.workflow(at.path));
       const d = typeof v.day === 'string' ? new Date(+v.day.slice(0, 4), +v.day.slice(5, 7) - 1, +v.day.slice(8, 10)) : null;
-      const day = d ? `\nSCHEDULED: ${stampText(d, weekdayNames(await ctx.files!.read(at.path).catch(() => '')))}` : '';
       const body = String(v.text ?? '').trim();
-      const org = `* ${String(v.title).trim() || 'Заметка'} :${v.mood}:${day}${body ? '\n' + body : ''}`;
-      const r = await ctx.edit!.transaction('Привет: заметка', (tx) => tx.update(at.path, (text) => {
-        if (at.create) return insertHeading(text, { position: 'end' }, '* Заметки\n*' + org); // the heading made, the note under it
-        const h = parseHeadings(text, wf).find((x) => x.level === 1 && x.title === at.heading);
-        return h ? insertHeading(text, { under: h, position: 'last' }, org) : null;
-      }), { onUndo: () => ctx.ui.notify('Привет: заметка отменена') });
+      const head = at.create ? null : ((await ctx.index!.outline(at.path)).find((h) => h.level === 1 && h.title === at.heading)?.ref ?? null);
+      // Org-level operations (API 1.3, ТЗ 30): each sees what the one before it did — the heading made, its reference
+      const r = await ctx.edit!.transaction('Привет: заметка', (tx) => {
+        const parent = at.create ? tx.insertHeading({ file: at.path, position: 'end' }, '* Заметки') : head;
+        const note = parent && tx.insertHeading({ under: parent, position: 'last' }, `* ${String(v.title).trim() || 'Заметка'}`);
+        if (!note) return;
+        tx.setTags(note, [String(v.mood)]);
+        if (d) tx.setPlanning(note, 'SCHEDULED', d);
+        if (body) tx.replaceBody(note, body);
+      }, { onUndo: () => ctx.ui.notify('Привет: заметка отменена') });
       ctx.ui.notify(r === 'ok' ? 'Заметка добавлена' : 'Не получилось: ' + r);
     });
 
