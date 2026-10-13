@@ -24,7 +24,7 @@ describe('insertHeading', () => {
   });
   it('at the top (after the header) or the end of a file', () => {
     expect(insertHeading(T, { position: 'top' }, '** Новая')).toBe('#+TITLE: x\n\n* Новая\n* A\nтекст\n** A1\n* B\n');
-    expect(insertHeading(T, { position: 'end' }, '* Новая')).toBe(T + '* Новая\n');
+    expect(insertHeading(T, { position: 'end' }, '* Новая')).toBe(T + '\n* Новая\n'); // a blank line after the headings above (ТЗ 30)
     expect(insertHeading('', { position: 'top' }, '* Новая')).toBe('* Новая\n');
   });
   it('one heading with its subtree only', () => {
@@ -65,5 +65,14 @@ describe('Tx: the operations of the plugins\' API', () => {
     const v = tx();
     v.setProperty(ref('a.org', 5, 'Нет такого'), 'X', '1');
     expect(v.conflict).toBe(true);
+  });
+});
+
+describe('insertHeadingAt (ТЗ 30)', () => {
+  it('at the end of a file: a blank line after the headings above, none after the header alone or a blank line', async () => {
+    const { insertHeadingAt } = await import('./orgOps');
+    expect(insertHeadingAt('#+TITLE: x\n* A\n', { position: 'end' }, '* B')).toEqual({ text: '#+TITLE: x\n* A\n\n* B\n', line: 3 });
+    expect(insertHeadingAt('#+TITLE: x\n', { position: 'end' }, '* B')).toEqual({ text: '#+TITLE: x\n* B\n', line: 1 });
+    expect(insertHeadingAt('* A\n\n', { position: 'end' }, '* B')!.text).toBe('* A\n\n* B\n');
   });
 });

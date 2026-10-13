@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SEQUENCE, fromSequences, parseHeadings } from '../../org'; // the test may use the core (the boundary is for the plugin's code)
 import {
-  GOALS_WORKFLOW, addSourceHeading, avatarColor, defaultQuarter, goalNote, initials, insertGoal, isSilent, parseQuarter, quarterSub,
-  readGoals, readSource, resultLine, sourcesJson, shiftQuarter, sourceSummary, withGoals, deadlineSoon, reviewQueue, markLines, markDayLabel, dayLabel, addMark, moveGoal,
-  readGoalSettings, withGoalSettings, reportText, finalMark, lastMarks, carryOver, quarterLabel,
+  GOALS_WORKFLOW, avatarColor, defaultQuarter, goalNote, initials, isSilent, parseQuarter, quarterSub,
+  readGoals, readSource, resultLine, sourcesJson, shiftQuarter, sourceSummary, withGoals, deadlineSoon, reviewQueue, markLines, markDayLabel, dayLabel,
+  readGoalSettings, withGoalSettings, reportText,
 } from './goals';
 
 const WF = fromSequences([DEFAULT_SEQUENCE, GOALS_WORKFLOW as never], 0, 'project');
@@ -125,53 +125,7 @@ describe('how a goal stands', () => {
   });
 });
 
-describe('writing a goal', () => {
-  const g = { title: 'Наставничество  для  двух мидлов', plan: 'Встречи раз в две недели.\n\n- план развития;\n* звёздочка в начале', result: '- оба с планом', deadline: new Date(2026, 11, 31), status: 'ACTIVE' };
-  it('at the end of its quarter, with DEADLINE, :CREATED: and the three fields; a star line is escaped', () => {
-    const r = insertGoal(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, g, RU, NOW)!;
-    const lines = r.text.split('\n');
-    expect(lines[r.line]).toBe('*** ACTIVE Наставничество для двух мидлов');
-    expect(lines.slice(r.line, r.line + 13)).toEqual([
-      '*** ACTIVE Наставничество для двух мидлов',
-      'DEADLINE: <2026-12-31 Чт>',
-      ':PROPERTIES:',
-      ':CREATED: [2026-10-12 Пн 00:00]',
-      ':END:',
-      '**** Что буду делать',
-      'Встречи раз в две недели.',
-      '',
-      '- план развития;',
-      ',* звёздочка в начале',
-      '**** Ожидаемый результат',
-      '- оба с планом',
-      '**** Отметки',
-    ]);
-    expect(lines[r.line - 1]).toBe('    CLOSED: [2026-10-08 Чт 10:00]'); // right after the last goal of Q4
-    expect(lines[r.line + 13]).toBe('** Заметки');
-    // read back
-    const back = readSource(r.text, hs(r.text), 'Квартальные задачи').quarters[0].goals.at(-1)!;
-    expect([back.title, back.plan, back.result, back.marks]).toEqual(['Наставничество для двух мидлов', g.plan.replace(',*', '*'), g.result, []]);
-  });
-  it('a new quarter in its place: the newest first, an older one after the others', () => {
-    const r1 = insertGoal(FILE, hs(FILE), 'Квартальные задачи', { y: 2027, q: 1 }, g, RU, NOW)!;
-    const l1 = r1.text.split('\n');
-    expect(l1[r1.line - 1]).toBe('** Квартал Q1 2027');
-    expect(l1[r1.line - 2]).toBe('* Квартальные задачи');
-    const r2 = insertGoal(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 2 }, g, RU, NOW)!;
-    const l2 = r2.text.split('\n');
-    expect(l2[r2.line - 1]).toBe('** Квартал Q2 2026');
-    expect(l2[r2.line - 2]).toBe('*** ACTIVE Старое');
-  });
-  it('no source heading: nothing; «Создать „Квартальные задачи“» adds it at the end', () => {
-    expect(insertGoal('* A\n', hs('* A\n'), 'Квартальные задачи', { y: 2026, q: 4 }, g, RU, NOW)).toBeNull();
-    const t = addSourceHeading('* A\n');
-    expect(t).toBe('* A\n\n* Квартальные задачи\n');
-    const r = insertGoal(t, hs(t), 'Квартальные задачи', { y: 2026, q: 4 }, g, RU, NOW)!;
-    expect(r.text.startsWith('* A\n\n* Квартальные задачи\n** Квартал Q4 2026\n*** ACTIVE')).toBe(true);
-  });
-});
-
-describe('the review: queue, marks, another quarter', () => {
+describe('the review: queue, marks', () => {
   const s = readSource(FILE, hs(FILE), 'Квартальные задачи');
   it('open goals only, the silent first, then by deadline', () => {
     const q = reviewQueue(s.quarters[0].goals, ['COMPLETED'], NOW);
@@ -185,33 +139,6 @@ describe('the review: queue, marks, another quarter', () => {
     ]);
     expect(markDayLabel(new Date(2026, 9, 12), NOW)).toBe('Сегодня, Пн 12 окт');
     expect(dayLabel(new Date(2026, 8, 22))).toBe('Вт, 22 сен');
-  });
-  it('added at the end of «Отметки», with its indent; a past day goes to its place', () => {
-    const t = addMark(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Сократить время сборки CI до 10 минут', new Date(2026, 9, 12), 'Кэш включили.', RU)!;
-    expect(t).toContain('       - кэш Docker даст ещё 3–4 мин.\n     - [2026-10-12 Пн] Кэш включили.\n*** BACKLOG Наставничество');
-    const p = addMark(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Сократить время сборки CI до 10 минут', new Date(2026, 8, 20), 'Между.', RU)!;
-    expect(p).toContain('Поставили цель на 1-1.\n     - [2026-09-20 Вс] Между.\n     - [2026-09-22 Вт] Замерили');
-    const back = readSource(p, hs(p), 'Квартальные задачи').quarters[0].goals[0].marks.map((m) => m.text.split('\n')[0]);
-    expect(back).toEqual(['Поставили цель на 1-1.', 'Между.', 'Замерили: p90 = 23 мин.']);
-  });
-  it('no «Отметки» under the goal: made at its end', () => {
-    const t = addMark(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Наставничество', new Date(2026, 9, 12), 'Первая.', RU)!;
-    expect(t).toContain('*** BACKLOG Наставничество\n**** Отметки\n- [2026-10-12 Пн] Первая.\n*** COMPLETED Дизайн-система');
-    expect(addMark(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Нет такой', new Date(), 'x', RU)).toBeNull();
-  });
-  it('another quarter: the goal moves under it, the quarter made in its place', () => {
-    const r = moveGoal(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Наставничество', { y: 2027, q: 1 }, hs)!;
-    const lines = r.text.split('\n');
-    expect(lines[r.line]).toBe('*** BACKLOG Наставничество');
-    expect(lines[r.line - 1]).toBe('** Квартал Q1 2027');
-    const src = readSource(r.text, hs(r.text), 'Квартальные задачи');
-    expect(src.quarters.map((x) => [x.q.q, x.goals.map((g) => g.title)])).toEqual([
-      [1, ['Наставничество']],
-      [4, ['Сократить время сборки CI до 10 минут', 'Дизайн-система']],
-      [3, ['Старое']],
-    ]);
-    const r2 = moveGoal(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Наставничество', { y: 2026, q: 3 }, hs)!;
-    expect(readSource(r2.text, hs(r2.text), 'Квартальные задачи').quarters[1].goals.map((g) => g.title)).toEqual(['Старое', 'Наставничество']);
   });
 });
 
@@ -238,27 +165,6 @@ describe('part 3: settings, report, carry-over', () => {
     const md = reportText(people, { y: 2026, q: 4 }, 'md');
     expect(md.startsWith('# Цели Q4 2026\n\n## Петров Алексей\n\n### Сократить время сборки CI до 10 минут\n**Что делал:** \nСейчас')).toBe(true);
     expect(md).toContain('**Срок:** 30 ноября 2026\n**Статус:** В работе');
-  });
-  it('the final mark and the last three', () => {
-    const t = addMark(FILE, hs(FILE), 'Квартальные задачи', { y: 2026, q: 4 }, 'Сократить время сборки CI до 10 минут', new Date(2026, 9, 12), 'Итог: p90 = 9 мин.', RU)!;
-    const ci = readSource(t, hs(t), 'Квартальные задачи').quarters[0].goals[0];
-    expect(finalMark(ci)?.text).toBe('Итог: p90 = 9 мин.');
-    expect(lastMarks(ci).map((m) => m.text.split('\n')[0])).toEqual(['Замерили: p90 = 23 мин.', 'Поставили цель на 1-1.']);
-  });
-  it('carry-over: under the next quarter, a deadline of the old one becomes the end of the new, a mark', () => {
-    const r = carryOver(FILE, 'Квартальные задачи', { y: 2026, q: 4 }, { y: 2027, q: 1 }, ['Сократить время сборки CI до 10 минут', 'Наставничество', 'Нет такой'], RU, hs, NOW);
-    expect(r.moved).toEqual(['Сократить время сборки CI до 10 минут', 'Наставничество']);
-    const src = readSource(r.text, hs(r.text), 'Квартальные задачи');
-    expect(src.quarters.map((x) => [quarterLabel(x.q), x.goals.map((g) => g.title)])).toEqual([
-      ['Q1 2027', ['Сократить время сборки CI до 10 минут', 'Наставничество']],
-      ['Q4 2026', ['Дизайн-система']],
-      ['Q3 2026', ['Старое']],
-    ]);
-    const [ci, mentor] = src.quarters[0].goals;
-    expect(ci.deadline).toEqual(new Date(2027, 2, 31));
-    expect(r.text).toContain('    DEADLINE: <2027-03-31 Ср>');
-    expect(ci.marks.at(-1)!.text).toBe('Перенесена из Q4 2026');
-    expect(mentor.marks.map((m) => m.text)).toEqual(['Перенесена из Q4 2026']);
   });
 });
 

@@ -1,17 +1,18 @@
 // The goals of the quarter (ТЗ 23) as the plugin «quarter-goals» (ТЗ 27): the sources, the views' data, the goal
 // form, the 1-1 review, the report and the carry-over — on the public API only. The files are read through `core`
-// (core.svelte.ts); every change of a file is a transaction of the plugin's own function (`tx.update`), one step of ⌘Z.
+// (core.svelte.ts); every change of a file is a transaction of Org-level operations (ops.ts, ТЗ 30), one step of ⌘Z.
 
 import { mount, unmount, type Component } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
-import type { Ctx, HeadingRef } from '@panopticon/api';
-import { parseHeadings, setKeyword, setPlanning, weekdayNames, workflow, type Heading } from '@panopticon/api/org';
+import type { Ctx, HeadingRef, Tx } from '@panopticon/api';
+import { weekdayNames } from '@panopticon/api/org';
 import { core, type PFile } from './core.svelte';
 import {
-  readGoals, readGoalSettings, sourcesJson, addSourceHeading, avatarColor, initials, insertGoal, quarterOf, readSource, sourceKey, addMark,
-  shiftQuarter, goalsIn, moveGoal, reviewQueue as goalQueue, shortDay, GOAL_STATES, quarterLabel, carryOver, isSilent, deadlineSoon,
+  readGoals, readGoalSettings, sourcesJson, avatarColor, initials, quarterOf, readSource, sourceKey, findSource, cmpQuarter,
+  shiftQuarter, goalsIn, reviewQueue as goalQueue, shortDay, GOAL_STATES, quarterLabel, isSilent, deadlineSoon,
   isDone, type GoalSettings, type Goal, type GoalSource, type NewGoal, type Quarter, type SourceGoals,
 } from './goals';
+import { addGoal, addMark, carryOver, moveGoal } from './ops';
 
 /** A source of goals as the views use it. */
 export interface GoalPerson {
@@ -119,20 +120,28 @@ class Goals {
     return (name && this.goalPeople.find((p) => p.src.file === name)?.key) || null;
   }
 
-  // ---- writing: the plugin's function on the file's text now, one step of ⌘Z ----------------------------------------
-  private async write(label: string, path: string, make: (text: string, hs: Heading[], names: string[]) => string | null, onUndo?: () => void): Promise<boolean> {
+  // ---- writing: Org-level operations (ops.ts), one step of ⌘Z --------------------------------------------------------
+  /** A transaction on a file; `build` gives false when there is nothing to do. */
+  private async write(label: string, path: string, build: (tx: Tx, names: string[]) => boolean | void, onUndo?: () => void): Promise<boolean> {
     const f = core.files.find((x) => x.path === path);
     if (!f) return false;
-    const wf = workflow(f.wf);
-    const r = await this.ctx.edit!.transaction(label, (tx) => tx.update(path, (t) => make(t, parseHeadings(t, wf), weekdayNames(t))), onUndo ? { onUndo } : undefined);
-    if (r === 'ok') await core.refresh(path); // the views follow at once
-    return r === 'ok';
+    const names = weekdayNames(f.text);
+    let none = false;
+    const r = await this.ctx.edit!.transaction(label, (tx) => void (none = build(tx, names) === false), onUndo ? { onUndo } : undefined);
+    if (r === 'ok' && !none) await core.refresh(path); // the views follow at once
+    return r === 'ok' && !none;
+  }
+  /** The source heading of a person (by its title, as the file has it now). */
+  private srcRef(p: GoalPerson): HeadingRef | null {
+    const f = p.file;
+    const i = f ? findSource(f.headings, p.src.heading) : -1;
+    return f && i >= 0 ? { path: f.path, line: f.headings[i].line, title: f.headings[i].title } : null;
   }
 
   // ---- the sources ------------------------------------------------------------------------------------------------
   /** «Добавить цели»: a source (made in the file first if asked); «мои» moves to it; `replace`: «Сменить заголовок…». */
   async addGoalSource(src: GoalSource, opts: { create?: boolean; replace?: string } = {}): Promise<boolean> {
-    if (opts.create && !(await this.write(`Заголовок «${src.heading}»`, src.file, (t) => addSourceHeading(t, src.heading)))) return false;
+    if (opts.create && !(await this.write(`Заголовок «${src.heading}»`, src.file, (tx) => void tx.insertHeading({ file: src.file, position: 'end' }, `* ${src.heading}`)))) return false;
     const list = this.goalSources
       .filter((x) => sourceKey(x) !== sourceKey(src) && sourceKey(x) !== opts.replace)
       .map((x) => (src.me ? { ...x, me: undefined } : x));
@@ -153,10 +162,12 @@ class Goals {
     const p = this.goalPeople.find((x) => x.key === key);
     if (!p?.file || !g.title.trim()) return false;
     let line = 0;
-    const ok = await this.write(`Новая цель: ${g.title.trim()}`, p.file.path, (t, hs, names) => {
-      const r = insertGoal(t, hs, p.src.heading, q, g, names);
+    const src = this.srcRef(p);
+    if (!src) return false;
+    const ok = await this.write(`Новая цель: ${g.title.trim()}`, p.file.path, (tx, names) => {
+      const r = addGoal(tx, src, q, g, names);
       if (r) line = r.line;
-      return r?.text ?? null;
+      return !!r;
     });
     if (!ok) return false;
     const path = p.file.path;
@@ -170,16 +181,12 @@ class Goals {
     let n = 0;
     const jobs = [...chosen].flatMap(([key, titles]) => {
       const p = this.goalPeople.find((x) => x.key === key);
-      return p?.file && titles.length ? [{ p, titles, wf: workflow(p.file.wf) }] : [];
+      const src = p && this.srcRef(p);
+      return p?.file && src && titles.length ? [{ p, src, titles, names: weekdayNames(p.file.text) }] : [];
     });
     if (!jobs.length) return 0;
     const r = await this.ctx.edit!.transaction(`Перенос целей в ${quarterLabel(to)}`, (tx) => {
-      for (const j of jobs)
-        tx.update(j.p.file!.path, (t) => {
-          const res = carryOver(t, j.p.src.heading, from, to, j.titles, weekdayNames(t), (x) => parseHeadings(x, j.wf));
-          n += res.moved.length;
-          return res.moved.length ? res.text : null;
-        });
+      for (const j of jobs) n += carryOver(tx, j.src, from, to, j.titles, j.names).length;
     });
     if (r !== 'ok') return 0;
     await Promise.all(jobs.map((j) => core.refresh(j.p.file!.path)));
@@ -231,11 +238,14 @@ class Goals {
         if (g.title === ref.title && (!best || Math.abs(g.line - ref.line) < Math.abs(best.goal.line - ref.line))) best = { q: x.q, goal: g };
     return { p, goal: best?.goal ?? null, q: best?.q ?? null, file: p.file };
   }
-  /** Write a step of the review to the person's file; `onUndo` puts the review's counters back. */
-  async reviewWrite(ref: HeadingRef, label: string, make: (text: string, hs: Heading[], names: string[], c: NonNullable<ReturnType<Goals['cardOf']>>) => string | null, onUndo?: () => void) {
+  /** Write a step of the review to the person's file, on the card's goal; `onUndo` puts the review's counters back. */
+  async reviewWrite(ref: HeadingRef, label: string, build: (tx: Tx, goal: HeadingRef, names: string[], c: NonNullable<ReturnType<Goals['cardOf']>>) => boolean | void, onUndo?: () => void) {
     const c = this.cardOf(ref);
     if (!c?.goal) return false;
-    return this.write(`${label}: ${c.goal.title}`, c.file.path, (t, hs, names) => make(t, hs, names, c), onUndo);
+    const h = c.file.headings.find((x) => x.line === c.goal!.line);
+    if (!h) return false;
+    const goal = { path: c.file.path, line: h.line, title: h.title };
+    return this.write(`${label}: ${c.goal.title}`, c.file.path, (tx, names) => build(tx, goal, names, c), onUndo);
   }
   /** «Добавить отметку»: the text of the field under the chosen day (today by default), in date order. */
   async goalAddMark(ref: HeadingRef): Promise<boolean> {
@@ -243,7 +253,7 @@ class Goals {
     if (!r || !r.draft.trim()) return false;
     const date = r.date ?? new Date();
     const text = r.draft;
-    const ok = await this.reviewWrite(ref, 'Отметка', (t, hs, names, c) => addMark(t, hs, c.p.src.heading, c.q!, c.goal!.title, date, text, names), () => {
+    const ok = await this.reviewWrite(ref, 'Отметка', (tx, goal, names) => addMark(tx, goal, date, text, names), () => {
       if (this.goalReview === r) r.marks = Math.max(0, r.marks - 1);
     });
     if (ok) {
@@ -260,12 +270,7 @@ class Goals {
     if (!r || !c?.goal) return false;
     const done = c.file.wf.done.includes(GOAL_STATES.done) ? GOAL_STATES.done : c.file.wf.done[0];
     if (!done || c.goal.keyword === done) return false;
-    const line = c.goal.line;
-    const wf = workflow(c.file.wf);
-    const ok = await this.reviewWrite(ref, 'Цель достигнута', (t, hs) => {
-      const h = hs.find((x) => x.line === line);
-      return h ? setKeyword(t, h, done, wf) : null;
-    }, () => {
+    const ok = await this.reviewWrite(ref, 'Цель достигнута', (tx, goal) => void tx.setStatus(goal, done), () => {
       if (this.goalReview === r) r.closed = Math.max(0, r.closed - 1);
     });
     if (ok) {
@@ -280,14 +285,10 @@ class Goals {
     const c = this.cardOf(ref);
     if (!r || !c?.goal) return false;
     const from = c.goal.deadline;
-    const line = c.goal.line;
     const mark = from ? `Срок перенесён: ${shortDay(from)} → ${shortDay(to)}` : `Срок: ${shortDay(to)}`;
-    const wf = workflow(c.file.wf);
-    const ok = await this.reviewWrite(ref, 'Срок перенесён', (t, hs, names, cc) => {
-      const h = hs.find((x) => x.line === line);
-      if (!h) return null;
-      const t1 = setPlanning(t, h, 'DEADLINE', to);
-      return addMark(t1, parseHeadings(t1, wf), cc.p.src.heading, cc.q!, cc.goal!.title, new Date(), mark, names);
+    const ok = await this.reviewWrite(ref, 'Срок перенесён', (tx, goal, names) => {
+      tx.setPlanning(goal, 'DEADLINE', to);
+      return addMark(tx, goal, new Date(), mark, names);
     }, () => {
       if (this.goalReview === r) r.moved = Math.max(0, r.moved - 1);
     });
@@ -298,9 +299,9 @@ class Goals {
   async goalMoveQuarter(ref: HeadingRef, to: Quarter): Promise<boolean> {
     const c = this.cardOf(ref);
     if (!c?.goal || !c.q) return false;
-    const wf = workflow(c.file.wf);
-    const from = c.q;
-    return this.reviewWrite(ref, 'Квартал', (t, hs, _n, cc) => moveGoal(t, hs, cc.p.src.heading, from, cc.goal!.title, to, (x) => parseHeadings(x, wf))?.text ?? null);
+    if (cmpQuarter(c.q, to) === 0) return false;
+    const src = this.srcRef(c.p);
+    return !!src && this.reviewWrite(ref, 'Квартал', (tx, goal) => moveGoal(tx, src, goal, to));
   }
 }
 
