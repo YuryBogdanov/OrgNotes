@@ -15,6 +15,7 @@ import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agen
 import { cachedTheme, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
 import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
 import { navOf, viewOf } from './views';
+import { mini as miniSettings } from './miniOptions.svelte';
 import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow, type WorkflowDef } from './org';
@@ -822,14 +823,19 @@ class Store {
       return String(e);
     }
   }
-  /** The mini window's system-wide shortcut (ТЗ 31; ⌃⌥⌘M: ⌃⌥Space switches the input source on macOS). Fixed in the
-   *  prototype; «Клавиши» take it in PR B. */
+  /** The mini window's system-wide shortcut (ТЗ 31; ⌃⌥⌘M: ⌃⌥Space switches the input source on macOS), as set in
+   *  «Клавиши»: registered again when it changes; one taken by another program is said. */
+  private miniKeyNow: string | null = null;
   async applyMiniKey(): Promise<string | null> {
     if (!isTauri) return null;
+    const accelerator = toAccelerator(this.bindings.get('miniShow')?.[0] ?? '') ?? '';
+    if (accelerator === this.miniKeyNow) return null;
+    this.miniKeyNow = accelerator;
     try {
-      await invoke('set_mini_shortcut', { accelerator: 'Control+Alt+CmdOrCtrl+KeyM' });
+      await invoke('set_mini_shortcut', { accelerator });
       return null;
     } catch (e) {
+      this.say('Сочетание мини-окна занято другой программой: ' + e);
       return String(e);
     }
   }
@@ -1345,7 +1351,7 @@ class Store {
     lsSet('mini:note', JSON.stringify(n));
   }
   /** ⇧⌘M: the heading the caret is in (the file whole above the first one, or as set), in the mini window. */
-  openInMini(whole = lsGet('mini:what') === 'file') {
+  openInMini(whole = miniSettings.cfg.what === 'file') {
     const t = this.tab;
     const f = this.file;
     let note: MiniNote | null = null;
@@ -1384,7 +1390,13 @@ class Store {
       this.pickInbox = Date.now();
     });
     void this.applyCaptureKey();
-    void this.applyMiniKey();
+    // and again when «Клавиши» change it
+    $effect.root(() => {
+      $effect(() => {
+        void this.applyMiniKey();
+      });
+    });
+    void miniSettings.apply(); // the panel's settings, kept by Rust until it is made
     await this.serveMini();
     await listen('quit-requested', () => this.quit()); // «Завершить» from the Dock
   }

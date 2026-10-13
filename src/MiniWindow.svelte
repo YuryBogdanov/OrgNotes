@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import Editor from './Editor.svelte';
   import MiniPalette from './MiniPalette.svelte';
+  import FindBar from './FindBar.svelte';
   import { store, type MiniNote } from './store.svelte';
   import { keyHandler } from './keyDispatch';
   import { pressOf } from './keys';
@@ -72,7 +73,25 @@
 
   // ---- the palette, the hint ---------------------------------------------------------------------------------
   let palette = $state(false);
-  $effect(() => void call('mini_pin', { on: palette })); // full while it is open
+
+  // ---- ⌘F: the search in what the window shows (as a pane's, ТЗ 21) -------------------------------------------
+  let fb = $state({ open: false, q: '', go: 0, dir: 1 as 1 | -1, focusN: 0 });
+  let hits = $state<{ total: number; cur: number; folded: number; wrapped: boolean } | null>(null);
+  const findProp = $derived(fb.q ? { q: fb.q, cs: store.findCase, word: store.findWord, show: fb.open, at: null, go: fb.go, dir: fb.dir } : null);
+  function findStep(dir: 1 | -1) {
+    if (!fb.q) return openFind();
+    fb.dir = dir;
+    fb.go++;
+  }
+  function openFind() {
+    fb.open = true;
+    fb.focusN++;
+  }
+  function closeFind() {
+    fb.open = false;
+    (document.querySelector('.mini .cm-content') as HTMLElement | null)?.focus();
+  }
+  $effect(() => void call('mini_pin', { on: palette || fb.open })); // full while one is open
   let hint = $state('');
   let hintT: ReturnType<typeof setTimeout> | undefined;
   function say(text: string) {
@@ -89,8 +108,11 @@
   /** The commands of the window here: ⌘P the palette, ⌘W hides it, ⌘S is the main window's (it writes); the rest
    *  needs the big window. The editor's commands run in the editor as in the main window. */
   function runWindow(id: string): boolean {
-    if (id === 'goto' || id === 'palette') return (palette = true), true;
-    if (id === 'closeTab' || id === 'closeWindow') return void call('mini_hide'), true;
+    if (id === 'goto') return (palette = true), true;
+    if (id === 'find') return openFind(), true;
+    if (id === 'findNext') return findStep(1), true;
+    if (id === 'findPrev') return findStep(-1), true;
+    if (id === 'closeWindow') return void call('mini_hide'), true;
     if (id === 'save' || id === 'saveAll') return true; // the main window writes at once
     say('Доступно в главном окне');
     return true;
@@ -113,22 +135,27 @@
     return true;
   }
   let last = 0;
+  /** The press is one of this command's (as set in «Клавиши», group «МИНИ-ОКНО»). */
+  const is = (id: string, press: string | null) => !!press && (store.bindings.get(id) ?? []).includes(press);
   function keys(e: KeyboardEvent) {
-    if (e.key === 'Escape' && !e.defaultPrevented) {
-      if (palette) palette = false;
-      else if (hint) hint = '';
-      else void call('mini_return_focus'); // the keys back to the program before; the window stays and fades
-      e.preventDefault();
-      return;
-    }
-    // ⌘P: the mini window's palette, whatever the set of keys gives it in the main window
     const press = pressOf(e);
-    if (press === '⌘P' || rootNew(e)) {
-      if (press === '⌘P') palette = true;
+    const stop = () => {
       e.preventDefault();
       e.stopImmediatePropagation(); // the window's handler is a listener of the window too
-      return;
+    };
+    // ⎋ (or as set): what is open closes first; then the keys go back to the program before (the window stays, fades)
+    if (e.key === 'Escape' || is('miniBack', press)) {
+      if (palette) palette = false;
+      else if (fb.open) closeFind();
+      else if (hint) hint = '';
+      else if (is('miniBack', press)) void call('mini_return_focus');
+      else return;
+      return stop();
     }
+    if (palette) return; // its own keys
+    if (is('miniPalette', press)) return (palette = true), stop();
+    if (is('miniHide', press)) return void call('mini_hide'), stop();
+    if (rootNew(e)) return stop();
     // full while typed in: a key now and then is enough (the pause is counted natively)
     const now = Date.now();
     if (now - last > 250) {
@@ -186,6 +213,9 @@
     </button>
   </header>
   <div class="body">
+    {#if fb.open}
+      <FindBar bind:q={() => fb.q, (v) => (fb.q = v)} info={hits} focusN={fb.focusN} onnext={() => findStep(1)} onprev={() => findStep(-1)} onclose={closeFind} />
+    {/if}
     {#if shown && note && (note.whole || found)}
       {#key gen}
         <Editor text={shown.text} fileKey={'mini|' + gen + '|' + shown.path} wf={shown.wf} {reveal} gutter={false} levels={store.levels}
@@ -200,6 +230,7 @@
           }}
           oncursor={(l) => (caret = l)}
           onnarrow={(line) => (rootLine = line)}
+          find={findProp} onfound={(i) => (hits = i)}
           onfollow={() => say('Доступно в главном окне')} />
       {/key}
     {:else if gone}

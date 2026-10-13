@@ -47,3 +47,30 @@ test('the main window answers the mini window: all the files, then each change; 
   await page.keyboard.type('!');
   await expect.poll(async () => (await log(page)).filter((x) => x[0] === 'emit' && x[2] === 'mini-file').map((x) => (x[3] as { text: string }).text).at(-1)).toContain('* Другое!');
 });
+
+test('«Настройки → Мини-окно»: applied at once to the panel; «Что открывать»; its keys shown, changed in «Клавиши»', async ({ page }) => {
+  await open(page);
+  await page.keyboard.press('Meta+,');
+  const s = page.getByRole('dialog', { name: 'Настройки' });
+  const tabs = await s.getByRole('tab').allInnerTexts();
+  expect(tabs.indexOf('Мини-окно')).toBe(tabs.indexOf('Файлы') + 1); // between «Файлы» and «Клавиши»
+  expect(tabs.indexOf('Клавиши')).toBe(tabs.indexOf('Мини-окно') + 1);
+  await s.getByRole('tab', { name: 'Мини-окно' }).click();
+  await s.getByLabel('Прозрачность').selectOption({ label: '50 %' });
+  await expect.poll(async () => (await log(page)).filter((e) => e[0] === 'mini_options').at(-1)?.[1]).toMatchObject({ opacity: 0.5, linger: 3, smooth: true, fullscreen: true, hideFromCapture: true, remember: true });
+  await s.getByRole('switch', { name: 'Скрывать от демонстрации и записи экрана' }).click();
+  await expect.poll(async () => (await log(page)).filter((e) => e[0] === 'mini_options').at(-1)?.[1]).toMatchObject({ hideFromCapture: false });
+  await s.getByRole('radio', { name: 'Весь файл' }).click();
+  await expect(s.getByRole('button', { name: /Показать мини-окно и писать/ })).toContainText('⌃⌥⌘M');
+  // its global key from «Клавиши»: registered again when changed
+  await s.getByRole('tab', { name: 'Клавиши' }).click();
+  const row = page.locator('[data-cmd="miniShow"]');
+  await row.getByRole('button', { name: /Изменить сочетание/ }).click();
+  await page.keyboard.press('Control+Alt+Meta+j');
+  await expect.poll(async () => (await log(page)).filter((e) => e[0] === 'set_mini_shortcut').at(-1)?.[1]).toEqual({ accelerator: 'Control+Alt+CmdOrCtrl+KeyJ' });
+  await s.getByRole('button', { name: 'Готово' }).click();
+  // «Весь файл»: ⇧⌘M opens the file whole
+  await page.locator('.cm-line', { hasText: 'миграция' }).click();
+  await page.keyboard.press('Shift+Meta+m');
+  await expect.poll(async () => (await log(page)).filter((e) => e[0] === 'mini_open').at(-1)?.[1]).toEqual({ note: { path: 'Work.org', line: 1, title: '', whole: true } });
+});
