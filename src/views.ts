@@ -111,3 +111,24 @@ export function registerKindAlias(from: string, to: string) {
   kindAliases.set(from, to);
 }
 export const kindAlias = (kind: string) => (kindAliases.has(kind) ? kindAliases.get(kind)! : kind);
+
+/** A view of a file (ТЗ 33): a file tab shown otherwise than as text («Доска»); a plugin's, by its manifest. */
+export interface FileViewSpec {
+  id: string;
+  /** «Доска»: in «Показать как ›». */
+  title: string;
+  icon: string;
+  /** The command that switches to it and back (its key is shown in the menu). */
+  key?: string;
+  /** What the pane shows for the file; given { id, path, tab }. */
+  component: Component<any>;
+  /** A file opened the first time is shown so («#+BOARD» in it). */
+  defaultFor?(f: { name: string; text: string }): boolean;
+}
+const fileViews = new SvelteMap<string, FileViewSpec>();
+export function registerFileView(v: FileViewSpec) {
+  fileViews.set(v.id, v);
+  return () => void (fileViews.get(v.id) === v && fileViews.delete(v.id));
+}
+export const fileViewOf = (id: string | undefined) => (id ? fileViews.get(id) : undefined);
+export const allFileViews = () => [...fileViews.values()];

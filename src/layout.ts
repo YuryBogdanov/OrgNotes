@@ -23,6 +23,7 @@ export interface Tab {
   agenda?: string; // agenda tabs: the id of a custom agenda («Мои агенды»); none = the built-in one
   data?: any; // a feature's tab: its state (JSON), kept after a restart
   label?: string; // a tab of a kind nobody registers: the name it had
+  view?: string; // a file tab: how it is shown — '' text, else a view of a plugin («Доска», ТЗ 33); unset: as the file was last
 }
 export interface Pane {
   id: string;
@@ -46,7 +47,7 @@ const reveal = (line: number, focus = false) => ({ line, n: ++revealSeq, focus }
 export function newTab(kind: TabKind, path?: string, line = 0, focus = false): Tab {
   return { id: uid('t'), kind, path, cursor: { line, col: 0 }, reveal: kind === 'file' ? reveal(line, focus) : null, fromAgenda: null };
 }
-export const copyTab = (t: Tab): Tab => ({ ...newTab(t.kind, t.path, t.cursor.line), cursor: { ...t.cursor }, reveal: t.kind === 'file' ? reveal(t.cursor.line) : null, agenda: t.agenda, data: t.data === undefined ? undefined : JSON.parse(JSON.stringify(t.data)), label: t.label });
+export const copyTab = (t: Tab): Tab => ({ ...newTab(t.kind, t.path, t.cursor.line), cursor: { ...t.cursor }, ...(t.view !== undefined ? { view: t.view } : {}), reveal: t.kind === 'file' ? reveal(t.cursor.line) : null, agenda: t.agenda, data: t.data === undefined ? undefined : JSON.parse(JSON.stringify(t.data)), label: t.label });
 const newPane = (tabs: Tab[]): Pane => ({ id: uid('p'), tabs, active: 0 });
 
 export const emptyLayout = (first?: Tab): Layout => ({ panes: [newPane(first ? [first] : [])], active: 0, ratio: 0.5 });
@@ -370,7 +371,7 @@ export function serialize(L: Layout): string {
         active: Math.max(0, tabs.indexOf(act)),
         tabs: tabs.map((t) => {
           const label = core(t.kind) ? undefined : (viewOf(t.kind)?.label(t) ?? t.label);
-          return { kind: t.kind, path: t.path, cursor: t.cursor, ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.data !== undefined ? { data: t.data } : {}), ...(label ? { label } : {}) };
+          return { kind: t.kind, path: t.path, cursor: t.cursor, ...(t.view !== undefined ? { view: t.view } : {}), ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.data !== undefined ? { data: t.data } : {}), ...(label ? { label } : {}) };
         }),
       };
     }),
@@ -400,6 +401,7 @@ export function restore(raw: string | null, exists: (path: string) => boolean): 
           const t = newTab('file', st.path, st.cursor?.line ?? 0);
           t.cursor = { line: st.cursor?.line ?? 0, col: st.cursor?.col ?? 0 };
           t.reveal = null; // the editor restores the caret, column included
+          if (typeof st.view === 'string') t.view = st.view;
           tabs.push(t);
         } else return;
         if (i === sp.active) active = tabs.length - 1;

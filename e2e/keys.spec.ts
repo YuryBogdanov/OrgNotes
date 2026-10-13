@@ -30,7 +30,7 @@ test.describe('the list', () => {
   test('every command by groups, with its shortcuts; the review row tells what ⌘1 does elsewhere', async ({ page }) => {
     await open(page);
     await keysSheet(page);
-    await expect(sheet(page).locator('.gt')).toHaveText(['ГЛОБАЛЬНЫЕ', 'ПРИЛОЖЕНИЕ И ОКНО', 'ФАЙЛ И ВКЛАДКИ', 'ПОИСК', 'ВИД И ПАНЕЛИ', 'ПЕРЕХОДЫ', 'ЗАГОЛОВКИ И ЗАДАЧИ', 'БЫСТРЫЙ ВВОД', 'МИНИ-ОКНО', 'СЕГОДНЯ', 'КАЛЕНДАРЬ', 'ЦЕЛИ КВАРТАЛА', 'INBOX']); // the plugins' groups: their names, in the order of the plugins
+    await expect(sheet(page).locator('.gt')).toHaveText(['ГЛОБАЛЬНЫЕ', 'ПРИЛОЖЕНИЕ И ОКНО', 'ФАЙЛ И ВКЛАДКИ', 'ПОИСК', 'ВИД И ПАНЕЛИ', 'ПЕРЕХОДЫ', 'ЗАГОЛОВКИ И ЗАДАЧИ', 'БЫСТРЫЙ ВВОД', 'МИНИ-ОКНО', 'СЕГОДНЯ', 'КАЛЕНДАРЬ', 'КАНБАН', 'ЦЕЛИ КВАРТАЛА', 'INBOX']); // the plugins' groups: their names, in the order of the plugins
     await expect(chips(page, 'capture')).toHaveText(['⇧⌘I']);
     await expect(chips(page, 'findNext')).toHaveText(['⌘G']);
     await expect(chips(page, 'searchPrev')).toHaveText(['⌥⇧⌘G']);
@@ -218,11 +218,11 @@ test('a changed shortcut shows in tooltips and the palette at once', async ({ pa
   await open(page);
   await keysSheet(page);
   await chips(page, 'back').click();
-  await page.keyboard.press('Meta+Alt+b');
+  await page.keyboard.press('Meta+Alt+u'); // ⌥⌘B is the board's (the plugin «Канбан»)
   await chips(page, 'paletteNewFile').click();
   await page.keyboard.press('Meta+Alt+n');
   await page.getByRole('button', { name: 'Готово' }).click();
-  await expect(page.locator('.toolbar').getByRole('button', { name: 'Назад (⌥⌘B)' })).toBeVisible();
+  await expect(page.locator('.toolbar').getByRole('button', { name: 'Назад (⌥⌘U)' })).toBeVisible();
   await page.keyboard.press('Shift+Meta+p');
   await expect(page.locator('.pal .row').filter({ hasText: 'Создать файл…' }).locator('.key')).toHaveText('⌥⌘N');
 });

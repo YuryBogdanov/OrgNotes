@@ -1,0 +1,38 @@
+{
+  "id": "kanban",
+  "name": "Канбан",
+  "version": "1.0.0",
+  "description": "Org-файл как канбан-доска: колонки — статусы одного workflow, карточки — заголовки 1-го уровня. Другой вид того же файла: формат Org не меняется.",
+  "author": "Panopticon",
+  "api": "^1.5",
+  "minAppVersion": "1.4.0",
+  "main": "main.js",
+  "permissions": ["index.read", "files.edit"],
+  "contributes": {
+    "commands": [
+      { "id": "kanban.toggle", "title": "Показать как доску / текст", "keys": ["⌥⌘B"], "synonyms": ["канбан", "доска", "текст"] },
+      { "id": "kanban.show", "title": "Показать как доску", "synonyms": ["канбан", "доска", "board"] }
+    ],
+    "fileViews": [
+      { "id": "kanban.board", "title": "Доска", "icon": "M3 4h4v12H3zM8.5 4h4v8h-4zM14 4h3v5h-3z", "key": "kanban.toggle" }
+    ],
+    "settings": [
+      {
+        "section": "Канбан",
+        "icon": "M3 4h4v12H3zM8.5 4h4v8h-4zM14 4h3v5h-3z",
+        "groups": [
+          {
+            "caption": "ЗАВЕРШЁННЫЕ",
+            "fields": [
+              { "key": "doneDays", "type": "choice", "look": "segments", "where": "local", "label": "Показывать завершённые за", "default": 14,
+                "options": [{ "value": 7, "label": "7 дней" }, { "value": 14, "label": "14 дней" }, { "value": 30, "label": "30 дней" }, { "value": 0, "label": "все" }],
+                "hint": "Старые — по «Ещё N старых ›» внизу колонки; карточки без CLOSED видны всегда" },
+              { "key": "collapseCancel", "type": "switch", "where": "local", "label": "Сворачивать колонки отмены", "default": true,
+                "hint": "Все завершающие колонки, кроме первой" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

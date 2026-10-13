@@ -14,7 +14,7 @@ import { DEFAULT_INBOX, append, entry, prepend, readInbox, withInbox, type Inbox
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
 import { cachedTheme, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
 import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
-import { navOf, viewOf } from './views';
+import { allFileViews, fileViewOf, navOf, viewOf } from './views';
 import { mini as miniSettings } from './miniOptions.svelte';
 import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
@@ -972,6 +972,7 @@ class Store {
     const folders = await this.readFolders(files);
     // the panes and tabs of the last session; files that cannot be opened any more are skipped
     const exists = (p: string) => files.some((f) => f.path === p);
+    this.readViewMemory();
     const saved = restore(lsGet(this.layoutKey()), exists);
     const last = lsGet('lastFile:' + (this.dir ?? ''));
     const pick = files.find((f) => f.path === last) ?? files.find((f) => f.name === 'Weekly.org') ?? files[0];
@@ -1692,6 +1693,39 @@ class Store {
   }
 
   // ---- panes and tabs ---------------------------------------------------------------
+
+  // ---- views of a file (ТЗ 33): a file tab shown as a plugin's view («Доска») or as text ------------------------------
+  /** The view each file was shown in last (name → '' text, or a view's id), on this Mac per folder. */
+  private viewMemory = $state<Record<string, string>>({});
+  private viewKey() {
+    return 'fileView:' + (this.dir ?? '');
+  }
+  readViewMemory() {
+    try {
+      this.viewMemory = JSON.parse(lsGet(this.viewKey()) ?? '{}') ?? {};
+    } catch {
+      this.viewMemory = {};
+    }
+  }
+  /** How a file tab is shown now: '' text, else a view of a plugin that is on. The tab's own choice, else the file's
+   *  last one, else a view that wants the file (it has «#+BOARD»). */
+  viewOf(tab: Tab | undefined): string {
+    if (!tab || tab.kind !== 'file') return '';
+    const ok = (v: string | undefined) => (v && fileViewOf(v) ? v : '');
+    if (tab.view !== undefined) return ok(tab.view);
+    const f = this.fileOf(tab);
+    if (!f) return '';
+    if (f.name in this.viewMemory) return ok(this.viewMemory[f.name]);
+    return allFileViews().find((v) => v.defaultFor?.(f))?.id ?? '';
+  }
+  /** «Показать как ›»: the tab shows the file so; remembered for the file. */
+  showAs(tab: Tab, view: string) {
+    const f = this.fileOf(tab);
+    tab.view = view;
+    if (!f) return;
+    this.viewMemory = { ...this.viewMemory, [f.name]: view };
+    lsSet(this.viewKey(), JSON.stringify(this.viewMemory));
+  }
 
   private layoutKey() {
     return 'layout:' + (this.dir ?? '');

@@ -4,7 +4,8 @@
   import Editor from './Editor.svelte';
   import Agenda from './Agenda.svelte';
   import { plugins } from './api/host.svelte';
-  import { viewOf } from './views';
+  import { allFileViews, fileViewOf, viewOf } from './views';
+  import PluginFileView from './PluginFileView.svelte';
   import RichMenu from './RichMenu.svelte';
   import FindBar from './FindBar.svelte';
   import { setPlanning, weekdayNames } from './edits';
@@ -22,6 +23,14 @@
   const active = $derived(store.layout.active === pi);
   const two = $derived(store.layout.panes.length > 1);
   const file = $derived(store.fileOf(tab));
+  // a view of the file a plugin draws («Доска», ТЗ 33); '' — the text
+  const fview = $derived(tab?.kind === 'file' ? store.viewOf(tab) : '');
+  const fviewSpec = $derived(fileViewOf(fview));
+  // the file's name while its view is shown: kept through a reread of the files (the view is not drawn anew)
+  let fviewPath = $state('');
+  $effect(() => {
+    if (file) fviewPath = file.name;
+  });
   const crumbs = $derived.by(() => {
     if (!file || !tab) return [] as string[];
     const h = file.headings[headingAt(file.headings, tab.cursor.line)];
@@ -132,6 +141,17 @@
       { label: 'Продублировать в соседнем редакторе', shortcut: store.keyHint(to > pi ? 'dupRight' : 'dupLeft'), disabled: to < 0 || t.kind === 'untitled' || !!viewOf(t.kind)?.single || isPinned(t), action: () => store.duplicateTab(pi, idx(t)) },
     ];
     if (hasFile) {
+      // «Показать как ›»: the text and the views of the plugins (ТЗ 33)
+      const now = store.viewOf(t);
+      items.push('sep');
+      items.push({
+        label: 'Показать как', action: () => {},
+        sub: [
+          { label: 'Текст', checked: now === '', action: () => store.showAs(t, '') },
+          ...allFileViews().map((v) => ({ label: v.title, checked: now === v.id, shortcut: v.key ? store.keyHint(v.key) : undefined, action: () => store.showAs(t, v.id) })),
+          'sep', { note: 'Виды добавляют плагины' },
+        ],
+      });
       items.push('sep');
       items.push({ label: 'Показать в навигаторе', shortcut: store.keyHint('revealInNav'), action: () => store.revealInNavigator(t) });
       items.push({ label: 'Скопировать путь', shortcut: store.keyHint('copyPath'), action: () => store.copyPath(t) });
@@ -292,6 +312,8 @@
           <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2.5v3M13 2.5v3" /></svg>
         {:else if !core(t.kind)}
           <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={viewOf(t.kind)?.icon ?? OFF_ICON} /></svg>
+        {:else if t.kind === 'file' && fileViewOf(store.viewOf(t))}
+          <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-view={store.viewOf(t)}><path d={fileViewOf(store.viewOf(t))!.icon} /></svg>
         {:else}
           <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" /></svg>
         {/if}
@@ -337,6 +359,9 @@
         {/if}
       </div>
     {/if}
+  {:else if tab && fviewSpec && (file || fviewPath)}
+    <!-- one component, not the spec's: a spec registered anew (the plugins declared again) must not draw the view anew -->
+    <div class="content"><PluginFileView id={fview} path={file?.name ?? fviewPath} {tab} pane={pi} /></div>
   {:else if file && tab}
     <div class="crumbs" aria-label="Заголовок">
       {#each crumbs as c, i}
@@ -352,7 +377,7 @@
         onnext={() => step(1)} onprev={() => step(-1)} onclose={closeBar} />
     {/if}
     <div class="ed">
-      <Editor text={file.text} fileKey={tab.id + '|' + file.path} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} resetOn={store.diskGen[file.path] ?? 0} levels={store.levels} drawers={store.foldDrawers} rich={store.rich} richNumbers={store.richNumbers}
+      <Editor text={file.text} fileKey={tab.id + '|' + file.path} path={file.name} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} resetOn={store.diskGen[file.path] ?? 0} levels={store.levels} drawers={store.foldDrawers} rich={store.rich} richNumbers={store.richNumbers}
         onrich={(pick) => richChoice(pick, file.path)} find={findProp} onfound={(i) => (found = i)} onapi={(a) => (api = a)}
         onchange={(t) => store.setText(t, file.path)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>

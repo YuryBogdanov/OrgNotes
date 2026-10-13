@@ -4,12 +4,22 @@
         label: string; action: () => void; danger?: boolean; disabled?: boolean; shortcut?: string;
         // the tab list of a pane: a check at the active one, the tab's icon, a dot at an unsaved one
         checked?: boolean; icon?: string; dot?: boolean; italic?: boolean; // icon: 'file' | 'agenda' | 'untitled', or an SVG path (a feature's tab)
+        sub?: MenuItem[]; // a submenu, opened by hovering or a click («Показать как ›»)
       }
+    | { note: string } // a grey line, not a command («Виды добавляют плагины»)
     | 'sep';
 </script>
 
 <script lang="ts">
-  let { x, y, items, onclose }: { x: number; y: number; items: MenuItem[]; onclose: () => void } = $props();
+  import Self from './ContextMenu.svelte';
+
+  let { x, y, items, onclose, nested = false }: { x: number; y: number; items: MenuItem[]; onclose: () => void; nested?: boolean } = $props();
+  // the submenu open: its item's index and where it goes
+  let sub = $state<{ i: number; x: number; y: number } | null>(null);
+  function openSub(e: Event, i: number) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    sub = { i, x: r.right + 2, y: r.top - 5 };
+  }
 
   // keep the menu inside the window
   let el: HTMLDivElement | undefined = $state();
@@ -19,22 +29,28 @@
     return { left: Math.max(4, Math.min(x, window.innerWidth - w - 4)), top: Math.max(4, Math.min(y, window.innerHeight - h - 4)) };
   });
 
-  const checks = $derived(items.some((it) => it !== 'sep' && it.checked !== undefined));
+  const checks = $derived(items.some((it) => it !== 'sep' && !('note' in it) && it.checked !== undefined));
 
   function key(e: KeyboardEvent) {
     if (e.key === 'Escape') onclose();
   }
 </script>
 
-<svelte:window onkeydown={key} onblur={onclose} />
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="scrim" onmousedown={onclose} oncontextmenu={(e) => { e.preventDefault(); onclose(); }}></div>
+<svelte:window onkeydown={(e) => !nested && key(e)} onblur={() => !nested && onclose()} />
+{#if !nested}
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <div class="scrim" onmousedown={onclose} oncontextmenu={(e) => { e.preventDefault(); onclose(); }}></div>
+{/if}
 <div class="menu" role="menu" bind:this={el} style="left:{pos.left}px;top:{pos.top}px">
-  {#each items as it}
+  {#each items as it, i}
     {#if it === 'sep'}
       <div class="sep"></div>
+    {:else if 'note' in it}
+      <div class="note">{it.note}</div>
     {:else}
-      <button role="menuitem" class:danger={it.danger} disabled={it.disabled} aria-keyshortcuts={it.shortcut} onclick={() => { onclose(); it.action(); }}>
+      <button role="menuitem" class:danger={it.danger} class:open={sub?.i === i} disabled={it.disabled} aria-keyshortcuts={it.shortcut} aria-haspopup={it.sub ? 'menu' : undefined} aria-expanded={it.sub ? sub?.i === i : undefined}
+        onmouseenter={(e) => (it.sub ? openSub(e, i) : (sub = null))}
+        onclick={(e) => { if (it.sub) return openSub(e, i); onclose(); it.action(); }}>
         {#if checks}
           <span class="chk" aria-hidden="true">{#if it.checked}<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5l2.6 2.6L10 3.5" /></svg>{/if}</span>
         {/if}
@@ -46,10 +62,15 @@
         <span class="lb" class:it={it.italic}>{it.label}</span>
         {#if it.dot}<span class="dot" aria-label="не сохранено"></span>{/if}
         {#if it.shortcut}<span class="kb">{it.shortcut}</span>{/if}
+        {#if it.sub}<span class="kb more" aria-hidden="true">›</span>{/if}
       </button>
     {/if}
   {/each}
 </div>
+{#if sub}
+  {@const host = items[sub.i]}
+  {#if host !== 'sep' && !('note' in host) && host.sub}<Self x={sub.x} y={sub.y} items={host.sub} {onclose} nested />{/if}
+{/if}
 
 <style>
   .scrim { position: fixed; inset: 0; z-index: 90; }
@@ -73,4 +94,7 @@
   .kb { margin-left: auto; padding-left: 16px; color: var(--fg2); }
   .menu button:hover:not(:disabled) .kb { color: inherit; }
   .sep { height: 1px; background: var(--line); margin: 5px 6px; }
+  .note { padding: 4px 10px 3px; font-size: 11px; line-height: 1.4; color: var(--fg3); }
+  .menu button.open { background: var(--acc); color: var(--onacc); }
+  .more { padding-left: 12px; }
 </style>

@@ -8,7 +8,10 @@ import { untrack, type Component } from 'svelte';
 import { store } from '../store.svelte';
 import { newTab, openFile, openFromAgenda, openView } from '../layout';
 import { register as registerPalette } from '../commands';
-import { registerAction, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf, viewOf } from '../views';
+import { registerAction, registerFileView, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf, viewOf } from '../views';
+import { setLineLink } from '../lineLinks';
+import PluginFileView from '../PluginFileView.svelte';
+import type { MenuItem as CoreMenuItem } from '../ContextMenu.svelte';
 import { registerTodayBlock } from '../todayBlocks';
 import PluginTodayBlock from '../PluginTodayBlock.svelte';
 import { fuzzy } from '../fuzzy';
@@ -91,6 +94,8 @@ class Host {
   todayRenders = new SvelteMap<string, { plugin: string; render: (el: HTMLElement, block: { setHidden(hidden: boolean): void }) => Dispose | void }>();
   todayHidden = new SvelteMap<string, true>();
   oneOnOnes = new SvelteMap<string, Parameters<Ctx['ui']['oneOnOne']>[0]>();
+  /** The views of a file (ТЗ 33): their drawings by the plugins. */
+  fileViews = new SvelteMap<string, { plugin: string; spec: Parameters<Ctx['ui']['fileView']>[1] }>();
   /** A tab drawn anew (`ui.open` with a new state for a tab shown): its number. */
   redraw = new SvelteMap<string, number>();
   /** The numbers on the plugins' buttons of the navigator (`ui.setBadge`). */
@@ -103,7 +108,7 @@ class Host {
   place = $state<PlaceReq | null>(null);
   review = $state<ReviewRun | null>(null);
   sheetReq = $state<{ plugin: string; spec: SheetSpec; resolve: (button: string | null) => void } | null>(null);
-  menuReq = $state<{ plugin: string; x: number; y: number; items: ({ label: string; action: () => void; danger?: boolean; disabled?: boolean } | 'sep')[] } | null>(null);
+  menuReq = $state<{ plugin: string; x: number; y: number; items: CoreMenuItem[] } | null>(null);
   private dynamic = new SvelteMap<string, { options?(v: Values): CoreOpt[] | [CoreOpt[], CoreOpt[]]; hint?(v: Values): string; show?(path: string | null): string; clean?(text: string): string }>();
   private disposers = new Map<string, Dispose[]>();
   private plugins = new Map<string, Plugin>();
@@ -330,6 +335,12 @@ class Host {
       this.keep(id, registerNav({ id: n.id, label: n.title, icon: n.icon, key: n.key, order: 100 + i, component: PluginNav as unknown as Component, badge: () => this.badges.get(n.id) ?? 0 }));
       if (n.key) this.keep(id, registerAction(n.key, () => this.showNav(n.id)));
     });
+    for (const v of m.contributes.fileViews) {
+      this.keep(id, registerFileView({
+        id: v.id, title: v.title, icon: v.icon, key: v.key, component: PluginFileView as unknown as Component,
+        defaultFor: (f) => !!this.guard(id, () => this.fileViews.get(v.id)?.spec.defaultFor?.(f.text), false),
+      }));
+    }
     for (const b of m.contributes.todayBlocks) {
       this.keep(id, registerTodayBlock({
         id: b.id, title: b.title, hint: b.hint, attach: b.attach, component: PluginTodayBlock as unknown as Component,
@@ -516,6 +527,8 @@ class Host {
       for (const [k, v] of this.navs) if (v.plugin === id) this.navs.delete(k);
       for (const [k, v] of this.todayRenders) if (v.plugin === id) (this.todayRenders.delete(k), this.todayHidden.delete(k));
       this.oneOnOnes.delete(id);
+      for (const [k, v] of this.fileViews) if (v.plugin === id) this.fileViews.delete(k);
+      setLineLink(id, null);
       void Promise.resolve(this.plugins.get(id)?.deactivate?.()).catch(() => {});
       this.plugins.delete(id);
     });
@@ -542,6 +555,8 @@ class Host {
       for (const [k, v] of this.navs) if (v.plugin === id) this.navs.delete(k);
       for (const [k, v] of this.todayRenders) if (v.plugin === id) (this.todayRenders.delete(k), this.todayHidden.delete(k));
       this.oneOnOnes.delete(id);
+      for (const [k, v] of this.fileViews) if (v.plugin === id) this.fileViews.delete(k);
+      setLineLink(id, null);
       store.refreshStatusSets();
       if (this.manifest(id)?.contributes.navSections.some((n) => n.id === store.navMode)) store.setNavMode('files');
       try {
@@ -611,6 +626,22 @@ class Host {
         },
       },
       ui: {
+        fileView: (fv, spec) => {
+          declared('вида файла', m.contributes.fileViews.some((x) => x.id === fv), fv);
+          this.fileViews.set(fv, { plugin: id, spec });
+          return keep(() => void (this.fileViews.get(fv)?.spec === spec && this.fileViews.delete(fv)));
+        },
+        showAs: async (fv) => {
+          if (fv !== null) declared('вида файла', m.contributes.fileViews.some((x) => x.id === fv), fv);
+          const t = store.tab;
+          if (!t || t.kind !== 'file') return false;
+          store.showAs(t, fv ?? '');
+          return true;
+        },
+        editorLink: (spec) => {
+          setLineLink(id, { label: (text, line) => this.guard(id, () => spec.label(text, line), null), run: (path, line) => this.guard(id, () => spec.run(path, line), undefined) });
+          return keep(() => setLineLink(id, null));
+        },
         todayBlock: (blk, render) => {
           declared('блока', m.contributes.todayBlocks.some((b) => b.id === blk), blk);
           this.todayRenders.set(blk, { plugin: id, render });
@@ -687,7 +718,10 @@ class Host {
         menu: (items, at) => {
           this.menuReq = {
             plugin: id, x: at.x, y: at.y,
-            items: items.map((it) => (it === 'sep' ? 'sep' : { label: it.label, danger: it.danger, disabled: it.disabled, action: () => this.guard(id, () => it.run(), undefined) })),
+            items: items.flatMap((it): CoreMenuItem[] => (it === 'sep' ? ['sep'] : [
+              { label: it.label, danger: it.danger, disabled: it.disabled, checked: it.checked, action: () => this.guard(id, () => it.run(), undefined) },
+              ...(it.hint ? [{ note: it.hint }] : []),
+            ])),
           };
         },
         choose: (o) =>
@@ -963,10 +997,10 @@ class Host {
         const now = () => {
           const t = store.tab;
           const own = !!t && !!this.manifest(id)?.contributes.views.some((v) => v.id === t.kind);
-          send({ kind: t?.kind ?? null, path: t?.kind === 'file' ? (store.file?.name ?? null) : null, state: own ? clone(t!.data) : undefined });
+          send({ kind: t?.kind ?? null, path: t?.kind === 'file' ? (store.file?.name ?? null) : null, state: own ? clone(t!.data) : undefined, view: t?.kind === 'file' ? store.viewOf(t) || null : null });
         };
         queueMicrotask(now); // the tab shown now, then each change
-        return watch(() => [store.tab?.id, store.tab?.data], now);
+        return watch(() => [store.tab?.id, store.tab?.data, store.viewOf(store.tab)], now);
       case 'inbox.changed':
         return watch(() => store.inboxFile?.name ?? null, (p) => send({ path: p }));
       case 'folder.changed':
