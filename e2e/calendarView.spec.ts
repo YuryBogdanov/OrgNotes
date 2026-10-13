@@ -117,6 +117,7 @@ test('the toolbar button opens the calendar in the second pane', async ({ page }
   await installTauriMock(page, FILES());
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
+  await pluginsReady(page); // the button is the calendar plugin's: it works once the plugin has started
   const btn = page.locator('.toolbar').getByRole('button', { name: 'Календарь', exact: true });
   await btn.click();
   await expect(page.locator('section.pane')).toHaveCount(2);

@@ -4,6 +4,8 @@
   import { store } from './store.svelte';
   import { moreSchema, showSchema, today } from './todayState.svelte';
   import { todayBlockOf } from './todayBlocks';
+  import { toneFor } from './org';
+  import { toneStyle } from './colors';
 
   // «Настройки → Сегодня» (ТЗ 32 §6): ПОКАЗ, ЗАДАЧИ (chips of statuses and files), АГЕНДА И 1-1, КОНЕЦ ДНЯ, БЛОКИ (their
   // switches, the order by dragging or ⌥↑ / ⌥↓). The schema draws the plain fields; the chips and the blocks are here.
@@ -54,7 +56,7 @@
         <span class="olab"><span id="today-statuses">Статусы</span><small>Какие задачи показывать</small></span>
         <span class="chips" role="group" aria-labelledby="today-statuses">
           {#each cfg.statuses as s (s)}
-            <span class="chip">{s}<button aria-label="Убрать статус {s}" onclick={() => setStatuses(cfg.statuses.filter((x) => x !== s))}>×</button></span>
+            <span class="chip st tone" style={toneStyle(toneFor(s, store.untitledWf))}>{s}<button aria-label="Убрать статус {s}" onclick={() => setStatuses(cfg.statuses.filter((x) => x !== s))}>×</button></span>
           {/each}
           <span class="addw">
             <button class="add" aria-label="Добавить статус" disabled={!freeStatuses.length} onclick={() => (adding = !adding)}>+</button>
@@ -72,7 +74,7 @@
         <span class="olab"><span id="today-files">Файлы</span><small>Откуда брать задачи</small></span>
         <span class="chips" role="group" aria-labelledby="today-files">
           {#each today.taskFiles as f (f)}
-            <span class="chip">{f}<button aria-label="Убрать файл {f}" onclick={() => setFiles(today.taskFiles.filter((x) => x !== f))}>×</button></span>
+            <span class="chip file">{f}<button aria-label="Убрать файл {f}" onclick={() => setFiles(today.taskFiles.filter((x) => x !== f))}>×</button></span>
           {/each}
           <button class="add" aria-label="Добавить файл" onclick={() => (picking = true)}>+</button>
         </span>
@@ -125,10 +127,13 @@
   .olab small { font-size: 11.5px; color: var(--fg2); }
   .grow { flex: 1; }
   .chips { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; }
-  .chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 4px 0 9px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); font-size: 12px; }
-  .chip button { width: 16px; height: 16px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--fg3); font-size: 13px; line-height: 1; }
-  .chip button:hover { background: var(--field); color: var(--fg); }
-  .add { width: 24px; height: 24px; padding: 0; border: 1px dashed var(--line); border-radius: 12px; background: none; color: var(--fg2); font-size: 14px; }
+  /* capsules of the values: a status in its colour, a file in mono */
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 22px; box-sizing: border-box; padding: 0 5px 0 8px; border-radius: 4px; letter-spacing: 0.02em; background: var(--field); color: var(--fg); font-size: 12px; white-space: nowrap; }
+  .chip.st { color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); font-weight: 700; }
+  .chip.file { font-family: var(--mono); }
+  .chip button { padding: 0; border: 0; background: none; color: inherit; opacity: 0.6; font: 12px var(--ui); line-height: 1; }
+  .chip button:hover { opacity: 1; }
+  .add { width: 26px; height: 22px; box-sizing: border-box; padding: 0; border: 1px dashed var(--line); border-radius: 4px; background: none; color: var(--fg2); font-size: 13px; }
   .add:disabled { opacity: 0.4; }
   .addw { position: relative; }
   .menu { position: absolute; right: 0; top: 28px; z-index: 5; min-width: 120px; display: flex; flex-direction: column; padding: 4px; background: var(--pop); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); }
