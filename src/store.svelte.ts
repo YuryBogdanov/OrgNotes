@@ -32,6 +32,26 @@ export interface NoteFile {
 }
 
 const isTauri = '__TAURI_INTERNALS__' in window;
+/** The note of the mini window (ТЗ 31): a heading of a file (by its title near its line), or the file whole. */
+export interface MiniNote {
+  path: string; // the file's name in the notes folder
+  line: number;
+  title: string;
+  whole?: boolean;
+}
+interface MiniSnapshot {
+  dir: string | null;
+  configRaw: string | null;
+  note: MiniNote | null;
+  files: { name: string; path: string; text: string; disk: string; diskRaw: string; eol: string }[];
+}
+function lsGetJson<T>(k: string): T | null {
+  try {
+    return JSON.parse(localStorage.getItem(k) ?? 'null');
+  } catch {
+    return null;
+  }
+}
 
 function build(name: string, path: string, text: string, disk: string, diskRaw: string, eol: Eol, cfg: ProjectConfig): NoteFile {
   const wf = resolveWorkflow(text, name, cfg);
@@ -1247,6 +1267,102 @@ class Store {
     if (p) await this.useFolder(p);
   }
 
+  // ---- the mini window (ТЗ 31): one state of the files in two windows ----------------------------------------------
+  // The main window owns the files (it reads, watches and writes them); the mini window mirrors them: it gets them
+  // all at its start, sends its edits here, and gets every change of another (typed here, from disk) back.
+  /** This store is the mini window's: no disk of its own, its edits go to the main window. */
+  mirror = false;
+  /** The note of the mini window (shown in it, or for its next show): a heading, or the file whole. */
+  miniNote = $state<MiniNote | null>(lsGetJson<MiniNote>('mini:note'));
+  /** The main window: the text the mini window has of each file (sent or got from it); null — no mini window yet. */
+  private mini: Map<string, string> | null = null;
+  private async emitMini(event: string, payload: unknown) {
+    if (!isTauri) return;
+    const { emitTo } = await import('@tauri-apps/api/event');
+    await emitTo(this.mirror ? 'main' : 'mini', event, payload).catch(() => {});
+  }
+  /** The main window: the files and the statuses the mini window's snapshot had. */
+  private miniPaths = '';
+  private miniCfg: string | null = null;
+  private snapshot() {
+    this.mini = new Map(this.files.map((f) => [f.path, f.text]));
+    this.miniPaths = this.files.map((f) => f.path).join('\n');
+    this.miniCfg = this.configRaw;
+    return { dir: this.dir, configRaw: this.configRaw, note: this.miniNote, files: this.files.map((f) => ({ name: f.name, path: f.path, text: f.text, disk: f.disk, diskRaw: f.diskRaw, eol: f.eol })) };
+  }
+  /** The main window: the mini window started (or asks again) — everything it mirrors; then each change. */
+  private async serveMini() {
+    const { listen } = await import('@tauri-apps/api/event');
+    await listen('mini-hello', () => void this.emitMini('mini-snapshot', this.snapshot()));
+    await listen<{ path: string; text: string }>('mini-edit', (e) => {
+      this.mini?.set(e.payload.path, e.payload.text); // it has it: not sent back
+      this.setText(e.payload.text, e.payload.path);
+    });
+    await listen<{ path: string; line: number }>('mini-open-main', (e) => void this.openFromMini(e.payload.path, e.payload.line));
+    $effect.root(() => {
+      $effect(() => {
+        const files = this.files;
+        const m = this.mini;
+        if (!m) return;
+        // a file came or went, the statuses changed: all of it again
+        if (files.map((f) => f.path).join('\n') !== this.miniPaths || this.configRaw !== this.miniCfg) return void this.emitMini('mini-snapshot', this.snapshot());
+        for (const f of files)
+          if (m.get(f.path) !== f.text) {
+            m.set(f.path, f.text);
+            void this.emitMini('mini-file', { path: f.path, text: f.text, disk: f.disk, diskRaw: f.diskRaw });
+          }
+      });
+    });
+  }
+  /** The mini window: its files from the main window. */
+  async loadMirror() {
+    this.mirror = true;
+    if (!isTauri) {
+      this.loaded = true;
+      return;
+    }
+    const { listen } = await import('@tauri-apps/api/event');
+    await listen<MiniSnapshot>('mini-snapshot', (e) => {
+      const s = e.payload;
+      this.dir = s.dir;
+      this.takeConfig(s.configRaw);
+      this.files = s.files.map((f) => build(f.name, f.path, f.text, f.disk, f.diskRaw, f.eol as Eol, this.config));
+      if (s.note && !this.miniNote) this.miniNote = s.note;
+      this.loaded = true;
+    });
+    await listen<{ path: string; text: string; disk: string; diskRaw: string }>('mini-file', (e) => {
+      const p = e.payload;
+      const f = this.files.find((x) => x.path === p.path);
+      if (!f || f.text === p.text) return;
+      this.files = this.files.map((x) => (x.path === p.path ? build(x.name, x.path, p.text, p.disk, p.diskRaw, x.eol, this.config) : x));
+    });
+    await listen<MiniNote>('mini-open', (e) => this.setMiniNote(e.payload));
+    void this.emitMini('mini-hello', null);
+  }
+  /** The note the mini window shows, kept for its next show. */
+  setMiniNote(n: MiniNote | null) {
+    this.miniNote = n;
+    lsSet('mini:note', JSON.stringify(n));
+  }
+  /** ⇧⌘M: the heading the caret is in (the file whole above the first one, or as set), in the mini window. */
+  openInMini(whole = lsGet('mini:what') === 'file') {
+    const t = this.tab;
+    const f = this.file;
+    let note: MiniNote | null = null;
+    if (t?.kind === 'file' && f) {
+      const h = this.selected >= 0 ? f.headings[this.selected] : undefined;
+      note = h && !whole ? { path: f.name, line: h.line, title: h.title } : { path: f.name, line: h?.line ?? 0, title: '', whole: true };
+    }
+    if (note) this.setMiniNote(note);
+    if (isTauri) void invoke('mini_open', { note }).catch(() => {});
+  }
+  /** «Открыть в главном окне»: the file at the line in a tab here, the app in front. */
+  async openFromMini(name: string, line: number) {
+    const i = this.files.findIndex((f) => f.name === name);
+    if (i >= 0) this.open(i, line);
+    if (isTauri) await invoke('show_main_window').catch(() => {});
+  }
+
   async listen() {
     // back in front: check the open files again in case an event was missed
     window.addEventListener('focus', () => this.activated());
@@ -1269,6 +1385,7 @@ class Store {
     });
     void this.applyCaptureKey();
     void this.applyMiniKey();
+    await this.serveMini();
     await listen('quit-requested', () => this.quit()); // «Завершить» from the Dock
   }
 
@@ -2191,6 +2308,12 @@ class Store {
   }
 
   private scheduleSave(path: string) {
+    if (this.mirror) {
+      // the mini window: the main window writes it (and says if it could not)
+      const f = this.files.find((x) => x.path === path);
+      if (f) void this.emitMini('mini-edit', { path, text: f.text });
+      return;
+    }
     if (!isTauri || this.conflicts[path]) return; // a conflict waits for the user's choice
     this.saveState = 'saving';
     clearTimeout(this.timers.get(path));
@@ -2199,6 +2322,7 @@ class Store {
 
   /** Write a file; resolves to the reason it failed, or null. */
   private async save(path: string): Promise<string | null> {
+    if (this.mirror) return (this.scheduleSave(path), null); // the main window writes the mini window's edits
     if (this.conflicts[path]) return CONFLICT; // never over a version the user has not seen
     const f = this.files.find((x) => x.path === path);
     if (!f || f.text === f.disk) {

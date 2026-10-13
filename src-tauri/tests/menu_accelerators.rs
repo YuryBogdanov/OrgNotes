@@ -45,6 +45,7 @@ fn every_default_accelerator_parses() {
         "Shift+CmdOrCtrl+KeyI",
         "Shift+CmdOrCtrl+KeyJ",
         "Shift+CmdOrCtrl+KeyN",
+        "Shift+CmdOrCtrl+KeyM",
         "Shift+CmdOrCtrl+KeyO",
         "Shift+CmdOrCtrl+KeyP",
         "Shift+CmdOrCtrl+KeyW",

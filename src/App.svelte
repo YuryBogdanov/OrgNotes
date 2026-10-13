@@ -166,6 +166,7 @@
     agenda: () => store.showAgendaHere(),
     back: () => store.back(),
     nav: () => (store.showNav = !store.showNav),
+    miniOpen: () => store.openInMini(),
     navFiles: () => store.setNavMode('files'),
     navAgendas: () => store.setNavMode('agendas'),
     capture: () => store.openCapture(),
