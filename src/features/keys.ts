@@ -17,4 +17,7 @@ registerKeys([
 
 // ---- «Сегодня» (ТЗ 32): the screen of the morning ---------------------------------------------------------------------
 registerGroup({ id: 'today', title: 'СЕГОДНЯ' });
-registerKeys([C('today', 'Открыть «Сегодня»', 'today', 'window', ['⇧⌘H'], { synonyms: ['сегодня', 'утро', 'обзор', 'день'] })]);
+registerKeys([
+  C('today', 'Открыть «Сегодня»', 'today', 'window', ['⇧⌘H'], { synonyms: ['сегодня', 'утро', 'обзор', 'день'] }),
+  C('endDay', 'Завершить день…', 'today', 'window', [], { synonyms: ['вечер', 'журнал', 'итоги', 'на завтра'] }),
+]);

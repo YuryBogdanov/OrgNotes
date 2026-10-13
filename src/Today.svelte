@@ -106,6 +106,9 @@
       </div>
       <div class="acts">
         {#if key}<span class="hint">{key} — открыть «Сегодня»</span>{/if}
+        <button class="btn" onclick={() => today.openEndDay()}>
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8z" /></svg>Завершить день…
+        </button>
         <button class="ico" aria-label="Настроить экран" title="Настроить экран" onclick={() => store.openSettings('Сегодня')}>
           <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="2.6" /><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6" /></svg>
         </button>
@@ -249,6 +252,8 @@
   h1 { margin: 2px 0 0; font-size: 26px; font-weight: 700; line-height: 1.2; }
   .acts { display: flex; align-items: center; gap: 8px; }
   .hint { font-size: 12px; color: var(--fg3); }
+  .btn { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); font: inherit; }
+  .btn:hover { background: var(--field); }
   .ico { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg2); padding: 0; }
   .ico:hover { color: var(--fg); }
   .row { display: flex; gap: 16px; flex-wrap: wrap; }
