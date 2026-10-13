@@ -46,7 +46,45 @@ export interface Ctx {
   folderRel: string; // the folder of the current file: new files go there
   canFiles: boolean; // files and folders can be made (a notes folder is open)
   noFolder: boolean; // the app has no notes folder yet
+  /** Where the heading commands write: the editor's heading under the cursor by default, a list's task (ТЗ 34). */
+  act?: HeadingAct;
+  /** A task chosen in a list (ТЗ 34): the palette shows «ВЫДЕЛЕННАЯ ЗАДАЧА» first. */
+  task?: TaskCtx;
 }
+/** What the heading commands change, and how. */
+export interface HeadingAct {
+  status(kw: string | null): void;
+  priority(p: string | null): void;
+  planning(kind: 'SCHEDULED' | 'DEADLINE', d: Date | null): void;
+  tags(tags: string[]): void;
+}
+export const editorAct: HeadingAct = {
+  status: (k) => store.setKeyword(k),
+  priority: (p) => store.setPriority(p),
+  planning: (k, d) => store.setPlanning(k, d),
+  tags: (t) => store.setTags(t),
+};
+const actOf = (c: Ctx) => c.act ?? editorAct;
+/** A list's task as the palette sees it: the heading commands' context for it. */
+export interface TaskCtx {
+  title: string;
+  ctx: Ctx; // file, heading and `act` of the task
+}
+/** A command of «ВЫДЕЛЕННАЯ ЗАДАЧА» (the core's; plugins' «действия с задачей» later). */
+export interface TaskCommand {
+  id: string;
+  title: string | ((t: TaskCtx) => string); // «Задача: завершить (DONE)» names the set's final status
+  icon: Icon;
+  keyId?: string;
+  synonyms?: string[];
+  when?: (t: TaskCtx) => boolean;
+  hint?: (t: TaskCtx) => string;
+  run: (t: TaskCtx) => Step | void;
+}
+export const taskCommands: TaskCommand[] = [];
+/** The list's task chosen now, if a list is active (taskLists sets it: no import of it here). */
+let listTask: () => TaskCtx | null = () => null;
+export const setListTask = (fn: () => TaskCtx | null) => (listTask = fn);
 
 /** One line of the list. Without `run` it is not selectable ("Ничего не найдено", a prompt). */
 export interface Row {
@@ -60,6 +98,7 @@ export interface Row {
   italic?: boolean;
   level?: number; // headings: the indent
   prefer?: boolean; // selected when the list first shows (the heading the cursor is in)
+  note?: string; // grey after the group's header (the task of «ВЫДЕЛЕННАЯ ЗАДАЧА»)
   run?: () => Step | void;
 }
 export type Plate =
@@ -224,7 +263,7 @@ register({
 // ---- matching -------------------------------------------------------------------------------------------------
 
 /** The best match of the query in a title or one of its synonyms (only the title's letters are made bold). */
-function matchCommand(q: string, c: Command): { m: Match; at: number[] } | null {
+function matchCommand(q: string, c: { title: string; synonyms?: string[] }): { m: Match; at: number[] } | null {
   let best: { m: Match; at: number[] } | null = null;
   for (const [i, text] of [c.title, ...(c.synonyms ?? [])].entries()) {
     const m = fuzzy(q, text);
@@ -257,6 +296,7 @@ export function contextOf(): Ctx {
   return {
     file, fileIdx: store.cur, heading: h, line: store.cursor.line,
     folderRel: file ? dirOf(file.name) : '', canFiles: store.canManageFiles, noFolder: store.needsFolder,
+    task: listTask() ?? undefined,
   };
 }
 
@@ -274,6 +314,23 @@ export function mainStep(c: Ctx): Step {
       if (/^[#№]/.test(q)) return headingRows(c, q.slice(1)); // «@» stays an ordinary character for now
       const u = uses();
       const rows: Row[] = [];
+      if (c.task) {
+        const t = c.task;
+        const found = taskCommands
+          .map((c0, i) => ({ c0, cmd: { ...c0, title: typeof c0.title === 'function' ? c0.title(t) : c0.title }, i }))
+          .map(({ c0, cmd, i }) => ({ c0, cmd, i, hit: (c0.when?.(t) ?? true) ? matchCommand(q, cmd) : null }))
+          .filter((x) => x.hit)
+          .map((x) => ({ ...x, m: x.hit!.m, w: weight(u, x.cmd.id) }));
+        if (q.trim()) found.sort(rank);
+        for (const { c0, cmd, hit } of found)
+          rows.push({
+            id: cmd.id, group: 'ВЫДЕЛЕННАЯ ЗАДАЧА', note: t.title, title: cmd.title, at: hit!.at, icon: cmd.icon, hint: c0.hint?.(t) || undefined, key: (c0.keyId === '' ? '' : store.keyHint(c0.keyId ?? cmd.id)) || undefined,
+            run: () => {
+              remember(cmd.id);
+              return c0.run(t);
+            },
+          });
+      }
       for (const g of ['heading', 'general'] as const) {
         const found = commands
           .map((cmd, i) => ({ cmd, i, hit: cmd.group === g && cmd.when(c) ? matchCommand(q, cmd) : null }))
@@ -282,7 +339,7 @@ export function mainStep(c: Ctx): Step {
         if (q.trim()) found.sort(rank);
         for (const { cmd, hit } of found)
           rows.push({
-            id: cmd.id, group: GROUPS[g], title: cmd.title, at: hit!.at, icon: cmd.icon, hint: cmd.hint?.(c) || undefined, key: store.keyHint(cmd.keyId ?? cmd.id) || undefined,
+            id: cmd.id, group: c.task && g === 'general' ? 'ВСЕ КОМАНДЫ' : GROUPS[g], title: cmd.title, at: hit!.at, icon: cmd.icon, hint: cmd.hint?.(c) || undefined, key: store.keyHint(cmd.keyId ?? cmd.id) || undefined,
             run: () => {
               remember(cmd.id);
               return cmd.run(c);
@@ -323,10 +380,10 @@ function statusStep(c: Ctx): Step {
         for (const st of s.states) {
           const m = fuzzy(q, st.name);
           if (m && !rows.some((r) => r.title === st.name))
-            rows.push({ id: 'st:' + st.name, group: seqs.length > 1 ? s.name.toUpperCase() || 'СТАТУСЫ' : 'СТАТУСЫ', title: st.name, at: m.at, icon: st.done ? 'check' : 'status', hint: st.name === c.heading!.keyword ? 'сейчас' : undefined, run: () => store.setKeyword(st.name) });
+            rows.push({ id: 'st:' + st.name, group: seqs.length > 1 ? s.name.toUpperCase() || 'СТАТУСЫ' : 'СТАТУСЫ', title: st.name, at: m.at, icon: st.done ? 'check' : 'status', hint: st.name === c.heading!.keyword ? 'сейчас' : undefined, run: () => actOf(c).status(st.name) });
         }
       const none = fuzzy(q, 'Без статуса');
-      if (none && c.heading!.keyword) rows.push({ id: 'st:none', group: 'СТАТУСЫ', title: 'Без статуса', at: none.at, icon: 'clear', run: () => store.setKeyword(null) });
+      if (none && c.heading!.keyword) rows.push({ id: 'st:none', group: 'СТАТУСЫ', title: 'Без статуса', at: none.at, icon: 'clear', run: () => actOf(c).status(null) });
       return rows.length ? rows : [NOTHING];
     },
   };
@@ -341,7 +398,7 @@ function dateStep(c: Ctx, kind: 'SCHEDULED' | 'DEADLINE'): Step {
   const group = kind === 'SCHEDULED' ? 'ЗАПЛАНИРОВАТЬ' : 'ДЕДЛАЙН';
   const icon: Icon = kind === 'SCHEDULED' ? 'sched' : 'dead';
   const current = kind === 'SCHEDULED' ? c.heading!.scheduled : c.heading!.deadline;
-  const pick = (d: Date | null) => () => store.setPlanning(kind, d);
+  const pick = (d: Date | null) => () => actOf(c).planning(kind, d);
   const today = new Date();
   const day = (n: number) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + n);
   const base = current ? jsDate(current) : day(0);
@@ -376,7 +433,7 @@ function calendarStep(c: Ctx, kind: 'SCHEDULED' | 'DEADLINE', initial: Date): St
   const cur = kind === 'SCHEDULED' ? h.scheduled : h.deadline;
   const old = new RegExp(`${kind}:\\s*(<[^>]*>)`).exec(f.text.split('\n')[h.line + 1] ?? '')?.[1];
   return calStep(
-    { kind, initial, current: cur ? jsDate(cur) : null, old, names: weekdayNames(f.text), pick: (d) => store.setPlanning(kind, d), back: () => dateStep(c, kind) },
+    { kind, initial, current: cur ? jsDate(cur) : null, old, names: weekdayNames(f.text), pick: (d) => actOf(c).planning(kind, d), back: () => dateStep(c, kind) },
     headingPlate(c),
   );
 }
@@ -394,10 +451,10 @@ function priorityStep(c: Ctx): Step {
       const rows: Row[] = [];
       for (const p of ['A', 'B', 'C']) {
         const m = fuzzy(q, p);
-        if (m) rows.push({ id: 'pr:' + p, group: 'ПРИОРИТЕТ', title: p, at: m.at, icon: 'prio', hint: p === now ? 'сейчас' : undefined, run: () => store.setPriority(p) });
+        if (m) rows.push({ id: 'pr:' + p, group: 'ПРИОРИТЕТ', title: p, at: m.at, icon: 'prio', hint: p === now ? 'сейчас' : undefined, run: () => actOf(c).priority(p) });
       }
       const none = fuzzy(q, 'Без приоритета');
-      if (none && now) rows.push({ id: 'pr:none', group: 'ПРИОРИТЕТ', title: 'Без приоритета', at: none.at, icon: 'clear', run: () => store.setPriority(null) });
+      if (none && now) rows.push({ id: 'pr:none', group: 'ПРИОРИТЕТ', title: 'Без приоритета', at: none.at, icon: 'clear', run: () => actOf(c).priority(null) });
       return rows.length ? rows : [NOTHING];
     },
   };
@@ -419,8 +476,8 @@ function tagsStep(c: Ctx): Step {
       const tags = [...new Set(q.split(/[\s,:;#]+/).filter(Boolean))];
       return [
         tags.length
-          ? { id: 'tags', group: 'ТЕГИ', title: `Сохранить теги: ${tags.join(', ')}`, icon: 'tag', run: () => store.setTags(tags) }
-          : { id: 'tags', group: 'ТЕГИ', title: before.length ? 'Убрать все теги' : 'Введите теги через пробел', icon: 'tag', run: before.length ? () => store.setTags([]) : undefined },
+          ? { id: 'tags', group: 'ТЕГИ', title: `Сохранить теги: ${tags.join(', ')}`, icon: 'tag', run: () => actOf(c).tags(tags) }
+          : { id: 'tags', group: 'ТЕГИ', title: before.length ? 'Убрать все теги' : 'Введите теги через пробел', icon: 'tag', run: before.length ? () => actOf(c).tags([]) : undefined },
       ];
     },
   };

@@ -6,16 +6,25 @@
   import { displayName } from './names';
   import Outline from './Outline.svelte';
   import { viewOf } from './views';
+  import { editorAct } from './commands';
+  import { lists, resolve } from './taskLists.svelte';
 
-  const f = $derived(store.file);
-  const h = $derived(f && store.selected >= 0 ? f.headings[store.selected] : undefined);
+  // the task chosen in a list of the active tab (the agenda, ТЗ 34), else the heading under the cursor
+  const lt = $derived(lists.forTab(store.tab));
+  const lr = $derived(lt ? resolve(lt.task) : null);
+  const f = $derived(lr ? lr.f : store.file);
+  const fi = $derived(lr ? lr.fi : store.cur);
+  const hi = $derived(lr ? lr.hi : store.selected);
+  const h = $derived(f && hi >= 0 ? f.headings[hi] : undefined);
+  // where its controls write: through the list (its toast, its ⌘Z) or into the editor's text
+  const act = $derived(lt ? (lists.ctx(lt.spec.id, lt.task)?.act ?? editorAct) : editorAct);
   // the heading's own workflow (the file's first one while it has no status yet)
   const seq = $derived(f ? sequenceFor(f.wf, h?.keyword ?? null) : undefined);
   const groups = $derived(
     f?.wf.sequences && f.wf.sequences.length > 1 ? f.wf.sequences : f ? [{ name: '', states: seq!.states }] : [],
   );
   const toneVars = $derived(h?.keyword && f ? toneStyle(toneFor(h.keyword, f.wf)) : '');
-  const progress = $derived(h && f ? subtreeProgress(f.headings, store.selected, f.wf) : { done: 0, total: 0 });
+  const progress = $derived(h && f ? subtreeProgress(f.headings, hi, f.wf) : { done: 0, total: 0 });
   const inherited = $derived.by(() => {
     if (!h || !f) return [] as string[];
     const out = new Set<string>(f.filetags);
@@ -31,12 +40,12 @@
   // links written in this heading's own text, and links from elsewhere that point here
   const own = $derived.by(() => {
     if (!f || !h) return [];
-    const next = f.headings[store.selected + 1]?.line ?? Infinity;
+    const next = f.headings[hi + 1]?.line ?? Infinity;
     return linksOf(f)
       .filter((l) => l.line >= h.line && l.line < next)
-      .map((l) => ({ l, t: resolveLink(l, store.cur, store.files) }));
+      .map((l) => ({ l, t: resolveLink(l, fi, store.files) }));
   });
-  const back = $derived(h ? backlinks(store.files, store.cur, h.line) : []);
+  const back = $derived(h ? backlinks(store.files, fi, h.line) : []);
   const isDone = $derived(!!h?.keyword && !!f?.wf.done.includes(h.keyword));
 </script>
 
@@ -62,7 +71,7 @@
       <label class="row">
         <span class="k">Состояние</span>
         <span class="plate">
-          <select class="pick {h.keyword ? 'tone' : ''}" style="{toneVars};font-weight:600" value={h.keyword ?? ''} onchange={(e) => store.setKeyword(e.currentTarget.value || null)}>
+          <select class="pick {h.keyword ? 'tone' : ''}" style="{toneVars};font-weight:600" value={h.keyword ?? ''} onchange={(e) => act.status(e.currentTarget.value || null)}>
           <option value="">—</option>
           {#each groups as g}
             {#if g.name && groups.length > 1}
@@ -78,7 +87,7 @@
       <label class="row">
         <span class="k">Приоритет</span>
         <span class="plate">
-          <select class="pick" style="color:{h.priority ? 'var(--wait)' : 'inherit'};font-weight:600" value={h.priority ?? ''} onchange={(e) => store.setPriority(e.currentTarget.value || null)}>
+          <select class="pick" style="color:{h.priority ? 'var(--wait)' : 'inherit'};font-weight:600" value={h.priority ?? ''} onchange={(e) => act.priority(e.currentTarget.value || null)}>
           <option value="">—</option>
           {#each ['A', 'B', 'C'] as p}<option value={p}>{p}</option>{/each}
         </select>
@@ -90,12 +99,17 @@
       {/if}
       <!-- no status: nothing to mark done, the heading can become a task; final: back to work; else: done -->
       {#if seq && !h.keyword}
-        <button class="secondary" onclick={() => store.setKeyword(startOf(seq))}>Сделать задачей</button>
+        <button class="secondary" onclick={() => act.status(startOf(seq))}>Сделать задачей</button>
       {:else if seq && firstDone(seq)}
-        <button class="primary" onclick={() => store.setKeyword(isDone ? startOf(seq) : firstDone(seq))}>
-          {isDone ? 'Вернуть в работу' : 'Выполнено'}
-        </button>
+        <div class="btns">
+          <button class="primary" onclick={() => act.status(isDone ? startOf(seq) : firstDone(seq))}>
+            {isDone ? (lt ? 'В работу' : 'Вернуть в работу') : 'Выполнено'}
+          </button>
+          <!-- a list's task: «Перенести…» as the menu's «Запланировать → Выбрать дату…» -->
+          {#if lt}<button class="secondary" onclick={() => lists.pickDate(lt.spec.id, lt.task, 'SCHEDULED')}>Перенести…</button>{/if}
+        </div>
       {/if}
+      {#if lt}<button class="open" onclick={() => lt.spec.open(false)}>Открыть в заметках</button>{/if}
     </section>
 
     <section>
@@ -157,7 +171,7 @@
       </section>
     {/if}
   {:else}
-    <div class="empty">Поставьте курсор внутрь заголовка, чтобы увидеть его свойства</div>
+    <div class="empty">{store.tab?.kind === 'agenda' ? 'Выберите задачу в агенде, чтобы увидеть её свойства' : 'Поставьте курсор внутрь заголовка, чтобы увидеть его свойства'}</div>
   {/if}
   {/if}
 </div>
@@ -185,6 +199,9 @@
   .secondary:active { filter: brightness(0.95); }
   .primary { height: 28px; border: 0; border-radius: 6px; background: var(--acc); color: var(--onacc); font-size: 12.5px; font-weight: 600; }
   .primary:active { filter: brightness(0.9); }
+  .btns { display: flex; gap: 8px; }
+  .btns button { flex: 1; min-width: 0; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .open { height: 28px; border: 1px solid var(--line); background: transparent; color: var(--acc); border-radius: 6px; font-size: 12.5px; }
   .hint { font-size: 11.5px; color: var(--fg2); }
   .right { text-align: right; }
   .tags { display: flex; flex-wrap: wrap; gap: 6px; }

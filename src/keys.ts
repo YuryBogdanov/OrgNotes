@@ -283,6 +283,8 @@ export function refusal(press: string, scope: Scope): string | null {
   if (scope === 'global' && !(p.meta || p.ctrl || p.alt)) return 'Нужна хотя бы одна из клавиш ⌘, ⌃ или ⌥';
   if (p.meta || p.ctrl || p.alt) return null;
   if (/^F\d+$/.test(p.key)) return null;
+  // a list of tasks (ТЗ 34): nothing is typed there, so ↩, ⎋ and ⇧ + arrows are free
+  if (scope === 'list' && (p.key === '↩' || p.key === '⎋' || (p.shift && ['←', '→', '↑', '↓'].includes(p.key)))) return null;
   const editor = scope === 'editor' || scope === 'heading';
   if (editor && (p.key === '⇥' || (p.shift && ['←', '→', '↑', '↓'].includes(p.key)))) return null;
   return editor ? 'Нужна ⌘, ⌥ или ⌃ (в редакторе ещё ⇧ + стрелка, Tab или ⇧Tab)' : 'Нужна хотя бы одна из клавиш ⌘, ⌥ или ⌃';

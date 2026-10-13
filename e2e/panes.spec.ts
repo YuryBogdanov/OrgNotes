@@ -115,11 +115,16 @@ test.describe('active pane', () => {
 });
 
 test.describe('agenda and its neighbour', () => {
-  test('click opens the task in the neighbour pane at its heading; the focus stays in the agenda', async ({ page }) => {
+  test('a click chooses the task, ↩ opens it in the neighbour pane at its heading; the focus stays in the agenda', async ({ page }) => {
     await open(page);
     await page.keyboard.press('Meta+2'); // the agenda in the only pane
     expect(await tabsOf(page, 0)).toEqual(['work', 'Агенда']);
     await page.locator('.item', { hasText: 'Синк с CTO' }).click();
+    // a click only chooses (ТЗ 34): highlighted, with the arrow; nothing opens
+    await expect(page.locator('.item.sel')).toContainText('Синк с CTO');
+    await expect(page.locator('.item.sel .go')).toBeVisible();
+    await expect(panes(page)).toHaveCount(1);
+    await page.keyboard.press('Enter');
     // the file opens on the LEFT, the agenda stays on the right
     await expect(panes(page)).toHaveCount(2);
     expect(await tabsOf(page, 0)).toEqual(['journal']);
@@ -127,10 +132,7 @@ test.describe('agenda and its neighbour', () => {
     await expect(panes(page).nth(0).locator('.cm-activeLine')).toHaveText('** TODO Синк с CTO');
     expect(await page.evaluate(() => !!document.activeElement?.closest('.agenda'))).toBe(true);
     await expect(panes(page).nth(1)).toHaveClass(/active/);
-    // selected row: highlighted, with the arrow
-    await expect(page.locator('.item.sel')).toContainText('Синк с CTO');
-    await expect(page.locator('.item.sel .go')).toBeVisible();
-    await expect(page.locator('.foot')).toHaveText('↩ открыть в соседней панели⌥↩ открыть здесь');
+    await expect(page.locator('.agenda .foot')).toHaveText(/↩открыть.*⇧← →статус.*⌥⇧← →дата ±1 день.*⇧↑ ↓приоритет.*⌃C Sзапланировать.*Агенда/);
   });
 
   test('↑ ↓ and ↩ from the keyboard; the neighbour that already shows the file only moves to the heading', async ({ page }) => {
@@ -171,7 +173,7 @@ test.describe('agenda and its neighbour', () => {
   test('"Открыто из агенды" appears and goes away when the caret leaves the heading', async ({ page }) => {
     await open(page);
     await btn(page, 'Агенда').click();
-    await page.locator('.item', { hasText: 'Подготовить бюджет' }).click();
+    await page.locator('.item', { hasText: 'Подготовить бюджет' }).dblclick();
     const cap = panes(page).nth(0).locator('.caption');
     await expect(cap).toHaveText(/Открыто из агенды:\s*Подготовить бюджет/);
     await panes(page).nth(0).locator('.cm-line', { hasText: 'текст бюджета' }).click(); // still the same heading
