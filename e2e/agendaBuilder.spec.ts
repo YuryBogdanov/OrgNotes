@@ -100,7 +100,13 @@ test.describe('entering, saving, cancelling', () => {
     await expect(page.locator('.toolbar .path')).toHaveText(/Агенда\s*›\s*Утро/);
     await expect(page.locator('.agenda .h1')).toHaveText('Утро');
     await expect(page.locator('.agenda .gh').first()).toContainText('Важное');
-    await expect(page.locator('.agenda .ttl')).toHaveText([/^\[#A\]\s*Подготовить бюджет 2027$/]);
+    // the priority: a capsule as on the board, apart from the title (#106)
+    await expect(page.locator('.agenda .ttl')).toHaveText([/^#AПодготовить бюджет 2027$/]);
+    const prio = page.locator('.agenda .ttl .prio');
+    await expect(prio).toHaveText('#A');
+    const [box, ttl] = await Promise.all([prio.boundingBox(), page.locator('.agenda .ttl').evaluate((el) => { const r = document.createRange(); r.setStart(el.lastChild!, 0); r.setEnd(el.lastChild!, 1); return r.getBoundingClientRect().left; })]);
+    expect(ttl - (box!.x + box!.width)).toBeGreaterThanOrEqual(5);
+    expect(await prio.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
   });
 
   test('an unfinished condition: the block opens, its empty value is marked, nothing is saved', async ({ page }) => {

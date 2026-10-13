@@ -10,7 +10,7 @@
 
   type Item = {
     day: number; // days from today
-    time: string; kw: string | null; tone: string; ev: boolean; pr: boolean;
+    time: string; kw: string | null; tone: string; ev: boolean; prio: string | null; // [#A]: a capsule, as on the board (#106)
     title: string; src: string; tags: string; mark: string; late: boolean; file: number; line: number; order: number;
     key: string;
   };
@@ -19,6 +19,9 @@
     key: string; title: string; sub: string; tone: string; dot?: string; level: 1 | 2;
     items: Item[]; empty?: boolean; more?: number;
   };
+
+  // the colours of the priorities, as the board's (ТЗ 33): A — TODO's, B — WAIT's, C — the secondary
+  const PRIO: Record<string, string> = { A: 'var(--todo)', B: 'var(--wait)', C: 'var(--fg2)' };
 
   // each agenda tab shows its own agenda
   const tab = $derived.by(() => {
@@ -39,7 +42,7 @@
         const isEvent = !h.keyword && !!h.event;
         if (!isOpen && !isEvent) continue;
         const base = {
-          kw: h.keyword, tone: h.keyword ? toneStyle(toneFor(h.keyword, f.wf)) : '', ev: isEvent, pr: h.priority === 'A',
+          kw: h.keyword, tone: h.keyword ? toneStyle(toneFor(h.keyword, f.wf)) : '', ev: isEvent, prio: h.priority,
           title: h.title, src: [displayName(f.name), ...h.path].join(' › '), tags: h.tags.join(' '),
           file: fi, line: h.line,
         };
@@ -96,7 +99,7 @@
           const d = t.scheduled ?? t.deadline;
           return {
             day: d ? dayDiff(toJs(d), midnight) : 0, time: t.scheduled?.time ?? '', kw: t.kw, tone: toneStyle(toneFor(t.kw, f.wf)), ev: false,
-            pr: t.prio === 'A', title: t.title, src: t.src, tags: t.tags.filter((x) => !f.filetags.includes(x)).join(' '),
+            prio: t.prio, title: t.title, src: t.src, tags: t.tags.filter((x) => !f.filetags.includes(x)).join(' '),
             mark: t.scheduled ? mark(t.scheduled, 'Запланировано') : mark(t.deadline, 'Дедлайн'),
             late: !!d && !t.done && dayDiff(toJs(d), midnight) < 0, file: t.file, line: t.line, order: t.order, key: `${bi}:${t.file}:${t.line}`,
           };
@@ -197,7 +200,7 @@
               <span class="kw ev">СОБ.</span>
             {/if}
             <div class="main">
-              <span class="ttl">{#if it.pr}<b class="pr">[#A] </b>{/if}{it.title}</span>
+              <span class="ttl">{#if it.prio}<span class="prio" style:--c={PRIO[it.prio] ?? 'var(--fg2)'} aria-label="Приоритет {it.prio}">#{it.prio}</span>{/if}{it.title}</span>
               <span class="src">{it.src}</span>
             </div>
             {#if it.tags}<span class="tag">{it.tags}</span>{/if}
@@ -245,7 +248,8 @@
   .kw.ev { color: var(--fg2); background: var(--field); }
   .main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
   .ttl { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pr { color: var(--wait); }
+  /* the priority as on the board (ТЗ 33): a capsule in its colour, apart from the title */
+  .prio { display: inline-block; margin-right: 6px; padding: 0 4px; border-radius: 4px; vertical-align: 1px; font-size: 10.5px; font-weight: 700; line-height: 16px; color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); }
   .src { font-size: 11.5px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tag { font-size: 11.5px; color: var(--tagfg); background: var(--tagbg); padding: 1px 8px; border-radius: 9px; }
   .mark { flex: 0 0 170px; text-align: right; font-size: 12px; color: var(--fg2); }
