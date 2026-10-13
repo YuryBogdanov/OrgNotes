@@ -16,9 +16,9 @@ export const SUN = 'M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM10 2.5v2M10 15.
 registerView({ kind: TODAY, label: () => 'Сегодня', icon: SUN, component: Today, crumbs: () => ['Сегодня'], pinned: true, single: true, hasInspector: () => false });
 registerSettings({ id: 'Сегодня', icon: SUN, order: 5, component: TodaySettings });
 
-// the core's blocks; «1-1 сегодня» and «Цели квартала» come later (ТЗ 32, part C)
+// the core's blocks; «Цели квартала» is the plugin's (`contributes.todayBlocks`)
 const WIDE = new Set(['note', 'focus']);
-for (const b of BLOCKS.filter((x) => x.id !== 'oneOnOne' && x.id !== 'goals')) registerTodayBlock({ id: b.id, title: b.title, hint: b.hint, wide: WIDE.has(b.id) });
+for (const b of BLOCKS) registerTodayBlock({ id: b.id, title: b.title, hint: b.hint, wide: WIDE.has(b.id), attach: b.id === 'oneOnOne' });
 
 
 // ---- by itself: at launch (each notes folder), on coming back to the window, on the first action after 4:00 ----
@@ -35,7 +35,14 @@ $effect.root(() => {
   $effect(() => {
     if (store.appActive) untrack(() => today.check(false));
   });
+  // the reminder on: the permission of macOS, asked once
+  $effect(() => {
+    if (store.loaded && today.local.remind) untrack(() => void today.prepareRemind());
+  });
 });
+// a click on the notification «Завершить день?» (Rust brought the window forward)
+if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window)
+  void import('@tauri-apps/api/event').then(({ listen }) => listen('end-day', () => today.openEndDay()));
 let last = 0;
 const poke = () => {
   const n = Date.now();

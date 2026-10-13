@@ -5,6 +5,7 @@
 import { bodyOf } from './orgOps';
 import { firstDone, sequenceFor, type Heading, type OrgDate, type Workflow } from './org';
 import { isoDay, weekNumber, type CalEntry } from './calIndex';
+import { nameOf } from './oneOnOne';
 
 // ---- the day ------------------------------------------------------------------------------------------------------
 
@@ -59,9 +60,19 @@ export function shouldShow(mode: ShowMode, lastShown: number | null, now: Date, 
   return lastShown === null || lastShown < +dayStart(now);
 }
 
+/**
+ * The reminder to end the day is due: on, a working day, its time passed (a Mac asleep then: on waking, till
+ * midnight), not reminded today, the day not ended (the journal has it).
+ */
+export function remindDue(o: { remind: boolean; remindAt: string }, now: Date, remindedOn: string | null, ended: boolean): boolean {
+  if (!o.remind || ended || now.getDay() === 0 || now.getDay() === 6) return false;
+  const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  return hm >= o.remindAt.padStart(5, '0') && remindedOn !== isoDay(now);
+}
+
 // ---- the settings ---------------------------------------------------------------------------------------------------
 
-export type BlockId = 'note' | 'focus' | 'agenda' | 'oneOnOne' | 'tasks' | 'overdue' | 'goals';
+export type BlockId = 'note' | 'focus' | 'agenda' | 'oneOnOne' | 'tasks' | 'overdue';
 export interface BlockState {
   id: string;
   on: boolean;
@@ -90,13 +101,13 @@ export const BLOCKS: { id: BlockId; title: string; hint?: string }[] = [
   { id: 'oneOnOne', title: '1-1 сегодня' },
   { id: 'tasks', title: 'Задачи' },
   { id: 'overdue', title: 'Просрочено' },
-  { id: 'goals', title: 'Цели квартала', hint: 'Добавляет плагин «Цели квартала». Порог «молчит» — в его настройках' },
 ];
+// «Цели квартала» is the plugin's block (`contributes.todayBlocks`): after these in the order until moved
 export const DEFAULT_FOLDER: TodayFolder = {
   statuses: ['TODO', 'NEXT'], files: null, overdueAll: true, agenda: '', tag: '1on1', journal: 'journal.org',
   blocks: BLOCKS.map((b) => ({ id: b.id, on: true })),
 };
-export const DEFAULT_LOCAL: TodayLocal = { show: 'day', overTabs: true, remind: true, remindAt: '18:30' };
+export const DEFAULT_LOCAL: TodayLocal = { show: 'day', overTabs: true, remind: true, remindAt: '17:30' }; // 17:30: the mockup
 
 const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && !!x.trim()) : null);
 /** The tag as written in the settings: «:1on1:», «#1on1», «1on1» → «1on1». */
@@ -128,7 +139,7 @@ export function readLocal(raw: unknown): TodayLocal {
     show: v.show === 'launch' || v.show === 'command' ? v.show : d.show,
     overTabs: typeof v.overTabs === 'boolean' ? v.overTabs : d.overTabs,
     remind: typeof v.remind === 'boolean' ? v.remind : d.remind,
-    remindAt: typeof v.remindAt === 'string' && /^\d{1,2}:\d{2}$/.test(v.remindAt) ? v.remindAt : d.remindAt,
+    remindAt: typeof v.remindAt === 'string' && /^\d{1,2}:\d{2}$/.test(v.remindAt) ? v.remindAt.padStart(5, '0') : d.remindAt,
   };
 }
 
@@ -233,12 +244,16 @@ export function agendaRows(entries: CalEntry[], files: TFile[], day: Date, now: 
     .filter((e) => e.layer !== 'done')
     .map((e): AgendaRow => {
       const kind = e.layer === 'event' ? 'event' : e.layer === 'deadline' ? 'deadline' : 'task';
-      const h = files.find((f) => f.path === e.path)?.headings.find((x) => x.line === e.line);
+      const f = files.find((x) => x.path === e.path);
+      const h = f?.headings.find((x) => x.line === e.line);
+      const meeting = !!tag && !!h?.tags.includes(tag);
+      const who = meeting && f ? nameOf(f) : '';
       const time = e.time ? (kind === 'deadline' ? `до ${e.time}` : e.end ? `${e.time}–${e.end}` : e.time) : 'весь день';
       const ends = e.end ?? e.time;
       return {
-        key: e.path + '#' + e.line + kind, time, kind, kw: e.keyword, meeting: !!tag && !!h?.tags.includes(tag), path: e.path, line: e.line,
-        title: kind === 'deadline' ? `Дедлайн: ${e.title}` : e.title,
+        key: e.path + '#' + e.line + kind, time, kind, kw: e.keyword, meeting, path: e.path, line: e.line,
+        // a 1-1 says whose («1-1 Петров Алексей»)
+        title: kind === 'deadline' ? `Дедлайн: ${e.title}` : who && !e.title.includes(who) ? `${e.title} ${who}` : e.title,
         past: gone || (today && !!ends && ends < hm),
         sort: (e.time ?? '99:99') + (kind === 'event' ? '0' : kind === 'deadline' ? '1' : '2'),
       };

@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.3.0';
+export const API_VERSION = '1.4.0';
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;
@@ -386,6 +386,12 @@ export interface Ctx {
     refile(ref: HeadingRef, o?: { before?(): void | Promise<void>; quiet?: boolean; onUndo?(): void }): Promise<{ path: string; line: number; title: string; label: string } | null>;
     /** The review shown now (its parts move and redraw it); null when there is none of the plugin's. */
     currentReview(): ReviewHandle | null;
+    /** A block of «Сегодня» the manifest declares (`todayBlocks`): the core gives the card, the plugin draws its
+     *  content; `setHidden(true)` leaves it out (nothing to show), the others take its place. Since 1.4. */
+    todayBlock(id: string, render: (el: HTMLElement, block: { setHidden(hidden: boolean): void }) => Dispose | void): Dispose;
+    /** What the plugin adds to a card of «1-1 сегодня» (the person's file, relative): a line under the person («Цели:
+     *  3 активных») and a button. Since 1.4. */
+    oneOnOne(spec: { line?(path: string): string | null | Promise<string | null>; action?: { label: string; available?(path: string): boolean | Promise<boolean>; run(path: string): void } }): Dispose;
   };
   /** Needs `index.read`. */
   index?: {

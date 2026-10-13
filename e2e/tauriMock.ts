@@ -5,12 +5,14 @@ import type { Page } from '@playwright/test';
  * debounced `notes-changed` event the Rust side produces, so the real save → watch → reload
  * cycle of the front end runs in a plain browser.
  */
-export async function installTauriMock(page: Page, files: Record<string, string>, opts: { eventDelayMs?: number; listDelayMs?: number; today?: boolean } = {}) {
+export async function installTauriMock(page: Page, files: Record<string, string>, opts: { eventDelayMs?: number; listDelayMs?: number; today?: boolean; remind?: boolean } = {}) {
   await page.addInitScript(
-    ({ files, eventDelay, listDelay, today }) => {
+    ({ files, eventDelay, listDelay, today, remind }) => {
       const w = window as any;
       // «Сегодня» (ТЗ 32) opens by itself at the start of the day: the tests of other things start as if it was shown
       if (!today) localStorage.setItem('today:shown', '4102444800000');
+      // nor its reminder in the evening of a working day, unless the test asks
+      if (!remind) localStorage.setItem('feature:today', JSON.stringify({ remind: false }));
       const disk: Record<string, string> = { ...files };
       const cbs: Record<number, (e: unknown) => void> = {};
       const listeners: Record<string, number> = {};
@@ -305,7 +307,7 @@ export async function installTauriMock(page: Page, files: Record<string, string>
         },
       };
     },
-    { files, eventDelay: opts.eventDelayMs ?? 300, listDelay: opts.listDelayMs ?? 0, today: !!opts.today },
+    { files, eventDelay: opts.eventDelayMs ?? 300, listDelay: opts.listDelayMs ?? 0, today: !!opts.today, remind: !!opts.remind },
   );
 }
 

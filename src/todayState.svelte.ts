@@ -5,11 +5,14 @@
 import { store } from './store.svelte';
 import { isPinned, newTab, pinFirst, type Layout } from './layout';
 import type { Schema, Values } from './settingsSchema';
-import { newId, writeDay, type DayTask, type Link } from './endDay';
-import { DEFAULT_FOLDER, DEFAULT_LOCAL, cleanTag, dayOf, readFolder, readLocal, shouldShow, type TodayFolder, type TodayLocal } from './today';
+import { isoOf, newId, writeDay, type DayTask, type Link } from './endDay';
+import { allTodayBlocks } from './todayBlocks';
+import { DEFAULT_FOLDER, DEFAULT_LOCAL, cleanTag, dayOf, journalDays, readFolder, remindDue, readLocal, shouldShow, type BlockState, type TodayFolder, type TodayLocal } from './today';
 
 export const TODAY = 'today'; // the kind of its tab
 const SHOWN = 'today:shown'; // when it was last shown (ms)
+const REMINDED = 'today:reminded'; // the day reminded last (yyyy-mm-dd)
+const MOON = 'M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8z';
 
 store.registerStorage(TODAY);
 store.addSheet(() => today.ending);
@@ -36,6 +39,11 @@ class TodayState {
   setLocal(patch: Partial<TodayLocal>) {
     store.setLocalData(TODAY, { ...this.local, ...patch });
   }
+  /** The blocks in their order: the saved one, then the blocks registered since (a plugin's), on. */
+  get blocks(): BlockState[] {
+    const saved = this.folder.blocks;
+    return [...saved, ...allTodayBlocks().filter((b) => !saved.some((s) => s.id === b.id)).map((b) => ({ id: b.id, on: true }))];
+  }
   /** The files of «Задачи»: the chosen ones, else the Inbox's file (else inbox.org). */
   get taskFiles(): string[] {
     return this.folder.files ?? [store.inboxCfg.file || 'inbox.org'];
@@ -48,6 +56,43 @@ class TodayState {
   tick() {
     const n = new Date();
     if (n.getMinutes() !== this.now.getMinutes() || +n - +this.now > 60000) this.now = n;
+    this.remindCheck(n);
+  }
+
+  // ---- «Напоминать завершить день» (ТЗ 32 §5) ----
+  private remindCheck(now: Date) {
+    if (!store.loaded || !store.dir || store.mirror) return;
+    const j = store.files.find((f) => f.name === this.folder.journal);
+    const ended = !!j && journalDays(j).some((d) => isoOf(d.date) === isoOf(now));
+    let on: string | null = null;
+    try {
+      on = localStorage.getItem(REMINDED);
+    } catch {
+      /* none */
+    }
+    if (!remindDue(this.local, now, on, ended)) return;
+    try {
+      localStorage.setItem(REMINDED, isoOf(now));
+    } catch {
+      /* this time only */
+    }
+    void this.remind();
+  }
+  /** The notification of macOS; without one, the window's. */
+  async remind() {
+    let shown = false;
+    if ('__TAURI_INTERNALS__' in window) {
+      const { invoke } = await import('@tauri-apps/api/core');
+      shown = !!(await invoke<boolean>('remind_end_day').catch(() => false));
+    }
+    // the window's own when macOS cannot show one (no app bundle: `tauri dev`, the browser)
+    if (!shown) store.note('Завершить день? Запишите заметку на завтра', [{ label: 'Завершить день…', run: () => this.openEndDay() }], 10 * 60000, MOON);
+  }
+  /** The reminder is on: macOS asks for the permission once (in an app built). */
+  async prepareRemind() {
+    if (!this.local.remind || !('__TAURI_INTERNALS__' in window)) return;
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('remind_prepare').catch(() => {});
   }
   start() {
     if (this.timer) return;
@@ -99,14 +144,9 @@ class TodayState {
     });
     if (!step) return false;
     this.ending = false;
-    this.toast = 'День завершён. До завтра';
-    clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => (this.toast = ''), 3000);
+    store.note('День завершён. До завтра', undefined, 3000, MOON);
     return true;
   }
-  /** «День завершён. До завтра» at the bottom of the window for 3 s. */
-  toast = $state('');
-  private toastTimer: ReturnType<typeof setTimeout> | undefined;
   /** At launch, on coming back to the window, on the first action after 4:00: opens it when the settings say so. */
   check(launch: boolean) {
     this.tick();
@@ -158,6 +198,10 @@ export const showSchema: Schema = {
     ],
   }],
 };
+const TIMES = Array.from({ length: 15 }, (_, i) => {
+  const t = `${String(15 + Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`;
+  return { value: t, label: t };
+}); // 15:00 … 22:00
 export const moreSchema: Schema = {
   id: 'today', label: 'Сегодня', values: both, set: put,
   groups: [
@@ -174,8 +218,10 @@ export const moreSchema: Schema = {
       caption: 'КОНЕЦ ДНЯ',
       fields: [
         { key: 'journal', type: 'file', where: 'folder', label: 'Журнал', show: (rel) => rel ?? DEFAULT_FOLDER.journal },
+        { key: 'remind', type: 'switch', where: 'local', label: 'Напоминать завершить день', hint: 'Уведомление macOS' },
+        { key: 'remindAt', type: 'choice', look: 'menu', where: 'local', label: 'Время напоминания', hint: 'Обычно за полчаса до конца рабочего дня', options: TIMES },
       ],
-      help: 'Дерево дат: год › месяц › день › «На завтра».',
+      help: 'Журнал — дерево дат: год › месяц › день › «На завтра». Напоминание — по будням, пока приложение открыто.',
     },
   ],
 };

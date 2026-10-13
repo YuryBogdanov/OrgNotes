@@ -174,3 +174,20 @@ describe('sourcesJson (roadmap 0.6)', () => {
     expect(sourcesJson(list)).toEqual([{ file: 'a.org', heading: 'Цели', title: 'А', me: true }, { file: 'b.org', heading: 'Цели', title: 'Б' }]);
   });
 });
+
+describe('«Сегодня»', () => {
+  it('a person at a glance: active, silent, the last mark; the words', async () => {
+    const { todayPerson, oneOnOneLine, agoWords, goalsCount } = await import('./goals');
+    const g = (keyword: string, mark: Date | null) => ({ title: keyword + (mark ? +mark : ''), keyword, line: 0, end: 0, deadline: null, closed: null, created: null, plan: '', result: '', marks: mark ? [{ date: mark, text: '', line: 0 }] : [] });
+    const now = new Date(2026, 9, 14);
+    const q = { y: 2026, q: 4 };
+    const s = { head: 0, quarters: [{ q, line: 0, end: 0, goals: [g('ACTIVE', new Date(2026, 9, 8)), g('ACTIVE', new Date(2026, 8, 20)), g('ACTIVE', null), g('COMPLETED', new Date(2026, 9, 13))] }] };
+    const p = todayPerson(s, q, now, 14);
+    expect(p).toMatchObject({ active: 3, last: 6 });
+    expect(p.silent.map((x) => x.days)).toEqual([24]);
+    expect(oneOnOneLine(p, 14)).toBe('Цели: 3 активных, 1 молчит больше 14 дней');
+    expect(oneOnOneLine({ active: 1, silent: [], last: 2 }, 14)).toBe('Цели: 1 активная');
+    expect([agoWords(6, false), agoWords(18, true), agoWords(1, false), agoWords(null, false)]).toEqual(['6 дней назад', '18 дней', 'вчера', 'нет отметок']);
+    expect(goalsCount(2)).toBe('2 цели');
+  });
+});

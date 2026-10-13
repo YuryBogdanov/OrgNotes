@@ -9,6 +9,8 @@ import { store } from '../store.svelte';
 import { newTab, openFile, openFromAgenda, openView } from '../layout';
 import { register as registerPalette } from '../commands';
 import { registerAction, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf, viewOf } from '../views';
+import { registerTodayBlock } from '../todayBlocks';
+import PluginTodayBlock from '../PluginTodayBlock.svelte';
 import { fuzzy } from '../fuzzy';
 import { runAgenda, statusKey, type Agenda, type Cond as CoreCond } from '../agendas';
 import { DEFAULT_SEQUENCE, DEFAULT_WORKFLOW, namedFor, type Heading, type WorkflowDef } from '../org';
@@ -85,6 +87,10 @@ class Host {
   /** What a plugin's code gave: the drawings of its sections and kinds of tabs. */
   navs = new SvelteMap<string, { plugin: string; render: Render }>();
   views = new SvelteMap<string, ViewEntry>();
+  /** The blocks of «Сегодня» (ТЗ 32): their drawings, the ones left out now; what the plugins add to a card of 1-1. */
+  todayRenders = new SvelteMap<string, { plugin: string; render: (el: HTMLElement, block: { setHidden(hidden: boolean): void }) => Dispose | void }>();
+  todayHidden = new SvelteMap<string, true>();
+  oneOnOnes = new SvelteMap<string, Parameters<Ctx['ui']['oneOnOne']>[0]>();
   /** A tab drawn anew (`ui.open` with a new state for a tab shown): its number. */
   redraw = new SvelteMap<string, number>();
   /** The numbers on the plugins' buttons of the navigator (`ui.setBadge`). */
@@ -324,6 +330,12 @@ class Host {
       this.keep(id, registerNav({ id: n.id, label: n.title, icon: n.icon, key: n.key, order: 100 + i, component: PluginNav as unknown as Component, badge: () => this.badges.get(n.id) ?? 0 }));
       if (n.key) this.keep(id, registerAction(n.key, () => this.showNav(n.id)));
     });
+    for (const b of m.contributes.todayBlocks) {
+      this.keep(id, registerTodayBlock({
+        id: b.id, title: b.title, hint: b.hint, attach: b.attach, component: PluginTodayBlock as unknown as Component,
+        empty: () => !this.todayRenders.has(b.id) || this.todayHidden.has(b.id),
+      }));
+    }
     for (const v of m.contributes.views) {
       const spec = () => this.views.get(v.id)?.spec;
       this.keep(id, registerView({
@@ -502,6 +514,8 @@ class Host {
       this.disposers.delete(id);
       for (const [k, v] of this.views) if (v.plugin === id) this.views.delete(k);
       for (const [k, v] of this.navs) if (v.plugin === id) this.navs.delete(k);
+      for (const [k, v] of this.todayRenders) if (v.plugin === id) (this.todayRenders.delete(k), this.todayHidden.delete(k));
+      this.oneOnOnes.delete(id);
       void Promise.resolve(this.plugins.get(id)?.deactivate?.()).catch(() => {});
       this.plugins.delete(id);
     });
@@ -526,6 +540,8 @@ class Host {
       this.disposers.delete(id);
       for (const [k, v] of this.views) if (v.plugin === id) this.views.delete(k);
       for (const [k, v] of this.navs) if (v.plugin === id) this.navs.delete(k);
+      for (const [k, v] of this.todayRenders) if (v.plugin === id) (this.todayRenders.delete(k), this.todayHidden.delete(k));
+      this.oneOnOnes.delete(id);
       store.refreshStatusSets();
       if (this.manifest(id)?.contributes.navSections.some((n) => n.id === store.navMode)) store.setNavMode('files');
       try {
@@ -595,6 +611,19 @@ class Host {
         },
       },
       ui: {
+        todayBlock: (blk, render) => {
+          declared('блока', m.contributes.todayBlocks.some((b) => b.id === blk), blk);
+          this.todayRenders.set(blk, { plugin: id, render });
+          return keep(() => {
+            if (this.todayRenders.get(blk)?.render !== render) return;
+            this.todayRenders.delete(blk);
+            this.todayHidden.delete(blk);
+          });
+        },
+        oneOnOne: (spec) => {
+          this.oneOnOnes.set(id, spec);
+          return keep(() => void (this.oneOnOnes.get(id) === spec && this.oneOnOnes.delete(id)));
+        },
         navSection: (nav, render) => {
           declared('раздела', m.contributes.navSections.some((n) => n.id === nav), nav);
           this.navs.set(nav, { plugin: id, render });
