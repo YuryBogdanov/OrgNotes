@@ -32,6 +32,17 @@ struct Config {
     /// macOS bookmark of the folder: survives a rename or a move of it
     #[serde(default, skip_serializing_if = "Option::is_none")]
     bookmark: Option<Vec<u8>>,
+    /// The mini window's place and size, logical points (ТЗ 31 §1: «Запоминать размер и положение»)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    mini_frame: Option<MiniFrame>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Default)]
+struct MiniFrame {
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
 }
 
 #[cfg(target_os = "macos")]
@@ -359,7 +370,9 @@ fn remembered_dir(app: &AppHandle) -> Option<PathBuf> {
 }
 
 fn remember(app: &AppHandle, path: &str) {
-    write_config(app, &Config { notes_dir: Some(path.to_string()), bookmark: bookmark::make(path) });
+    // the folder changes; what else this Mac keeps (the mini window's frame) stays
+    let cfg = read_config(app);
+    write_config(app, &Config { notes_dir: Some(path.to_string()), bookmark: bookmark::make(path), ..cfg });
 }
 
 /// «Повторить»: open the remembered folder if it is back.
@@ -1346,6 +1359,37 @@ fn on_main<R: Send + 'static>(app: &AppHandle, f: impl FnOnce() -> R + Send + 's
     rx.recv().ok()
 }
 
+/// The settings of «Мини-окно» as last given by the page: opacity, the pause after typing (s), smooth, over full-screen
+/// programs, hidden from capture, remember the frame. Kept here: the panel is made later, on its first show.
+static MINI_OPTS: std::sync::Mutex<(f64, f64, bool, bool, bool, bool)> = std::sync::Mutex::new((0.3, 3.0, true, true, true, true));
+
+/// The saved frame, if the settings keep it and a screen still has its corner.
+fn mini_saved_frame(app: &AppHandle) -> Option<MiniFrame> {
+    if !MINI_OPTS.lock().unwrap().5 {
+        return None;
+    }
+    let f = read_config(app).mini_frame?;
+    let on_screen = app.available_monitors().ok()?.iter().any(|m| {
+        let s = m.scale_factor();
+        let pos = m.position().to_logical::<f64>(s);
+        let size = m.size().to_logical::<f64>(s);
+        f.x >= pos.x && f.y >= pos.y && f.x < pos.x + size.width && f.y < pos.y + size.height
+    });
+    on_screen.then_some(f)
+}
+/// The window moved or resized: its frame kept (when the settings say so).
+fn mini_keep_frame(w: &tauri::Window) {
+    if !MINI_OPTS.lock().unwrap().5 {
+        return;
+    }
+    let (Ok(pos), Ok(size), Ok(s)) = (w.outer_position(), w.inner_size(), w.scale_factor()) else { return };
+    let (p, z) = (pos.to_logical::<f64>(s), size.to_logical::<f64>(s));
+    let app = w.app_handle();
+    let mut cfg = read_config(app);
+    cfg.mini_frame = Some(MiniFrame { x: p.x, y: p.y, w: z.width, h: z.height });
+    write_config(app, &cfg);
+}
+
 fn make_mini_window(app: &AppHandle) {
     if app.get_webview_window(MINI).is_some() {
         return;
@@ -1366,10 +1410,24 @@ fn make_mini_window(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     if let Ok(ns) = w.ns_window() {
         let ptr = ns as usize;
-        on_main(app, move || unsafe { mini_native::mini_setup(ptr as *mut std::ffi::c_void, true, true) });
+        let o = *MINI_OPTS.lock().unwrap();
+        on_main(app, move || unsafe {
+            mini_native::mini_setup(ptr as *mut std::ffi::c_void, o.3.into(), o.4.into());
+            mini_native::mini_options(o.0, o.1, o.2.into(), o.3.into(), o.4.into());
+        });
     }
-    // by default in the bottom right corner of the screen, 24 pt from its edges
-    if let Ok(Some(m)) = w.current_monitor() {
+    if let Some(f) = mini_saved_frame(app) {
+        let _ = w.set_size(tauri::LogicalSize::new(f.w.max(280.0), f.h.max(180.0)));
+        let _ = w.set_position(tauri::LogicalPosition::new(f.x, f.y));
+        return;
+    }
+    // by default in the bottom right corner of the screen the pointer is on, 24 pt from its edges
+    let m = app
+        .cursor_position()
+        .ok()
+        .and_then(|c| app.monitor_from_point(c.x, c.y).ok().flatten())
+        .or_else(|| w.current_monitor().ok().flatten());
+    if let Some(m) = m {
         let s = m.scale_factor();
         let size = m.size().to_logical::<f64>(s);
         let pos = m.position().to_logical::<f64>(s);
@@ -1438,9 +1496,10 @@ fn mini_return_focus(app: AppHandle) {
     #[cfg(target_os = "macos")]
     on_main(&app, || unsafe { mini_native::mini_return_focus() });
 }
-/// The settings of «Мини-окно» (ТЗ 31 §6), applied at once.
+/// The settings of «Мини-окно» (ТЗ 31 §6), applied at once (and kept for the panel made later).
 #[tauri::command]
-fn mini_options(app: AppHandle, opacity: f64, linger: f64, smooth: bool, fullscreen: bool, hide_from_capture: bool) {
+fn mini_options(app: AppHandle, opacity: f64, linger: f64, smooth: bool, fullscreen: bool, hide_from_capture: bool, remember: bool) {
+    *MINI_OPTS.lock().unwrap() = (opacity, linger, smooth, fullscreen, hide_from_capture, remember);
     #[cfg(target_os = "macos")]
     on_main(&app, move || unsafe { mini_native::mini_options(opacity, linger, smooth.into(), fullscreen.into(), hide_from_capture.into()) });
 }
@@ -1532,6 +1591,9 @@ pub fn run() {
         })
         // as on macOS: closing the window keeps the app (in the Dock); its text stays in memory, nothing is lost
         .on_window_event(|w, e| {
+            if w.label() == MINI && matches!(e, tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_)) {
+                mini_keep_frame(w);
+            }
             if let tauri::WindowEvent::CloseRequested { api, .. } = e {
                 if w.label() == "main" {
                     api.prevent_close();

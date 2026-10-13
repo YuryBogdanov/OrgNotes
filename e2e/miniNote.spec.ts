@@ -17,9 +17,12 @@ const snapshot = (text = TEXT, note: unknown = { path: 'Work.org', line: 0, titl
 const mini = (page: Page) => page.getByRole('application', { name: 'Мини-окно' });
 const lines = (page: Page) => mini(page).locator('.cm-line');
 
-async function open(page: Page, note?: unknown) {
+async function open(page: Page, note?: unknown, ls: Record<string, string> = {}) {
   await page.setViewportSize({ width: 440, height: 330 });
-  await page.addInitScript(() => localStorage.clear());
+  await page.addInitScript((kv) => {
+    localStorage.clear();
+    for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v);
+  }, ls);
   await installTauriMock(page, {});
   await page.goto('/#mini');
   await expect(mini(page)).toBeVisible();
@@ -89,4 +92,27 @@ test('no note yet: the palette at once; a command of the big window says so; ⎋
   await expect.poll(async () => (await log(page)).some((e) => e[0] === 'mini_return_focus')).toBe(true);
   await page.getByRole('button', { name: 'Открыть в главном окне' }).click();
   await expect.poll(async () => (await log(page)).find((e) => e[0] === 'emit' && e[2] === 'mini-open-main')?.[3]).toEqual({ path: 'Work.org', line: 0 });
+});
+
+test('⌘F searches what the window shows; ⎋ closes the bar first; full while it is open', async ({ page }) => {
+  await open(page);
+  await page.keyboard.press('Meta+f');
+  const bar = page.getByRole('textbox', { name: /Найти/ });
+  await expect(bar).toBeFocused();
+  await page.keyboard.type('биллинг');
+  await expect(mini(page).locator('.cm-find').first()).toBeVisible();
+  await expect.poll(async () => (await log(page)).filter((e) => e[0] === 'mini_pin').at(-1)?.[1]).toEqual({ on: true });
+  await page.keyboard.press('Escape');
+  await expect(bar).toHaveCount(0);
+  await expect.poll(async () => (await log(page)).filter((e) => e[0] === 'mini_pin').at(-1)?.[1]).toEqual({ on: false });
+  expect((await log(page)).some((e) => e[0] === 'mini_return_focus')).toBe(false); // the bar closed, the keys stay here
+});
+
+test('its keys are the ones of «Клавиши»: ⌘W hides it, a changed ⌘P opens the palette', async ({ page }) => {
+  await open(page, undefined, { keys: JSON.stringify({ preset: 'emacs', overrides: { miniPalette: ['⌘O'] } }) });
+  await page.keyboard.press('Meta+o');
+  await expect(page.getByRole('dialog', { name: 'Сменить заметку' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Meta+w');
+  await expect.poll(async () => (await log(page)).some((e) => e[0] === 'mini_hide')).toBe(true);
 });

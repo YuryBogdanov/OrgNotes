@@ -13,5 +13,8 @@ import './goalsMigration';
 // ---- the calendar: the built-in plugin «calendar» (ТЗ 29); the month under the Inbox review's card stays the core's
 import './calendarMigration';
 
+// ---- the mini window (ТЗ 31): a part of the core; its settings' section
+import './mini';
+
 // the plugins that are on: what their manifests declare (roadmap 1.1); their code is started by App once drawn
 import '../api/host.svelte';

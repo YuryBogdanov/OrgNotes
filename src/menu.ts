@@ -105,7 +105,7 @@ export async function installMenu(actions: MenuActions, accel: (id: string) => s
             { item: 'Fullscreen' },
           ],
         },
-        { text: 'Окно', items: [it('closeWindow', 'Закрыть окно'), sep, it('miniOpen', 'Открыть в мини-окне'), sep, { item: 'Minimize' }, { item: 'Maximize' }, sep, { item: 'BringAllToFront' }] },
+        { text: 'Окно', items: [it('closeWindow', 'Закрыть окно'), sep, it('miniOpen', 'Открыть в мини-окне'), it('miniShow', 'Показать мини-окно'), sep, { item: 'Minimize' }, { item: 'Maximize' }, sep, { item: 'BringAllToFront' }] },
       ],
     });
     await menu.setAsAppMenu();
