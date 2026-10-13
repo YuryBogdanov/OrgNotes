@@ -1,6 +1,7 @@
 <script lang="ts">
   import './features'; // the built-in features register their tabs, sections and keys (roadmap 0.3)
   import { onMount, untrack } from 'svelte';
+  import { cubicOut } from 'svelte/easing';
   import { store } from './store.svelte';
   import Inspector from './Inspector.svelte';
   import Pane from './Pane.svelte';
@@ -77,6 +78,14 @@
   $effect(() => {
     if (fit.merge) store.mergePanes();
   });
+
+  // ---- the navigator and the inspector come and go as in Xcode: the editor widens, the panel slides out to its side
+  // (its content keeps its width, the edge by the editor goes first)
+  const slide = (node: HTMLElement) => {
+    const w = node.offsetWidth;
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    return { duration: still ? 0 : 220, easing: cubicOut, css: (t: number) => `width:${t * w}px` };
+  };
 
   // ---- the divider between the panes ---------------------------------------------------------------------
   let panesEl: HTMLDivElement | undefined = $state();
@@ -374,8 +383,10 @@
 
   <div class="body" bind:clientWidth={bodyW}>
     {#if fit.nav}
-      <aside class="side" style="width:{store.navW}px"><NavPanel /></aside>
-      <Splitter onresize={(dx) => (store.navW = clamp(store.navW + dx, 180, 480))} />
+      <div class="slot nav-slot" transition:slide>
+        <aside class="side" style="width:{store.navW}px"><NavPanel /></aside>
+        <Splitter onresize={(dx) => (store.navW = clamp(store.navW + dx, 180, 480))} />
+      </div>
     {/if}
 
     <main class="center">
@@ -398,8 +409,10 @@
     </main>
 
     {#if fit.insp}
-      <Splitter onresize={(dx) => (store.inspW = clamp(store.inspW - dx, 220, 440))} />
-      <aside class="side" style="width:{store.inspW}px"><Inspector /></aside>
+      <div class="slot insp-slot" transition:slide>
+        <Splitter onresize={(dx) => (store.inspW = clamp(store.inspW - dx, 220, 440))} />
+        <aside class="side" style="width:{store.inspW}px"><Inspector /></aside>
+      </div>
     {/if}
   </div>
   {/if}
@@ -460,6 +473,11 @@
 
   .body { flex: 1; min-height: 0; display: flex; }
   .side { flex: 0 0 auto; min-width: 0; background: var(--side-bg); overflow: hidden; }
+  /* the panel and its splitter; while it comes or goes only its width changes: the navigator's content is held by its
+     right edge (it slides left), the inspector's by its left one (it slides right) */
+  .slot { flex: 0 0 auto; min-height: 0; display: flex; overflow: hidden; }
+  .nav-slot { justify-content: flex-end; }
+  .insp-slot { justify-content: flex-start; }
   .center { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; background: var(--bg); }
   .panes { flex: 1; min-height: 0; display: flex; }
   .pwrap { min-width: 0; display: flex; }
