@@ -13,7 +13,7 @@ export const CONFIG = JSON.stringify({
     { name: 'Задачи', states: [{ name: 'TODO', done: false }, { name: 'NEXT', done: false }, { name: 'WAIT', done: false }, { name: 'DONE', done: true }] },
   ],
 });
-export const PLATFORM = (board = true) =>
+export const PLATFORM = (board = true, extra: string[] = []) =>
   [
     '#+TITLE: Платформа',
     ...(board ? ['#+BOARD: Разработка'] : []),
@@ -38,10 +38,11 @@ export const PLATFORM = (board = true) =>
     '* DONE Старая задача',
     `CLOSED: [${stamp(-40)} 10:00]`,
     '* CANCELLED Отменённое',
+    ...extra,
     '',
   ].join('\n');
-export const FILES = (board = true) => ({
+export const FILES = (board = true, extra: string[] = []) => ({
   '/mock/.orgnotes/config.json': CONFIG,
-  '/mock/work/platform.org': PLATFORM(board),
+  '/mock/work/platform.org': PLATFORM(board, extra),
   '/mock/inbox.org': '* TODO x\n',
 });

@@ -13,8 +13,9 @@ export interface ManifestCommand {
   title: string;
   keys?: string[];
   synonyms?: string[];
-  /** «review»: the keys of an action of the plugin's review (work while its tab is shown). */
-  scope?: 'review';
+  /** «review»: the keys of an action of the plugin's review (work while its tab is shown); «view»: of its view of a
+   *  file (work while a file tab shows it: the board's keys, 1.5). */
+  scope?: 'review' | 'view';
   /** From the palette it asks in the palette (`ui.choose` at once): the next step of the same window. */
   step?: boolean;
 }
@@ -145,8 +146,8 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
     const keys = arr(x.keys).filter(isStr);
     const ok = keys.filter((k) => !RESERVED_KEYS.includes(k));
     for (const k of keys) if (!ok.includes(k)) warnings.push(`${k} у «${String(x.title)}» занято приложением`);
-    if (x.scope !== undefined && x.scope !== 'review') problems.push(`команда «${x.id}»: scope — только review`);
-    commands.push({ id: x.id as string, title: String(x.title ?? ''), keys: ok, synonyms: arr(x.synonyms).filter(isStr), ...(x.scope === 'review' ? { scope: 'review' as const } : {}), ...(x.step === true ? { step: true } : {}) });
+    if (x.scope !== undefined && x.scope !== 'review' && x.scope !== 'view') problems.push(`команда «${x.id}»: scope — review или view`);
+    commands.push({ id: x.id as string, title: String(x.title ?? ''), keys: ok, synonyms: arr(x.synonyms).filter(isStr), ...(x.scope === 'review' || x.scope === 'view' ? { scope: x.scope } : {}), ...(x.step === true ? { step: true } : {}) });
   }
   const navSections: ManifestNav[] = [];
   for (const x of arr(c.navSections).map(obj)) {

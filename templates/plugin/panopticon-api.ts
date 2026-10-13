@@ -102,10 +102,11 @@ export interface Tx {
   setTags(h: HeadingRef, tags: string[]): void;
   setProperty(h: HeadingRef, key: string, value: string | null): void;
   /** Org text of one heading with its subtree, its stars relevelled to the place: under a heading (its first or last
-   *  child — the last before the blank lines ending the parent — or right before one of its children), or at the top
-   *  or the end of a file. Its reference (1.3), for the next operations; null — not made. */
+   *  child — the last before the blank lines ending the parent — or right before one of its children), at the top or
+   *  the end of a file, or right after another heading's subtree at its level (`after`, 1.5). Its reference (1.3), for
+   *  the next operations; null — not made. */
   insertHeading(
-    at: { under: HeadingRef; position: 'first' | 'last' } | { under: HeadingRef; before: HeadingRef } | { file: string; position: 'top' | 'end' },
+    at: { under: HeadingRef; position: 'first' | 'last' } | { under: HeadingRef; before: HeadingRef } | { file: string; position: 'top' | 'end' } | { after: HeadingRef },
     org: string,
   ): HeadingRef | null;
   /** The direct subheading of that title (case and spaces around aside), made when there is none: last, or before a
@@ -119,7 +120,9 @@ export interface Tx {
   body(h: HeadingRef): string | null;
   /** The text under the heading (after its planning and drawers), up to its first subheading. */
   replaceBody(h: HeadingRef, org: string): void;
-  move(h: HeadingRef, to: { under: HeadingRef } | { file: string }): void;
+  /** Under a heading, to a file's top level, or right before / after another heading of its file at that one's level
+   *  (`before` / `after`, 1.5). */
+  move(h: HeadingRef, to: { under: HeadingRef } | { file: string } | { before: HeadingRef } | { after: HeadingRef }): void;
   remove(h: HeadingRef): void;
   /** The file changed by the plugin's own function: null leaves it. A fallback for a structure of the plugin's own in
    *  the file — the operations above are the core's to check and to merge (ТЗ 30). */

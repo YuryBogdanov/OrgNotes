@@ -72,3 +72,18 @@
 .kb-plate { margin: 6px 20px 0; padding: 9px 12px; border-radius: 8px; background: var(--side); font-size: 12px; color: var(--fg2); line-height: 1.5; }
 .kb-plate code { font: 12px var(--mono); color: var(--fg); }
 .kb-btns { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 20px; }
+
+/* ТЗ 33 part B: the column's «+», a new card, dragging */
+.kanban { outline: none; }
+.kanban.dragging, .kanban.dragging * { cursor: grabbing !important; user-select: none; }
+.kb-chw { flex: 0 0 38px; display: flex; align-items: center; padding-right: 8px; }
+.kb-chw .kb-ch { flex: 1; min-width: 0; height: 38px; }
+.kb-plus { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: none; color: var(--fg2) !important; font-size: 15px !important; line-height: 1; }
+.kb-plus:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.kb-add { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px; border: 0; border-radius: 7px; background: none; color: var(--fg3) !important; font-size: 12.5px !important; text-align: left; }
+.kb-add:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); color: var(--fg2) !important; }
+.kb-new { flex: 0 0 auto; box-sizing: border-box; height: 36px; padding: 0 10px; border: 1px solid var(--acc); border-radius: 8px; background: var(--bg); color: var(--fg); font: 13px var(--ui); outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--acc) 16%, transparent); }
+.kb-card.ghost { opacity: 0.35; }
+.kb-ph { flex: 0 0 auto; box-sizing: border-box; border: 2px dashed var(--acc); border-radius: 8px; background: color-mix(in srgb, var(--acc) 8%, transparent); }
+.kb-col.folded.over { box-shadow: inset 0 0 0 2px var(--acc); }
+.kb-drag { position: fixed; z-index: 95; pointer-events: none; display: flex; flex-direction: column; gap: 6px; box-sizing: border-box; padding: 9px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--acc); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28); transform: rotate(2deg); font: 13px var(--ui); color: var(--fg); }

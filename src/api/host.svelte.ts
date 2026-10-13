@@ -21,7 +21,7 @@ import { parseTheme, type Theme } from '../themes';
 import { displayName } from '../names';
 import type { Tx as CoreTx } from '../journal';
 import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSchema';
-import { builtinEntries, declareKeys, entries, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, type Entry, type Listed } from './declare';
+import { builtinEntries, declareKeys, entries, viewScope, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, type Entry, type Listed } from './declare';
 import PluginsSettings from '../PluginsSettings.svelte';
 import { hostAllowed, hostOf, type Manifest, type ManifestSettings } from './manifest';
 import type { Ctx, Dispose, Named, SheetSpec, EventName, FormSpec, HeadingInfo, HeadingRef, Place, Plugin, Query, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
@@ -311,11 +311,34 @@ class Host {
     if (store.loaded) void store.readFeatureFile(id); // declared after the folder was read (installed, turned on)
     // not in the palette: a review's keys, and «Навигатор: …» (as the core's own sections)
     const navKeys = new Set(m.contributes.navSections.map((n) => n.key).filter(Boolean));
+    // a view's keys (the board's, ТЗ 33): while a file tab shows a view of the plugin and nothing is typed into a field
+    const viewShown = () => {
+      const t = store.tab;
+      return !!t && t.kind === 'file' && m.contributes.fileViews.some((v) => v.id === store.viewOf(t));
+    };
+    const inView = () => {
+      if (!viewShown()) return false;
+      const a = document.activeElement as HTMLElement | null;
+      return !(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable));
+    };
+    if (m.contributes.commands.some((c) => c.scope === 'view')) {
+      const scope = viewScope(id);
+      store.setScopeKeys(scope, {
+        active: inView,
+        run: (cmd) => {
+          const run = m.contributes.commands.some((c) => c.id === cmd && c.scope === 'view') ? actionOf(cmd) : undefined;
+          if (!run) return false;
+          run();
+          return true;
+        },
+      });
+      this.keep(id, () => store.setScopeKeys(scope, null));
+    }
     for (const c of m.contributes.commands.filter((x) => x.scope !== 'review' && !navKeys.has(x.id) && !this.inPalette.has(x.id))) {
       this.inPalette.add(c.id);
       registerPalette({
         id: c.id, title: c.title, icon: 'plug', group: 'general', synonyms: c.synonyms,
-        when: () => !!actionOf(c.id),
+        when: () => !!actionOf(c.id) && (c.scope !== 'view' || viewShown()), // the palette has the focus itself
         run: () => {
           // a command that asks in the palette: run now, its choice is the palette's next step (no gap to type into)
           if (c.step) {
@@ -1197,10 +1220,12 @@ function apiTx(tx: CoreTx, ev: Changed[]) {
     setPlanning: (h: HeadingRef, k: 'SCHEDULED' | 'DEADLINE', d: Date | null) => (tx.setPlanning(coreRef(h), k, d), ev.push([h, 'planning'])),
     setTags: (h: HeadingRef, tags: string[]) => (tx.setTags(coreRef(h), tags), ev.push([h, 'tags'])),
     setProperty: (h: HeadingRef, k: string, v: string | null) => (tx.setProperty(coreRef(h), k, v), ev.push([h, 'property'])),
-    insertHeading: (at: { under: HeadingRef; position: 'first' | 'last' } | { under: HeadingRef; before: HeadingRef } | { file: string; position: 'top' | 'end' }, org: string) =>
+    insertHeading: (at: { under: HeadingRef; position: 'first' | 'last' } | { under: HeadingRef; before: HeadingRef } | { file: string; position: 'top' | 'end' } | { after: HeadingRef }, org: string) =>
       apiRef(
         tx.insertHeading(
-          'under' in at ? ('before' in at ? { under: coreRef(at.under), before: coreRef(at.before) } : { under: coreRef(at.under), position: at.position }) : { file: corePath(at.file), position: at.position },
+          'after' in at
+            ? { after: coreRef(at.after) }
+            : 'under' in at ? ('before' in at ? { under: coreRef(at.under), before: coreRef(at.before) } : { under: coreRef(at.under), position: at.position }) : { file: corePath(at.file), position: at.position },
           org,
         ),
       ),
@@ -1217,7 +1242,10 @@ function apiTx(tx: CoreTx, ev: Changed[]) {
     },
     body: (h: HeadingRef) => tx.body(coreRef(h)),
     replaceBody: (h: HeadingRef, org: string) => (tx.replaceBody(coreRef(h), org), ev.push([h, 'body'])),
-    move: (h: HeadingRef, to: { under: HeadingRef } | { file: string }) => (tx.move(coreRef(h), 'under' in to ? { under: coreRef(to.under) } : { file: corePath(to.file) }), ev.push([h, 'moved'])),
+    move: (h: HeadingRef, to: { under: HeadingRef } | { file: string } | { before: HeadingRef } | { after: HeadingRef }) => (
+      tx.move(coreRef(h), 'under' in to ? { under: coreRef(to.under) } : 'before' in to ? { before: coreRef(to.before) } : 'after' in to ? { after: coreRef(to.after) } : { file: corePath(to.file) }),
+      ev.push([h, 'moved'])
+    ),
     remove: (h: HeadingRef) => (tx.remove(coreRef(h)), ev.push([h, 'removed'])),
     update: (path: string, fn: (text: string) => string | null) =>
       tx.update(corePath(path), (t) => {
