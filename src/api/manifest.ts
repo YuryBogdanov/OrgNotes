@@ -38,6 +38,13 @@ export interface ManifestSettings {
   icon?: string;
   groups: Group[];
 }
+/** A view of a file (ТЗ 33): «Показать как ›» in a file tab's menu; `key` — the plugin's command that switches to it. */
+export interface ManifestFileView {
+  id: string;
+  title: string;
+  icon: string;
+  key?: string;
+}
 /** A block of «Сегодня» (ТЗ 32): in the settings' list of blocks; `attach` puts it under the block before it. */
 export interface ManifestTodayBlock {
   id: string;
@@ -68,6 +75,7 @@ export interface Manifest {
     navSections: ManifestNav[];
     views: ManifestView[];
     todayBlocks: ManifestTodayBlock[];
+    fileViews: ManifestFileView[];
     settings: ManifestSettings[];
     statusSets: ManifestStatusSet[];
     themes: string[];
@@ -159,6 +167,13 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
     if (!isStr(x.title)) problems.push(`блок «${x.id}»: нет title`);
     todayBlocks.push({ id: x.id as string, title: String(x.title ?? ''), ...(isStr(x.hint) ? { hint: x.hint } : {}), ...(x.attach === true ? { attach: true } : {}) });
   }
+  const fileViews: ManifestFileView[] = [];
+  for (const x of arr(c.fileViews).map(obj)) {
+    if (!own('вид файла', x.id)) continue;
+    if (!isStr(x.title)) problems.push(`вид файла «${x.id}»: нет title`);
+    if (x.key !== undefined && !commands.some((k) => k.id === x.key)) problems.push(`вид файла «${x.id}»: key — не команда этого плагина`);
+    fileViews.push({ id: x.id as string, title: String(x.title ?? ''), icon: isStr(x.icon) ? x.icon : 'M4 4h12v12H4z', ...(isStr(x.key) ? { key: x.key } : {}) });
+  }
   const settings: ManifestSettings[] = [];
   for (const x of arr(c.settings).map(obj)) {
     if (!isStr(x.section) && !isStr(x.block)) {
@@ -190,7 +205,7 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
       main: isStr(j.main) ? j.main : undefined, styles: isStr(j.styles) ? j.styles : undefined,
       defaultEnabled: typeof j.defaultEnabled === 'boolean' ? j.defaultEnabled : undefined,
       permissions: permissions as Permission[], net,
-      contributes: { commands, navSections, views, todayBlocks, settings, statusSets, themes: arr(c.themes).filter(isStr) as string[] },
+      contributes: { commands, navSections, views, todayBlocks, fileViews, settings, statusSets, themes: arr(c.themes).filter(isStr) as string[] },
       warnings,
     },
   };

@@ -9,12 +9,14 @@
   import { extractLinks, type OrgLink } from './links';
   import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree, insertItem, type Result } from './outline';
   import type { Text } from '@codemirror/state';
+  import { lineLinks, onLineLinks } from './lineLinks';
   import { DEFAULT_LEVELS, orgIndent, type LevelView } from './orgIndent';
   import { orgRich, type RichPick } from './orgRich';
   import { findExtension, findField, foundInfo, moveFind, setFind, type FindQuery } from './findView';
   import { registerEditor } from './editorKeys';
 
-  let { text, fileKey, wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
+  let { text, fileKey, path = '', wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
+    path?: string; // the file's name in the folder: what a plugin's link at the end of a line is run with (ТЗ 33)
     levels?: LevelView; // «Структурный вид»: one star per level, text moved by level
     drawers?: boolean; // drawers folded when a file opens and when the app adds one (:PROPERTIES:, :LOGBOOK:)
     gutter?: boolean; // the line numbers and the fold markers on the left (none in the mini window, ТЗ 31)
@@ -65,6 +67,76 @@
       return s;
     }
   }
+  // ---- the plugins' links at the end of a line («Открыть доску ⌥⌘B», ТЗ 33) ----
+  class LinkWidget extends WidgetType {
+    label: string;
+    owner: number;
+    line: number;
+    constructor(label: string, owner: number, line: number) {
+      super();
+      this.label = label;
+      this.owner = owner;
+      this.line = line;
+    }
+    eq(o: LinkWidget) {
+      return o.label === this.label && o.owner === this.owner && o.line === this.line;
+    }
+    toDOM() {
+      const s = document.createElement('span');
+      s.className = 'cm-line-link';
+      s.textContent = this.label;
+      s.dataset.lineLink = this.owner + ':' + this.line;
+      return s;
+    }
+    ignoreEvent() {
+      return false;
+    }
+  }
+  const linksChanged = StateEffect.define<null>();
+  function lineLinkDecos(v: EditorView): DecorationSet {
+    const all = lineLinks();
+    if (!all.length) return Decoration.none;
+    const out: Range<Decoration>[] = [];
+    for (const r of v.visibleRanges)
+      for (let pos = r.from; pos <= r.to; ) {
+        const ln = v.state.doc.lineAt(pos);
+        all.forEach((l, i) => {
+          const label = l.label(ln.text, ln.number - 1);
+          if (label) out.push(Decoration.widget({ widget: new LinkWidget(label, i, ln.number - 1), side: 1 }).range(ln.to));
+        });
+        pos = ln.to + 1;
+      }
+    return Decoration.set(out, true);
+  }
+  const lineLinkExt = () => [
+    ViewPlugin.fromClass(
+      class {
+        decorations: DecorationSet;
+        stop: () => void;
+        constructor(v: EditorView) {
+          this.decorations = lineLinkDecos(v);
+          this.stop = onLineLinks(() => queueMicrotask(() => v.dispatch({ effects: linksChanged.of(null) })));
+        }
+        update(u: ViewUpdate) {
+          if (u.docChanged || u.viewportChanged || u.transactions.some((t) => t.effects.some((e) => e.is(linksChanged)))) this.decorations = lineLinkDecos(u.view);
+        }
+        destroy() {
+          this.stop();
+        }
+      },
+      { decorations: (p) => p.decorations },
+    ),
+    EditorView.domEventHandlers({
+      mousedown(e) {
+        const el = (e.target as HTMLElement).closest?.('[data-line-link]') as HTMLElement | null;
+        if (!el || e.button !== 0) return false;
+        e.preventDefault();
+        const [i, line] = el.dataset.lineLink!.split(':').map(Number);
+        lineLinks()[i]?.run(path, line);
+        return true;
+      },
+    }),
+  ];
   const noteExt = (n: { line: number; text: string } | null) =>
     n ? EditorView.decorations.compute([], (st) => (n.line + 1 > st.doc.lines ? Decoration.none : Decoration.set([Decoration.widget({ widget: new NoteWidget(n.text), side: 1 }).range(st.doc.line(n.line + 1).to)]))) : [];
 
@@ -473,7 +545,7 @@
             return el;
           },
         }),
-        ...(gutter ? [foldGutter()] : []), plugin, selectionClass, note.of(noteExt(lineNote)), structure.of(structureExt(words)),
+        ...(gutter ? [foldGutter()] : []), plugin, ...lineLinkExt(), selectionClass, note.of(noteExt(lineNote)), structure.of(structureExt(words)),
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         EditorView.domEventHandlers({

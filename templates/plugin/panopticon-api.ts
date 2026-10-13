@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.4.0';
+export const API_VERSION = '1.5.0';
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;
@@ -204,6 +204,10 @@ export interface MenuItem {
   run(): void;
   danger?: boolean;
   disabled?: boolean;
+  /** A check left of it (the one chosen of a list); since 1.5. */
+  checked?: boolean;
+  /** A grey line under it, not a command; since 1.5. */
+  hint?: string;
 }
 export interface ChooseItem {
   id: string;
@@ -392,6 +396,14 @@ export interface Ctx {
     /** What the plugin adds to a card of «1-1 сегодня» (the person's file, relative): a line under the person («Цели:
      *  3 активных») and a button. Since 1.4. */
     oneOnOne(spec: { line?(path: string): string | null | Promise<string | null>; action?: { label: string; available?(path: string): boolean | Promise<boolean>; run(path: string): void } }): Dispose;
+    /** A view of a file the manifest declares (`fileViews`): the tab of the file shows it instead of the text («Доска»).
+     *  `render(el, { path }, { showText })`; `defaultFor(text)` — a file opened the first time is shown so. Since 1.5. */
+    fileView(id: string, spec: { render(el: HTMLElement, file: { path: string }, view: { showText(): void }): Dispose | void; defaultFor?(text: string): boolean }): Dispose;
+    /** The file tab shown now goes to a view of the plugin (null: the text); false — the tab is not a file's. Since 1.5. */
+    showAs(viewId: string | null): Promise<boolean>;
+    /** A link at the end of the lines of the editor it names («Открыть доску ⌥⌘B» right of «#+BOARD»); the file does
+     *  not change. Since 1.5. */
+    editorLink(spec: { label(text: string, line: number): string | null; run(path: string, line: number): void }): Dispose;
   };
   /** Needs `index.read`. */
   index?: {

@@ -60,6 +60,9 @@ button { cursor: default; }
 /* ---- editor (CodeMirror): the colours of the editor theme, `--ed-*` (themes.ts) ---- */
 .cm-editor { height: 100%; background: var(--ed-bg) !important; color: var(--ed-fg); font-family: var(--mono); font-size: 13px; }
 .cm-editor.cm-focused { outline: none; }
+/* a plugin's link at the end of a line («Открыть доску ⌥⌘B», ТЗ 33) */
+.cm-line-link { margin-left: 16px; font: 12px var(--ui); color: var(--fg3); cursor: pointer; }
+.cm-line-link:hover { color: var(--acc); text-decoration: underline; }
 .cm-editor .cm-scroller { font-family: var(--mono); line-height: 22px; padding: 10px 0; background: var(--ed-bg); }
 .cm-editor .cm-content { -webkit-user-select: text; user-select: text; cursor: text; caret-color: var(--ed-caret); padding: 0 24px 0 0; }
 .cm-editor .cm-cursor { border-left-color: var(--ed-caret); }
