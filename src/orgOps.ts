@@ -65,7 +65,8 @@ export function treeOf(org: string): { lines: string[]; level: number } | null {
 export type InsertAt = { under: Heading; position: 'first' | 'last' } | { under: Heading; before: Heading } | { position: 'top' | 'end' };
 
 /** A new heading (with its subtree) and the line it is on now; null — not one heading. The last child goes before the
- *  blank lines that end its parent's subtree, right after the text above it. */
+ *  blank lines that end its parent's subtree, right after the text above it; at the end of a file, a blank line
+ *  separates it from the headings above. */
 export function insertHeadingAt(text: string, at: InsertAt, org: string): { text: string; line: number } | null {
   const t = treeOf(org);
   if (!t) return null;
@@ -83,7 +84,14 @@ export function insertHeadingAt(text: string, at: InsertAt, org: string): { text
     return { text: lines.join('\n'), line: i };
   }
   const tree = relevel(t.lines, t.level, 1);
-  if (at.position === 'end') return place(text, tree, null);
+  if (at.position === 'end') {
+    // a blank line between it and the headings above (not after the file's header alone), as the app writes them
+    const r = place(text, tree, null);
+    if (!headingLines(text.split('\n')).size) return r;
+    const lines = r.text.split('\n');
+    lines.splice(r.line, 0, '');
+    return { text: lines.join('\n'), line: r.line + 1 };
+  }
   // the top: after the file's header (#+ lines and the text before the first heading)
   const lines = text.split('\n');
   const heads = headingLines(lines);

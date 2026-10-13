@@ -277,42 +277,6 @@ export function goalLines(g: NewGoal, names: string[], now = new Date()): string
   return out;
 }
 
-/** Before the blank lines that close a subtree, so a new heading sits right after the text above it. */
-function before(lines: string[], end: number, from: number) {
-  let i = end;
-  while (i > from + 1 && !lines[i - 1]?.trim()) i--;
-  return i;
-}
-
-/**
- * The text with a goal added at the end of its quarter under the source; the quarter is made if it is not there,
- * in its place among the others (newest first). Null if the source heading is gone. `line`: where the goal is.
- */
-export function insertGoal(text: string, hs: Heading[], heading: string, q: Quarter, g: NewGoal, names: string[], now = new Date()): { text: string; line: number } | null {
-  const head = findSource(hs, heading);
-  if (head < 0) return null;
-  const lines = text.split('\n');
-  const src = readSource(text, hs, heading);
-  const goal = goalLines(g, names, now);
-  const have = src.quarters.find((x) => cmpQuarter(x.q, q) === 0);
-  if (have) {
-    const at = before(lines, have.end, have.line);
-    lines.splice(at, 0, ...goal);
-    return { text: lines.join('\n'), line: at };
-  }
-  // a new quarter: before the newest of the older ones (quarters go newest first), else at the end of the source
-  const older = src.quarters.find((x) => cmpQuarter(x.q, q) < 0);
-  const pos = older ? older.line : before(lines, hs[head].end, hs[head].line);
-  lines.splice(pos, 0, `** ${quarterTitle(q)}`, ...goal);
-  return { text: lines.join('\n'), line: pos + 1 };
-}
-
-/** The file with «* Квартальные задачи» added at its end. */
-export function addSourceHeading(text: string, title = SOURCE_HEADING): string {
-  const body = text.replace(/\n\s*$/, '');
-  return (body.trim() ? body + '\n\n' : '') + `* ${title}\n`;
-}
-
 /** «2 квартала · 7 целей» for a heading that looks like a source; '' otherwise. */
 export function sourceSummary(text: string, hs: Heading[], i: number): string {
   const src = readSource(text, hs, hs[i].title);
@@ -358,60 +322,6 @@ export function markLines(date: Date, body: string, names: string[]): string[] {
   const lines = body.replace(/\r\n?/g, '\n').replace(/\s+$/, '').split('\n');
   const stamp = `[${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${names[date.getDay()]}]`;
   return [`- ${stamp} ${lines[0].trim()}`.replace(/\s+$/, ''), ...lines.slice(1).map((l) => (l.trim() ? '  ' + l.replace(/^,?(\*)/, ',$1') : ''))];
-}
-
-/**
- * The text with a mark added to «Отметки» of the goal (made at the end of the goal if it is not there), in the
- * order of dates: a mark of a past day goes to its place. Null if the goal is not found.
- */
-export function addMark(text: string, hs: Heading[], heading: string, q: Quarter, title: string, date: Date, body: string, names: string[]): string | null {
-  if (!body.trim()) return null;
-  const src = readSource(text, hs, heading);
-  const g = findGoal(src, q, title);
-  if (!g) return null;
-  const lines = text.split('\n');
-  const gi = hs.findIndex((h) => h.line === g.line);
-  const field = kids(hs, gi).find((fi) => same(hs[fi].title, FIELDS.marks));
-  const add = markLines(date, body, names);
-  if (field === undefined) {
-    const at = before(lines, g.end, g.line);
-    lines.splice(at, 0, `${'*'.repeat(hs[gi].level + 1)} ${FIELDS.marks}`, ...add);
-    return lines.join('\n');
-  }
-  const later = g.marks.find((m) => +m.date > +date);
-  const at = later ? later.line : before(lines, hs[field].end, hs[field].line);
-  // the marks of the field keep its indent
-  const indent = later ? /^\s*/.exec(lines[later.line])![0] : g.marks.length ? /^\s*/.exec(lines[g.marks[0].line])![0] : '';
-  lines.splice(at, 0, ...add.map((l) => (l ? indent + l : l)));
-  return lines.join('\n');
-}
-
-/**
- * «Квартал»: the goal moved under another quarter of its source (made in its place if needed), at its end.
- * `parse` reads the headings of a text (the statuses of the file). Null if the goal is not found.
- */
-export function moveGoal(text: string, hs: Heading[], heading: string, from: Quarter, title: string, to: Quarter, parse: (t: string) => Heading[]): { text: string; line: number } | null {
-  if (cmpQuarter(from, to) === 0) return null;
-  const g = findGoal(readSource(text, hs, heading), from, title);
-  if (!g) return null;
-  const lines = text.split('\n');
-  const end = before(lines, g.end, g.line);
-  const cut = lines.splice(g.line, end - g.line);
-  const t = lines.join('\n');
-  const h = parse(t);
-  const src = readSource(t, h, heading);
-  const have = src.quarters.find((x) => cmpQuarter(x.q, to) === 0);
-  const out = t.split('\n');
-  if (have) {
-    const at = before(out, have.end, have.line);
-    out.splice(at, 0, ...cut);
-    return { text: out.join('\n'), line: at };
-  }
-  const head = findSource(h, heading);
-  const older = src.quarters.find((x) => cmpQuarter(x.q, to) < 0);
-  const at = older ? older.line : before(out, h[head].end, h[head].line);
-  out.splice(at, 0, `** ${quarterTitle(to)}`, ...cut);
-  return { text: out.join('\n'), line: at + 1 };
 }
 
 // ---- part 3: the settings, the report of a quarter, the carry-over ------------------------------------------------
@@ -490,34 +400,4 @@ export function reportText(people: ReportPerson[], q: Quarter, format: 'text' | 
     });
   }
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
-}
-
-/**
- * «Перенести незакрытые»: each goal (by title) goes under the next quarter; a deadline inside the old quarter becomes
- * the last day of the new one; a mark «Перенесена из Q4 2026». `parse` reads headings of a text. The goals not found
- * are left out of `moved`.
- */
-export function carryOver(text: string, heading: string, from: Quarter, to: Quarter, titles: string[], names: string[], parse: (t: string) => Heading[], now = new Date()): { text: string; moved: string[] } {
-  let t = text;
-  const moved: string[] = [];
-  for (const title of titles) {
-    const r = moveGoal(t, parse(t), heading, from, title, to, parse);
-    if (!r) continue;
-    t = r.text;
-    let hs = parse(t);
-    const g = findGoal(readSource(t, hs, heading), to, title);
-    if (!g) continue;
-    if (g.deadline && cmpQuarter(quarterOf(g.deadline), from) === 0) {
-      const lines = t.split('\n');
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const e = qEnd(to);
-      const stamp = `<${e.getFullYear()}-${pad(e.getMonth() + 1)}-${pad(e.getDate())} ${names[e.getDay()]}>`;
-      lines[g.line + 1] = lines[g.line + 1].replace(/DEADLINE:\s*<[^>]*>/, `DEADLINE: ${stamp}`);
-      t = lines.join('\n');
-      hs = parse(t);
-    }
-    t = addMark(t, hs, heading, to, title, now, `Перенесена из ${quarterLabel(from)}`, names) ?? t;
-    moved.push(title);
-  }
-  return { text: t, moved };
 }
