@@ -6,7 +6,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { untrack, type Component } from 'svelte';
 import { store } from '../store.svelte';
-import { openView } from '../layout';
+import { openFile, openView } from '../layout';
 import { register as registerPalette } from '../commands';
 import { registerAction, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf, viewOf } from '../views';
 import { fuzzy } from '../fuzzy';
@@ -16,7 +16,7 @@ import { parseTheme, type Theme } from '../themes';
 import { displayName } from '../names';
 import type { Tx as CoreTx } from '../journal';
 import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSchema';
-import { builtinEntries, declareKeys, entries, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, REVIEW_SCOPE, type Entry, type Listed } from './declare';
+import { builtinEntries, declareKeys, entries, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, type Entry, type Listed } from './declare';
 import PluginsSettings from '../PluginsSettings.svelte';
 import { hostAllowed, hostOf, type Manifest, type ManifestSettings } from './manifest';
 import type { Ctx, Dispose, Named, SheetSpec, EventName, FormSpec, HeadingInfo, HeadingRef, Place, Plugin, Query, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
@@ -84,6 +84,8 @@ class Host {
   views = new SvelteMap<string, ViewEntry>();
   /** A tab drawn anew (`ui.open` with a new state for a tab shown): its number. */
   redraw = new SvelteMap<string, number>();
+  /** The numbers on the plugins' buttons of the navigator (`ui.setBadge`). */
+  badges = new SvelteMap<string, number>();
   /** The core's sheets a plugin asked for, and its review. */
   form = $state<FormReq | null>(null);
   place = $state<PlaceReq | null>(null);
@@ -172,7 +174,8 @@ class Host {
     const r = this.review;
     const ref = r && r.cur >= 0 ? r.refs[r.cur] : null;
     const f = ref ? fileOf(ref.path) : undefined;
-    const h = f && ref ? findHeading(f.headings, ref) : undefined;
+    // by its title; else the heading at its line (its title edited in the card, ТЗ 28)
+    const h = f && ref ? (findHeading(f.headings, ref) ?? f.headings.find((x) => x.line === ref.line)) : undefined;
     return f && h ? { file: f, heading: h, info: infoOf(f, h) } : null;
   }
   async reviewAct(actionId: string) {
@@ -196,6 +199,16 @@ class Host {
       r.done = r.doneAt.size;
       await this.reviewStep(1);
     } else this.reviewRedraw++;
+  }
+  /** The card's heading was edited in it (its line moved, its title changed): the card keeps it (ТЗ 28). */
+  reviewEdited(line: number) {
+    const r = this.review;
+    const ref = r && r.cur >= 0 ? r.refs[r.cur] : null;
+    const f = ref ? fileOf(ref.path) : undefined;
+    const h = f?.headings.find((x) => x.line === line);
+    // only the same heading: moved by an edit above it (its title) or retitled in place (its line); a rewrite of the
+    // file (a goal moved to another quarter) leaves the narrowed range pointing elsewhere — the title finds it then
+    if (r && ref && h && (h.title === ref.title || h.line === ref.line) && (ref.line !== h.line || ref.title !== h.title)) r.refs[r.cur] = { path: ref.path, line: h.line, title: h.title };
   }
   /** The card drawn again (the plugin's parts read the file anew). */
   reviewRedraw = $state(0);
@@ -281,7 +294,7 @@ class Host {
       });
     }
     m.contributes.navSections.forEach((n, i) => {
-      this.keep(id, registerNav({ id: n.id, label: n.title, icon: n.icon, key: n.key, order: 100 + i, component: PluginNav as unknown as Component }));
+      this.keep(id, registerNav({ id: n.id, label: n.title, icon: n.icon, key: n.key, order: 100 + i, component: PluginNav as unknown as Component, badge: () => this.badges.get(n.id) ?? 0 }));
       if (n.key) this.keep(id, registerAction(n.key, () => this.showNav(n.id)));
     });
     for (const v of m.contributes.views) {
@@ -625,6 +638,36 @@ class Host {
           this.review?.plugin === id
             ? { step: (d) => this.reviewStep(d), redraw: () => void this.reviewRedraw++, update: () => void this.reviewBar++ }
             : null,
+        setBadge: (nav, n) => {
+          declared('раздела', m.contributes.navSections.some((x) => x.id === nav), nav);
+          this.badges.set(nav, Math.max(0, Math.floor(Number(n) || 0)));
+        },
+        refile: (ref, o = {}) =>
+          new Promise((resolve) => {
+            const f = fileOf(ref.path);
+            const h = f && findHeading(f.headings, ref);
+            if (!f || !h) return resolve(null);
+            let done = false;
+            let writing = false; // the core closes the dialog, then writes: not a cancel
+            store.refileHeading(f, h, {
+              before: async () => {
+                writing = true;
+                if (o.before) await this.guard(id, () => o.before!(), undefined);
+              },
+              done: (r) => {
+                done = true;
+                const to = store.files.find((x) => x.path === r.path);
+                const th = to?.headings.find((x) => x.line === r.line);
+                resolve({ path: to?.name ?? r.path, line: r.line, title: th?.title ?? h.title, label: r.label });
+                return !!o.quiet; // the plugin tells of it itself, or the core's toast
+              },
+            });
+            const stop = watch(() => store.refile, (rq) => {
+              if (rq) return;
+              stop();
+              if (!done && !writing) resolve(null);
+            });
+          }),
         notify: (text, actions) => store.note(text, actions?.map((a) => ({ label: a.label, run: () => this.guard(id, () => a.run(), undefined) })), actions?.length ? 8000 : 4000),
       },
       storage: { folder: this.storeOf(id, 'folder', 'data', keep), local: this.storeOf(id, 'local', 'data', keep) },
@@ -682,6 +725,7 @@ class Host {
           const f = fileOf(path);
           return f && kw ? (namedFor(kw, f.wf) as Named) : null;
         },
+        inbox: async () => ({ path: store.inboxFile?.name ?? null }),
         workflow: async (path) => {
           const f = fileOf(path);
           return { open: [...(f?.wf.open ?? DEFAULT_WORKFLOW.open)], done: [...(f?.wf.done ?? DEFAULT_WORKFLOW.done)] };
@@ -712,6 +756,7 @@ class Host {
           }
           return tx?.conflict ? 'conflict' : tx && !tx.error && !tx.result().length ? 'ok' : 'error';
         },
+        undo: () => store.undoLast(),
       };
     return ctx;
   }
@@ -805,6 +850,8 @@ class Host {
         };
         queueMicrotask(now); // the tab shown now, then each change
         return watch(() => [store.tab?.id, store.tab?.data], now);
+      case 'inbox.changed':
+        return watch(() => store.inboxFile?.name ?? null, (p) => send({ path: p }));
       case 'folder.changed':
         return watch(() => store.dir, (d) => send({ folder: d }));
       case 'theme.changed': {
@@ -921,7 +968,17 @@ function coreCommand(cmd: string, arg: unknown) {
     case 'file.open': {
       const i = store.files.findIndex((f) => f.name === a.path);
       if (i < 0) throw new Error(`нет файла «${a.path}»`);
-      return store.open(i, Math.max(0, Number((arg as { line?: number })?.line) || 0));
+      const o = (arg ?? {}) as { line?: number; beside?: boolean; focus?: boolean };
+      const line = Math.max(0, Number(o.line) || 0);
+      if (!o.beside) return store.open(i, line, o.focus !== false);
+      // in the other editor (a new tab when there is one), what is shown here stays in front
+      const L = store.layout;
+      const here = L.active;
+      const keep = L.panes[here].tabs[L.panes[here].active];
+      openFile(L, L.panes.length > 1 ? 1 - here : here, store.files[i].path, line, { replace: false, focus: false });
+      L.active = here;
+      L.panes[here].active = Math.max(0, L.panes[here].tabs.indexOf(keep));
+      return;
     }
     case 'heading.reveal': {
       const i = a.ref ? store.files.findIndex((f) => f.name === a.ref!.path) : -1;
@@ -931,8 +988,18 @@ function coreCommand(cmd: string, arg: unknown) {
     }
     case 'agenda.open':
       return store.showAgendaHere();
-    case 'heading.status': {
-      // the palette's statuses for the heading: the caret goes to it in the tab shown (its file must be the tab's)
+    case 'capture.open':
+      return store.openCapture();
+    case 'inbox.pickFile':
+      return void (store.pickInbox = Date.now());
+    case 'inbox.createFile':
+      return store.createInboxFile();
+    case 'heading.status':
+    case 'heading.schedule':
+    case 'heading.deadline':
+    case 'heading.tags':
+    case 'heading.priority': {
+      // the palette's step for the heading: the caret goes to it in the tab shown (its file must be the tab's)
       const f = a.ref ? fileOf(a.ref.path) : undefined;
       const h = f && a.ref ? findHeading(f.headings, a.ref) : undefined;
       const t = store.tab;
@@ -940,7 +1007,7 @@ function coreCommand(cmd: string, arg: unknown) {
       const shown = t.kind === 'file' ? t.path : viewOf(t.kind)?.fileOf?.(t);
       if (shown !== f.path) throw new Error('файл заголовка не показан во вкладке');
       store.setTabCursor(t, h.line, 0);
-      return store.openPalette('status');
+      return store.openPalette(cmd.slice('heading.'.length) as 'status');
     }
   }
   throw new Error(`нет команды «${cmd}»`);

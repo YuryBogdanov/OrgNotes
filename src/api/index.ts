@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.1.0';
+export const API_VERSION = '1.2.0';
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;
@@ -109,7 +109,7 @@ export interface Store {
   set<T>(value: T): Promise<void>;
   onChange(fn: () => void): Dispose;
 }
-export type EventName = 'file.changed' | 'heading.changed' | 'tab.active' | 'day.changed' | 'theme.changed' | 'folder.changed';
+export type EventName = 'file.changed' | 'heading.changed' | 'tab.active' | 'day.changed' | 'theme.changed' | 'folder.changed' | 'inbox.changed';
 export interface Opt {
   value: string | number | boolean | null;
   label: string;
@@ -138,6 +138,9 @@ export type FormField =
       headNote?(path: string, title: string): string;
       create?(path: string): string | null;
     }
+  /** A widget only (`ui.widget`): a month of the calendar's entries, the task marked — value
+   *  { path, line, date: 'yyyy-mm-dd' | null, open }; a click on «Показать календарь» gives { …, open } back. */
+  | { type: 'month'; key: string; label: string; hint?: string; keyId?: string }
   /** Drawn by the plugin. */
   | { type: 'custom'; key: string; label: string; hint?: string; render(el: HTMLElement, ctrl: FieldCtrl): Dispose | void };
 export interface FormCtrl {
@@ -284,8 +287,10 @@ export interface Ctx {
     setAvailable(id: string, on: boolean): void;
     /** The first shortcut of a command as set now («⌘↩»), '' none: for the plugin's own hints. */
     keyOf(id: string): string;
-    /** A command of the plugin, or of the core: `file.open` {path, line?}, `heading.reveal` {ref}, `agenda.open`,
-     *  `heading.status` {ref} (the palette's statuses for it; the heading's file is the one shown). */
+    /** A command of the plugin, or of the core: `file.open` {path, line?, beside?, focus?}, `heading.reveal` {ref},
+     *  `agenda.open`, `heading.status` / `heading.schedule` / `heading.deadline` / `heading.tags` / `heading.priority`
+     *  {ref} (the palette's step for it; the heading's file is the one shown), `capture.open` (the quick entry),
+     *  `inbox.pickFile`, `inbox.createFile`. */
     run(id: string, arg?: unknown): Promise<void>;
   };
   ui: {
@@ -329,6 +334,11 @@ export interface Ctx {
       move(d: 1 | -1): void;
       focusList(which: 'file' | 'head'): void;
     };
+    /** The number on the plugin's button of the navigator (0: none). */
+    setBadge(navId: string, n: number): void;
+    /** The core's move of a heading to another place («Перенести в…»): where it went, null — cancelled. `before`:
+     *  just before the write (a row's fade); `quiet`: the plugin tells of it, no toast of the core. */
+    refile(ref: HeadingRef, o?: { before?(): void | Promise<void>; quiet?: boolean }): Promise<{ path: string; line: number; title: string; label: string } | null>;
     /** The review shown now (its parts move and redraw it); null when there is none of the plugin's. */
     currentReview(): ReviewHandle | null;
   };
@@ -340,6 +350,8 @@ export interface Ctx {
     files(): Promise<FileInfo[]>;
     /** The named colour of a status in the sets of the file (the plugin draws with var(--p-<colour>)). */
     statusTone(keyword: string, path: string): Promise<Named | null>;
+    /** The Inbox file (a setting of the core: the quick entry writes there); null — not chosen. */
+    inbox(): Promise<{ path: string | null }>;
     /** The statuses the file knows: open and done keywords (for `@panopticon/api/org`). */
     workflow(path: string): Promise<{ open: string[]; done: string[] }>;
   };
@@ -348,6 +360,8 @@ export interface Ctx {
   /** Needs `files.edit`. One step of ⌘Z, as an edit by hand. */
   edit?: {
     transaction(label: string, build: (tx: Tx) => void, o?: { onUndo?(): void }): Promise<'ok' | 'conflict' | 'error'>;
+    /** Take back the last step of the journal (a toast's «Отменить»): false — there is none, or its files changed. */
+    undo(): Promise<boolean>;
   };
   /** The plugin's own: in the notes folder (goes with the notes) and on this Mac. */
   storage: { folder: Store; local: Store };

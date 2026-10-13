@@ -28,7 +28,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLEl
 }
 
 export default definePlugin({
-  activate(ctx) {
+  async activate(ctx) {
     ctx.commands.on('hello.greet', async () => {
       const n = ctx.settings.values().count ? ` Открытых задач: ${(await openTasks(ctx)).length}.` : '';
       ctx.ui.notify(`${greeting(ctx)}!${n}`, [{ label: 'Доска', run: () => void ctx.ui.open<Board>('hello.board', { clicks: 0 }) }]);
@@ -85,6 +85,7 @@ export default definePlugin({
       const tasks = await openTasks(ctx);
       let draft = '';
       let notes = 0;
+      let calToggle = () => {};
       const writeNote = async (h: HeadingInfo) => {
         const text = draft.trim();
         if (!text) return false;
@@ -111,7 +112,10 @@ export default definePlugin({
           el('b', { className: 'hello-rh' }, `${card.heading.title} · ${card.index + 1} из ${card.total}`),
           el('span', { className: 'hello-pill' }, card.heading.keyword ?? '—'),
         ),
-        quick: (root, card) => void root.append(el('button', { type: 'button', onclick: () => void ctx.commands.run('heading.status', { ref: card.heading.ref }) }, el('span', {}, 'Статус'), el('span', { className: 'hello-qv' }, card.heading.keyword ?? '—'))),
+        quick: (root, card) => void root.append(
+          el('button', { type: 'button', onclick: () => void ctx.commands.run('heading.status', { ref: card.heading.ref }) }, el('span', {}, 'Статус'), el('span', { className: 'hello-qv' }, card.heading.keyword ?? '—')),
+          el('button', { type: 'button', onclick: () => void ctx.commands.run('heading.deadline', { ref: card.heading.ref }) }, el('span', {}, 'Дедлайн')),
+        ),
         aside: (root, card) => {
           const area = el('div', { className: 'hello-aside' });
           root.append(el('div', { className: 'hello-cap' }, 'ЗАМЕТКА'), area);
@@ -127,7 +131,21 @@ export default definePlugin({
           { id: 'note', label: 'Записать заметку', kind: 'primary', command: 'hello.reviewNote', disabled: () => !draft.trim(), run: async (h) => ((await writeNote(h)), 'stay' as const) },
           { id: 'done', label: 'Выполнено', sub: 'DONE', kind: 'ok', command: 'hello.reviewDone', disabled: (h) => h.done, run: async (h) => ((await ctx.edit!.transaction('Привет: выполнено', (tx) => tx.setStatus(h.ref, 'DONE'))) === 'ok' ? 'next' : 'stay') },
           { id: 'next', label: 'Следующая', command: 'hello.reviewNext', run: () => 'next' },
+          { id: 'cal', label: 'Календарь', command: 'hello.reviewCal', run: () => (calToggle(), 'stay' as const) },
+          { id: 'file', label: 'Открыть в файле', run: (h) => (void ctx.commands.run('file.open', { path: h.ref.path, line: h.ref.line, beside: true, focus: false }), 'stay' as const) },
         ],
+        below: (root, ref) => {
+          let open = false;
+          const w = ctx.ui.widget(root, { type: 'month', key: 'm', label: 'Календарь', keyId: 'hello.reviewCal' }, { path: ref.path, line: ref.line, date: null, open }, (v) => {
+            open = !!(v as { open: boolean }).open;
+            w.set({ path: ref.path, line: ref.line, date: null, open });
+          });
+          calToggle = () => {
+            open = !open;
+            w.set({ path: ref.path, line: ref.line, date: null, open });
+          };
+          return () => w.dispose();
+        },
         summary: (root, r) => void root.append(
           el('p', { className: 'hello-sum' }, `Заметок: ${notes}, разобрано ${r.done} из ${r.total}`),
           el('button', { type: 'button', className: 'hello-end', onclick: () => r.end() }, 'Готово'),
@@ -166,6 +184,26 @@ export default definePlugin({
         },
       });
       ctx.ui.notify('Свой лист: ' + (r ?? 'отмена'));
+    });
+
+    // ТЗ 28 (roadmap 3.1 A): what the Inbox needs of the core
+    const badge = async () => ctx.ui.setBadge('hello', (await openTasks(ctx)).length);
+    void badge();
+    ctx.events.on('file.changed', () => void badge());
+    let inboxPath: string | null = (await ctx.index!.inbox()).path;
+    ctx.events.on('inbox.changed', (p) => void (inboxPath = (p as { path: string | null }).path));
+    ctx.commands.on('hello.inbox', () => {
+      const path = inboxPath;
+      ctx.ui.notify(path ? `Inbox: ${path}` : 'Файл Inbox не выбран', [
+        { label: 'Выбрать…', run: () => void ctx.commands.run('inbox.pickFile') },
+        { label: 'Записать', run: () => void ctx.commands.run('capture.open') },
+      ]);
+    });
+    ctx.commands.on('hello.move', async () => {
+      const t = (await openTasks(ctx))[0];
+      if (!t) return;
+      const to = await ctx.ui.refile(t.ref, { quiet: true });
+      ctx.ui.notify(to ? `Перенесено: ${to.title} → ${to.label}` : 'Перенос отменён', to ? [{ label: 'Отменить', run: () => void ctx.edit!.undo() }] : undefined);
     });
 
     // ТЗ 27 (roadmap 2.1 A): the core's extension points for plugins with their own structure in a file

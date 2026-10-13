@@ -43,6 +43,9 @@ export type Field =
       /** «+ Создать «Квартальные задачи» в конце файла»: the label, when that heading can be made in the file. */
       create?: (path: string) => string | null;
     })
+  /** A month of the calendar's entries with a task marked (under a review's card): value { path, line, date, open };
+   *  `keyId` — the command whose key folds it. A widget only (ТЗ 28). */
+  | (Base & { type: 'month'; keyId?: string })
   /** Drawn by the plugin. */
   | (Base & { type: 'custom'; render: (el: HTMLElement, ctrl: FieldCtrl) => (() => void) | void });
 
@@ -60,7 +63,7 @@ export interface PlaceValue {
   create?: boolean;
 }
 /** Fields drawn under their label, across the sheet. */
-export const WIDE = new Set(['textarea', 'date', 'place', 'custom']);
+export const WIDE = new Set(['textarea', 'date', 'place', 'custom', 'month']);
 
 export interface Group {
   caption: string;

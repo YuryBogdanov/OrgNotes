@@ -341,6 +341,14 @@ net?: { fetch(url: string, init?: { method?; headers?; body?: string }): Promise
 
 Справочник по всему API — в инструкции. Чего пока нет — в конце инструкции и в роадмапе.
 
+## API v1.2 — для Inbox (ТЗ 28)
+
+- **Inbox:** `index.inbox()` и событие `inbox.changed`.
+- **Команды приложения:** `capture.open`, `inbox.pickFile`, `inbox.createFile`, `heading.schedule` / `deadline` / `tags` / `priority`; `file.open { beside, focus }`.
+- **Интерфейс:** `ui.setBadge`, `ui.refile`; виджет `month`.
+- **Правки:** `edit.undo()`.
+- **Разбор:** заголовок карточки можно править в ней; у каждого плагина своя область клавиш разбора.
+
 ## Разбивка и приёмка
 
 | Задача | Что | Готово, когда |

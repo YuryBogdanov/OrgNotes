@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { inboxReview } from './features/review.svelte';
   import { calendar } from './features/calendar.svelte';
   import { onMount } from 'svelte';
   import { store } from './store.svelte';
@@ -11,9 +10,9 @@
   // The calendar under the card of the Inbox review (ТЗ 24, part 3): folded by default, a compact month of the same
   // entries as the calendar tab (its layers and files), two in a cell and «… ещё N». The task's own date has a
   // dashed frame, and the task is «— эта задача» in the list of the day. No dragging: dates are set by the card.
-  let { task }: { task: { path: string; line: number; date: Date | null } } = $props();
-
-  const open = $derived(inboxReview.reviewCal);
+  // Shown by a review (the Inbox's, a plugin's through the widget «month»): folded or not is the review's — `open`,
+  // `ontoggle`; `keyId` is the command whose key folds it (its hint).
+  let { task, open, ontoggle, keyId = '' }: { task: { path: string; line: number; date: Date | null }; open: boolean; ontoggle: () => void; keyId?: string } = $props();
   // the month of the task's date, else this month; leafing holds until the next card
   let month = $state(new Date());
   let shownFor = '';
@@ -65,11 +64,11 @@
 </script>
 
 <div class="rcal">
-  <button class="toggle" aria-expanded={open} onclick={() => (inboxReview.reviewCal = !open)} title="{open ? 'Скрыть' : 'Показать'} календарь{store.keyHint('reviewCalendar') ? ' · ' + store.keyHint('reviewCalendar') : ''}">
+  <button class="toggle" aria-expanded={open} onclick={ontoggle} title="{open ? 'Скрыть' : 'Показать'} календарь{keyId && store.keyHint(keyId) ? ' · ' + store.keyHint(keyId) : ''}">
     <svg class="chev" class:open width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2l4 4-4 4" /></svg>
     <span class="tl">{open ? 'Скрыть календарь' : 'Показать календарь'}</span>
     <span class="sub">{monthTitle(month)} · {entriesWord(inMonth)}</span>
-    {#if store.keyHint('reviewCalendar')}<kbd>{store.keyHint('reviewCalendar')}</kbd>{/if}
+    {#if keyId && store.keyHint(keyId)}<kbd>{store.keyHint(keyId)}</kbd>{/if}
   </button>
   {#if open}
     <div class="rcard" role="region" aria-label="Календарь">

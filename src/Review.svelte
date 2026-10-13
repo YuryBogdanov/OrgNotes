@@ -210,7 +210,7 @@
     </div>
   {/snippet}
   {#snippet below()}
-    <CalReview task={{ path: f!.path, line: h!.line, date: taskDate }} />
+    <CalReview task={{ path: f!.path, line: h!.line, date: taskDate }} open={inboxReview.reviewCal} ontoggle={() => (inboxReview.reviewCal = !inboxReview.reviewCal)} keyId="reviewCalendar" />
   {/snippet}
   {#snippet actions()}
     <button class="a done-b" disabled={!doneKw} onclick={() => inboxReview.reviewClose('done')}>

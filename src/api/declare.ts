@@ -108,15 +108,19 @@ export const entries: Entry[] = [...builtinEntries, ...installedEntries(readInst
 /** The group of «Клавиши» of a plugin. */
 export const groupOf = (id: string) => 'plugin:' + id;
 
-/** The scope of the keys of a plugin's review (its tab): over the window and the editor, as the goals' review. */
-export const REVIEW_SCOPE = 'pluginReview';
-registerScope({ id: REVIEW_SCOPE, name: 'в разборе плагина', over: ['window', 'editor', 'heading', 'review'], outside: { scopes: ['window', 'editor'], word: 'Вне разбора' }, rank: 30 });
+/** The scope of the keys of a plugin's review (its tab): over the window and the editor. Each plugin has its own, so
+ *  two plugins' reviews (the goals' and the Inbox's ⌘1) do not clash (ТЗ 28). */
+export const reviewScope = (id: string) => 'pluginReview:' + id;
+function declareReviewScope(m: Manifest) {
+  registerScope({ id: reviewScope(m.id), name: `в разборе «${m.name}»`, over: ['window', 'editor', 'heading', 'review'], outside: { scopes: ['window', 'editor'], word: 'Вне разбора' }, rank: 30 });
+}
 
 /** A plugin's commands in the registry of keys (and its group of «Клавиши»). */
 export function declareKeys(m: Manifest) {
   if (!m.contributes.commands.length) return;
   registerGroup({ id: groupOf(m.id), title: m.name.toUpperCase(), note: 'плагин' });
-  registerKeys(m.contributes.commands.map((c) => C(c.id, c.title, groupOf(m.id), c.scope === 'review' ? REVIEW_SCOPE : 'window', c.keys ?? [], { synonyms: c.synonyms })));
+  if (m.contributes.commands.some((c) => c.scope === 'review')) declareReviewScope(m);
+  registerKeys(m.contributes.commands.map((c) => C(c.id, c.title, groupOf(m.id), c.scope === 'review' ? reviewScope(m.id) : 'window', c.keys ?? [], { synonyms: c.synonyms })));
 }
 export function undeclareKeys(m: Manifest) {
   unregisterKeys(m.contributes.commands.map((c) => c.id), groupOf(m.id));

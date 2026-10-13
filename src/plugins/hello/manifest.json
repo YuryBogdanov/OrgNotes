@@ -135,6 +135,30 @@
         "keys": [
           "⌃⌘7"
         ]
+      },
+      {
+        "id": "hello.inbox",
+        "title": "Привет: про Inbox",
+        "synonyms": [
+          "пример",
+          "inbox"
+        ]
+      },
+      {
+        "id": "hello.move",
+        "title": "Привет: перенести первую задачу…",
+        "synonyms": [
+          "пример",
+          "перенос"
+        ]
+      },
+      {
+        "id": "hello.reviewCal",
+        "title": "Разбор «Привет»: календарь",
+        "keys": [
+          "⌘K"
+        ],
+        "scope": "review"
       }
     ],
     "navSections": [
