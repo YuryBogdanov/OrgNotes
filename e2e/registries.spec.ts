@@ -31,11 +31,14 @@ test('the features\' sections of the navigator come in their places; their short
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
   const tabs = page.getByRole('tablist', { name: 'Режимы навигатора' }).getByRole('tab');
-  expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Задачи', 'Агенда', 'Календарь', 'Теги', 'Поиск по заметкам', 'Цели']); // «Цели» is a plugin: after the core's (ТЗ 27)
+  // «Цели» and «Inbox» are plugins: after the core's (ТЗ 27, ТЗ 28)
+  expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Задачи', 'Агенда', 'Календарь', 'Теги', 'Поиск по заметкам', 'Цели', 'Inbox']);
   await page.keyboard.press('Control+Meta+5');
-  await expect(tabs.nth(4)).toHaveAttribute('aria-selected', 'true'); // «Календарь»
+  await expect(tabs.nth(3)).toHaveAttribute('aria-selected', 'true'); // «Календарь»
   await page.keyboard.press('Control+Meta+4');
-  await expect(tabs.nth(7)).toHaveAttribute('aria-selected', 'true'); // «Цели», once the plugin is started
+  await expect(tabs.nth(6)).toHaveAttribute('aria-selected', 'true'); // «Цели», once the plugin is started
+  await page.keyboard.press('Control+Meta+2');
+  await expect(tabs.nth(7)).toHaveAttribute('aria-selected', 'true'); // «Inbox»
   // the settings: «Календарь» is the calendar's section, in its place
   await page.keyboard.press('Meta+Comma');
   expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Календарь', 'Inbox', 'Файлы', 'Клавиши', 'Плагины']);

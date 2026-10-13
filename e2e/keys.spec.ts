@@ -30,14 +30,14 @@ test.describe('the list', () => {
   test('every command by groups, with its shortcuts; the review row tells what ⌘1 does elsewhere', async ({ page }) => {
     await open(page);
     await keysSheet(page);
-    await expect(sheet(page).locator('.gt')).toHaveText(['ГЛОБАЛЬНЫЕ', 'ПРИЛОЖЕНИЕ И ОКНО', 'ФАЙЛ И ВКЛАДКИ', 'ПОИСК', 'ВИД И ПАНЕЛИ', 'ПЕРЕХОДЫ', 'ЗАГОЛОВКИ И ЗАДАЧИ', 'INBOX И РАЗБОР', 'ЦЕЛИ КВАРТАЛА']); // the plugin's group: its name
+    await expect(sheet(page).locator('.gt')).toHaveText(['ГЛОБАЛЬНЫЕ', 'ПРИЛОЖЕНИЕ И ОКНО', 'ФАЙЛ И ВКЛАДКИ', 'ПОИСК', 'ВИД И ПАНЕЛИ', 'ПЕРЕХОДЫ', 'ЗАГОЛОВКИ И ЗАДАЧИ', 'БЫСТРЫЙ ВВОД', 'ЦЕЛИ КВАРТАЛА', 'INBOX']); // the plugins' groups: their names, in the order of the plugins
     await expect(chips(page, 'capture')).toHaveText(['⇧⌘I']);
     await expect(chips(page, 'findNext')).toHaveText(['⌘G']);
     await expect(chips(page, 'searchPrev')).toHaveText(['⌥⇧⌘G']);
     await expect(chips(page, 'openFolder')).toHaveText(['Назначить']);
     await expect(chips(page, 'schedule')).toHaveText(['⌃C S']);
     await expect(row(page, 'schedule').locator('.sub')).toHaveText('Аккорд: ⌃C, затем S');
-    await expect(row(page, 'reviewDone').locator('.sub')).toHaveText('Вне разбора ⌘1 — «Заметки»');
+    await expect(row(page, 'inbox.done').locator('.sub')).toHaveText('Вне разбора ⌘1 — «Заметки»');
     await expect(sheet(page).locator('.group').filter({ hasText: 'ЗАГОЛОВКИ И ЗАДАЧИ' }).locator('.gn')).toHaveText('в редакторе, курсор на заголовке');
     await expect(sheet(page).locator('details.fixed summary')).toHaveText('НЕ НАСТРАИВАЮТСЯ');
   });
@@ -157,15 +157,15 @@ test.describe('clashes', () => {
   test('⌘1 in the review and in the window is not a clash; a first press of a chord is', async ({ page }) => {
     await open(page);
     await keysSheet(page);
-    await chips(page, 'reviewSkip').click();
+    await chips(page, 'inbox.skip').click();
     await page.keyboard.press('Meta+n'); // «Новый файл» outside the review: nested, fine
-    await expect(chips(page, 'reviewSkip')).toHaveText(['⌘N']);
-    await expect(row(page, 'reviewSkip').locator('.warn')).toHaveCount(0);
-    // but «Отменить» of the review has ⌘2 too: the same scope
-    await chips(page, 'reviewDone').click();
+    await expect(chips(page, 'inbox.skip')).toHaveText(['⌘N']);
+    await expect(row(page, 'inbox.skip').locator('.warn')).toHaveCount(0);
+    // but «Отменить» of the review has ⌘2 too: the same scope (the goals' review has its own: no clash, ТЗ 28)
+    await chips(page, 'inbox.done').click();
     await page.keyboard.press('Meta+2');
-    await expect(row(page, 'reviewDone').locator('.warn')).toContainText('⌘2 уже назначено команде «Разбор: Отменить» (Inbox и разбор)');
-    await row(page, 'reviewDone').getByRole('button', { name: 'Отмена' }).click();
+    await expect(row(page, 'inbox.done').locator('.warn')).toContainText('⌘2 уже назначено команде «Разбор: Отменить» (Inbox)');
+    await row(page, 'inbox.done').getByRole('button', { name: 'Отмена' }).click();
     await chips(page, 'find').click();
     await page.keyboard.press('Control+c');
     await page.waitForTimeout(1200); // no second press: ⌃C alone, which begins the chords of the headings

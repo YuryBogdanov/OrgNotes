@@ -1,6 +1,5 @@
 <script lang="ts">
   import './features'; // the built-in features register their tabs, sections and keys (roadmap 0.3)
-  import { inboxReview } from './features/review.svelte';
   import { calendar } from './features/calendar.svelte';
   import { onMount, untrack } from 'svelte';
   import { store } from './store.svelte';
@@ -160,10 +159,8 @@
     back: () => store.back(),
     nav: () => (store.showNav = !store.showNav),
     navFiles: () => store.setNavMode('files'),
-    navInbox: () => store.setNavMode('inbox'),
     navAgendas: () => store.setNavMode('agendas'),
     capture: () => store.openCapture(),
-    review: () => inboxReview.startReview(),
     rich: () => store.setRich(!store.rich),
     find: () => store.askFind('open'),
     findAll: () => store.openSearch(window.getSelection()?.toString() ?? ''),

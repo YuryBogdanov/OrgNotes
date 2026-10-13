@@ -29,7 +29,7 @@ export const GROUPS: { id: GroupId; title: string; note?: string }[] = [
   { id: 'view', title: 'ВИД И ПАНЕЛИ' },
   { id: 'go', title: 'ПЕРЕХОДЫ' },
   { id: 'heading', title: 'ЗАГОЛОВКИ И ЗАДАЧИ', note: 'в редакторе, курсор на заголовке' },
-  { id: 'inbox', title: 'INBOX И РАЗБОР' },
+  { id: 'inbox', title: 'БЫСТРЫЙ ВВОД' },
 ];
 
 export const SCOPE_NAMES: Record<Scope, string> = {
@@ -161,6 +161,8 @@ export interface ScopeSpec {
   outside: { scopes: Scope[]; word: string };
   /** Which of the features' scopes is tried first (higher first). */
   rank: number;
+  /** A tab of its own (a plugin's review): never active with another such scope, the same shortcut is no clash. */
+  alone?: boolean;
 }
 export const SCOPES = new Map<string, ScopeSpec>();
 export function registerScope(s: ScopeSpec) {
@@ -318,11 +320,15 @@ export function withKeys(s: KeyState, id: string, keys: string[]): KeyState {
   else overrides[id] = list;
   return { ...s, overrides };
 }
-/** Commands renamed (the goals of the quarter became the plugin «quarter-goals», ТЗ 27): a changed shortcut follows. */
+/** Commands renamed (features became plugins: the goals «quarter-goals», ТЗ 27; the Inbox «inbox», ТЗ 28): a changed
+ *  shortcut follows. */
 const RENAMED: Record<string, string> = {
   navGoals: 'quarter-goals.nav', newGoal: 'quarter-goals.new', goalsOverview: 'quarter-goals.overview',
   goalMark: 'quarter-goals.mark', goalDone: 'quarter-goals.done', goalShift: 'quarter-goals.shift',
   goalBack: 'quarter-goals.back', goalNext: 'quarter-goals.next',
+  // and the Inbox and its review the plugin «inbox» (ТЗ 28)
+  navInbox: 'inbox.nav', review: 'inbox.review', reviewDone: 'inbox.done', reviewCancel: 'inbox.cancel', reviewMove: 'inbox.move',
+  reviewDefer: 'inbox.defer', reviewSkip: 'inbox.skip', reviewBack: 'inbox.back', reviewCalendar: 'inbox.calendar',
 };
 export function parseState(raw: string | null): KeyState {
   try {
@@ -358,7 +364,7 @@ export function conflictsOf(bindings: Map<string, string[]>, id: string, key: st
   if (!me) return [];
   const out: Conflict[] = [];
   for (const c of KEY_COMMANDS) {
-    if (c.id === id || nested(me.scope, c.scope)) continue;
+    if (c.id === id || nested(me.scope, c.scope) || (me.scope !== c.scope && SCOPES.get(me.scope)?.alone && SCOPES.get(c.scope)?.alone)) continue;
     for (const k of bindings.get(c.id) ?? []) if (clash(key, k)) out.push({ id: c.id, key: k });
   }
   return out;

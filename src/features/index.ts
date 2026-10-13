@@ -5,26 +5,15 @@
 import './keys';
 import { registerNav, registerSettings, registerView } from '../views';
 import { calendar } from './calendar.svelte';
-import { inboxReview } from './review.svelte';
-import { inbox } from './inbox.svelte';
-import { store } from '../store.svelte';
 import { fromIso, monthTitle, weekNumber } from '../calIndex';
 import CalendarView from '../CalendarView.svelte';
 import CalendarDay from '../CalendarDay.svelte';
 import CalendarPanel from '../CalendarPanel.svelte';
 import { calendarSchema } from './calendarSettings';
-import Review from '../Review.svelte';
-import InboxPanel from '../InboxPanel.svelte';
-
-const INBOX_ICON = 'M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4';
 const CAL_ICON = 'M5.5 4h9A2.5 2.5 0 0 1 17 6.5v8a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 3 14.5v-8A2.5 2.5 0 0 1 5.5 4zM3 8h14M7 2.5v3M13 2.5v3M7 12h.01M10 12h.01M13 12h.01';
 
-// ---- Inbox and its review ------------------------------------------------------------------------------------------
-registerNav({ id: 'inbox', label: 'Inbox', icon: INBOX_ICON, key: 'navInbox', order: 10, component: InboxPanel, badge: () => (store.inboxCfg.counter ? inbox.list.length : 0) });
-registerView({
-  kind: 'review', label: () => 'Разбор Inbox', icon: INBOX_ICON, component: Review,
-  transient: true, single: true, fileOf: (t) => t.path, onGone: () => (inboxReview.review = null),
-});
+// ---- Inbox and its review: the built-in plugin «inbox» (ТЗ 28); the quick entry and the Inbox file stay the core's
+import './inboxMigration';
 
 // ---- the goals of the quarter: the built-in plugin «quarter-goals» (ТЗ 27); what the core kept under the old id
 // moves to it

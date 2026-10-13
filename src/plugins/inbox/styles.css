@@ -1,0 +1,43 @@
+/* «Разбор Inbox» on the core's review by cards (ТЗ 28): the card's header, the quick buttons, the bar, the summary. */
+.creview.review .k { font-weight: 600; }
+.creview.review .where { color: var(--fg2); }
+.creview.review .moved { color: var(--acc); font-weight: 600; }
+.creview.review .age { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 11px; font-size: 12px; font-weight: 600; color: var(--fg2); background: color-mix(in srgb, var(--fg2) 12%, transparent); }
+.creview.review .age.stale { color: var(--wait); background: color-mix(in srgb, var(--wait) 14%, transparent); }
+.creview.review .qb svg { color: var(--fg2); }
+.creview.review .qv { font-weight: 600; color: var(--fg3); }
+.creview.review .qv.date { color: var(--ts); }
+.creview.review .ed { padding: 8px 0 12px; min-height: 120px; }
+.creview.review .done p { margin: 0; color: var(--fg2); }
+.creview.review .stats { width: 100%; margin: 6px 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.creview.review .stat { display: flex; flex-direction: column; gap: 2px; padding: 10px 6px; border-radius: 8px; background: var(--side); font-size: 12px; color: var(--fg2); }
+.creview.review .stat .n { font-size: 22px; font-weight: 700; }
+.creview.review .added { font-size: 12.5px; color: var(--fg2); }
+.creview.review .lnk { border: 0; background: none; color: var(--acc); font-weight: 600; padding: 0 2px; }
+.creview.review .btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.creview.review .btns button { height: 32px; padding: 0 16px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); }
+.creview.review .btns .pri { border: 0; background: var(--acc); color: var(--onacc); font-weight: 600; }
+.creview.review .fine { font-size: 11.5px; color: var(--fg3); }
+.creview.review .a.on { background: var(--sel); border-color: var(--acc); }
+.creview.review .done-b { background: var(--done); border-color: var(--done); color: var(--onacc); }
+.creview.review .move-b { background: var(--acc); border-color: var(--acc); color: var(--onacc); }
+.creview.review .hint { font-weight: 400; font-size: 11.5px; opacity: 0.8; }
+.creview.review .dots { width: 34px; height: 34px; border: 0; border-radius: 7px; background: transparent; color: var(--fg2); display: flex; align-items: center; justify-content: center; padding: 0; }
+.creview.review .dwrap { position: relative; }
+.creview.review .defer { position: absolute; bottom: 44px; left: 50%; transform: translateX(-50%); z-index: 41; width: 300px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28); outline: none; font-size: 13px; }
+.creview.review .dh { display: flex; align-items: baseline; gap: 8px; }
+.creview.review .dh span { font-size: 11.5px; color: var(--fg2); }
+.creview.review .opts { display: flex; flex-direction: column; gap: 1px; }
+.creview.review .opt { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: 6px; cursor: default; }
+.creview.review .opt.on { background: var(--acc); color: var(--onacc); }
+.creview.review .ol { flex: 1; }
+.creview.review .od { font-size: 12px; opacity: 0.8; }
+.creview.review .dn { font-size: 11.5px; color: var(--fg2); line-height: 1.45; }
+.creview.review .dscrim { position: fixed; inset: 0; z-index: 40; }
+.creview.review .ib-modal { position: fixed; inset: 0; z-index: 110; background: rgba(0, 0, 0, 0.28); display: flex; align-items: flex-start; justify-content: center; padding-top: 14vh; }
+.creview.review .ib-dlg { width: 420px; max-width: calc(100% - 32px); padding: 18px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); }
+.creview.review .ib-dlg h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.creview.review .ib-dlg p { margin: 0 0 14px; color: var(--fg2); line-height: 1.45; font-size: 12.5px; }
+.creview.review .ib-btns { display: flex; justify-content: flex-end; gap: 8px; }
+.creview.review .ib-btns button { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--field); }
+.creview.review .ib-btns .danger-b { background: var(--todo); color: var(--onacc); font-weight: 600; }

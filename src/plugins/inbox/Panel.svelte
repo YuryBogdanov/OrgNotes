@@ -1,19 +1,21 @@
 <script lang="ts">
-  import { inbox } from './features/inbox.svelte';
-  import { inboxReview } from './features/review.svelte';
   import { tick } from 'svelte';
-  import { store } from './store.svelte';
-  import { ago, type InboxItem } from './inbox';
-  import { displayName } from './names';
-  import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
+  import { data } from './state.svelte';
+  import { session } from './session.svelte';
+  import { ago, type InboxItem } from './list';
   import { ageDays, ageShort, days, subLabel, tasksWord, type ReviewItem } from './review';
 
   // The navigator in the «Inbox» mode: the unsorted tasks of the Inbox file and what to do with them — open, move,
-  // date, done, delete. Not set up yet (or the file is gone): a stub to choose or create the file.
-  const cfg = $derived(store.inboxCfg);
-  const file = $derived(store.inboxFile);
-  const items = $derived(inbox.list);
-  const missing = $derived(!!cfg.file && !file);
+  // date, done, delete. Not set up yet (or the file is gone): a stub to choose or create the file. During a review:
+  // its queue.
+  const ctx = data.ctx;
+  const cfg = $derived(data.settings);
+  const file = $derived(data.file);
+  const items = $derived(data.list);
+  const missing = $derived(!!data.chosen && !file);
+  const titled = (t: string, id: string) => (ctx.commands.keyOf(id) ? `${t} (${ctx.commands.keyOf(id)})` : t);
+  /** «Работа/journal.org» → «journal». */
+  const shortName = (p: string) => p.split('/').pop()!.replace(/\.org$/, '');
 
   let sel = $state(0);
   let list: HTMLDivElement | undefined = $state();
@@ -26,12 +28,17 @@
     if (sel >= items.length) sel = Math.max(0, items.length - 1);
   });
 
-  let leaving = $state<number | null>(null); // the line of a task going away («Готово»: a short fade)
-  async function done(it: InboxItem) {
-    leaving = it.line;
+  const ref = (it: InboxItem) => data.refOf(it);
+  let leaving = $state<number | null>(null); // the line of a task going away (a short fade)
+  const fade = async (line: number) => {
+    leaving = line;
     await new Promise((r) => setTimeout(r, 180));
     leaving = null;
-    await inbox.done(it);
+  };
+  async function done(it: InboxItem) {
+    const kw = data.doneOf(it.keyword);
+    await fade(it.line);
+    if (kw) await ctx.edit!.transaction(`Выполнено: ${it.title}`, (tx) => tx.setStatus(ref(it), kw));
     list?.focus();
   }
   let confirmDel = $state<InboxItem | null>(null);
@@ -41,14 +48,17 @@
       return;
     }
     confirmDel = null;
-    await inbox.remove(it);
+    await ctx.edit!.transaction(`Удалено: ${it.title}`, (tx) => tx.remove(ref(it)));
     list?.focus();
   }
-  const refile = (it: InboxItem) => inbox.refile(it);
+  /** «Перенести…»: the core's move, the row fading out just before the write. */
+  const refile = (it: InboxItem) => void ctx.ui.refile(ref(it), { before: () => fade(it.line) });
+  /** «Открыть»: the Inbox file in the editor, at the task. */
+  const openItem = (it: InboxItem) => void ctx.commands.run('file.open', { path: data.path, line: it.line });
 
   // ---- «Разбор» ---------------------------------------------------------------------------------------------
-  const review = $derived(inboxReview.review);
-  const pending = $derived(file ? inboxReview.reviewPending : []);
+  const review = $derived(session.run);
+  const pending = $derived(file ? data.pending : []);
   const oldest = $derived(Math.max(0, ...pending.map((x) => ageDays(x.created) ?? 0)));
   const handled = $derived(review ? review.items.filter((x) => x.result && x.result !== 'skip').length : 0);
   const skippedN = $derived(review ? review.items.filter((x) => x.result === 'skip').length : 0);
@@ -56,17 +66,13 @@
   const SEG: Record<string, string> = { ...MARK, skip: 'var(--wait)' };
   const segColor = (it: ReviewItem, i: number) => (it.result ? SEG[it.result] : i === review?.cur ? 'var(--fg2)' : 'var(--field)');
   const closed = (it: ReviewItem) => it.result === 'done' || it.result === 'cancel' || it.result === 'move' || it.result === 'delete';
-  const isStale = (it: ReviewItem) => !closed(it) && (ageDays(it.created) ?? 0) > store.inboxCfg.stale;
-  function showCard(i: number) {
-    const at = store.layout.panes.flatMap((p, pi) => p.tabs.map((t, ti) => ({ t, pi, ti }))).find((x) => x.t.kind === 'review');
-    if (at) store.activateTab(at.pi, at.ti);
-    inboxReview.reviewShow(i);
-  }
+  const isStale = (it: ReviewItem) => !closed(it) && (ageDays(it.created) ?? 0) > cfg.stale;
 
   // ---- the date popover ----------------------------------------------------------------------------------------
   let datePop = $state<{ it: InboxItem; x: number; y: number; kind: 'SCHEDULED' | 'DEADLINE' } | null>(null);
-  function openDate(e: MouseEvent, it: InboxItem) {
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  function openDate(e: { currentTarget: EventTarget | null; clientX?: number; clientY?: number }, it: InboxItem) {
+    const el = e.currentTarget as HTMLElement | null;
+    const r = el?.getBoundingClientRect?.() ?? { left: e.clientX ?? 0, bottom: e.clientY ?? 0 };
     datePop = { it, x: Math.min(r.left, window.innerWidth - 260), y: r.bottom + 6, kind: 'SCHEDULED' };
   }
   const day = (n: number) => {
@@ -83,7 +89,7 @@
   async function setDate(d: Date | null) {
     const p = datePop;
     datePop = null;
-    if (p) await inbox.date(p.it, p.kind, d);
+    if (p) await ctx.edit!.transaction(`Дата: ${p.it.title}`, (tx) => tx.setPlanning(ref(p.it), p.kind, d));
   }
   const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -96,39 +102,39 @@
       void tick().then(() => list?.querySelector('.row.sel')?.scrollIntoView({ block: 'nearest' }));
     } else if (e.key === 'Enter' && it) {
       e.preventDefault();
-      inbox.openItem(it);
+      openItem(it);
     }
   }
-  let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   function context(e: MouseEvent, it: InboxItem, i: number) {
     e.preventDefault();
     sel = i;
-    const at = e;
-    menu = {
-      x: e.clientX, y: e.clientY,
-      items: [
-        { label: 'Открыть', action: () => inbox.openItem(it) },
-        { label: 'Перенести…', action: () => refile(it) },
-        { label: 'Дата…', action: () => openDate(at, it) },
-        { label: 'Готово', action: () => void done(it) },
+    const at = { currentTarget: null, clientX: e.clientX, clientY: e.clientY };
+    ctx.ui.menu(
+      [
+        { label: 'Открыть', run: () => openItem(it) },
+        { label: 'Перенести…', run: () => refile(it) },
+        { label: 'Дата…', run: () => openDate(at, it) },
+        { label: 'Готово', run: () => void done(it) },
         'sep',
-        { label: 'Удалить…', danger: true, action: () => void del(it) },
+        { label: 'Удалить…', danger: true, run: () => void del(it) },
       ],
-    };
+      { x: e.clientX, y: e.clientY },
+    );
   }
 </script>
 
+
 <div class="inbox">
   <div class="head">
-    <span class="title" title={file?.name}>{file ? `INBOX · ${items.length}` : 'INBOX'}</span>
+    <span class="title" title={file?.path}>{file ? `INBOX · ${items.length}` : 'INBOX'}</span>
     {#if file && review}
-      <button class="rv stop" onclick={() => inboxReview.endReview()}>
+      <button class="rv stop" onclick={() => session.end()}>
         <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h10v10H5z" /></svg>Закончить</button>
     {:else if file}
-      <button class="rv" disabled={!pending.length} title={pending.length ? store.titled('Разобрать Inbox', 'review') : 'Нечего разбирать'} onclick={() => inboxReview.startReview()}>
+      <button class="rv" disabled={!pending.length} title={pending.length ? titled('Разобрать Inbox', 'inbox.review') : 'Нечего разбирать'} onclick={() => session.start()}>
         <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4.5l9 5.5-9 5.5z" /></svg>Разобрать</button>
     {/if}
-    <button class="plus" aria-label={store.titled('Новая задача в Inbox', 'capture')} title={store.titled('Новая задача в Inbox', 'capture')} onclick={() => store.openCapture()}>
+    <button class="plus" aria-label={titled('Новая задача в Inbox', 'capture')} title={titled('Новая задача в Inbox', 'capture')} onclick={() => ctx.commands.run('capture.open')}>
       <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg>
     </button>
   </div>
@@ -137,10 +143,10 @@
     <div class="stub">
       <svg class="box" width="40" height="40" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4" /></svg>
       <div class="st">Inbox пока не настроен</div>
-      {#if missing}<div class="warn">Файл {displayName(cfg.file!)} не найден</div>{/if}
+      {#if missing}<div class="warn">Файл {shortName(data.chosen!)} не найден</div>{/if}
       <div class="sd">Выберите файл, в который будут попадать быстрые задачи</div>
-      <button class="primary" onclick={() => (store.pickInbox = Date.now())}>Выбрать файл…</button>
-      <button class="link" onclick={() => store.createInboxFile()}>Создать inbox.org в рабочей папке</button>
+      <button class="primary" onclick={() => ctx.commands.run('inbox.pickFile')}>Выбрать файл…</button>
+      <button class="link" onclick={() => ctx.commands.run('inbox.createFile')}>Создать inbox.org в рабочей папке</button>
     </div>
   {:else if review}
     <div class="prog">
@@ -151,7 +157,7 @@
       {#each review.items as it, i (it.id)}
         {@const c = MARK[it.result ?? '']}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="rrow" class:cur={i === review.cur} class:closed={closed(it)} role="option" aria-selected={i === review.cur} tabindex="-1" onclick={() => showCard(i)}>
+        <div class="rrow" class:cur={i === review.cur} class:closed={closed(it)} role="option" aria-selected={i === review.cur} tabindex="-1" onclick={() => session.show(i)}>
           <span class="mark" class:skip={it.result === 'skip'} style:background={c ?? 'transparent'} style:border-color={c ?? (it.result === 'skip' ? 'var(--wait)' : 'var(--fg3)')} aria-hidden="true">
             {#if it.result === 'done'}<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg>
             {:else if it.result === 'cancel' || it.result === 'delete'}<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" /></svg>
@@ -166,9 +172,9 @@
         </div>
       {/each}
     </div>
-    <div class="foot">Порядок — {store.inboxCfg.reviewOrder === 'old' ? 'от старых к новым' : 'от новых к старым'}. Задача старше {days(store.inboxCfg.stale)} помечена цветом.</div>
+    <div class="foot">Порядок — {cfg.reviewOrder === 'old' ? 'от старых к новым' : 'от новых к старым'}. Задача старше {days(cfg.stale)} помечена цветом.</div>
   {:else if !items.length}
-    <div class="empty">Inbox разобран: задач нет.<br />Новая — кнопкой «+»{store.keyHint('capture') ? ` или ${store.keyHint('capture')}` : ''}.</div>
+    <div class="empty">Inbox разобран: задач нет.<br />Новая — кнопкой «+»{ctx.commands.keyOf('capture') ? ` или ${ctx.commands.keyOf('capture')}` : ''}.</div>
   {:else}
     {#if pending.length}
       <div class="prog"><div class="pt"><span>{tasksWord(pending.length)}</span>{#if oldest}<span>самой старой {days(oldest)}</span>{/if}</div></div>
@@ -177,8 +183,8 @@
     <div class="list" bind:this={list} role="listbox" tabindex="0" aria-label="Задачи Inbox" aria-activedescendant="ib-{sel}" onkeydown={key}>
       {#each items as it, i (it.line + ':' + it.title)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="row" class:sel={i === sel} class:leaving={leaving === it.line || inbox.leaving === it.line} id="ib-{i}" role="option" aria-selected={i === sel} data-line={it.line}
-          onclick={() => { sel = i; list?.focus(); }} ondblclick={() => inbox.openItem(it)} oncontextmenu={(e) => context(e, it, i)}>
+        <div class="row" class:sel={i === sel} class:leaving={leaving === it.line} id="ib-{i}" role="option" aria-selected={i === sel} data-line={it.line}
+          onclick={() => { sel = i; list?.focus(); }} ondblclick={() => openItem(it)} oncontextmenu={(e) => context(e, it, i)}>
           <button class="check" aria-label="Готово: {it.title}" title="Готово" onclick={(e) => { e.stopPropagation(); void done(it); }}></button>
           <div class="main">
             <div class="line1">
@@ -237,7 +243,6 @@
   </div>
 {/if}
 
-{#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
 
 <style>
   .inbox { flex: 1; min-height: 0; display: flex; flex-direction: column; }

@@ -23,7 +23,7 @@ export interface Entry {
 const BUILTIN = import.meta.glob('../plugins/*/manifest.json', { eager: true, import: 'default' }) as Record<string, unknown>;
 const ENABLED_KEY = 'plugins:enabled';
 /** The core's features: their storages and keys are taken. */
-const CORE_IDS = ['goals', 'calendar', 'inbox', 'review', 'agenda', 'files', 'search'];
+const CORE_IDS = ['goals', 'calendar', 'review', 'agenda', 'files', 'search'];
 
 /** The user's choices: { id: on }. */
 export function readChoices(): Record<string, boolean> {
@@ -112,7 +112,7 @@ export const groupOf = (id: string) => 'plugin:' + id;
  *  two plugins' reviews (the goals' and the Inbox's ⌘1) do not clash (ТЗ 28). */
 export const reviewScope = (id: string) => 'pluginReview:' + id;
 function declareReviewScope(m: Manifest) {
-  registerScope({ id: reviewScope(m.id), name: `в разборе «${m.name}»`, over: ['window', 'editor', 'heading', 'review'], outside: { scopes: ['window', 'editor'], word: 'Вне разбора' }, rank: 30 });
+  registerScope({ id: reviewScope(m.id), name: `в разборе «${m.name}»`, over: ['window', 'editor', 'heading'], outside: { scopes: ['window', 'editor'], word: 'Вне разбора' }, rank: 30, alone: true });
 }
 
 /** A plugin's commands in the registry of keys (and its group of «Клавиши»). */

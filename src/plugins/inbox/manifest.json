@@ -1,0 +1,52 @@
+{
+  "id": "inbox",
+  "name": "Inbox",
+  "version": "1.0.0",
+  "description": "Раздел Inbox: задачи файла Inbox — открыть, перенести, дата, готово, удалить — и «Разбор Inbox» по карточкам. Быстрый ввод (⇧⌘I) и файл Inbox — настройки приложения.",
+  "author": "Panopticon",
+  "api": "^1.2",
+  "minAppVersion": "1.1.0",
+  "main": "main.js",
+  "permissions": ["index.read", "files.edit"],
+  "contributes": {
+    "commands": [
+      { "id": "inbox.nav", "title": "Навигатор: Inbox", "keys": ["⌃⌘2"] },
+      { "id": "inbox.review", "title": "Разобрать Inbox", "keys": ["⇧⌘R"], "synonyms": ["разбор", "inbox", "карточки"] },
+      { "id": "inbox.done", "title": "Разбор: Выполнено", "keys": ["⌘1"], "scope": "review" },
+      { "id": "inbox.cancel", "title": "Разбор: Отменить", "keys": ["⌘2"], "scope": "review" },
+      { "id": "inbox.move", "title": "Разбор: Перенести…", "keys": ["⌘3"], "scope": "review" },
+      { "id": "inbox.defer", "title": "Разбор: Отложить…", "keys": ["⌘4"], "scope": "review" },
+      { "id": "inbox.skip", "title": "Разбор: Пропустить", "keys": ["⌘5"], "scope": "review" },
+      { "id": "inbox.back", "title": "Разбор: Назад", "keys": ["⌘["], "scope": "review" },
+      { "id": "inbox.calendar", "title": "Разбор: Показать / скрыть календарь", "keys": ["⌘K"], "synonyms": ["календарь"], "scope": "review" }
+    ],
+    "navSections": [
+      { "id": "inbox", "title": "Inbox", "icon": "M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4", "key": "inbox.nav" }
+    ],
+    "settings": [
+      {
+        "block": "Inbox",
+        "groups": [
+          {
+            "caption": "СПИСОК",
+            "fields": [
+              { "key": "order", "type": "choice", "look": "menu", "where": "folder", "label": "Порядок", "default": "new", "options": [{ "value": "new", "label": "Новые сверху" }, { "value": "file", "label": "Как в файле" }] },
+              { "key": "counter", "type": "switch", "where": "folder", "label": "Счётчик на кнопке Inbox", "default": true },
+              { "key": "details", "type": "switch", "where": "folder", "label": "Показывать детали под заголовком", "default": true }
+            ]
+          },
+          {
+            "caption": "РАЗБОР",
+            "fields": [
+              { "key": "reviewDone", "type": "choice", "look": "menu", "where": "folder", "label": "Статус «Выполнено»", "default": "DONE", "options": [] },
+              { "key": "reviewCancel", "type": "choice", "look": "menu", "where": "folder", "label": "Статус «Отменено»", "default": "CANCELLED", "options": [] },
+              { "key": "reviewOrder", "type": "choice", "look": "segments", "where": "folder", "label": "Порядок карточек", "default": "old", "options": [{ "value": "old", "label": "Старые сначала" }, { "value": "new", "label": "Новые сначала" }] },
+              { "key": "stale", "type": "choice", "look": "menu", "where": "folder", "label": "Считать задачу залежавшейся через", "default": 7, "options": [{ "value": 3, "label": "3 дня" }, { "value": 7, "label": "7 дней" }, { "value": 14, "label": "14 дней" }, { "value": 30, "label": "30 дней" }] }
+            ],
+            "help": "«Разобрать» показывает задачи Inbox по одной. У задачи из другого набора статусов «Выполнено» и «Отменить» ставят первый и второй завершающие статусы её набора. Залежавшиеся задачи помечаются цветом в списке и на карточке."
+          }
+        ]
+      }
+    ]
+  }
+}

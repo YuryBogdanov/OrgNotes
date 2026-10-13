@@ -347,7 +347,11 @@ net?: { fetch(url: string, init?: { method?; headers?; body?: string }): Promise
 - **Команды приложения:** `capture.open`, `inbox.pickFile`, `inbox.createFile`, `heading.schedule` / `deadline` / `tags` / `priority`; `file.open { beside, focus }`.
 - **Интерфейс:** `ui.setBadge`, `ui.refile`; виджет `month`.
 - **Правки:** `edit.undo()`.
-- **Разбор:** заголовок карточки можно править в ней; у каждого плагина своя область клавиш разбора.
+- **Разбор:**
+  - заголовок карточки можно править в ней; у каждого плагина своя область клавиш разбора;
+  - свой порядок карточек (`next`), своя нижняя панель (`bar`, `barEnd`), открытые ящики (`drawers`), «разбор закрыли» (`onClose`);
+  - `currentReview()`: показать карточку (`show`), заменить очередь (`setItems`), закончить (`end`).
+- **Прочее:** `ui.refile { onUndo }`; наборы статусов файла в `index.workflow(path).sets`; `index.inbox().chosen`.
 
 ## Разбивка и приёмка
 

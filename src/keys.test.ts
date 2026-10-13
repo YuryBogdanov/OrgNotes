@@ -5,6 +5,7 @@ import {
   KEY_COMMANDS, bindingsOf, chordNote, clash, conflictsOf, fromAccelerator, isModified, matchesQuery, modifiedCount, normPress, outerNote,
   parseState, pressOf, queryKeys, refusal, toAccelerator, withKeys, commandById, defaultsOf, keyName, type KeyState,
 } from './keys';
+import './api/declare'; // the built-in plugins' keys (the Inbox's review, ТЗ 28), as the app declares them
 
 const ev = (code: string, mods = '') => ({ code, ctrlKey: mods.includes('c'), altKey: mods.includes('a'), shiftKey: mods.includes('s'), metaKey: mods.includes('m') });
 const emacs: KeyState = { preset: 'emacs', overrides: {} };
@@ -104,8 +105,8 @@ describe('clashes', () => {
   it('same scope or window and editor clash; review over window and heading over editor do not', () => {
     const b = bindingsOf(emacs);
     expect(conflictsOf(b, 'refile', '⌘E')).toEqual([{ id: 'useSelection', key: '⌘E' }]);
-    expect(conflictsOf(b, 'reviewDone', '⌘2')).toEqual([{ id: 'reviewCancel', key: '⌘2' }]);
-    expect(conflictsOf(b, 'reviewDone', '⌘1')).toEqual([]);
+    expect(conflictsOf(b, 'inbox.done', '⌘2')).toEqual([{ id: 'inbox.cancel', key: '⌘2' }]);
+    expect(conflictsOf(b, 'inbox.done', '⌘1')).toEqual([]);
     expect(conflictsOf(b, 'statusNext', '⌥↩')).toEqual([]); // ⌥↩ is a new heading (editor) everywhere else
     expect(conflictsOf(b, 'followLink', '⌘F')).toEqual([{ id: 'find', key: '⌘F' }]);
   });
@@ -117,8 +118,8 @@ describe('clashes', () => {
   });
   it('the review row says what its key does outside the review', () => {
     const b = bindingsOf(emacs);
-    expect(outerNote(b, 'reviewDone')).toBe('Вне разбора ⌘1 — «Заметки»');
-    expect(outerNote(b, 'reviewBack')).toBe('Вне разбора ⌘[ — «Назад»');
+    expect(outerNote(b, 'inbox.done')).toBe('Вне разбора ⌘1 — «Заметки»');
+    expect(outerNote(b, 'inbox.back')).toBe('Вне разбора ⌘[ — «Назад»');
     expect(outerNote(b, 'find')).toBe('');
   });
 });
@@ -156,7 +157,7 @@ describe('the Rust test of the menu bar', () => {
   const listOf = (name: string) => [...rs.slice(rs.indexOf(`let ${name} = [`)).split('];')[0].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
   it('lists the defaults of the registry', () => {
     const want = new Set(['CmdOrCtrl+Q', 'Alt+CmdOrCtrl+Backslash']); // «Выйти», «Разделить вниз»: not configurable
-    for (const c of KEY_COMMANDS.filter((x) => x.scope === 'window' || x.scope === 'global'))
+    for (const c of KEY_COMMANDS.filter((x) => (x.scope === 'window' || x.scope === 'global') && !x.id.includes('.'))) // a plugin's: not in the menu
       for (const p of ['emacs', 'mac'] as const) for (const k of defaultsOf(c, p)) if (toAccelerator(k)) want.add(toAccelerator(k)!);
     expect(listOf('defaults').sort()).toEqual([...want].sort());
   });

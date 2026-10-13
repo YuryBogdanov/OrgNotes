@@ -235,7 +235,9 @@ export interface ReviewSpec {
   aside?: CardRender;
   /** Lines folded in the narrowed editor, a note at the end of a line («3 — справа»), a line to show (a new `n`
    *  each time: the caret goes there). */
-  narrow?(h: HeadingInfo): { fold?: number[]; note?: { line: number; text: string } | null; reveal?: { line: number; n: number } | null };
+  narrow?(h: HeadingInfo): { fold?: number[]; note?: { line: number; text: string } | null; reveal?: { line: number; n: number; col?: number } | null };
+  /** The drawers (:PROPERTIES:) shown open in the narrowed editor (else folded). */
+  drawers?: boolean;
   /** A class of the plugin's on the review's frame (its own styles, as the goals' «greview»). */
   cls?: string;
   /** The toolbar's path while the review is shown (else its title). */
@@ -252,6 +254,16 @@ export interface ReviewSpec {
   width?: number;
   /** The card shown first (the cards before it are reached by «Назад»). */
   start?: number;
+  // ---- ТЗ 28: a review of its own order and bar (the Inbox's) ----
+  /** The bar's buttons drawn by the plugin instead of the actions' (the actions stay: their keys run them). */
+  bar?: CardRender;
+  /** Right of the bar («…»). */
+  barEnd?: CardRender;
+  /** The card after `cur` going `d` (an action's «next», «Назад», a key): its index, -1 the summary, `cur` none.
+   *  By default the next one in the queue. */
+  next?(cur: number, d: 1 | -1): number;
+  /** The review left the window (its tab closed, «Закончить», another review started). */
+  onClose?(): void;
 }
 /** The review shown (from `ui.review`): move it, draw the card again. */
 export interface ReviewHandle {
@@ -260,6 +272,12 @@ export interface ReviewHandle {
   redraw(): void;
   /** Only the bar read again (an action's `disabled` changed: a note typed). */
   update(): void;
+  /** Show the card `i` (-1: the summary), the review's tab brought to the front. */
+  show(i: number): void;
+  /** The queue now (a task moved to another file, gone from its file); `cur`: the card shown then. */
+  setItems(items: HeadingRef[], cur?: number): void;
+  /** The review closed, as «Закончить». */
+  end(): void;
 }
 export interface ReviewResult {
   total: number;
@@ -337,8 +355,9 @@ export interface Ctx {
     /** The number on the plugin's button of the navigator (0: none). */
     setBadge(navId: string, n: number): void;
     /** The core's move of a heading to another place («Перенести в…»): where it went, null — cancelled. `before`:
-     *  just before the write (a row's fade); `quiet`: the plugin tells of it, no toast of the core. */
-    refile(ref: HeadingRef, o?: { before?(): void | Promise<void>; quiet?: boolean }): Promise<{ path: string; line: number; title: string; label: string } | null>;
+     *  just before the write (a row's fade); `quiet`: the plugin tells of it, no toast of the core; `onUndo`: the
+     *  move taken back (⌘Z, «Отменить»). */
+    refile(ref: HeadingRef, o?: { before?(): void | Promise<void>; quiet?: boolean; onUndo?(): void }): Promise<{ path: string; line: number; title: string; label: string } | null>;
     /** The review shown now (its parts move and redraw it); null when there is none of the plugin's. */
     currentReview(): ReviewHandle | null;
   };
@@ -350,10 +369,11 @@ export interface Ctx {
     files(): Promise<FileInfo[]>;
     /** The named colour of a status in the sets of the file (the plugin draws with var(--p-<colour>)). */
     statusTone(keyword: string, path: string): Promise<Named | null>;
-    /** The Inbox file (a setting of the core: the quick entry writes there); null — not chosen. */
-    inbox(): Promise<{ path: string | null }>;
-    /** The statuses the file knows: open and done keywords (for `@panopticon/api/org`). */
-    workflow(path: string): Promise<{ open: string[]; done: string[] }>;
+    /** The Inbox file (a setting of the core: the quick entry writes there); null — not chosen, or not there:
+     *  `chosen` is the setting then (a file gone). */
+    inbox(): Promise<{ path: string | null; chosen: string | null }>;
+    /** The statuses the file knows: open and done keywords (for `@panopticon/api/org`), and its sets in order. */
+    workflow(path: string): Promise<{ open: string[]; done: string[]; sets: StatusSet[] }>;
   };
   /** Needs `files.read` (or `files.edit`). */
   files?: { read(path: string): Promise<string> };

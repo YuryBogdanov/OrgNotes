@@ -35,7 +35,6 @@ fn every_default_accelerator_parses() {
         "Control+CmdOrCtrl+ArrowLeft",
         "Control+CmdOrCtrl+ArrowRight",
         "Control+CmdOrCtrl+Digit1",
-        "Control+CmdOrCtrl+Digit2",
         "Control+CmdOrCtrl+Digit3",
         "Control+CmdOrCtrl+Digit5",
         "Control+CmdOrCtrl+Digit6",
@@ -50,7 +49,6 @@ fn every_default_accelerator_parses() {
         "Shift+CmdOrCtrl+KeyN",
         "Shift+CmdOrCtrl+KeyO",
         "Shift+CmdOrCtrl+KeyP",
-        "Shift+CmdOrCtrl+KeyR",
         "Shift+CmdOrCtrl+KeyW",
     ];
     for a in defaults {
