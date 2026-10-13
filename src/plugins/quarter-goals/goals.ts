@@ -401,3 +401,31 @@ export function reportText(people: ReportPerson[], q: Quarter, format: 'text' | 
   }
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
 }
+
+// ---- «Сегодня» (ТЗ 32): a person's goals at a glance — the block «Цели квартала» and the line of a 1-1 card ----------
+
+export interface TodayPerson {
+  active: number; // active goals of the quarter
+  silent: { title: string; days: number }[]; // the active ones without a mark longer than the threshold
+  last: number | null; // days since the last mark of an active goal (else its :CREATED:); null — none known
+}
+/** The person's quarter: how many active, which are silent, how long since the last mark. */
+export function todayPerson(s: SourceGoals, q: Quarter, now = new Date(), threshold = SILENT_DAYS): TodayPerson {
+  const act = goalsIn(s, q).filter((g) => g.keyword === GOAL_STATES.active);
+  const quiet = act.map((g) => quietDays(g, now)).filter((d): d is number => d !== null);
+  return {
+    active: act.length,
+    silent: act.filter((g) => isSilent(g, now, threshold)).map((g) => ({ title: g.title, days: quietDays(g, now)! })),
+    last: quiet.length ? Math.min(...quiet) : null,
+  };
+}
+/** «6 дней назад», «вчера», «сегодня»; a silent one — «18 дней». */
+export const agoWords = (n: number | null, silent: boolean) =>
+  n === null ? 'нет отметок' : silent ? days(n) : n <= 0 ? 'сегодня' : n === 1 ? 'вчера' : `${days(n)} назад`;
+export const goalsCount = (n: number) => `${n} ${plural(n, 'цель', 'цели', 'целей')}`;
+/** The line of a 1-1 card: «Цели: 3 активных, 2 молчат больше 14 дней». */
+export function oneOnOneLine(p: TodayPerson, threshold = SILENT_DAYS): string {
+  const act = p.active ? `${p.active} ${plural(p.active, 'активная', 'активных', 'активных')}` : 'активных нет';
+  const k = p.silent.length;
+  return `Цели: ${act}` + (k ? `, ${k} ${plural(k, 'молчит', 'молчат', 'молчат')} больше ${days(threshold)}` : '');
+}

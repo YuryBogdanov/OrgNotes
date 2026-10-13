@@ -1344,6 +1344,55 @@ mod mini_native {
     swift!(pub fn mini_return_focus());
 }
 
+// ---- «Напоминать завершить день» (ТЗ 32 §5) ------------------------------------------------------------------------
+// A notification of macOS (swift/MiniPanel/Notify.swift); a click on it brings the window forward and opens the sheet
+// «Завершить день» (the event `end-day`). Without an app bundle (`tauri dev`) there is none: the page says it itself.
+
+#[cfg(target_os = "macos")]
+mod notify_native {
+    extern "C" {
+        pub fn notify_available() -> bool;
+        pub fn notify_setup(on_click: extern "C" fn());
+        pub fn notify_end_day() -> bool;
+    }
+}
+static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
+
+#[cfg(target_os = "macos")]
+extern "C" fn end_day_clicked() {
+    let Some(app) = APP.get() else { return };
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+    let _ = app.emit_to("main", "end-day", ());
+}
+/// The reminder is on: the notifications' delegate and the permission (asked once). Whether they can be shown.
+#[tauri::command]
+fn remind_prepare(app: AppHandle) -> bool {
+    let _ = APP.set(app.clone());
+    #[cfg(target_os = "macos")]
+    return on_main(&app, || unsafe {
+        notify_native::notify_setup(end_day_clicked);
+        notify_native::notify_available()
+    })
+    .unwrap_or(false);
+    #[cfg(not(target_os = "macos"))]
+    false
+}
+/// «Завершить день?» now; false — not shown (no bundle): the page shows its own.
+#[tauri::command]
+fn remind_end_day(app: AppHandle) -> bool {
+    #[cfg(target_os = "macos")]
+    return on_main(&app, || unsafe { notify_native::notify_end_day() }).unwrap_or(false);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        false
+    }
+}
+
 /// On the main thread, as AppKit wants it: at once when this is it (a sync command, a shortcut's handler), else
 /// sent there and waited for.
 fn on_main<R: Send + 'static>(app: &AppHandle, f: impl FnOnce() -> R + Send + 'static) -> Option<R> {
@@ -1551,6 +1600,8 @@ pub fn run() {
             mini_pin,
             mini_return_focus,
             mini_options,
+            remind_prepare,
+            remind_end_day,
             show_main_window,
             list_themes,
             write_theme,

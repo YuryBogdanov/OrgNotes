@@ -11,6 +11,8 @@
   import { weekdayNames } from './edits';
   import { today } from './todayState.svelte';
   import { allTodayBlocks, arrange, todayBlockOf } from './todayBlocks';
+  import { newMeeting, oneOnOnes, type OneOnOne } from './oneOnOne';
+  import { plugins } from './api/host.svelte';
   import {
     agendaRows, dateTitle, doneStatus, focusRows, journalDays, kicker, lastDay, noteLines, noteWhen, overdue, overdueWords, taskGroups, whenChosen,
     type OverdueRow, type TaskRow,
@@ -53,15 +55,48 @@
   const late = $derived(overdue(cfg.overdueAll ? files : files.filter((f) => today.taskFiles.includes(f.name)), day));
   const LATE_CAP = 6;
 
-  const EMPTY: Record<string, () => boolean> = { overdue: () => !late.length };
+  // ---- 1-1: the meetings of the day; what the plugins add to a card (the goals' line, «Разбор целей») ----
+  const meetings = $derived(oneOnOnes(files, day, cfg.tag));
+  const extras = $state<Record<string, { line: string | null; action: { label: string; run: () => void } | null }[]>>({});
+  $effect(() => {
+    const specs = [...plugins.oneOnOnes.entries()];
+    for (const m of meetings) {
+      const file = m.file;
+      void Promise.all(
+        specs.map(async ([pid, s]) => ({
+          line: s.line ? await Promise.resolve(plugins.guard(pid, () => s.line!(file), null)).catch(() => null) : null,
+          action: s.action && (await Promise.resolve(plugins.guard(pid, () => s.action!.available?.(file) ?? true, false)).catch(() => false))
+            ? { label: s.action.label, run: () => plugins.guard(pid, () => s.action!.run(file), undefined) } : null,
+        })),
+      ).then((r) => (extras[m.key] = r));
+    }
+  });
+  async function meeting(m: OneOnOne) {
+    if (m.today !== null) return open(m.path, m.today + 1);
+    let at = -1;
+    const step = await store.transaction('Новая встреча', (tx) =>
+      tx.update(m.path, (text) => {
+        const f = files.find((x) => x.path === m.path);
+        const r = f ? newMeeting(text, f.headings, m.line, day) : null;
+        if (r) at = r.line;
+        return r?.text ?? null;
+      }),
+    );
+    if (step && at >= 0) open(m.path, at);
+  }
+  const lastWords = (d: Date) => `${d.getDate()} ${['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'][d.getMonth()]}`;
+
+  const EMPTY: Record<string, () => boolean> = { overdue: () => !late.length, oneOnOne: () => !meetings.length };
   const shown = (id: string) => {
     const b = todayBlockOf(id);
     if (!b || (b.empty?.() ?? EMPTY[id]?.() ?? false)) return undefined;
     return b;
   };
+  // a plugin's block left out stays drawn out of sight: it can come back by itself
+  const resting = $derived(today.blocks.filter((o) => o.on && todayBlockOf(o.id)?.component && !shown(o.id)).map((o) => o.id));
   const layout = $derived.by(() => {
     void allTodayBlocks();
-    return arrange(cfg.blocks, shown);
+    return arrange(today.blocks, shown);
   });
 
   // ---- actions ----
@@ -120,6 +155,9 @@
         {#each layout.top as id (id)}{@render block(id)}{/each}
       </div>
     {/if}
+    {#if resting.length}
+      <div hidden>{#each resting as id (id)}{@const b = todayBlockOf(id)}{#if b?.component}<b.component id={b.id} />{/if}{/each}</div>
+    {/if}
     {#if layout.cols.length}
       <div class="row cols">
         {#each layout.cols as col (col.join())}
@@ -133,7 +171,29 @@
 {#snippet block(id: string)}
   {@const b = todayBlockOf(id)}
   {#if b?.component}
-    <section class="card" aria-label={b.title}><b.component /></section>
+    <section class="card" aria-label={b.title}><b.component id={b.id} /></section>
+  {:else if id === 'oneOnOne'}
+    {#each meetings as m (m.key)}
+      {@const ex = extras[m.key] ?? []}
+      <section class="card one" aria-label="1-1 сегодня: {m.name}">
+        <div class="head"><span class="name">1-1 сегодня</span>{#if m.time}<span class="sub">{m.time}</span>{/if}</div>
+        <div class="who">
+          <span class="av" style:background={m.color} aria-hidden="true">{m.initials}</span>
+          <div class="wl"><div class="wn">{m.name}</div><div class="ws">{[m.file, m.every, m.last ? `прошлая — ${lastWords(m.last)}` : ''].filter(Boolean).join(' · ')}</div></div>
+        </div>
+        {#if ex.some((e) => e.line) || m.open}
+          <div class="facts">
+            {#each ex.filter((e) => e.line) as e, i (i)}<div class="fact"><span class="fdot wait"></span><span>{e.line}</span></div>{/each}
+            {#if m.open}<div class="fact"><span class="fdot red"></span><span>Открытые договорённости с прошлой 1-1: {m.open}</span></div>{/if}
+          </div>
+        {/if}
+        <div class="mbtns">
+          <button class="mb primary" onclick={() => void meeting(m)}>{m.today !== null ? 'Открыть встречу' : 'Новая встреча'}</button>
+          <button class="mb" onclick={() => open(m.path, m.line)}>Открыть файл</button>
+          {#each ex.filter((e) => e.action) as e, i (i)}<button class="mb" onclick={() => e.action!.run()}>{e.action!.label}</button>{/each}
+        </div>
+      </section>
+    {/each}
   {:else if id === 'note'}
     <section class="card note" aria-label="Записка со вчера">
       <div class="head">
@@ -315,4 +375,21 @@
   .when { margin-right: auto; font-size: 11.5px; color: var(--todo); }
   .chip { height: 22px; display: inline-flex; align-items: center; padding: 0 8px; border: 0; border-radius: 5px; background: var(--field); color: var(--fg); font: inherit; font-size: 11.5px; }
   .chip:hover { background: var(--sel); }
+
+  /* «1-1 сегодня» */
+  .one { padding: 12px 16px; }
+  .who { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .av { flex: 0 0 30px; width: 30px; height: 30px; border-radius: 15px; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .wl { flex: 1; min-width: 0; }
+  .wn { font-weight: 600; }
+  .ws { font-size: 12px; color: var(--fg2); }
+  .facts { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; }
+  .fact { display: flex; gap: 8px; }
+  .fdot { flex: 0 0 8px; width: 8px; height: 8px; margin-top: 5px; border-radius: 4px; }
+  .fdot.wait { background: var(--wait); }
+  .fdot.red { background: var(--todo); }
+  .mbtns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .mb { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 12px; }
+  .mb:hover { background: var(--field); }
+  .mb.primary { border: 0; background: var(--acc); color: var(--onacc); font-weight: 600; }
 </style>

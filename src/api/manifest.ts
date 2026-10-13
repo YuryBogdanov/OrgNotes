@@ -38,6 +38,13 @@ export interface ManifestSettings {
   icon?: string;
   groups: Group[];
 }
+/** A block of «Сегодня» (ТЗ 32): in the settings' list of blocks; `attach` puts it under the block before it. */
+export interface ManifestTodayBlock {
+  id: string;
+  title: string;
+  hint?: string;
+  attach?: boolean;
+}
 export interface ManifestStatusSet {
   name: string;
   states: string; // «IDEA DOING | DONE»
@@ -60,6 +67,7 @@ export interface Manifest {
     commands: ManifestCommand[];
     navSections: ManifestNav[];
     views: ManifestView[];
+    todayBlocks: ManifestTodayBlock[];
     settings: ManifestSettings[];
     statusSets: ManifestStatusSet[];
     themes: string[];
@@ -145,6 +153,12 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
     if (!isStr(x.title)) problems.push(`вид «${x.id}»: нет title`);
     views.push({ id: x.id as string, title: String(x.title ?? ''), icon: isStr(x.icon) ? x.icon : 'M4 4h12v12H4z', ...(x.toolbar === true ? { toolbar: true } : {}) });
   }
+  const todayBlocks: ManifestTodayBlock[] = [];
+  for (const x of arr(c.todayBlocks).map(obj)) {
+    if (!own('блок', x.id)) continue;
+    if (!isStr(x.title)) problems.push(`блок «${x.id}»: нет title`);
+    todayBlocks.push({ id: x.id as string, title: String(x.title ?? ''), ...(isStr(x.hint) ? { hint: x.hint } : {}), ...(x.attach === true ? { attach: true } : {}) });
+  }
   const settings: ManifestSettings[] = [];
   for (const x of arr(c.settings).map(obj)) {
     if (!isStr(x.section) && !isStr(x.block)) {
@@ -176,7 +190,7 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
       main: isStr(j.main) ? j.main : undefined, styles: isStr(j.styles) ? j.styles : undefined,
       defaultEnabled: typeof j.defaultEnabled === 'boolean' ? j.defaultEnabled : undefined,
       permissions: permissions as Permission[], net,
-      contributes: { commands, navSections, views, settings, statusSets, themes: arr(c.themes).filter(isStr) as string[] },
+      contributes: { commands, navSections, views, todayBlocks, settings, statusSets, themes: arr(c.themes).filter(isStr) as string[] },
       warnings,
     },
   };

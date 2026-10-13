@@ -139,11 +139,12 @@ class Store {
   /** The sheet about a changed or deleted file. */
   diskReq = $state<{ kind: 'changed' | 'deleted'; path: string; resolve: (a: DiskAnswer) => void } | null>(null);
   /** «work» обновлён с диска — a status line at the bottom of the editor for 4 s. */
-  toast = $state<{ text: string; n: number; actions?: { label: string; run: () => void }[] } | null>(null);
-  /** A short note at the bottom (with buttons, e.g. «Открыть», «Отменить»); it goes after a few seconds. */
-  note(text: string, actions?: { label: string; run: () => void }[], ms = 4000) {
+  toast = $state<{ text: string; n: number; actions?: { label: string; run: () => void }[]; icon?: string } | null>(null);
+  /** A short note at the bottom (with buttons, e.g. «Открыть», «Отменить»); it goes after a few seconds. `icon`: an SVG
+   *  path (viewBox 0 0 20 20) instead of the arrows of «обновлён с диска». */
+  note(text: string, actions?: { label: string; run: () => void }[], ms = 4000, icon?: string) {
     this.toastNames = [];
-    this.toast = { text, n: Date.now(), actions };
+    this.toast = { text, n: Date.now(), actions, icon };
     clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => (this.toast = null), ms);
   }

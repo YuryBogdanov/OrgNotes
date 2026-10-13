@@ -3,7 +3,7 @@ import { parseHeadings, DEFAULT_WORKFLOW } from './org';
 import { entriesIn } from './calIndex';
 import {
   agendaRows, dateTitle, dayOf, doneStatus, focusRows, inlineHtml, journalDays, kicker, lastDay, noteLines, overdue, overdueWords, readFolder,
-  readLocal, shouldShow, taskGroups, whenChosen, type TFile,
+  readLocal, remindDue, shouldShow, taskGroups, whenChosen, type TFile,
 } from './today';
 import { arrange } from './todayBlocks';
 
@@ -42,6 +42,20 @@ describe('when it opens by itself', () => {
   });
 });
 
+describe('the reminder', () => {
+  const o = { remind: true, remindAt: '17:30' };
+  const wed = (t: string) => at('2026-10-14T' + t);
+  it('on a working day after its time, once, not when the day is ended', () => {
+    expect(remindDue(o, wed('17:29'), null, false)).toBe(false);
+    expect(remindDue(o, wed('17:30'), null, false)).toBe(true);
+    expect(remindDue(o, wed('19:00'), null, false)).toBe(true); // asleep at 17:30: on waking
+    expect(remindDue(o, wed('19:00'), '2026-10-14', false)).toBe(false);
+    expect(remindDue(o, wed('19:00'), '2026-10-13', true)).toBe(false);
+    expect(remindDue({ ...o, remind: false }, wed('19:00'), null, false)).toBe(false);
+    expect(remindDue(o, at('2026-10-17T19:00'), null, false)).toBe(false); // Saturday
+  });
+});
+
 describe('the settings', () => {
   it('read with defaults; the blocks keep their order, a new one goes last', () => {
     const f = readFolder({ statuses: ['NEXT'], tag: ':1on1:', blocks: [{ id: 'tasks', on: false }, { id: 'note', on: true }] });
@@ -49,8 +63,8 @@ describe('the settings', () => {
     expect(f.files).toBeNull();
     expect(f.tag).toBe('1on1');
     expect(f.blocks.slice(0, 3)).toEqual([{ id: 'tasks', on: false }, { id: 'note', on: true }, { id: 'focus', on: true }]);
-    expect(f.blocks).toHaveLength(7);
-    expect(readLocal({ show: 'nope', remindAt: '7' })).toEqual({ show: 'day', overTabs: true, remind: true, remindAt: '18:30' });
+    expect(f.blocks).toHaveLength(6);
+    expect(readLocal({ show: 'nope', remindAt: '7' })).toEqual({ show: 'day', overTabs: true, remind: true, remindAt: '17:30' });
   });
   it('lays the blocks out: wide ones first, an attached one under the one before', () => {
     const spec = (id: string) => ({ id, title: id, wide: id === 'note' || id === 'focus', attach: id === 'oneOnOne' || id === 'goals' });
@@ -84,8 +98,9 @@ describe('the blocks', () => {
   });
   it('«Агенда»: the day by time, the whole day last, the past dimmed, a 1-1 marked', () => {
     const f = file('cal.org', [
+      '#+TITLE: Петров Алексей',
       '* Стендап', '<2026-10-14 Ср 10:00-10:30>',
-      '* 1-1 Петров :1on1:', '<2026-10-14 Ср 15:00-15:45>',
+      '* 1-1 :1on1:', '<2026-10-14 Ср 15:00-15:45>',
       '* TODO Отчёт', 'DEADLINE: <2026-10-14 Ср 18:00>',
       '* TODO Слайды', 'SCHEDULED: <2026-10-14 Ср>',
       '* DONE Готово', 'CLOSED: [2026-10-14 Ср 09:00]',
@@ -94,7 +109,7 @@ describe('the blocks', () => {
     const rows = agendaRows(entriesIn([f], day, day), [f], day, at('2026-10-14T11:00'), '1on1');
     expect(rows.map((r) => [r.time, r.title, r.past, r.meeting])).toEqual([
       ['10:00–10:30', 'Стендап', true, false],
-      ['15:00–15:45', '1-1 Петров', false, true],
+      ['15:00–15:45', '1-1 Петров Алексей', false, true],
       ['до 18:00', 'Дедлайн: Отчёт', false, false],
       ['весь день', 'Слайды', false, false],
     ]);

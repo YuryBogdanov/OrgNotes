@@ -321,7 +321,7 @@
   {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
   {#if store.toast}
     <div class="toast" class:acts={!!store.toast.actions} role="status">
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 10a6.5 6.5 0 1 1-2-4.7M16.5 3.5V6.5h-3" /></svg>
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={store.toast.icon ?? 'M16.5 10a6.5 6.5 0 1 1-2-4.7M16.5 3.5V6.5h-3'} /></svg>
       <span>{store.toast.text}</span>
       {#each store.toast.actions ?? [] as a}<button class="tbtn" onclick={() => { store.toast = null; a.run(); }}>{a.label}</button>{/each}
     </div>
@@ -430,7 +430,7 @@
 {#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
 {#if store.settingsOpen && store.loaded}<Settings />{/if}
 {#if today.ending}<EndDay />{/if}
-{#if today.toast}<div class="toast" role="status">{today.toast}</div>{/if}
+
 <!-- the sheets a plugin asks for: over the window and the settings (the trust sheet comes from «Плагины») -->
 <PluginSheets />
 {/if}
@@ -495,6 +495,4 @@
   .pwrap { min-width: 0; display: flex; }
   .divider { flex: 0 0 1px; background: var(--line); position: relative; z-index: 5; }
   .divider::after { content: ''; position: absolute; inset: 0 -4px; cursor: col-resize; }
-  /* «День завершён. До завтра» (ТЗ 32) */
-  .toast { position: fixed; z-index: 90; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 8px 16px; border-radius: 8px; background: var(--pop); color: var(--fg); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); font-size: 13px; }
 </style>

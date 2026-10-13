@@ -18,11 +18,12 @@
   const setStatuses = (list: string[]) => void today.setFolder({ statuses: list });
   const setFiles = (list: string[]) => void today.setFolder({ files: list });
 
-  const rows = $derived(cfg.blocks.filter((b) => todayBlockOf(b.id)));
+  const all = $derived(today.blocks);
+  const rows = $derived(all.filter((b) => todayBlockOf(b.id)));
   let dragId = $state<string | null>(null);
   let overId = $state<string | null>(null);
   function moveBlock(id: string, to: number) {
-    const list = [...cfg.blocks];
+    const list = [...all];
     const from = list.findIndex((b) => b.id === id);
     if (from < 0) return;
     const [b] = list.splice(from, 1);
@@ -30,7 +31,7 @@
     void today.setFolder({ blocks: list });
   }
   const dropOn = (target: string) => {
-    if (dragId && dragId !== target) moveBlock(dragId, cfg.blocks.findIndex((b) => b.id === target));
+    if (dragId && dragId !== target) moveBlock(dragId, all.findIndex((b) => b.id === target));
     dragId = overId = null;
   };
   function step(e: KeyboardEvent, id: string) {
@@ -40,10 +41,10 @@
     const i = shown.indexOf(id);
     const j = i + (e.key === 'ArrowUp' ? -1 : 1);
     if (j < 0 || j >= shown.length) return;
-    moveBlock(id, cfg.blocks.findIndex((b) => b.id === shown[j]));
+    moveBlock(id, all.findIndex((b) => b.id === shown[j]));
     requestAnimationFrame(() => (document.querySelector(`[data-grip="${id}"]`) as HTMLElement | null)?.focus());
   }
-  const toggle = (id: string) => void today.setFolder({ blocks: cfg.blocks.map((b) => (b.id === id ? { ...b, on: !b.on } : b)) });
+  const toggle = (id: string) => void today.setFolder({ blocks: all.map((b) => (b.id === id ? { ...b, on: !b.on } : b)) });
 </script>
 
 <div class="body">

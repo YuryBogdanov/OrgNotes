@@ -5,10 +5,11 @@ import { definePlugin, type Ctx } from '@panopticon/api';
 import { mount, unmount } from 'svelte';
 import { core } from './core.svelte';
 import { goals, OVERVIEW } from './state.svelte';
-import { GOALS_WORKFLOW } from './goals';
+import { GOALS_WORKFLOW, oneOnOneLine, quarterOf, todayPerson } from './goals';
 import { openAdd, openForm, startReview } from './actions';
 import Overview from './Overview.svelte';
 import Panel from './Panel.svelte';
+import Today from './Today.svelte';
 import './styles.css';
 
 /** The name of a goals tab: the overview or a person. */
@@ -79,5 +80,19 @@ export default definePlugin({
       if (key) await startReview(key);
     });
     goals.watchAvailable();
+
+    // «Сегодня» (ТЗ 32): the block of goals; the goals' line and «Разбор целей» on a card of 1-1
+    ctx.ui.todayBlock('quarter-goals.today', (el, block) => {
+      const app = mount(Today, { target: el, props: { hide: (h: boolean) => block.setHidden(h) } });
+      return () => void unmount(app);
+    });
+    const personOf = (path: string) => goals.goalPeople.find((p) => p.found && !p.src.me && p.src.file === path);
+    ctx.ui.oneOnOne({
+      line: (path) => {
+        const p = personOf(path);
+        return p ? oneOnOneLine(todayPerson(p.data, quarterOf(new Date()), new Date(), goals.goalSettings.silent), goals.goalSettings.silent) : null;
+      },
+      action: { label: 'Разбор целей', available: (path) => !!personOf(path), run: (path) => void (personOf(path) && startReview(personOf(path)!.key)) },
+    });
   },
 });
