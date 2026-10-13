@@ -53,6 +53,7 @@
   import { keyHandler, menuMayRun } from './keyDispatch';
   import { actionOf, allNavs, allViews, viewOf } from './views';
   import { today } from './todayState.svelte';
+  import EndDay from './EndDay.svelte';
   import { plugins } from './api/host.svelte';
   import PluginSheets from './PluginSheets.svelte';
 
@@ -170,6 +171,7 @@
     miniOpen: () => store.openInMini(),
     miniShow: () => store.toggleMini(),
     today: () => today.open(),
+    endDay: () => today.openEndDay(),
     navFiles: () => store.setNavMode('files'),
     navAgendas: () => store.setNavMode('agendas'),
     capture: () => store.openCapture(),
@@ -427,6 +429,8 @@
 </div>
 {#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
 {#if store.settingsOpen && store.loaded}<Settings />{/if}
+{#if today.ending}<EndDay />{/if}
+{#if today.toast}<div class="toast" role="status">{today.toast}</div>{/if}
 <!-- the sheets a plugin asks for: over the window and the settings (the trust sheet comes from «Плагины») -->
 <PluginSheets />
 {/if}
@@ -491,4 +495,6 @@
   .pwrap { min-width: 0; display: flex; }
   .divider { flex: 0 0 1px; background: var(--line); position: relative; z-index: 5; }
   .divider::after { content: ''; position: absolute; inset: 0 -4px; cursor: col-resize; }
+  /* «День завершён. До завтра» (ТЗ 32) */
+  .toast { position: fixed; z-index: 90; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 8px 16px; border-radius: 8px; background: var(--pop); color: var(--fg); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); font-size: 13px; }
 </style>

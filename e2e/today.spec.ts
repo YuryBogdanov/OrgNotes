@@ -35,7 +35,7 @@ test('at the start of the day it opens by itself: pinned, first, over the tabs t
   await expect(focus).toContainText('Задача не найдена');
 
   const agenda = screen(page).getByRole('region', { name: 'Агенда на сегодня' });
-  await expect(agenda.locator('.arow')).toHaveCount(4);
+  await expect(agenda.locator('.arow')).toHaveCount(5);
   await expect(agenda.locator('.arow').first()).toHaveClass(/past/);
   await expect(agenda.locator('.badge')).toHaveText('1-1');
   await expect(agenda.locator('.arow').last()).toContainText('весь день');

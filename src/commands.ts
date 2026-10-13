@@ -32,6 +32,7 @@ export const ICONS = {
   plug: 'M8 2.5v4M12 2.5v4M5.5 6.5h9v3a4.5 4.5 0 0 1-9 0zM10 14v3.5',
   window: 'M3 4.5h14v11H3zM3 7.5h14M10.5 10.5h4.5v3.5h-4.5z', // a window with a small one in its corner
   sun: 'M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4',
+  moon: 'M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8z',
   gear: 'M10 7.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2zM10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6',
 };
 export type Icon = keyof typeof ICONS;
@@ -210,6 +211,10 @@ register({
 register({
   id: 'today', title: 'Открыть «Сегодня»', icon: 'sun', group: 'general', synonyms: ['сегодня', 'утро', 'обзор', 'день'],
   when: () => !!store.dir || store.files.length > 0, run: () => void setTimeout(() => today.open()),
+});
+register({
+  id: 'endDay', title: 'Завершить день…', icon: 'moon', group: 'general', synonyms: ['вечер', 'журнал', 'итоги', 'на завтра'],
+  when: () => !!store.dir || store.files.length > 0, run: () => void setTimeout(() => today.openEndDay()),
 });
 register({
   id: 'settings', title: 'Настройки…', icon: 'gear', group: 'general', synonyms: ['параметры', 'клавиши', 'сочетания', 'preferences'],

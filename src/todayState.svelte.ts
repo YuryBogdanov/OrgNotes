@@ -5,12 +5,23 @@
 import { store } from './store.svelte';
 import { isPinned, newTab, pinFirst, type Layout } from './layout';
 import type { Schema, Values } from './settingsSchema';
+import { newId, writeDay, type DayTask, type Link } from './endDay';
 import { DEFAULT_FOLDER, DEFAULT_LOCAL, cleanTag, dayOf, readFolder, readLocal, shouldShow, type TodayFolder, type TodayLocal } from './today';
 
 export const TODAY = 'today'; // the kind of its tab
 const SHOWN = 'today:shown'; // when it was last shown (ms)
 
 store.registerStorage(TODAY);
+store.addSheet(() => today.ending);
+
+/** A task as «Завершить день» knows it (its :ID: if it has one). */
+export type EndTask = Pick<DayTask, 'key' | 'path' | 'line' | 'title'> & { id?: string };
+export interface EndPlan {
+  moves: { task: EndTask; date: Date }[]; // «Не успел»: SCHEDULED moves there
+  focus: EndTask[]; // «Главное на завтра»
+  done: EndTask[]; // «Сделано»
+  note: string; // «Заметка на завтра»
+}
 
 class TodayState {
   get folder(): TodayFolder {
@@ -58,6 +69,44 @@ class TodayState {
       /* this time only */
     }
   }
+  // ---- «Завершить день» (ТЗ 32 §3) ----
+  /** The sheet is up. */
+  ending = $state(false);
+  openEndDay() {
+    if (!store.dir && !store.files.length) return;
+    this.tick();
+    this.ending = true;
+  }
+  /**
+   * One transaction, one ⌘Z: the moves of «Не успел», an :ID: for every task linked that has none, the day in the
+   * journal (the file made when it is not there). Closes the sheet and says so; false when nothing was written.
+   */
+  async finishDay(plan: EndPlan): Promise<boolean> {
+    const journal = await store.ensureFile(this.folder.journal);
+    if (!journal) return false;
+    const ids = new Map<string, string>(); // a task's key → its id
+    const link = (t: EndTask): Link => {
+      if (!ids.has(t.key)) ids.set(t.key, t.id ?? newId());
+      return { id: ids.get(t.key)!, title: t.title };
+    };
+    const focus = plan.focus.map(link);
+    const done = plan.done.map(link);
+    const all = [...plan.focus, ...plan.done];
+    const step = await store.transaction('Завершить день', (tx) => {
+      for (const m of plan.moves) tx.setPlanning({ path: m.task.path, line: m.task.line, title: m.task.title }, 'SCHEDULED', m.date);
+      for (const t of all) if (!t.id) tx.setProperty({ path: t.path, line: t.line, title: t.title }, 'ID', ids.get(t.key)!);
+      tx.update(journal.path, (text) => writeDay(text, this.day, { note: plan.note, focus, done }, new Date()));
+    });
+    if (!step) return false;
+    this.ending = false;
+    this.toast = 'День завершён. До завтра';
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => (this.toast = ''), 3000);
+    return true;
+  }
+  /** «День завершён. До завтра» at the bottom of the window for 3 s. */
+  toast = $state('');
+  private toastTimer: ReturnType<typeof setTimeout> | undefined;
   /** At launch, on coming back to the window, on the first action after 4:00: opens it when the settings say so. */
   check(launch: boolean) {
     this.tick();

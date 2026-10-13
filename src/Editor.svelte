@@ -478,7 +478,9 @@
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         EditorView.domEventHandlers({
           mousedown(e, v) {
-            if (!(e.metaKey || e.ctrlKey)) return false;
+            // ⌘-click follows a link; drawn as «Оформленный текст», a plain click on it does (ТЗ 32)
+            const plain = e.button === 0 && !e.shiftKey && !e.altKey && v.dom.classList.contains('cm-rich') && !!(e.target as HTMLElement).closest?.('.cm-link');
+            if (!(e.metaKey || e.ctrlKey || plain)) return false;
             const pos = v.posAtCoords({ x: e.clientX, y: e.clientY });
             const l = pos == null ? undefined : linkAt(v.state.doc, pos);
             if (!l) return false;

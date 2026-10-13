@@ -734,6 +734,23 @@ class Store {
     }
     await this.setInbox({ file: 'inbox.org' });
   }
+  /** A file of the folder, made empty when it is not there yet (the journal of «Завершить день»); none if it failed. */
+  async ensureFile(rel: string): Promise<NoteFile | undefined> {
+    const have = this.files.find((f) => f.name === rel);
+    if (have) return have;
+    const i = rel.lastIndexOf('/');
+    try {
+      await this.flush();
+      if (isTauri) await invoke<string>('create_entry', { parent: this.abs(i < 0 ? '' : rel.slice(0, i)), name: rel.slice(i + 1), isDir: false });
+      await this.reload();
+    } catch (e) {
+      if (!String(e).includes('exist')) {
+        this.say(`Не удалось создать «${rel}»: ${e}`);
+        return undefined;
+      }
+    }
+    return this.files.find((f) => f.name === rel);
+  }
   /** Write a file now (not after the autosave pause): unsaved edits of its tab go along. Null, or why it failed. */
   async writeNow(path: string, text: string): Promise<string | null> {
     this.setText(text, path);
