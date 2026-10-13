@@ -1,6 +1,6 @@
 // The shortcuts of the built-in features (roadmap 0.3). The Inbox and its review, the goals of the quarter and the
-// calendar became plugins (ТЗ 27–29): their keys are in their manifests. Here: the mini window's (ТЗ 31). The tests
-// of keys import this module as the app does.
+// calendar became plugins (ТЗ 27–29): their keys are in their manifests. Here: the mini window's (ТЗ 31) and those of
+// «Сегодня» (ТЗ 32). The tests of keys import this module as the app does.
 
 import { C, registerGroup, registerKeys, registerScope } from '../keys';
 
@@ -14,3 +14,7 @@ registerKeys([
   C('miniPalette', 'Сменить заметку', 'mini', 'mini', ['⌘P']),
   C('miniHide', 'Скрыть мини-окно', 'mini', 'mini', ['⌘W']),
 ]);
+
+// ---- «Сегодня» (ТЗ 32): the screen of the morning ---------------------------------------------------------------------
+registerGroup({ id: 'today', title: 'СЕГОДНЯ' });
+registerKeys([C('today', 'Открыть «Сегодня»', 'today', 'window', ['⇧⌘H'], { synonyms: ['сегодня', 'утро', 'обзор', 'день'] })]);

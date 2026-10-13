@@ -42,6 +42,7 @@ fn every_default_accelerator_parses() {
         "Shift+CmdOrCtrl+Backslash",
         "Shift+CmdOrCtrl+KeyF",
         "Shift+CmdOrCtrl+KeyG",
+        "Shift+CmdOrCtrl+KeyH",
         "Shift+CmdOrCtrl+KeyI",
         "Shift+CmdOrCtrl+KeyJ",
         "Shift+CmdOrCtrl+KeyN",

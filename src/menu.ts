@@ -78,6 +78,7 @@ export async function installMenu(actions: MenuActions, accel: (id: string) => s
           text: 'Вид',
           items: [
             it('palette', 'Командная палитра'),
+            it('today', 'Сегодня'),
             it('jumpBar', 'Строка пути'),
             it('structure', 'Структурный вид'),
             rich,

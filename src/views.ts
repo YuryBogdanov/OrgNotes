@@ -30,6 +30,8 @@ export interface ViewSpec {
   restore?(data: unknown): unknown;
   /** Not offered for «Продублировать в соседнем редакторе». */
   single?: boolean;
+  /** Stays the first tab of the left pane: not moved, not duplicated, nothing goes before it («Сегодня»). */
+  pinned?: boolean;
   /** Called when the last tab of the kind is closed (a review ends). */
   onGone?(): void;
 }

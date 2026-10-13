@@ -16,11 +16,11 @@ const look = (page: Page) => page.getByRole('region', { name: 'Оформлен�
 const root = (page: Page) => page.locator('html');
 const color = (page: Page, sel: string, prop = 'color') => page.locator(sel).first().evaluate((el, p) => getComputedStyle(el).getPropertyValue(p), prop);
 
-test('«Оформление» is the second section; «Системное» is chosen and follows macOS', async ({ page }) => {
+test('«Оформление» comes after «Основные» and «Сегодня»; «Системное» is chosen and follows macOS', async ({ page }) => {
   await open(page, 'dark');
   await expect(root(page)).toHaveAttribute('data-appearance', 'dark');
   await openSettingsSheet(page, 'Оформление');
-  await expect(page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').nth(1)).toHaveText('Оформление');
+  await expect(page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').nth(2)).toHaveText('Оформление');
   await expect(look(page).getByRole('radio', { name: 'Системное' })).toHaveAttribute('aria-checked', 'true');
   await expect(look(page)).toContainText('сейчас активна — системное оформление тёмное');
   await page.emulateMedia({ colorScheme: 'light' });

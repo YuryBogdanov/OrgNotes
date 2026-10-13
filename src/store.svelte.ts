@@ -1,6 +1,6 @@
 import {
   activeTab, addPane, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
-  openFile, openFromAgenda, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
+  openFile, openFromAgenda, pinFirst, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
   newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
@@ -1679,6 +1679,7 @@ class Store {
     return 'layout:' + (this.dir ?? '');
   }
   persistLayout() {
+    pinFirst(this.layout);
     lsSet(this.layoutKey(), serialize(this.layout));
   }
   setActivePane(i: number) {

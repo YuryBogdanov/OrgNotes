@@ -185,7 +185,7 @@ test.describe('table', () => {
 
   test('sections are in the order of the mockup, including Оформление, Календарь and Клавиши', async ({ page }) => {
     await openSettings(page);
-    expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Файлы', 'Мини-окно', 'Клавиши', 'Календарь', 'Плагины']);
+    expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Сегодня', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Файлы', 'Мини-окно', 'Клавиши', 'Календарь', 'Плагины']);
   });
 });
 
@@ -540,13 +540,15 @@ test.describe('sheet', () => {
     await openSettings(page);
     const sheet = page.getByRole('dialog', { name: 'Настройки' });
     const on = sheet.getByRole('tab', { selected: true });
-    await expect(sheet.getByRole('tab')).toHaveText(['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Файлы', 'Мини-окно', 'Клавиши', 'Календарь', 'Плагины']);
+    await expect(sheet.getByRole('tab')).toHaveText(['Основные', 'Сегодня', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Файлы', 'Мини-окно', 'Клавиши', 'Календарь', 'Плагины']);
     await expect(on).toHaveText('Статусы');
     await page.keyboard.press('Meta+BracketRight');
     await expect(on).toHaveText('Агенды'); // «Теги» is not made yet
     await page.keyboard.press('Meta+BracketLeft');
     await page.keyboard.press('Meta+BracketLeft');
     await expect(on).toHaveText('Оформление');
+    await page.keyboard.press('Meta+BracketLeft');
+    await expect(on).toHaveText('Сегодня');
     await page.keyboard.press('Meta+BracketLeft');
     await expect(on).toHaveText('Основные');
     await expect(sheet.locator('.t2')).toHaveText('Основные');
@@ -559,7 +561,7 @@ test.describe('sheet', () => {
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Meta+Comma');
-    await expect(on).toHaveText('Оформление');
+    await expect(on).toHaveText('Сегодня');
   });
 
   test('«Основные» leads to «Клавиши»; a status added is understood by the window at once', async ({ page }) => {
