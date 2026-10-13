@@ -93,9 +93,18 @@ class Data {
   }
   /** The status «Выполнено» / «Отменить» writes for this task (null: its set has none). */
   closing(it: ReviewItem, which: 'done' | 'cancel'): string | null {
+    const kw = this.closingOf(it, which);
+    return kw && kw !== this.keywordOf(it) ? kw : null; // already so: nothing to do (#105)
+  }
+  /** The status «Выполнено» / «Отменить» writes, whether or not the task has it already. */
+  closingOf(it: ReviewItem, which: 'done' | 'cancel'): string | null {
     const r = this.find(it);
     const wf = r?.f.wf ?? this.file?.wf;
-    return wf ? closingStatus(wf, r?.h.keyword ?? it.keyword, which, which === 'done' ? this.settings.reviewDone : this.settings.reviewCancel) : null;
+    return wf ? closingStatus(wf, this.keywordOf(it), which, which === 'done' ? this.settings.reviewDone : this.settings.reviewCancel) : null;
+  }
+  /** The task's status now. */
+  keywordOf(it: ReviewItem): string | null {
+    return this.find(it)?.h.keyword ?? it.keyword;
   }
 }
 

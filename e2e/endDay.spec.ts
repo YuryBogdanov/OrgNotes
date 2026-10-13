@@ -62,7 +62,8 @@ test('⌘↩ writes the day into the journal, moves what was left, gives the tas
   await expect(page.getByText('День завершён. До завтра')).toBeVisible();
 
   const j = (await disk(page, '/mock/journal.org'))!;
-  expect(j).toContain(`${dayHead}\n**** На завтра\n:PROPERTIES:\n:CREATED:  [${iso(DAY)}`);
+  // :CREATED: is the moment it was written: after midnight (the day lasts till 4:00) it is the next date
+  expect(j).toContain(`${dayHead}\n**** На завтра\n:PROPERTIES:\n:CREATED:  [${iso(new Date())}`);
   expect(j).toContain(':END:\n- Дожать Аню\n**** Главное\n- [[id:a1][Бюджет на нагрузочное]]\n- [[id:a2][Вопросы к ревью биллинга]]\n- [[id:');
   expect(j).toMatch(/\*\*\*\* Сделано\n- \[\[id:[0-9a-f-]{36}\]\[Ответил по оферу SRE\]\]\n- \[\[id:[0-9a-f-]{36}\]\[Ревью RFC логирования\]\]/);
   const w = (await disk(page, '/mock/work.org'))!;

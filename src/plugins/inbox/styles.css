@@ -21,6 +21,9 @@
 .creview.review .a.on { background: var(--sel); border-color: var(--acc); }
 .creview.review .done-b { background: var(--done); border-color: var(--done); color: var(--onacc); }
 .creview.review .move-b { background: var(--acc); border-color: var(--acc); color: var(--onacc); }
+/* off (the task is done already): no fill, so it reads as off in the dark theme too (#105) */
+.creview.review .done-b:disabled { background: var(--bg); border-color: var(--line); color: var(--fg3); opacity: 1; }
+.creview.review .done-b:disabled .hint { color: var(--done); }
 .creview.review .hint { font-weight: 400; font-size: 11.5px; opacity: 0.8; }
 .creview.review .dots { width: 34px; height: 34px; border: 0; border-radius: 7px; background: transparent; color: var(--fg2); display: flex; align-items: center; justify-content: center; padding: 0; }
 .creview.review .dwrap { position: relative; }
