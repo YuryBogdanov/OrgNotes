@@ -61,7 +61,7 @@
   function leave() {
     closeMenus();
     focusIdx = null;
-    if (keyboard && before?.isConnected) before.focus(); // back to the caret
+    if (keyboard && before?.isConnected) before.focus({ preventScroll: true }); // back to the caret, not scrolled (#103)
     keyboard = false;
   }
   function sub(item: Item) {

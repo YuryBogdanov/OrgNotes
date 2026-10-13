@@ -219,6 +219,7 @@ test.describe('search', () => {
 test.describe('keyboard and mouse', () => {
   test('↑↓ skip the group headers and go round; hover picks a row after the pointer moves', async ({ page }) => {
     await open(page);
+    await pluginsReady(page); // the last row is a plugin's command: there once the plugins have started
     await at(page, 'Подготовить бюджет');
     await palette(page);
     await page.keyboard.press('ArrowUp'); // round to the last

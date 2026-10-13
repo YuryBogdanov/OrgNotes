@@ -75,7 +75,7 @@
   // the sheet hands the focus back to the editor, the caret where it was
   function done(saved: boolean) {
     store.finishSaveAs(saved);
-    requestAnimationFrame(() => document.querySelector<HTMLElement>('section.pane.active .cm-content')?.focus());
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('section.pane.active .cm-content')?.focus({ preventScroll: true }));
   }
   // back to the name field, so Return saves again
   function closeAsk() {

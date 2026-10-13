@@ -59,7 +59,7 @@
     const s = api?.selection() ?? '';
     return s && !s.includes('\n') ? s : '';
   };
-  const focusText = () => requestAnimationFrame(() => document.querySelector<HTMLElement>(`section.pane[data-pane="${pi}"] .cm-content`)?.focus());
+  const focusText = () => requestAnimationFrame(() => document.querySelector<HTMLElement>(`section.pane[data-pane="${pi}"] .cm-content`)?.focus({ preventScroll: true }));
   function step(dir: 1 | -1) {
     if (!fb.q) return void openBar();
     fb.at = null;

@@ -900,7 +900,7 @@ class Store {
     const el = this.builderFrom as HTMLElement | null;
     this.builderFrom = null;
     // after the window under the sheet takes input again
-    if (el?.isConnected) setTimeout(() => el.isConnected && el.focus());
+    if (el?.isConnected) setTimeout(() => el.isConnected && el.focus({ preventScroll: true }));
   }
   get builderDirty() {
     const b = this.builder;
