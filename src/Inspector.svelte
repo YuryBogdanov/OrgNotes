@@ -41,7 +41,7 @@
 </script>
 
 <div class="insp">
-  {#if viewOf(store.tab?.kind)?.inspector}
+  {#if viewOf(store.tab?.kind)?.inspector && (viewOf(store.tab?.kind)!.hasInspector?.(store.tab!) ?? true)}
   {@const Insp = viewOf(store.tab?.kind)!.inspector!}
   <Insp />
   {:else}

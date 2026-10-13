@@ -28,7 +28,7 @@ describe('parseManifest', () => {
       contributes: {
         commands: [{ id: 'hello.greet', title: 'Привет', keys: ['⌃⌘H', '⌘S'] }],
         navSections: [{ id: 'hello', title: 'Привет', icon: 'M0 0', key: 'hello.greet' }],
-        views: [{ id: 'hello.board', title: 'Доска' }],
+        views: [{ id: 'hello.board', title: 'Доска' }, { id: 'hello.wall', title: 'Стена', toolbar: true }, { id: 'hello.x', title: 'X', toolbar: 'yes' }],
         settings: [{ section: 'Привет', groups: [{ caption: 'X', fields: [{ key: 'n', type: 'switch', label: 'N', where: 'local' }] }] }],
       },
     });
@@ -37,6 +37,7 @@ describe('parseManifest', () => {
     expect(r.manifest.contributes.commands[0].keys).toEqual(['⌃⌘H']);
     expect(r.manifest.warnings).toEqual(['⌘S у «Привет» занято приложением']);
     expect(r.manifest.contributes.views[0].icon).toBeTruthy();
+    expect(r.manifest.contributes.views.map((v) => !!v.toolbar)).toEqual([false, true, false]); // a button in the toolbar: only `true` (ТЗ 29)
   });
   it('says every problem at once', () => {
     const r = parseManifest({ id: 'Hello World', version: 'x', permissions: ['root'], net: ['a.ru'], contributes: { commands: [{ id: 'other.x', title: 'X' }, { id: 'other.x', title: 'Y' }] } });

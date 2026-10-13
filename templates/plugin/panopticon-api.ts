@@ -87,8 +87,12 @@ export interface ViewSpec<S> {
   /** The toolbar's path while the tab is active. */
   crumbs?(state: S): string[];
   render: Render<S>;
-  /** The state read back after a restart (checked; a default when wrong). */
+  /** The state read back after a restart (checked; a default when wrong). A new tab of the toolbar's button gets
+   *  `restore(null)`. */
   restore?(raw: unknown): S;
+  /** The inspector on the right while the tab is active (none: the file's). Drawn again when another tab of the
+   *  kind becomes active; the plugin follows its state itself. */
+  inspector?: Render<S>;
 }
 export interface Tx {
   setStatus(h: HeadingRef, keyword: string | null): void;
@@ -316,7 +320,8 @@ export interface Ctx {
     navSection(id: string, render: Render): Dispose;
     /** A kind of tab the manifest declares. */
     view<S>(id: string, spec: ViewSpec<S>): Dispose;
-    /** Open the view in the active editor (one tab of a kind per editor) or in the other one. */
+    /** Open the view in the active editor (one tab of a kind per editor) or in the other one. A view with `"toolbar":
+     *  true` in the manifest also has a button in «Открыть в панели»: the second pane, or out of it. */
     open<S>(viewId: string, state: S, where?: 'here' | 'beside'): Promise<void>;
     notify(text: string, actions?: { label: string; run(): void }[]): void;
     /** The core's sheet with the fields; null: cancelled. */
@@ -370,8 +375,8 @@ export interface Ctx {
     /** The named colour of a status in the sets of the file (the plugin draws with var(--p-<colour>)). */
     statusTone(keyword: string, path: string): Promise<Named | null>;
     /** The Inbox file (a setting of the core: the quick entry writes there); null — not chosen, or not there:
-     *  `chosen` is the setting then (a file gone). */
-    inbox(): Promise<{ path: string | null; chosen: string | null }>;
+     *  `chosen` is the setting then (a file gone). `add`: where a new task goes in it. */
+    inbox(): Promise<{ path: string | null; chosen: string | null; add: 'top' | 'end' }>;
     /** The statuses the file knows: open and done keywords (for `@panopticon/api/org`), and its sets in order. */
     workflow(path: string): Promise<{ open: string[]; done: string[]; sets: StatusSet[] }>;
   };

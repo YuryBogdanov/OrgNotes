@@ -173,7 +173,8 @@
       {
         "id": "hello.board",
         "title": "Доска",
-        "icon": "M3.5 3.5h13v13h-13zM3.5 8h13M8 8v8.5"
+        "icon": "M3.5 3.5h13v13h-13zM3.5 8h13M8 8v8.5",
+        "toolbar": true
       }
     ],
     "settings": [

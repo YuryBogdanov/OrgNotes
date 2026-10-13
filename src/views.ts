@@ -20,6 +20,8 @@ export interface ViewSpec {
   crumbs?(t: Tab): string[];
   /** The inspector's content while the tab is active (none: the inspector of the file). */
   inspector?: Component;
+  /** Whether the tab has it now (a plugin's view: once its code says so); by default it has. */
+  hasInspector?(t: Tab): boolean;
   /** A session (a review): not kept after a restart. */
   transient?: boolean;
   /** The file the tab is about (a card's file): what the inspector and the commands of a heading work on. */
