@@ -1,17 +1,14 @@
 <script lang="ts">
-  import { calendar } from './features/calendar.svelte';
-  import { store } from './store.svelte';
-  import { toneFor } from './org';
-  import { toneStyle } from './colors';
-  import { LAYERS, undated } from './calIndex';
+  import { cal as calendar } from './state.svelte';
+  import { LAYERS, toneVars, undated } from '@panopticon/api/org';
 
   // The navigator in the «Календарь» mode (ТЗ 24): the layers shown, the files with dated entries, the open tasks
   // without a date. Both choices are kept on this Mac (the files per notes folder).
   const hidden = $derived(new Set(calendar.hiddenNow));
-  const files = $derived(calendar.files);
-  const tasks = $derived(undated(store.files.filter((f) => !hidden.has(f.name))));
+  const files = $derived(calendar.dated);
+  const tasks = $derived(undated(calendar.files.filter((f) => !hidden.has(f.name))));
   const base = (n: string) => n.split('/').pop()!.replace(/\.org$/, '');
-  const wfOf = (path: string) => store.files.find((f) => f.path === path)?.wf;
+  const wfOf = (path: string) => calendar.files.find((f) => f.path === path)?.wf;
 </script>
 
 <nav class="calnav" aria-label="Календарь: слои и файлы">
@@ -38,7 +35,7 @@
     <button class="ud" title="{t.title} — {base(t.file)}" onclick={() => calendar.openEntry(t)} draggable="true"
       ondragstart={(e) => { calendar.drag = { path: t.path, line: t.line, layer: 'undated', repeat: false, title: t.title, dy: 0 }; e.dataTransfer?.setData('text/plain', t.title); }}
       ondragend={() => (calendar.drag = null)}>
-      <span class="kw tone-chip" style={wfOf(t.path) ? toneStyle(toneFor(t.keyword, wfOf(t.path)!)) : ''}>{t.keyword}</span>
+      <span class="kw tone-chip" style={wfOf(t.path) ? toneVars(t.keyword, wfOf(t.path)!) : ''}>{t.keyword}</span>
       <span class="t">{t.priority ? `[#${t.priority}] ` : ''}{t.title}</span>
     </button>
   {:else}

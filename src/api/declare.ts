@@ -23,7 +23,7 @@ export interface Entry {
 const BUILTIN = import.meta.glob('../plugins/*/manifest.json', { eager: true, import: 'default' }) as Record<string, unknown>;
 const ENABLED_KEY = 'plugins:enabled';
 /** The core's features: their storages and keys are taken. */
-const CORE_IDS = ['goals', 'calendar', 'review', 'agenda', 'files', 'search'];
+const CORE_IDS = ['goals', 'review', 'agenda', 'files', 'search'];
 
 /** The user's choices: { id: on }. */
 export function readChoices(): Record<string, boolean> {

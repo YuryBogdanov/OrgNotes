@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, pluginsReady } from './tauriMock';
 import { FILES, NOW, WORK } from './calendarFixture';
 
 // ТЗ 24, part 2: moving an entry by the mouse, «+ Задача» / «+ Событие», «Настройки → Календарь».
@@ -11,6 +11,7 @@ async function open(page: Page, files: Record<string, string> = FILES(), cfg: ob
   await installTauriMock(page, { ...files, [CFG]: JSON.stringify(cfg) });
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
+  await pluginsReady(page); // the calendar is a plugin (ТЗ 29)
   await page.keyboard.press('Meta+3');
   await expect(cal(page)).toBeVisible();
 }
@@ -133,7 +134,7 @@ test('«Спрашивать»: the file is chosen in the sheet, and remembered 
   await sheet.getByLabel('Заголовок').fill('Сдать отчёт');
   await sheet.getByLabel('Заголовок').press('Enter');
   await expect.poll(() => disk(page, '/mock/finance.org')).toContain('\n* TODO Сдать отчёт\nSCHEDULED: <2026-10-12 Пн>\n');
-  await expect.poll(async () => (await calFolder(page))?.last).toEqual({ task: 'finance.org', event: null });
+  await expect.poll(async () => (await calFolder(page))?.data?.last).toEqual({ task: 'finance.org', event: null });
   await page.getByRole('region', { name: 'Выбранный день' }).getByRole('button', { name: '+ Задача' }).click();
   await expect(page.getByRole('dialog', { name: 'Новая задача' }).getByLabel('Файл')).toHaveValue('finance.org');
 });
@@ -144,7 +145,7 @@ test('«Настройки → Календарь»: what new entries go to in t
   await page.keyboard.press('Meta+,');
   await page.getByRole('tab', { name: 'Календарь' }).last().click();
   const s = page.getByRole('dialog', { name: 'Настройки' });
-  await expect(s.getByTestId('cal-taskFile')).toHaveText('Inbox — inbox.org');
+  await expect(s.getByTestId('calendar-0-taskFile')).toHaveText('Inbox — inbox.org');
   await s.getByRole('radio', { name: 'Неделя' }).click();
   await s.getByLabel('С', { exact: true }).selectOption('9');
   await s.getByRole('switch', { name: 'Номера недель' }).click();
@@ -155,9 +156,9 @@ test('«Настройки → Календарь»: what new entries go to in t
   await s.getByRole('button', { name: 'Выбрать файл для событий' }).click();
   await page.getByRole('dialog', { name: 'Файл для событий' }).getByPlaceholder('Найти файл').fill('journal');
   await page.keyboard.press('Enter');
-  await expect(s.getByTestId('cal-eventFile')).toHaveText('journal.org');
-  await expect.poll(async () => calFolder(page)).toEqual({ taskHeading: 'Календарь', eventFile: 'journal.org' });
-  expect(await calLocal(page)).toEqual({ view: 'week', from: 9, weekNumbers: false, weekends: false, undated: false });
+  await expect(s.getByTestId('calendar-0-eventFile')).toHaveText('journal.org');
+  await expect.poll(async () => (await calFolder(page))?.settings).toEqual({ taskHeading: 'Календарь', eventFile: 'journal.org' }); // the plugin's file (ТЗ 29)
+  expect((await calLocal(page))?.settings).toEqual({ view: 'week', from: 9, weekNumbers: false, weekends: false, undated: false });
   expect((await config(page)).calendar).toBeUndefined(); // moved out of config.json
   await s.getByRole('button', { name: 'Готово' }).click();
   await expect(cal(page).locator('.row .wk')).toHaveCount(0);

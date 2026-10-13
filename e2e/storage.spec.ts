@@ -24,8 +24,9 @@ test('the calendar\'s settings of config.json are read; the first change moves t
   await expect(s.getByLabel('Заголовок для задач')).toHaveValue('Календарь');
   await expect(s.getByRole('switch', { name: 'Показывать выходные' })).toHaveAttribute('aria-checked', 'false');
   await s.getByRole('switch', { name: 'Номера недель' }).click();
-  await expect.poll(() => json(page, '/mock/.orgnotes/plugins/calendar.json')).toEqual({ taskHeading: 'Календарь' });
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('feature:calendar') ?? 'null'))).toEqual({ weekNumbers: false, weekends: false });
+  // the calendar is a plugin (ТЗ 29): its files are `{ settings, data }`
+  await expect.poll(async () => (await json(page, '/mock/.orgnotes/plugins/calendar.json'))?.settings).toEqual({ taskHeading: 'Календарь' });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('feature:calendar') ?? 'null')?.settings)).toEqual({ weekNumbers: false, weekends: false });
   await expect.poll(async () => (await json(page, CFG)).calendar).toBeUndefined();
   expect((await json(page, CFG)).version).toBe(1); // the rest of config.json stays
 });

@@ -1,14 +1,11 @@
 <script lang="ts">
-  import { calendar } from './features/calendar.svelte';
-  import { store } from './store.svelte';
-  import { toneFor } from './org';
-  import { toneStyle } from './colors';
-  import { dayTitle, entriesIn, fromIso, isoDay, sortDay, type CalEntry } from './calIndex';
-  import { relWords } from './calendar';
+  import { cal as calendar } from './state.svelte';
+  import { dayTitle, entriesIn, fromIso, relWords, sortDay, toneVars, type CalEntry } from '@panopticon/api/org';
+  import type { CalState } from './state.svelte';
 
   // The inspector while a calendar tab is shown (ТЗ 24): the chosen day — its entries as cards, and the deadlines
   // ahead of it.
-  const c = $derived(store.tab?.kind === 'calendar' ? (store.tab.data as { view: 'month' | 'week'; date: string } | undefined) : undefined);
+  let { shown: c }: { shown: CalState } = $props();
   const day = $derived(c ? fromIso(c.date) : new Date());
   const list = $derived(c ? (calendar.days(day, day).get(c.date) ?? []) : []);
   const ahead = $derived.by(() => {
@@ -16,11 +13,11 @@
     const from = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
     const to = new Date(day.getFullYear(), day.getMonth() + 3, day.getDate());
     const hidden = new Set(calendar.hiddenNow);
-    return sortDay(entriesIn(store.files.filter((f) => !hidden.has(f.name)), from, to).filter((e) => e.layer === 'deadline'))
+    return sortDay(entriesIn(calendar.files.filter((f) => !hidden.has(f.name)), from, to).filter((e) => e.layer === 'deadline'))
       .sort((a, b) => a.day.localeCompare(b.day))
       .slice(0, 3);
   });
-  const wfOf = (e: CalEntry) => store.files.find((f) => f.path === e.path)?.wf;
+  const wfOf = (e: CalEntry) => calendar.files.find((f) => f.path === e.path)?.wf;
   const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
   const WD = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
   /** «work › Календарь»: where a new entry goes. */
@@ -49,7 +46,7 @@
         {:else if e.layer === 'deadline'}
           <span class="kw dl">СРОК</span>
         {:else}
-          <span class="kw tone-chip" style={e.keyword && wfOf(e) ? toneStyle(toneFor(e.keyword, wfOf(e)!)) : ''}>{e.keyword}</span>
+          <span class="kw tone-chip" style={e.keyword && wfOf(e) ? toneVars(e.keyword, wfOf(e)!) : ''}>{e.keyword}</span>
         {/if}
         <span class="tt"><span class="t">{#if e.priority}<b class="pr">[#{e.priority}]</b>{' '}{/if}{e.title}</span><span class="w">{e.where}</span></span>
       </button>
@@ -69,7 +66,7 @@
     {:else}
       Задачи — в {tPlace ?? 'Inbox'}, события — в {ePlace ?? 'Inbox'}
     {/if}
-    · <button class="link" onclick={() => store.openSettings('Календарь')}>Изменить в настройках</button>
+    · <button class="link" onclick={() => calendar.settings()}>Изменить в настройках</button>
   </div>
   {#if ahead.length}
     <div class="sep"></div>

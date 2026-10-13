@@ -31,11 +31,11 @@ test.describe('the navigator', () => {
     await page.goto('/');
     await expect(page.locator('.cm-content').first()).toBeVisible();
     const tabs = modes(page).getByRole('tab');
-    // «Цели» and «Inbox» are plugins: after the core's, in the order of the plugins (ТЗ 27, ТЗ 28)
-    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Задачи', 'Агенда', 'Календарь', 'Теги', 'Поиск по заметкам', 'Цели', 'Inbox']);
+    // «Календарь», «Цели» and «Inbox» are plugins: after the core's, in the order of the plugins (ТЗ 27–29)
+    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Задачи', 'Агенда', 'Теги', 'Поиск по заметкам', 'Календарь', 'Цели', 'Inbox']);
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
     await expect(tabs.nth(7)).toHaveAttribute('title', /^Inbox/);
-    await expect(tabs.nth(1)).toBeDisabled();
+    await expect(tabs.nth(1)).toBeDisabled(); // «Задачи»
     await expect(modes(page).locator('.badge')).toHaveText('4');
     await page.keyboard.press('Control+Meta+2');
     await expect(panel(page)).toBeVisible();

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { calendar } from './features/calendar.svelte';
+  import { allDays, openEntry } from './calOpen';
   import { onMount } from 'svelte';
   import { store } from './store.svelte';
   import { toneFor } from './org';
@@ -7,9 +7,9 @@
   import CalDayList from './CalDayList.svelte';
   import { entriesWord, isoDay, monthTitle, monthWeeks, weekdayShort, type CalEntry } from './calIndex';
 
-  // The calendar under the card of the Inbox review (ТЗ 24, part 3): folded by default, a compact month of the same
-  // entries as the calendar tab (its layers and files), two in a cell and «… ещё N». The task's own date has a
-  // dashed frame, and the task is «— эта задача» in the list of the day. No dragging: dates are set by the card.
+  // The calendar under the card of the Inbox review (ТЗ 24, part 3): folded by default, a compact month of every dated
+  // entry (the calendar's layers and hidden files are its plugin's, ТЗ 29: tech debt #99), two in a cell and «… ещё N».
+  // The task's own date has a dashed frame, and the task is «— эта задача» in the list of the day. No dragging: dates are set by the card.
   // Shown by a review (the Inbox's, a plugin's through the widget «month»): folded or not is the review's — `open`,
   // `ontoggle`; `keyId` is the command whose key folds it (its hint).
   let { task, open, ontoggle, keyId = '' }: { task: { path: string; line: number; date: Date | null }; open: boolean; ontoggle: () => void; keyId?: string } = $props();
@@ -24,7 +24,7 @@
     month = new Date(d.getFullYear(), d.getMonth(), 1);
   });
   const weeks = $derived(monthWeeks(month.getFullYear(), month.getMonth()));
-  const days = $derived(calendar.days(weeks[0][0], weeks[weeks.length - 1][6]));
+  const days = $derived(allDays(weeks[0][0], weeks[weeks.length - 1][6]));
   const inMonth = $derived([...days].filter(([k]) => +k.slice(5, 7) === month.getMonth() + 1).reduce((n, [, v]) => n + v.length, 0));
   const today = isoDay(new Date());
   const mine = (e: CalEntry) => e.path === task.path && e.line === task.line;
@@ -97,7 +97,7 @@
                 <span class="num" class:today={k === today}>{d.getDate()}</span>
                 {#each shown as e (e.path + e.line + e.layer + (e.time ?? ''))}
                   <button class="ch {e.layer}" class:mine={mine(e)} style={e.layer === 'task' || e.layer === 'wait' || e.layer === 'done' ? toneOf(e) : ''}
-                    title="{title(e)} — {e.where}" onclick={(ev) => calendar.openEntry(e, ev.metaKey)}>
+                    title="{title(e)} — {e.where}" onclick={(ev) => openEntry(e, ev.metaKey)}>
                     {#if e.layer === 'event' && e.time}<b class="tm">{e.time}</b>{:else if e.layer !== 'event' && e.layer !== 'deadline'}<span class="dot" aria-hidden="true"></span>{/if}
                     <span class="tx">{title(e)}</span>
                   </button>
@@ -110,7 +110,7 @@
           </div>
         {/each}
       </div>
-      <p class="foot">Показываются запланированные задачи, дедлайны и события из всех файлов — как в основном календаре.</p>
+      <p class="foot">Показываются запланированные задачи, дедлайны и события из всех файлов.</p>
     </div>
   {/if}
 </div>

@@ -26,7 +26,7 @@ test('«Календарь»: each group says where it is kept; the hours exclud
   await expect(dl.locator('small')).toHaveText('DEADLINE сдвигается на столько же дней');
   await expect(s.getByLabel('Статус новой задачи')).toHaveValue(''); // unset: «Начальный статус набора»
   await s.getByLabel('Статус новой задачи').selectOption('TODO');
-  await expect.poll(async () => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/plugins/calendar.json'] ?? '{}').taskStatus)).toBe('TODO');
+  await expect.poll(async () => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/plugins/calendar.json'] ?? '{}').settings?.taskStatus)).toBe('TODO');
 });
 
 test('a file: ⎋ closes the picker, not the sheet; × gives back «как Inbox»', async ({ page }) => {
@@ -40,9 +40,9 @@ test('a file: ⎋ closes the picker, not the sheet; × gives back «как Inbox
   await s.getByRole('button', { name: 'Выбрать файл для задач' }).click();
   await page.getByRole('dialog', { name: 'Файл для задач' }).getByPlaceholder('Найти файл').fill('journal');
   await page.keyboard.press('Enter');
-  await expect(s.getByTestId('cal-taskFile')).toHaveText('journal.org');
+  await expect(s.getByTestId('calendar-0-taskFile')).toHaveText('journal.org');
   await s.getByRole('button', { name: 'Файл для задач: как Inbox' }).click();
-  await expect(s.getByTestId('cal-taskFile')).toHaveText('Inbox — inbox.org');
+  await expect(s.getByTestId('calendar-0-taskFile')).toHaveText('Inbox — inbox.org');
 });
 
 test('«Агенды»: the block of the goals, drawn from its schema, kept on this Mac', async ({ page }) => {

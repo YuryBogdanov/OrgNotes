@@ -1,6 +1,5 @@
 <script lang="ts">
   import './features'; // the built-in features register their tabs, sections and keys (roadmap 0.3)
-  import { calendar } from './features/calendar.svelte';
   import { onMount, untrack } from 'svelte';
   import { store } from './store.svelte';
   import Inspector from './Inspector.svelte';
@@ -21,7 +20,6 @@
   import AgendaBuilder from './AgendaBuilder.svelte';
   import NavPanel from './NavPanel.svelte';
   import Capture from './Capture.svelte';
-  import CalNew from './CalNew.svelte';
   import Picker from './Picker.svelte';
   import Refile from './Refile.svelte';
   import CaptureWindow from './CaptureWindow.svelte';
@@ -119,7 +117,6 @@
     outline: () => store.showOutline(),
     captureHere: () => store.openCapture(),
     navCollapse: () => store.navTree('collapse'),
-    calendar: () => calendar.showHere(),
     navExpand: () => store.navTree('expand'),
     newFile: () => {
       if (!store.canManageFiles) return;
@@ -301,12 +298,6 @@
       {/key}
     </div>
   {/if}
-  {#if calendar.newEntry}
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="capscrim" onmousedown={(e) => { if (e.target === e.currentTarget) calendar.newEntry = null; }}>
-      {#key calendar.newEntry.n}<CalNew kind={calendar.newEntry.kind} date={calendar.newEntry.date} onclose={() => (calendar.newEntry = null)} />{/key}
-    </div>
-  {/if}
   {#if store.pickInbox}{#key store.pickInbox}<Picker onclose={() => (store.pickInbox = 0)} />{/key}{/if}
   {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
   {#if store.toast}
@@ -365,9 +356,6 @@
         </button>
         <button aria-label="Агенда" title="Агенда" aria-pressed={pressed === 'agenda'} class:on={pressed === 'agenda'} onclick={() => store.toggleSecond('agenda')}>
           <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5h9M8 10h9M8 14.5h9" /><circle cx="4" cy="5.5" r="1" /><circle cx="4" cy="10" r="1" /><circle cx="4" cy="14.5" r="1" /></svg>
-        </button>
-        <button aria-label="Календарь" title="Календарь" aria-pressed={pressed === 'calendar'} class:on={pressed === 'calendar'} onclick={() => calendar.toggleSecond()}>
-          <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2.5v3M13 2.5v3" /><circle cx="10" cy="12.5" r="2" /></svg>
         </button>
         {#each plugins.toolbarViews as v (v.id)}
           <button aria-label={v.title} title={v.title} aria-pressed={pressed === v.id} class:on={pressed === v.id} onclick={() => plugins.toggleSecond(v.id)}>

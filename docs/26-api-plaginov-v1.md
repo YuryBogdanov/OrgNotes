@@ -359,6 +359,12 @@ net?: { fetch(url: string, init?: { method?; headers?; body?: string }): Promise
 - **Кнопка на панели:** `"toolbar": true` у вида в манифесте — кнопка в «Открыть в панели» после кнопок приложения.
 - **Inbox:** `index.inbox().add` — куда быстрый ввод добавляет задачи.
 - **Индекс дат** (`calIndex`) — в `@panopticon/api/org`: записи по дням, сетки месяца и недели, подписи.
+- **Для переезда календаря (PR B):**
+  - `settings.dynamic`: `show` для поля файла, `clean` для текста, оба списка `pair`;
+  - команды ядра `settings.open {section}` и `file.open {neighbour}`;
+  - `index.folder()`;
+  - в `@panopticon/api/org`: `toneVars`, `relWords`, `startOf`;
+  - цвета статусов в `index.workflow().sets`.
 
 ## Разбивка и приёмка
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CAL_FOLDER_KEYS, CAL_LOCAL_KEYS, DEFAULT_CAL, calPart, entryLines, insertEntry, moveEntry, moveStamp, readCal } from './calEdit';
+import { DEFAULT_CAL, entryLines, insertEntry, moveEntry, moveStamp, readCal } from './edit';
 
 const RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 const D = (s: string) => new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
@@ -63,25 +63,9 @@ describe('moving, the edge cases', () => {
 });
 
 describe('settings', () => {
-  it('read with defaults, bad values dropped; written only where they differ', async () => {
-    const { readCal, withCal, DEFAULT_CAL } = await import('./calEdit');
+  it('read with defaults, bad values dropped', () => {
     expect(readCal(undefined)).toEqual(DEFAULT_CAL);
     const c = readCal({ pick: 'ask', taskFile: 'work.org', minutes: 45, from: 9, to: 8, view: 'week', weekends: false });
     expect([c.pick, c.taskFile, c.minutes, c.from, c.to, c.view, c.weekends]).toEqual(['ask', 'work.org', 60, 9, 20, 'week', false]);
-    const out = JSON.parse(withCal('{"version":1,"inbox":{"file":"a.org"}}', c));
-    expect(out).toEqual({ version: 1, inbox: { file: 'a.org' }, calendar: { pick: 'ask', taskFile: 'work.org', from: 9, view: 'week', weekends: false } });
-    expect(JSON.parse(withCal(JSON.stringify(out), DEFAULT_CAL)).calendar).toBeUndefined();
-  });
-});
-
-describe('calPart (roadmap 0.6)', () => {
-  it('splits the settings into the folder\'s and this Mac\'s, only what differs from the defaults', () => {
-    const c = readCal({ taskHeading: 'Календарь', view: 'week', weekends: false });
-    expect(calPart(c, CAL_FOLDER_KEYS)).toEqual({ taskHeading: 'Календарь' });
-    expect(calPart(c, CAL_LOCAL_KEYS)).toEqual({ view: 'week', weekends: false });
-    expect(calPart(DEFAULT_CAL, CAL_FOLDER_KEYS)).toEqual({});
-  });
-  it('no key is in both parts', () => {
-    expect(CAL_FOLDER_KEYS.filter((k) => (CAL_LOCAL_KEYS as readonly string[]).includes(k))).toEqual([]);
   });
 });

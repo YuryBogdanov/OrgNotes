@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock } from './tauriMock';
+import { installTauriMock, pluginsReady } from './tauriMock';
 
 // ТЗ «Выбор даты в календаре (палитра, ⇧ + стрелки)».
 const W = '/mock/work.org';

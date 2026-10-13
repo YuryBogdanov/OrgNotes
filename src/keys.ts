@@ -320,8 +320,8 @@ export function withKeys(s: KeyState, id: string, keys: string[]): KeyState {
   else overrides[id] = list;
   return { ...s, overrides };
 }
-/** Commands renamed (features became plugins: the goals «quarter-goals», ТЗ 27; the Inbox «inbox», ТЗ 28): a changed
- *  shortcut follows. */
+/** Commands renamed (features became plugins: the goals «quarter-goals», ТЗ 27; the Inbox «inbox», ТЗ 28; the
+ *  calendar «calendar», ТЗ 29): a changed shortcut follows. */
 const RENAMED: Record<string, string> = {
   navGoals: 'quarter-goals.nav', newGoal: 'quarter-goals.new', goalsOverview: 'quarter-goals.overview',
   goalMark: 'quarter-goals.mark', goalDone: 'quarter-goals.done', goalShift: 'quarter-goals.shift',
@@ -329,6 +329,8 @@ const RENAMED: Record<string, string> = {
   // and the Inbox and its review the plugin «inbox» (ТЗ 28)
   navInbox: 'inbox.nav', review: 'inbox.review', reviewDone: 'inbox.done', reviewCancel: 'inbox.cancel', reviewMove: 'inbox.move',
   reviewDefer: 'inbox.defer', reviewSkip: 'inbox.skip', reviewBack: 'inbox.back', reviewCalendar: 'inbox.calendar',
+  // and the calendar the plugin «calendar» (ТЗ 29)
+  navCalendar: 'calendar.nav', calendar: 'calendar.open',
 };
 export function parseState(raw: string | null): KeyState {
   try {
