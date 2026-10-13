@@ -6,6 +6,8 @@ import { FILES, INBOX, NOW } from './inboxFixture';
 const IB = '/mock/inbox.org';
 const disk = (page: Page, p = IB) => page.evaluate((p) => (window as any).__disk[p] as string, p);
 const config = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/config.json'] ?? 'null'));
+/** The plugin «Inbox»'s settings in the notes folder (ТЗ 28). */
+const own = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/plugins/inbox.json'] ?? 'null')?.settings);
 const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 const modes = (page: Page) => page.getByRole('tablist', { name: 'Режимы навигатора' });
 const panel = (page: Page) => page.locator('.inbox');
@@ -23,16 +25,17 @@ async function open(page: Page, files: Record<string, string> = FILES()) {
 }
 
 test.describe('the navigator', () => {
-  test('the bar: Файлы first (and by default), then Inbox, Задачи, Агенда, Цели, Теги, Поиск; names as tips; the count on Inbox', async ({ page }) => {
+  test('the bar: Файлы first (and by default), the core\'s sections, then the plugins\' Цели and Inbox; names as tips; the count on Inbox', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 800 });
     await installTauriMock(page, FILES());
     await page.goto('/');
     await expect(page.locator('.cm-content').first()).toBeVisible();
     const tabs = modes(page).getByRole('tab');
-    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Задачи', 'Агенда', 'Календарь', 'Теги', 'Поиск по заметкам', 'Цели']); // «Цели» is a plugin: after the core's (ТЗ 27)
+    // «Цели» and «Inbox» are plugins: after the core's, in the order of the plugins (ТЗ 27, ТЗ 28)
+    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Задачи', 'Агенда', 'Календарь', 'Теги', 'Поиск по заметкам', 'Цели', 'Inbox']);
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
-    await expect(tabs.nth(1)).toHaveAttribute('title', /^Inbox/);
-    await expect(tabs.nth(2)).toBeDisabled();
+    await expect(tabs.nth(7)).toHaveAttribute('title', /^Inbox/);
+    await expect(tabs.nth(1)).toBeDisabled();
     await expect(modes(page).locator('.badge')).toHaveText('4');
     await page.keyboard.press('Control+Meta+2');
     await expect(panel(page)).toBeVisible();
@@ -218,7 +221,7 @@ test.describe('sorting out', () => {
 });
 
 test.describe('settings → Inbox', () => {
-  test('the file, the status, :CREATED:, the order, the counter, the details; written to config.json', async ({ page }) => {
+  test('the file, the status, :CREATED: to config.json; the order, the counter, the details to the plugin\'s file', async ({ page }) => {
     await installTauriMock(page, FILES());
     await page.goto('/');
     await openSettingsSheet(page, 'Inbox');
@@ -230,7 +233,8 @@ test.describe('settings → Inbox', () => {
     await page.getByLabel('Порядок', { exact: true }).selectOption('file');
     await page.getByRole('switch', { name: 'Счётчик на кнопке Inbox' }).click();
     await page.getByRole('switch', { name: 'Показывать детали под заголовком' }).click();
-    await expect.poll(async () => (await config(page)).inbox).toEqual({ file: 'inbox.org', status: 'NEXT', created: false, add: 'end', order: 'file', counter: false, details: false });
+    await expect.poll(async () => (await config(page)).inbox).toEqual({ file: 'inbox.org', status: 'NEXT', created: false, add: 'end' });
+    await expect.poll(() => own(page)).toEqual({ order: 'file', counter: false, details: false });
   });
 
   test('«Выбрать…»: the palette of files, the chosen one shown as a path; a missing file says so', async ({ page }) => {

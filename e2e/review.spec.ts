@@ -6,7 +6,7 @@ import { FILES, INBOX, WORK } from './reviewFixture';
 const IB = '/mock/inbox.org';
 const FIN = '/mock/Работа/finance.org';
 const disk = (page: Page, p = IB) => page.evaluate((p) => (window as any).__disk[p] as string, p);
-const config = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/config.json'] ?? 'null'));
+const own = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/plugins/inbox.json'] ?? 'null')?.settings);
 const panel = (page: Page) => page.locator('.inbox');
 const card = (page: Page) => page.locator('.review .card');
 const cardLines = (page: Page) => card(page).locator('.cm-line');
@@ -219,7 +219,7 @@ test('Settings › Inbox › РАЗБОР: statuses, the order of the cards, the
   await expect(page.getByLabel('Статус «Отменено»')).toHaveValue('CANCELLED');
   await page.getByRole('radio', { name: 'Новые сначала' }).click();
   await page.getByLabel('Считать задачу залежавшейся через').selectOption('14');
-  await expect.poll(async () => (await config(page)).inbox).toEqual({ file: 'inbox.org', reviewOrder: 'new', stale: 14 });
+  await expect.poll(() => own(page)).toEqual({ reviewOrder: 'new', stale: 14 }); // the plugin's file (ТЗ 28)
   await expect(page.getByLabel('Считать задачу залежавшейся через').locator('option')).toHaveText(['3 дня', '7 дней', '14 дней', '30 дней']);
 });
 

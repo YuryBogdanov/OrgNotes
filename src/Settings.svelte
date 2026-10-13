@@ -10,7 +10,6 @@
   import { toneOf, toneStyle, colorName } from './colors';
   import ColorPicker from './ColorPicker.svelte';
   import Picker from './Picker.svelte';
-  import { days } from './review';
   import {
     MAX_KEYWORD, addState, checkKey, normalizeKey, addWorkflow, canRemoveState, canRemoveWorkflow, checkKeyword, displayName, dropState, dropWorkflow,
     effectiveKeys, fromConfig, initialOf, moveState, normalizeKeyword, orgLine, pendingState, removeState, removeWorkflow,
@@ -332,13 +331,6 @@
   const inboxPath = $derived(
     !store.inboxCfg.file ? 'Не выбран' : store.inboxCfg.file.split('/').join(' / ') + (store.inboxFile ? '' : ' — не найден'),
   );
-  // «Разбор»: the done statuses «Выполнено» and «Отменить» may write
-  const doneStates = $derived.by(() => {
-    const seqs = store.inboxFile?.wf.sequences ?? store.config.workflows;
-    return [...new Set(seqs.flatMap((sq) => sq.states.filter((x) => x.done).map((x) => x.name)))];
-  });
-  /** The chosen status, or (renamed or deleted in «Статусы») the 1st / 2nd done status of «Задачи». */
-  const shownStatus = (v: string, i: number) => (doneStates.includes(v) ? v : (doneStates[i] ?? v));
   const inboxStates = $derived.by(() => {
     const seqs = store.inboxFile?.wf.sequences ?? store.config.workflows;
     return [...new Set(seqs.flatMap((sq) => sq.states.filter((x) => !x.done).map((x) => x.name)))];
@@ -436,55 +428,7 @@
           </div>
           <p class="help">Из любой программы: приложение должно быть запущено (окно можно закрыть, оно остаётся в Dock). Сочетание хранится на этом Mac.</p>
 
-          <div class="cap">СПИСОК</div>
-          <div class="opts">
-            <div class="opt">
-              <label for="ib-order">Порядок</label>
-              <select id="ib-order" class="sel" value={store.inboxCfg.order} onchange={(e) => store.setInbox({ order: e.currentTarget.value === 'file' ? 'file' : 'new' })}>
-                <option value="new">Новые сверху</option>
-                <option value="file">Как в файле</option>
-              </select>
-            </div>
-            <div class="opt">
-              <label for="ib-counter">Счётчик на кнопке Inbox</label>
-              <button id="ib-counter" class="switch" role="switch" aria-checked={store.inboxCfg.counter} aria-label="Счётчик на кнопке Inbox"
-                onclick={() => store.setInbox({ counter: !store.inboxCfg.counter })}><span></span></button>
-            </div>
-            <div class="opt">
-              <label for="ib-details">Показывать детали под заголовком</label>
-              <button id="ib-details" class="switch" role="switch" aria-checked={store.inboxCfg.details} aria-label="Показывать детали под заголовком"
-                onclick={() => store.setInbox({ details: !store.inboxCfg.details })}><span></span></button>
-            </div>
-          </div>
-          <div class="cap">РАЗБОР</div>
-          <div class="opts">
-            <div class="opt">
-              <label for="rv-done">Статус «Выполнено»</label>
-              <select id="rv-done" class="sel" value={shownStatus(store.inboxCfg.reviewDone, 0)} onchange={(e) => store.setInbox({ reviewDone: e.currentTarget.value })}>
-                {#each doneStates as st (st)}<option value={st}>{st}</option>{/each}
-              </select>
-            </div>
-            <div class="opt">
-              <label for="rv-cancel">Статус «Отменено»</label>
-              <select id="rv-cancel" class="sel" value={shownStatus(store.inboxCfg.reviewCancel, 1)} onchange={(e) => store.setInbox({ reviewCancel: e.currentTarget.value })}>
-                {#each doneStates as st (st)}<option value={st}>{st}</option>{/each}
-              </select>
-            </div>
-            <div class="opt">
-              <span id="rv-order">Порядок карточек</span>
-              <div class="segs" role="radiogroup" aria-labelledby="rv-order">
-                <button role="radio" aria-checked={store.inboxCfg.reviewOrder === 'old'} class:on={store.inboxCfg.reviewOrder === 'old'} onclick={() => store.setInbox({ reviewOrder: 'old' })}>Старые сначала</button>
-                <button role="radio" aria-checked={store.inboxCfg.reviewOrder === 'new'} class:on={store.inboxCfg.reviewOrder === 'new'} onclick={() => store.setInbox({ reviewOrder: 'new' })}>Новые сначала</button>
-              </div>
-            </div>
-            <div class="opt">
-              <label for="rv-stale">Считать задачу залежавшейся через</label>
-              <select id="rv-stale" class="sel" value={String(store.inboxCfg.stale)} onchange={(e) => store.setInbox({ stale: +e.currentTarget.value })}>
-                {#each [3, 7, 14, 30] as d (d)}<option value={String(d)}>{days(d)}</option>{/each}
-              </select>
-            </div>
-          </div>
-          <p class="help">«Разобрать» показывает задачи Inbox по одной. У задачи из другого набора статусов «Выполнено» и «Отменить» ставят первый и второй завершающие статусы её набора. Залежавшиеся задачи помечаются цветом в списке и на карточке.</p>
+          {#each blocksOf('Inbox') as b (b.schema.id)}<SchemaSettings schema={b.schema} embedded />{/each}
         </section>
       </div>
     {:else if settingsOf(tab)}

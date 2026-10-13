@@ -27,7 +27,7 @@
     narrow?: { line: number; end: number } | null;
     folded?: number[]; // heading lines folded when the editor opens («Отметки» on a card of goals)
     lineNote?: { line: number; text: string } | null; // a grey note at the end of a line («2 — справа»)
-    onnarrow?: (line: number, last: number) => void; // where the shown lines are now (they move with edits)
+    onnarrow?: (line: number, last: number, typed: boolean) => void; // where the shown lines are now (they move with edits); typed: by the user here
     hint?: string; // grey placeholder in an empty document
     resetOn?: number; // bumped when the text was silently reloaded from disk: the undo history starts over
     text: string; fileKey: string; wf: Workflow;
@@ -374,7 +374,7 @@
       EditorView.updateListener.of((u) => {
         if (!u.docChanged) return;
         const r = u.state.field(field);
-        onnarrow?.(u.state.doc.lineAt(r.from).number - 1, u.state.doc.lineAt(r.to).number - 1);
+        onnarrow?.(u.state.doc.lineAt(r.from).number - 1, u.state.doc.lineAt(r.to).number - 1, u.transactions.some((tr) => !!tr.annotation(Transaction.userEvent)));
       }),
     ];
   }

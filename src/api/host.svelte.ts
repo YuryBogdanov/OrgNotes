@@ -55,6 +55,8 @@ export interface ReviewRun {
   done: number;
   /** The cards an action moved on from (a card gone back to counts once). */
   doneAt: Set<number>;
+  /** The queue set anew by the plugin with another heading at the card shown: the card is drawn anew. */
+  gen: number;
   resolved: boolean;
   resolve: (r: ReviewResult) => void;
 }
@@ -200,7 +202,8 @@ class Host {
       await this.reviewStep(1);
     } else this.reviewRedraw++;
   }
-  /** The card's heading was edited in it (its line moved, its title changed): the card keeps it (ТЗ 28). */
+  /** The card's heading was edited in it, by the user (its line moved, its title changed): the card keeps it (ТЗ 28).
+   *  A change from outside is not: the heading at its line may be another one then. */
   reviewEdited(line: number) {
     const r = this.review;
     const ref = r && r.cur >= 0 ? r.refs[r.cur] : null;
@@ -228,6 +231,13 @@ class Host {
       }
     }
     if (this.review !== r) return;
+    if (r.spec.next) {
+      const n = this.guard(r.plugin, () => r.spec.next!(r.cur, d < 0 ? -1 : 1), r.cur);
+      if (this.review !== r || n === r.cur || n < -1 || n >= r.refs.length) return;
+      r.cur = n;
+      if (n < 0) this.endReview(true, false, true);
+      return;
+    }
     if (r.cur < 0) {
       if (d < 0) r.cur = r.refs.length - 1; // «Назад» from the summary
       return;
@@ -237,6 +247,16 @@ class Host {
     r.cur = n < r.refs.length ? n : -1;
     if (r.cur < 0) this.endReview(true, false, true);
   }
+  /** The plugin shows a card (-1: the summary): the review's tab in front. */
+  reviewShow(r: ReviewRun, i: number) {
+    if (this.review !== r || i < -1 || i >= r.refs.length) return;
+    for (const [pi, p] of store.layout.panes.entries()) {
+      const ti = p.tabs.findIndex((t) => t.kind === REVIEW_KIND);
+      if (ti >= 0 && (store.layout.active !== pi || p.active !== ti)) store.activateTab(pi, ti);
+    }
+    r.cur = i;
+    if (i < 0) this.endReview(true, false, true);
+  }
   /** The review answers its plugin: through, or left; `keep`: its summary stays shown. */
   endReview(finished: boolean, gone = false, keep = false) {
     const r = this.review;
@@ -245,7 +265,10 @@ class Host {
       r.resolved = true;
       r.resolve({ total: r.refs.length, done: r.done, finished });
     }
-    if (!keep) this.review = null;
+    if (!keep) {
+      this.review = null;
+      if (r.spec.onClose) this.guard(r.plugin, () => r.spec.onClose!(), undefined);
+    }
     if (!gone && !keep) for (const [pi, p] of store.layout.panes.entries()) {
       const ti = p.tabs.findIndex((t) => t.kind === REVIEW_KIND);
       if (ti >= 0) store.closeTab(pi, ti);
@@ -591,7 +614,7 @@ class Host {
           new Promise((resolve) => {
             this.endReview(false, true); // the earlier review answers; its tab is reused (closing it would race the new one)
             if (!spec.items.length) return resolve({ total: 0, done: 0, finished: true });
-            this.review = { plugin: id, spec, refs: spec.items.map((r) => ({ ...r })), cur: Math.min(Math.max(0, spec.start ?? 0), spec.items.length - 1), done: 0, doneAt: new Set<number>(), resolved: false, resolve };
+            this.review = { plugin: id, spec, refs: spec.items.map((r) => ({ ...r })), cur: Math.min(Math.max(0, spec.start ?? 0), spec.items.length - 1), done: 0, doneAt: new Set<number>(), gen: 0, resolved: false, resolve };
             openView(store.layout, store.layout.active, REVIEW_KIND, () => ({}), (t) => this.redraw.set(t.id, (this.redraw.get(t.id) ?? 0) + 1));
           }),
         sheet: (spec) =>
@@ -636,7 +659,21 @@ class Host {
         widget: (el, field, value, onChange) => mountWidget(id, el, field, value, onChange, (err) => this.fail(id, err)),
         currentReview: () =>
           this.review?.plugin === id
-            ? { step: (d) => this.reviewStep(d), redraw: () => void this.reviewRedraw++, update: () => void this.reviewBar++ }
+            ? ((r) => ({
+                step: (d) => this.reviewStep(d),
+                redraw: () => void this.reviewRedraw++,
+                update: () => void this.reviewBar++,
+                show: (i) => this.reviewShow(r, i),
+                setItems: (items, cur) => {
+                  if (this.review !== r) return;
+                  const was = r.refs[r.cur];
+                  r.refs = items.map((x) => ({ path: String(x.path), line: Number(x.line), title: String(x.title) }));
+                  r.cur = Math.min(Math.max(-1, cur ?? r.cur), r.refs.length - 1);
+                  const now = r.refs[r.cur];
+                  if (now && (!was || was.path !== now.path || was.title !== now.title)) r.gen++;
+                },
+                end: () => void (this.review === r && this.endReview(true)),
+              }))(this.review)
             : null,
         setBadge: (nav, n) => {
           declared('раздела', m.contributes.navSections.some((x) => x.id === nav), nav);
@@ -656,6 +693,7 @@ class Host {
               },
               done: (r) => {
                 done = true;
+                if (o.onUndo) r.step.onUndo = () => this.guard(id, () => o.onUndo!(), undefined);
                 const to = store.files.find((x) => x.path === r.path);
                 const th = to?.headings.find((x) => x.line === r.line);
                 resolve({ path: to?.name ?? r.path, line: r.line, title: th?.title ?? h.title, label: r.label });
@@ -725,10 +763,14 @@ class Host {
           const f = fileOf(path);
           return f && kw ? (namedFor(kw, f.wf) as Named) : null;
         },
-        inbox: async () => ({ path: store.inboxFile?.name ?? null }),
+        inbox: async () => ({ path: store.inboxFile?.name ?? null, chosen: store.inboxCfg.file }),
         workflow: async (path) => {
           const f = fileOf(path);
-          return { open: [...(f?.wf.open ?? DEFAULT_WORKFLOW.open)], done: [...(f?.wf.done ?? DEFAULT_WORKFLOW.done)] };
+          const seqs = f?.wf.sequences ?? store.config.workflows;
+          return {
+            open: [...(f?.wf.open ?? DEFAULT_WORKFLOW.open)], done: [...(f?.wf.done ?? DEFAULT_WORKFLOW.done)],
+            sets: seqs.map((q) => ({ name: q.name, states: q.states.map((x) => ({ name: x.name, done: !!x.done })) })),
+          };
         },
       };
     if (can('files.read') || can('files.edit'))

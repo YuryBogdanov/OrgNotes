@@ -420,7 +420,7 @@ class Store {
   }
   /** config.json still has the feature's old keys (its file is not written yet). */
   hasLegacy(id: string) {
-    return (this.storages.get(id)?.legacyKeys ?? []).some((k) => this.parsedConfig && k in this.parsedConfig);
+    return (this.storages.get(id)?.legacyKeys ?? []).some((k) => hasPath(this.parsedConfig, k));
   }
   /** The feature's settings in the notes folder (its file, else what config.json had before 0.6). */
   folderData(id: string): unknown {
@@ -437,12 +437,12 @@ class Store {
     this.featureFiles = { ...this.featureFiles, [id]: value };
     this.refreshStatusSets();
     // moved: the old keys leave config.json (the file is the place now)
-    const keys = (this.storages.get(id)?.legacyKeys ?? []).filter((k) => this.parsedConfig && k in this.parsedConfig);
+    const keys = (this.storages.get(id)?.legacyKeys ?? []).filter((k) => hasPath(this.parsedConfig, k));
     if (keys.length)
       await this.updateConfig((raw) => {
         try {
           const p = raw ? JSON.parse(raw) : {};
-          for (const k of keys) delete p[k];
+          for (const k of keys) dropPath(p, k);
           return JSON.stringify(p, null, 2) + '\n';
         } catch {
           return raw ?? '';
@@ -2222,12 +2222,25 @@ class Store {
 }
 
 export const DEFAULT_CAPTURE_KEY = 'Shift+CmdOrCtrl+KeyI';
+/** A key of config.json («goals») or a key in one («inbox.order»). */
+function hasPath(o: any, path: string): boolean {
+  const [a, b] = path.split('.');
+  return !!o && typeof o === 'object' && a in o && (b === undefined || (!!o[a] && typeof o[a] === 'object' && b in o[a]));
+}
+function dropPath(o: any, path: string) {
+  const [a, b] = path.split('.');
+  if (b === undefined) return void delete o[a];
+  if (!o[a] || typeof o[a] !== 'object') return;
+  delete o[a][b];
+  if (!Object.keys(o[a]).length) delete o[a];
+}
 /** What a feature does around a move it asked for. */
 /** Where a feature keeps its settings and where they were before roadmap 0.6 (config.json). */
 export interface StorageSpec {
   /** Its folder's settings as config.json had them. */
   legacy?: (parsed: any) => unknown;
-  /** The keys of config.json dropped once the feature's file is written. */
+  /** The keys of config.json dropped once the feature's file is written («goals», or «inbox.order» inside a key: the
+   *  key goes when nothing is left in it). */
   legacyKeys?: string[];
   /** Its settings of this Mac as config.json had them. */
   localLegacy?: (parsed: any) => unknown;

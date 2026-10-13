@@ -1,8 +1,8 @@
 // «Разбор Inbox»: the Inbox tasks one by one, as cards. Pure functions — the queue, the dates of «Отложить», which
-// status «Выполнено» and «Отменить» write, the labels — shared by the store, the panel and the tests.
+// status «Выполнено» and «Отменить» write, the labels — shared by the review, the section and the tests.
 
-import { inboxItems, type InboxItem } from './inbox';
-import { sequenceFor, type Heading, type OrgDate, type Workflow } from './org';
+import { inboxItems, type InboxItem } from './list';
+import { sequenceFor, type Heading, type OrgDate, type Workflow } from '@panopticon/api/org';
 
 export type Result = 'done' | 'cancel' | 'move' | 'defer' | 'skip' | 'delete';
 export interface ReviewItem {

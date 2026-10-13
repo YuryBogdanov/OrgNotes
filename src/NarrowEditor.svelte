@@ -16,7 +16,7 @@
     drawers?: boolean;
     folded?: number[];
     lineNote?: { line: number; text: string } | null;
-    onnarrow?: (line: number, last: number) => void; // the shown lines moved with an edit
+    onnarrow?: (line: number, last: number, typed: boolean) => void; // the shown lines moved with an edit (typed here or not)
   } = $props();
 </script>
 

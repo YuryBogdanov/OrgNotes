@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_WORKFLOW, fromSequences, parseHeadings } from './org';
+import { DEFAULT_WORKFLOW, fromSequences, parseHeadings } from '../../org';
 import { agePill, ageShort, closingStatus, deferDates, locate, nextOpen, reviewQueue, withDay, type ReviewItem } from './review';
 
 const INBOX = [

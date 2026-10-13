@@ -63,7 +63,7 @@
   // something of the plugin under the card: drawn again for each card
   let belowEl = $state<HTMLElement>();
   // drawn again only when the card changes (not when an action stays on it: a calendar opened under it stays open)
-  const belowKey = $derived(c ? `${plugins.review?.cur}|${c.info.ref.path}|${c.info.ref.line}` : '');
+  const belowKey = $derived(c ? `${plugins.review?.cur}|${plugins.review?.gen}|${c.info.ref.path}|${c.info.ref.line}` : '');
   $effect(() => {
     const node = belowEl;
     void belowKey;
@@ -93,7 +93,7 @@
 
 <CardReview cls={'preview' + (r?.spec.cls ? ' ' + r.spec.cls : '')} scope={reviewScope(r?.plugin ?? '')} {keys} width={r?.spec.width ?? 820}
   state={r && r.cur >= 0 && c ? 'card' : r && r.cur < 0 ? 'summary' : 'empty'}
-  cardKey={r && c ? r.cur + '|' + c.info.ref.path : ''}
+  cardKey={r && c ? r.cur + '|' + r.gen + '|' + c.info.ref.path : ''}
   back={r ? { disabled: r.cur === 0, run: () => void plugins.reviewStep(-1), key: r.spec.backCommand ?? '' } : null}>
   {#snippet head()}
     {#if r && c}
@@ -113,8 +113,9 @@
     {#if r && c}
       <div class="cols" class:with={!!r.spec.aside}>
         <div class="ed">
-          <NarrowEditor file={c.file} line={c.heading.line} end={c.heading.end} {tab} fileKey={'preview|' + r.cur + '|' + c.file.path + '|' + (narrow.fold ?? []).join(',')}
-            folded={narrow.fold ?? []} lineNote={narrow.note ?? null} onnarrow={(line) => plugins.reviewEdited(line)} reveal={narrow.reveal ? { line: narrow.reveal.line, n: narrow.reveal.n, focus: true } : null} />
+          <NarrowEditor file={c.file} line={c.heading.line} end={c.heading.end} {tab} fileKey={'preview|' + r.cur + '|' + r.gen + '|' + c.file.path + '|' + (narrow.fold ?? []).join(',')}
+            folded={narrow.fold ?? []} lineNote={narrow.note ?? null} drawers={!r.spec.drawers} onnarrow={(line, _last, typed) => typed && plugins.reviewEdited(line)}
+            reveal={narrow.reveal ? { line: narrow.reveal.line, n: narrow.reveal.n, col: narrow.reveal.col, focus: true } : null} />
         </div>
         {#if r.spec.aside}<aside class="pa" use:part={() => r.spec.aside}></aside>{/if}
       </div>
@@ -124,12 +125,17 @@
     {#if r && c && r.spec.below}<div class="below" bind:this={belowEl}></div>{/if}
   {/snippet}
   {#snippet actions()}
-    {#if r && c}
+    {#if r && c && r.spec.bar}
+      <div class="pbar" use:part={() => r.spec.bar}></div>
+    {:else if r && c}
       {#each r.spec.actions as a (a.id)}
         <button class="a" class:pri={a.kind === 'primary'} class:ok={a.kind === 'ok'} disabled={off(a.disabled as never)} onclick={() => void plugins.reviewAct(a.id)}>{a.label}{#if a.sub}<span class="h">{a.sub}</span>{/if}{#if kbd(a.command)}<kbd>{kbd(a.command)}</kbd>{/if}</button>
       {/each}
       {#if !r.spec.noSkip}<button class="a" onclick={() => void plugins.reviewStep(1)}>Пропустить</button>{/if}
     {/if}
+  {/snippet}
+  {#snippet barEnd()}
+    {#if r?.spec.barEnd && c}<div class="pbar" use:part={() => r.spec.barEnd}></div>{/if}
   {/snippet}
   {#snippet summary()}
     {#if r}
@@ -165,6 +171,7 @@
   .none button { margin-left: 8px; }
   .below { width: 100%; max-width: 820px; margin-top: 14px; }
   .psum { display: contents; }
+  .pbar { display: contents; }
   :global(.preview .acts .a.pri) { background: var(--acc); color: var(--onacc); border-color: transparent; }
   :global(.preview .acts .a.ok) { color: var(--done); }
   :global(.preview .acts .a .h) { font-weight: 400; color: var(--fg2); font-size: 11.5px; }

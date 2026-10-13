@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_INBOX, ago, append, entry, inboxItems, prepend, readInbox, remove, withInbox } from './inbox';
+import { DEFAULT_INBOX, append, entry, prepend, readInbox, remove, withInbox } from './inbox';
 import { DEFAULT_WORKFLOW, parseHeadings } from './org';
 
 const INBOX = [
@@ -21,28 +21,6 @@ const INBOX = [
   '',
 ].join('\n');
 const hs = parseHeadings(INBOX, DEFAULT_WORKFLOW);
-
-describe('the list', () => {
-  it('open top-level tasks, newest first by :CREATED:, the rest after them in the file’s order', () => {
-    const items = inboxItems(INBOX, hs, DEFAULT_WORKFLOW);
-    expect(items.map((i) => i.title)).toEqual(['Позвонить в банк про лимиты', 'Согласовать отпуск', 'Без даты создания']);
-    expect(items[0]).toMatchObject({ details: 'по карте компании, уточнить комиссию', hasDetails: true });
-    expect(items[0].created).toEqual(new Date(2026, 9, 12, 9, 12));
-    expect(items[1]).toMatchObject({ details: '', hasDetails: true }); // a sub-heading
-    expect(items[2]).toMatchObject({ details: '', hasDetails: false, created: null });
-    expect(inboxItems(INBOX, hs, DEFAULT_WORKFLOW, 'file').map((i) => i.title)).toEqual(['Позвонить в банк про лимиты', 'Без даты создания', 'Согласовать отпуск']);
-  });
-  it('relative time', () => {
-    const now = new Date(2026, 9, 12, 10, 0);
-    expect(ago(new Date(2026, 9, 12, 9, 59, 40), now)).toBe('только что');
-    expect(ago(new Date(2026, 9, 12, 9, 55), now)).toBe('5 мин');
-    expect(ago(new Date(2026, 9, 12, 7, 5), now)).toBe('сегодня 07:05');
-    expect(ago(new Date(2026, 9, 11, 23, 0), now)).toBe('вчера');
-    expect(ago(new Date(2026, 9, 8), now)).toBe('8 окт');
-    expect(ago(new Date(2025, 11, 30), now)).toBe('30 дек 2025');
-    expect(ago(null, now)).toBe('');
-  });
-});
 
 describe('writing', () => {
   it('a new task: one line of title, :CREATED:, details with a heading-like line escaped', () => {
@@ -82,18 +60,20 @@ describe('writing', () => {
 describe('settings', () => {
   it('read with defaults, written without them, other keys kept', () => {
     expect(readInbox(undefined)).toEqual(DEFAULT_INBOX);
-    const c = { ...DEFAULT_INBOX, file: 'inbox.org', counter: false };
+    const c = { ...DEFAULT_INBOX, file: 'inbox.org', created: false };
     const raw = withInbox('{"version":1,"workflows":[]}', c);
-    expect(JSON.parse(raw)).toEqual({ version: 1, workflows: [], inbox: { file: 'inbox.org', counter: false } });
+    expect(JSON.parse(raw)).toEqual({ version: 1, workflows: [], inbox: { file: 'inbox.org', created: false } });
     expect(readInbox(JSON.parse(raw).inbox)).toEqual(c);
     expect(JSON.parse(withInbox(raw, DEFAULT_INBOX)).inbox).toBeUndefined();
     // where a task goes: the top by default, the end only when set
     expect(DEFAULT_INBOX.add).toBe('top');
     expect(readInbox({ add: 'end' }).add).toBe('end');
     expect(readInbox({ add: 'middle' }).add).toBe('top');
-    // «Разбор»: the statuses, the order of the cards, when a task lies too long
-    expect(readInbox({ reviewDone: 'HELD', reviewOrder: 'new', stale: 14 })).toMatchObject({ reviewDone: 'HELD', reviewCancel: 'CANCELLED', reviewOrder: 'new', stale: 14 });
-    expect(readInbox({ stale: 5, reviewOrder: 'x' })).toMatchObject({ stale: 7, reviewOrder: 'old' });
     expect(JSON.parse(withInbox(null, { ...DEFAULT_INBOX, add: 'end' })).inbox).toEqual({ add: 'end' });
+  });
+  it("the list's and the review's keys (the plugin's now, ТЗ 28) stay until the plugin moves them", () => {
+    const raw = JSON.stringify({ version: 1, inbox: { file: 'inbox.org', order: 'file', stale: 14 } });
+    expect(JSON.parse(withInbox(raw, { ...DEFAULT_INBOX, file: 'inbox.org', add: 'end' })).inbox).toEqual({ file: 'inbox.org', order: 'file', stale: 14, add: 'end' });
+    expect(JSON.parse(withInbox(raw, { ...DEFAULT_INBOX, file: null })).inbox).toEqual({ order: 'file', stale: 14 });
   });
 });

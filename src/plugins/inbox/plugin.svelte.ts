@@ -1,0 +1,48 @@
+// The plugin «inbox» (ТЗ 28): the section «Inbox» — the unsorted tasks of the Inbox file — and «Разбор Inbox» by cards,
+// on the public API only. The quick entry and the Inbox file are the core's: the plugin follows them.
+
+import { definePlugin } from '@panopticon/api';
+import { mount, unmount } from 'svelte';
+import { data } from './state.svelte';
+import { session } from './session.svelte';
+import Panel from './Panel.svelte';
+import './styles.css';
+
+let stop: (() => void) | null = null;
+
+export default definePlugin({
+  async activate(ctx) {
+    data.ctx = ctx;
+    data.readSettings();
+    await data.load();
+
+    // the Inbox file, its tasks, the files of the review's tasks: read again when they change
+    ctx.events.on('inbox.changed', () => void data.load());
+    ctx.events.on('folder.changed', () => void data.load());
+    ctx.events.on('file.changed', (p) => {
+      const path = (p as { path: string }).path;
+      if (path in data.files) void data.refresh(path).then(() => session.synced());
+    });
+    ctx.settings.onChange(() => data.readSettings());
+    // «Выполнено» and «Отменить» of the settings: the done statuses of the Inbox file's sets
+    const states = () => data.doneStates.map((s) => ({ value: s, label: s }));
+    ctx.settings.dynamic('reviewDone', { options: states });
+    ctx.settings.dynamic('reviewCancel', { options: states });
+
+    // the section with the count on its button; «Разобрать Inbox» offered while there is something to go through
+    ctx.ui.navSection('inbox', (el) => {
+      const app = mount(Panel, { target: el });
+      return () => void unmount(app);
+    });
+    ctx.commands.on('inbox.review', () => session.start());
+    stop = $effect.root(() => {
+      $effect(() => ctx.ui.setBadge('inbox', data.settings.counter ? data.list.length : 0));
+      $effect(() => ctx.commands.setAvailable('inbox.review', data.pending.length > 0));
+    });
+  },
+  deactivate() {
+    stop?.();
+    stop = null;
+    session.run = null;
+  },
+});
