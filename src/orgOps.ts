@@ -106,6 +106,38 @@ export function insertHeading(text: string, at: InsertAt, org: string): string |
   return insertHeadingAt(text, at, org)?.text ?? null;
 }
 
+/** The heading's title replaced; its stars, status, priority and tags stay. */
+export function setTitle(text: string, h: Heading, title: string): string {
+  const lines = text.split('\n');
+  const line = lines[h.line] ?? '';
+  const stars = /^\*+\s+/.exec(line)?.[0];
+  if (!stars) return text;
+  let head = stars;
+  let rest = line.slice(stars.length);
+  if (h.keyword && rest.startsWith(h.keyword + ' ')) {
+    head += h.keyword + ' ';
+    rest = rest.slice(h.keyword.length + 1);
+  }
+  const prio = /^\[#[A-Z0-9]\]\s+/.exec(rest)?.[0] ?? '';
+  const tags = /(\s+:[^\s:]+(?::[^\s:]+)*:)\s*$/.exec(rest)?.[1] ?? '';
+  lines[h.line] = head + prio + title.replace(/\s+/g, ' ').trim() + tags;
+  return lines.join('\n');
+}
+
+/** The heading's own properties (its :PROPERTIES: drawer under the heading or its planning line), keys in upper case. */
+export function propertiesOf(text: string, h: Heading): Record<string, string> {
+  const lines = text.split('\n');
+  let i = h.line + 1;
+  if (/^\s*(SCHEDULED|DEADLINE|CLOSED):/.test(lines[i] ?? '')) i++;
+  const out: Record<string, string> = {};
+  if (!/^\s*:PROPERTIES:\s*$/i.test(lines[i] ?? '')) return out;
+  for (i++; i < lines.length && !/^\s*:END:\s*$/i.test(lines[i]) && !/^\*+\s/.test(lines[i]); i++) {
+    const m = /^\s*:([^\s:]+):\s*(.*?)\s*$/.exec(lines[i]);
+    if (m) out[m[1].toUpperCase()] = m[2];
+  }
+  return out;
+}
+
 /** The heading's body as `replaceBody` changes it: after its planning and drawers, up to its first subheading, the
  *  blank lines at its end left out. */
 export function bodyOf(text: string, h: Heading): string {

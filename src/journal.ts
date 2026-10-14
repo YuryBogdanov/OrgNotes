@@ -5,7 +5,7 @@
 import { parseHeadings, setKeyword, type Heading, type Workflow } from './org';
 import { setPlanning, setTags } from './edits';
 import { remove } from './inbox';
-import { bodyOf, insertAfter, insertHeadingAt, moveBeside, replaceBody, setProperty } from './orgOps';
+import { bodyOf, insertAfter, insertHeadingAt, moveBeside, replaceBody, setProperty, setTitle } from './orgOps';
 import { moveTo, moveWithin } from './refile';
 
 /** A heading as a feature knows it: lines move with every edit, so the title is checked too. */
@@ -132,6 +132,11 @@ export class Tx {
   }
   setTags(ref: HeadingRef, tags: string[]) {
     this.on(ref, (t, h) => setTags(t, h, tags));
+  }
+  /** Rename a heading: its stars, status, priority and tags stay. */
+  setTitle(ref: HeadingRef, title: string) {
+    if (!title.trim()) this.error = 'пустое название';
+    else this.on(ref, (t, h) => setTitle(t, h, title));
   }
   remove(ref: HeadingRef) {
     this.on(ref, (t, h) => remove(t, h));

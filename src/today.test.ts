@@ -5,7 +5,7 @@ import {
   agendaRows, dateTitle, dayOf, doneStatus, focusRows, inlineHtml, journalDays, kicker, lastDay, noteLines, overdue, overdueWords, readFolder,
   readLocal, remindDue, shouldShow, taskGroups, whenChosen, type TFile,
 } from './today';
-import { arrange } from './todayBlocks';
+import { arrange, withNew } from './todayBlocks';
 
 const file = (name: string, text: string): TFile => ({ name, path: '/n/' + name, text, wf: DEFAULT_WORKFLOW, headings: parseHeadings(text, DEFAULT_WORKFLOW) });
 const at = (s: string) => new Date(s);
@@ -69,7 +69,9 @@ describe('the settings', () => {
   it('lays the blocks out: wide ones first, an attached one under the one before', () => {
     const spec = (id: string) => ({ id, title: id, wide: id === 'note' || id === 'focus', attach: id === 'oneOnOne' || id === 'goals' });
     const order = ['note', 'focus', 'agenda', 'oneOnOne', 'tasks', 'overdue', 'goals'].map((id) => ({ id, on: id !== 'focus' }));
-    expect(arrange(order, spec)).toEqual({ top: ['note'], cols: [['agenda', 'oneOnOne'], ['tasks'], ['overdue', 'goals']] });
+    const a = arrange(order, spec);
+    expect({ top: a.top, cols: a.cols }).toEqual({ top: ['note'], cols: [['agenda', 'oneOnOne'], ['tasks'], ['overdue', 'goals']] });
+    expect(a.rows).toEqual([{ kind: 'top', ids: ['note'] }, { kind: 'cols', cols: [['agenda', 'oneOnOne'], ['tasks'], ['overdue', 'goals']] }]);
     expect(arrange(order, (id) => (id === 'overdue' ? undefined : spec(id))).cols).toEqual([['agenda', 'oneOnOne'], ['tasks', 'goals']]);
   });
 });
@@ -144,5 +146,15 @@ describe('the journal', () => {
     expect(rows[0].task).toMatchObject({ title: 'Бюджет', meta: 'дедлайн сегодня', late: true, done: false });
     expect(rows[1]).toEqual({ id: 'gone', title: 'Пропавшая', task: null });
     expect(doneStatus('TODO', DEFAULT_WORKFLOW)).toBe('DONE');
+  });
+  it('a full block is a row of its own where the order puts it; a new one goes before or after the block it names', () => {
+    const spec = (id: string) => ({ id, title: id, wide: id === 'note' || id === 'focus', full: id === 'banner' || id === 'week' });
+    const order = ['banner', 'note', 'focus', 'week', 'agenda', 'tasks'].map((id) => ({ id, on: true }));
+    expect(arrange(order, spec).rows).toEqual([
+      { kind: 'full', id: 'banner' }, { kind: 'top', ids: ['note', 'focus'] }, { kind: 'full', id: 'week' }, { kind: 'cols', cols: [['agenda'], ['tasks']] },
+    ]);
+    const saved = ['note', 'focus', 'agenda'].map((id) => ({ id, on: true }));
+    const all = [{ id: 'banner', title: '', before: 'note' }, { id: 'week', title: '', after: 'focus' }, { id: 'x', title: '', after: 'nope' }];
+    expect(withNew(saved, all).map((b) => b.id)).toEqual(['banner', 'note', 'focus', 'week', 'agenda', 'x']);
   });
 });

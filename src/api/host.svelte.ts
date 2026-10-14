@@ -32,6 +32,7 @@ import PluginNav from '../PluginNav.svelte';
 import PluginReview from '../PluginReview.svelte';
 import { mountWidget } from './widgets.svelte';
 import { lists } from '../taskLists.svelte';
+import { bodyOf, propertiesOf } from '../orgOps';
 
 const isTauri = '__TAURI_INTERNALS__' in window;
 const invoke = async <T,>(cmd: string, args?: Record<string, unknown>) => (await import('@tauri-apps/api/core')).invoke<T>(cmd, args);
@@ -376,7 +377,7 @@ class Host {
     }
     for (const b of m.contributes.todayBlocks) {
       this.keep(id, registerTodayBlock({
-        id: b.id, title: b.title, hint: b.hint, attach: b.attach, component: PluginTodayBlock as unknown as Component,
+        id: b.id, title: b.title, hint: b.hint, attach: b.attach, full: b.width === 'full', before: b.before, after: b.after, component: PluginTodayBlock as unknown as Component,
         empty: () => !this.todayRenders.has(b.id) || this.todayHidden.has(b.id),
       }));
     }
@@ -933,6 +934,11 @@ class Host {
           const h = f && findHeading(f.headings, ref);
           return f && h ? infoOf(f, h) : null;
         },
+        body: async (ref) => {
+          const f = fileOf(ref.path);
+          const h = f && findHeading(f.headings, ref);
+          return f && h ? bodyOf(f.text, h) : null;
+        },
         outline: async (path) => {
           const f = fileOf(path);
           return f ? f.headings.map((h) => infoOf(f, h)) : [];
@@ -1106,7 +1112,7 @@ class Host {
   }
   private headingListeners = new Set<(p: unknown) => void>();
   /** After a plugin's transaction: what it changed in which heading. */
-  headingChanged(ref: HeadingRef, what: 'status' | 'planning' | 'tags' | 'property' | 'body' | 'moved' | 'removed') {
+  headingChanged(ref: HeadingRef, what: 'status' | 'planning' | 'tags' | 'title' | 'property' | 'body' | 'moved' | 'removed') {
     for (const l of this.headingListeners) l({ ref, what });
   }
 }
@@ -1161,6 +1167,8 @@ const fileOf = (path: string) => store.files.find((f) => f.name === path);
 function findHeading(hs: Heading[], ref: HeadingRef) {
   return hs.find((h) => h.line === ref.line && h.title === ref.title) ?? hs.filter((h) => h.title === ref.title).sort((a, b) => Math.abs(a.line - ref.line) - Math.abs(b.line - ref.line))[0];
 }
+/** A heading's own parts the plugins read since 1.7: its event, its properties. */
+const extraOf = (text: string, h: Heading) => ({ ...(h.event ? { event: { ...h.event } } : {}), properties: propertiesOf(text, h) });
 function infoOf(f: (typeof store.files)[number], h: Heading): HeadingInfo {
   const inherited = new Set<string>(f.filetags);
   for (let p = h.parent; p >= 0; p = f.headings[p].parent) for (const t of f.headings[p].tags) inherited.add(t);
@@ -1168,6 +1176,7 @@ function infoOf(f: (typeof store.files)[number], h: Heading): HeadingInfo {
     ref: { path: f.name, line: h.line, title: h.title }, level: h.level, keyword: h.keyword, done: !!h.keyword && f.wf.done.includes(h.keyword),
     priority: h.priority, title: h.title, tags: [...new Set([...h.tags, ...inherited])],
     ...(h.scheduled ? { scheduled: { ...h.scheduled } } : {}), ...(h.deadline ? { deadline: { ...h.deadline } } : {}), ...(h.closed ? { closed: { ...h.closed } } : {}),
+    ...extraOf(f.text, h),
   } as HeadingInfo;
 }
 /** The agenda's engine on a query: a keyword without its set means it in every set. */
@@ -1263,6 +1272,7 @@ function txInfo(tx: CoreTx, ref: HeadingRef, h: Heading): HeadingInfo {
     ref: { path: f?.name ?? ref.path, line: h.line, title: h.title }, level: h.level, keyword: h.keyword, done, priority: h.priority, title: h.title,
     tags: [...new Set([...h.tags, ...inherited])],
     ...(h.scheduled ? { scheduled: { ...h.scheduled } } : {}), ...(h.deadline ? { deadline: { ...h.deadline } } : {}), ...(h.closed ? { closed: { ...h.closed } } : {}),
+    ...extraOf(tx.text(ref.path) ?? '', h),
   } as HeadingInfo;
 }
 /** The plugin's Tx over the core's (§5.4): the same operations; what changed in which heading, for the events. */
@@ -1271,6 +1281,7 @@ function apiTx(tx: CoreTx, ev: Changed[]) {
     setStatus: (h: HeadingRef, kw: string | null) => (tx.setStatus(coreRef(h), kw), ev.push([h, 'status'])),
     setPlanning: (h: HeadingRef, k: 'SCHEDULED' | 'DEADLINE', d: Date | null) => (tx.setPlanning(coreRef(h), k, d), ev.push([h, 'planning'])),
     setTags: (h: HeadingRef, tags: string[]) => (tx.setTags(coreRef(h), tags), ev.push([h, 'tags'])),
+    setTitle: (h: HeadingRef, title: string) => (tx.setTitle(coreRef(h), String(title)), ev.push([h, 'title'])),
     setProperty: (h: HeadingRef, k: string, v: string | null) => (tx.setProperty(coreRef(h), k, v), ev.push([h, 'property'])),
     insertHeading: (at: { under: HeadingRef; position: 'first' | 'last' } | { under: HeadingRef; before: HeadingRef } | { file: string; position: 'top' | 'end' } | { after: HeadingRef }, org: string) =>
       apiRef(

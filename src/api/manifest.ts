@@ -54,6 +54,11 @@ export interface ManifestTodayBlock {
   title: string;
   hint?: string;
   attach?: boolean;
+  /** A row of its own, the whole width (1.7). */
+  width?: 'full';
+  /** Where it goes in the order the first time: before or after a block of the screen (1.7). */
+  before?: string;
+  after?: string;
 }
 export interface ManifestStatusSet {
   name: string;
@@ -168,7 +173,7 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
   for (const x of arr(c.todayBlocks).map(obj)) {
     if (!own('блок', x.id)) continue;
     if (!isStr(x.title)) problems.push(`блок «${x.id}»: нет title`);
-    todayBlocks.push({ id: x.id as string, title: String(x.title ?? ''), ...(isStr(x.hint) ? { hint: x.hint } : {}), ...(x.attach === true ? { attach: true } : {}) });
+    todayBlocks.push({ id: x.id as string, title: String(x.title ?? ''), ...(isStr(x.hint) ? { hint: x.hint } : {}), ...(x.attach === true ? { attach: true } : {}), ...(x.width === 'full' ? { width: 'full' as const } : {}), ...(isStr(x.before) ? { before: x.before } : {}), ...(isStr(x.after) ? { after: x.after } : {}) });
   }
   const fileViews: ManifestFileView[] = [];
   for (const x of arr(c.fileViews).map(obj)) {

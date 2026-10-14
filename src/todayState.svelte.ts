@@ -6,7 +6,7 @@ import { store } from './store.svelte';
 import { isPinned, newTab, pinFirst, type Layout } from './layout';
 import type { Schema, Values } from './settingsSchema';
 import { isoOf, newId, writeDay, type DayTask, type Link } from './endDay';
-import { allTodayBlocks } from './todayBlocks';
+import { allTodayBlocks, withNew } from './todayBlocks';
 import { DEFAULT_FOLDER, DEFAULT_LOCAL, cleanTag, dayOf, journalDays, readFolder, remindDue, readLocal, shouldShow, type BlockState, type TodayFolder, type TodayLocal } from './today';
 
 export const TODAY = 'today'; // the kind of its tab
@@ -41,8 +41,7 @@ class TodayState {
   }
   /** The blocks in their order: the saved one, then the blocks registered since (a plugin's), on. */
   get blocks(): BlockState[] {
-    const saved = this.folder.blocks;
-    return [...saved, ...allTodayBlocks().filter((b) => !saved.some((s) => s.id === b.id)).map((b) => ({ id: b.id, on: true }))];
+    return withNew(this.folder.blocks, allTodayBlocks());
   }
   /** The files of «Задачи»: the chosen ones, else the Inbox's file (else inbox.org). */
   get taskFiles(): string[] {
