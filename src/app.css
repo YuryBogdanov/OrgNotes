@@ -4,7 +4,7 @@
   --cur: #eef4ff; --field: #e3e3e8; --sel: rgba(10,100,214,0.14); --acc: #0a64d6; --onacc: #ffffff;
   --h1: #0a58c2; --h2: #0b7a6f; --h3: #a4510a;
   --todo: #c4262e; --done: #1d7f3a; --next: #0a58c2; --wait: #935300; --purple: #7a3fc4;
-  --ts: #a3187a; --tagbg: #e6e6eb; --tagfg: #4a4a52; --link: #0a58c2;
+  --ts: #a3187a; --tagbg: #e6e6eb; --tagfg: #4a4a52; --tagdot: #c7c7cc; --link: #0a58c2;
   --segon: #ffffff; --shadow: 0 1px 2px rgba(0,0,0,0.18);
   /* popovers (the command palette): their ground, the dim behind, the selected row (white text ≥ 4.5:1) */
   --pop: #ffffff; --scrim: rgba(0,0,0,0.20); --pacc: #0a64d6; --onpacc: #ffffff;
@@ -22,7 +22,7 @@
   --cur: #2a3347; --field: #37373e; --sel: rgba(10,132,255,0.30); --acc: #6cb4ff; --onacc: #0b1626;
   --h1: #6cb4ff; --h2: #5fd3c2; --h3: #f0a45d;
   --todo: #ff7b80; --done: #6fd58a; --next: #6cb4ff; --wait: #f0b04d; --purple: #c39bff;
-  --ts: #f58ad4; --tagbg: #3d3d46; --tagfg: #c9c9d2; --link: #6cb4ff;
+  --ts: #f58ad4; --tagbg: #3d3d46; --tagfg: #c9c9d2; --tagdot: #55555e; --link: #6cb4ff;
   --segon: #55555e; --shadow: none;
   --pop: #2c2c32; --scrim: rgba(0,0,0,0.45); --pacc: #1f6fd6; --onpacc: #ffffff;
   --stage: #18181b;

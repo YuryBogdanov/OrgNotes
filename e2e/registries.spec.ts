@@ -31,14 +31,16 @@ test('the features\' sections of the navigator come in their places; their short
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
   const tabs = page.getByRole('tablist', { name: 'Режимы навигатора' }).getByRole('tab');
-  // «Календарь», «Цели» and «Inbox» are plugins: after the core's, in the order of the plugins (ТЗ 27–29)
-  expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Задачи', 'Агенда', 'Теги', 'Поиск по заметкам', 'Календарь', 'Цели', 'Inbox']);
+  // «Календарь», «Цели» and «Inbox» are built-in plugins: in their places among the core's (ТЗ 38)
+  expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Агенда', 'Цели', 'Календарь', 'Теги', 'Поиск по заметкам']);
   await page.keyboard.press('Control+Meta+5');
-  await expect(tabs.nth(5)).toHaveAttribute('aria-selected', 'true'); // «Календарь»
+  await expect(tabs.nth(4)).toHaveAttribute('aria-selected', 'true'); // «Календарь»
   await page.keyboard.press('Control+Meta+4');
-  await expect(tabs.nth(6)).toHaveAttribute('aria-selected', 'true'); // «Цели», once the plugin is started
+  await expect(tabs.nth(3)).toHaveAttribute('aria-selected', 'true'); // «Цели», once the plugin is started
   await page.keyboard.press('Control+Meta+2');
-  await expect(tabs.nth(7)).toHaveAttribute('aria-selected', 'true'); // «Inbox»
+  await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true'); // «Inbox»
+  await page.keyboard.press('Control+Meta+8');
+  await expect(tabs.nth(5)).toHaveAttribute('aria-selected', 'true'); // «Теги»
   // the settings: «Календарь» is the calendar's section, in its place
   await page.keyboard.press('Meta+Comma');
   expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Сегодня', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Файлы', 'Мини-окно', 'Клавиши', 'Плагины', 'Календарь', 'Канбан']);

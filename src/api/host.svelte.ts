@@ -405,7 +405,10 @@ class Host {
       });
     }
     m.contributes.navSections.forEach((n, i) => {
-      this.keep(id, registerNav({ id: n.id, label: n.title, icon: n.icon, key: n.key, order: 100 + i, component: PluginNav as unknown as Component, badge: () => this.badges.get(n.id) ?? 0 }));
+      // the built-in plugins' sections in their places among the core's (ТЗ 38: Файлы, Inbox, Агенда, Цели, Календарь,
+      // Теги, Поиск); an installed plugin's after them
+      const place = this.entry(id)?.builtin ? BUILTIN_NAV[n.id] : undefined;
+      this.keep(id, registerNav({ id: n.id, label: n.title, icon: n.icon, key: n.key, order: place ?? 100 + i, component: PluginNav as unknown as Component, badge: () => this.badges.get(n.id) ?? 0 }));
       if (n.key) this.keep(id, registerAction(n.key, () => this.showNav(n.id)));
     });
     for (const v of m.contributes.fileViews) {
@@ -1265,6 +1268,8 @@ interface SlotPiece {
   plugin: string;
   render: (el: HTMLElement, data: unknown) => Dispose | void;
 }
+/** Where the built-in plugins' sections of the navigator stand (views.ts: Файлы 0 … Поиск 70). */
+const BUILTIN_NAV: Record<string, number> = { inbox: 10, 'quarter-goals': 40, calendar: 50 };
 const clone = <T>(v: T): T => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 /** An effect outside any component: `fn` with the new value when it changes (not at first). */
 function watch<T>(read: () => T, fn: (v: T) => void): Dispose {

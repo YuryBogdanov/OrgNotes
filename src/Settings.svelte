@@ -2,6 +2,7 @@
   import { store, type SettingsSection } from './store.svelte';
   import { allSettings, blocksOf, settingsOf } from './views';
   import SchemaSettings from './SchemaSettings.svelte';
+  import TagsSettings from './TagsSettings.svelte';
   import KeysSettings from './KeysSettings.svelte';
   import AppearanceSettings from './AppearanceSettings.svelte';
   import ThemeEditor from './ThemeEditor.svelte';
@@ -310,7 +311,7 @@
   const ofPlugins = $derived(allSettings().filter((x) => x.plugin).map((x) => x.id).sort((a, b) => a.localeCompare(b, 'ru')));
   const sections = $derived([...own, ...(settingsOf('Плагины') ? ['Плагины'] : []), ...ofPlugins]);
   const HEADS: Record<string, string> = $derived({ ...(settingsOf('Плагины') ? { Плагины: 'ПЛАГИНЫ' } : {}), ...(ofPlugins.length ? { [ofPlugins[0]]: 'НАСТРОЙКИ ПЛАГИНОВ' } : {}) });
-  const READY = $derived<SettingsSection[]>(['Основные', 'Оформление', 'Статусы', 'Агенды', 'Inbox', 'Клавиши', ...allSettings().map((x) => x.id)]);
+  const READY = $derived<SettingsSection[]>(['Основные', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Клавиши', ...allSettings().map((x) => x.id)]);
   const ICON: Record<SettingsSection, string> = {
     Основные: 'M10 7.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2zM10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2',
     Оформление: 'M10 3a7 7 0 1 0 0 14c1 0 1.5-.6 1.5-1.3 0-1.1-1-1.4-1-2.4 0-.8.7-1.3 1.5-1.3H14a3 3 0 0 0 3-3C17 5.6 13.9 3 10 3zM6.5 9.5h.01M8.5 6.5h.01M12 6.5h.01',
@@ -436,6 +437,8 @@
           {#each blocksOf('Inbox') as b (b.schema.id)}<SchemaSettings schema={b.schema} embedded />{/each}
         </section>
       </div>
+    {:else if tab === 'Теги'}
+      <TagsSettings />
     {:else if settingsOf(tab)}
       {@const spec = settingsOf(tab)!}
       {#if spec.schema}<SchemaSettings schema={spec.schema} plugin={spec.plugin} />{:else if spec.component}<spec.component />{/if}

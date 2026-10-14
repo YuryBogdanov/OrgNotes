@@ -543,7 +543,7 @@ test.describe('sheet', () => {
     await expect(sheet.getByRole('tab')).toHaveText(['Основные', 'Сегодня', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Файлы', 'Мини-окно', 'Клавиши', 'Плагины', 'Календарь', 'Канбан']);
     await expect(on).toHaveText('Статусы');
     await page.keyboard.press('Meta+BracketRight');
-    await expect(on).toHaveText('Агенды'); // «Теги» is not made yet
+    await expect(on).toHaveText('Теги'); // ТЗ 38
     await page.keyboard.press('Meta+BracketLeft');
     await page.keyboard.press('Meta+BracketLeft');
     await expect(on).toHaveText('Оформление');

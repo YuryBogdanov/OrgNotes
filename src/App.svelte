@@ -184,6 +184,7 @@
     endDay: () => today.openEndDay(),
     navFiles: () => store.setNavMode('files'),
     navAgendas: () => store.setNavMode('agendas'),
+    navTags: () => store.setNavMode('tags'),
     capture: () => store.openCapture(),
     rich: () => store.setRich(!store.rich),
     find: () => store.askFind('open'),

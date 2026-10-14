@@ -3,17 +3,17 @@
   import Navigator from './Navigator.svelte';
   import AgendaList from './AgendaList.svelte';
   import SearchPanel from './SearchPanel.svelte';
+  import TagsPanel from './TagsPanel.svelte';
   import { allNavs, navOf, type NavSpec } from './views';
 
   // The left panel: a bar of modes (as in Xcode) over the navigator of that mode. The mode belongs to the window:
-  // it changes only by the bar or «Вид» (⌃⌘1…⌃⌘6), never by itself when another tab or pane becomes active. The
+  // it changes only by the bar or «Вид» (⌃⌘1…⌃⌘8), never by itself when another tab or pane becomes active. The
   // core's modes are here; the features' (Inbox, Цели, Календарь) come from the registry (views.ts), in order.
   type Mode = { id: string; label: string; icon: string; key?: string; order: number; off?: boolean; badge?: () => number };
   const CORE: Mode[] = [
     { id: 'files', label: 'Файлы', icon: 'M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4M7 10h6M7 13h4', key: 'navFiles', order: 0 },
-    { id: 'tasks', label: 'Задачи', icon: 'M3.5 5.5l1.5 1.5 3-3M3.5 12.5l1.5 1.5 3-3M11 5.5h6M11 12.5h6', order: 20, off: true },
     { id: 'agendas', label: 'Агенда', icon: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3', key: 'navAgendas', order: 30 },
-    { id: 'tags', label: 'Теги', icon: 'M3 3h6.5l7.5 7.5-6 6L3.5 9.5zM6.8 6.8h.01', order: 60, off: true },
+    { id: 'tags', label: 'Теги', icon: 'M3 3h6.5l7.5 7.5-6 6L3.5 9.5zM6.8 6.8h.01', key: 'navTags', order: 60 },
     { id: 'search', label: 'Поиск по заметкам', icon: 'M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM13.5 13.5L17 17', key: 'navSearch', order: 70 },
   ];
   const modes = $derived([...CORE, ...allNavs().map((n: NavSpec): Mode => ({ ...n }))].sort((a, b) => a.order - b.order));
@@ -32,7 +32,7 @@
     {/each}
   </div>
   <div class="body">
-    {#if store.navMode === 'agendas'}<AgendaList />{:else if store.navMode === 'search'}<SearchPanel />{:else if feature}<feature.component id={feature.id} />{:else}<Navigator />{/if}
+    {#if store.navMode === 'agendas'}<AgendaList />{:else if store.navMode === 'tags'}<TagsPanel />{:else if store.navMode === 'search'}<SearchPanel />{:else if feature}<feature.component id={feature.id} />{:else}<Navigator />{/if}
   </div>
 </div>
 

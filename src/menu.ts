@@ -102,6 +102,7 @@ export async function installMenu(actions: MenuActions, accel: (id: string) => s
             it('nav', 'Навигатор'),
             it('navFiles', 'Навигатор: файлы'),
             it('navAgendas', 'Навигатор: агенды'),
+            it('navTags', 'Навигатор: теги'),
             it('navSearch', 'Навигатор: поиск'),
             it('insp', 'Инспектор'),
             sep,
