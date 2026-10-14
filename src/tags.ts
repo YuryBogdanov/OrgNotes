@@ -112,3 +112,50 @@ export function foundText(found: { hits: TagHit[] }[]): string {
   const pl = (n: number, one: string, few: string, many: string) => (n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many);
   return `${h} ${pl(h, 'заголовок', 'заголовка', 'заголовков')} в ${f} ${pl(f, 'файле', 'файлах', 'файлах')}`;
 }
+
+/**
+ * A tag renamed (`to`) or removed (null) in a file's text: in its headings' tags (the column of spaces before them
+ * kept; a tag there twice after a rename kept once; no tags left — the spaces go too) and in #+FILETAGS. `lines` —
+ * the heading lines (0-based) the parser found: a «* x :t:» inside a block is not touched. How many headings changed.
+ */
+export function retag(text: string, lines: number[], from: string, to: string | null): { text: string; n: number; file: boolean } {
+  const k = key(from);
+  const ls = text.split('\n');
+  const swap = (tags: string[]) => {
+    const out: string[] = [];
+    for (const t of tags) {
+      const x = key(t) === k ? to : t;
+      if (x && !out.some((o) => key(o) === key(x))) out.push(x);
+    }
+    return out;
+  };
+  let n = 0;
+  for (const i of lines) {
+    const m = /^(.*?)(\s+):((?:[^\s:]+:)+)\s*$/.exec(ls[i] ?? '');
+    if (!m) continue;
+    const tags = m[3].split(':').filter(Boolean);
+    if (!tags.some((t) => key(t) === k)) continue;
+    const next = swap(tags);
+    ls[i] = next.length ? `${m[1]}${m[2]}:${next.join(':')}:` : m[1];
+    n++;
+  }
+  let file = false;
+  ls.forEach((l, i) => {
+    const m = /^(#\+FILETAGS:\s*)(.*)$/i.exec(l);
+    if (!m) return;
+    const tags = m[2].split(':').map((s) => s.trim()).filter(Boolean);
+    if (!tags.some((t) => key(t) === k)) return;
+    const next = swap(tags);
+    ls[i] = next.length ? `${m[1]}:${next.join(':')}:` : m[1].trimEnd();
+    file = true;
+  });
+  return { text: ls.join('\n'), n, file };
+}
+
+/** «platform.org 9 · work.org 5 · … · ещё 3 файла»: the files by how many headings change, four at most named. */
+export function perFile(counts: { name: string; n: number }[], shown = 4): string {
+  const l = counts.filter((c) => c.n > 0).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ru'));
+  const rest = l.length - shown;
+  const pl = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? 'файл' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'файла' : 'файлов');
+  return [...l.slice(0, shown).map((c) => `${c.name} ${c.n}`), ...(rest > 0 ? [`ещё ${rest} ${pl(rest)}`] : [])].join(' · ');
+}

@@ -1,6 +1,9 @@
 <script lang="ts">
   import { tagsState as ts } from './tagsState.svelte';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
+  import TagRename from './TagRename.svelte';
+  import { PALETTE, toneOf, toneStyle } from './colors';
+  import { portal } from './portal';
 
   // The navigator's «Теги» (ТЗ 38 §1): the folder's tags — a search, by count or A–Я, each with its colour and how many
   // headings have it set; a click shows its headings, ⌘-click adds it to the filter shown (И), ⌥-click in a new tab.
@@ -42,9 +45,26 @@
         { label: 'Показать заголовки', shortcut: '↩', action: () => ts.open([tag]) },
         { label: 'Добавить к фильтру', shortcut: '⌘-клик', action: () => ts.add(tag) },
         { label: 'Открыть в новой вкладке', shortcut: '⌥↩', action: () => ts.open([tag], true) },
+        'sep',
+        { label: 'Переименовать во всех файлах…', action: () => (renaming = { tag, merge: false }) },
+        { label: 'Объединить с…', action: () => (renaming = { tag, merge: true }) },
+        {
+          label: 'Цвет тега', action: () => {}, subWidth: 180,
+          sub: [
+            ...PALETTE.map((p): MenuItem => ({ label: p.name, checked: ts.colorOf(tag) === p.id, capsule: toneStyle(toneOf(p.id)!), action: () => void ts.setColor(tag, p.id) })),
+            'sep',
+            { label: 'Без цвета', checked: !ts.colorOf(tag), action: () => void ts.setColor(tag, null) },
+          ],
+        },
+        'sep',
+        { label: 'Убрать из всех файлов…', danger: true, action: () => (removing = tag) },
       ],
     };
   }
+  let renaming = $state<{ tag: string; merge: boolean } | null>(null);
+  let removing = $state<string | null>(null);
+  const removeInfo = $derived(removing ? ts.preview(removing, null) : null);
+  const pl = (n: number, one: string, few: string, many: string) => (n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many);
   const dot = (tag: string) => {
     const c = ts.colorOf(tag);
     return c ? `var(--p-${c})` : 'var(--tagdot)';
@@ -81,7 +101,24 @@
   </div>
   <p class="hint">Клик — заголовки с тегом. ⌘-клик — добавить тег к фильтру (все сразу).</p>
 </div>
-{#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
+{#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} width={290} onclose={() => (menu = null)} />{/if}
+{#if renaming}<TagRename from={renaming.tag} merge={renaming.merge} onclose={() => (renaming = null)} />{/if}
+{#if removing && removeInfo}
+  <div class="layer" use:portal>
+    <div class="scrim" aria-hidden="true"></div>
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Убрать тег" tabindex="-1"
+      onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); removing = null; } }}>
+      <b>Убрать :{removing}: у {removeInfo.n} {pl(removeInfo.n, 'заголовка', 'заголовков', 'заголовков')} в {removeInfo.files} {pl(removeInfo.files, 'файле', 'файлах', 'файлах')}?</b>
+      <p>Сами заголовки останутся. Одна правка во всех файлах — ⌘Z вернёт тег.</p>
+      <div class="row">
+        <button class="b" onclick={() => (removing = null)}>Отмена</button>
+        <!-- svelte-ignore a11y_autofocus -->
+        <button class="b danger" autofocus onclick={() => { const t = removing!; removing = null; void ts.remove(t); }}>Убрать</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .tp { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -103,5 +140,12 @@
   .n { font-size: 11.5px; color: var(--fg3); font-variant-numeric: tabular-nums; }
   .tag.on .nm, .tag.on .n { color: var(--acc); font-weight: 600; }
   .none { margin: 8px; font-size: 12px; color: var(--fg3); }
+  .layer { color: var(--fg); font: 13px var(--ui, -apple-system, system-ui, sans-serif); }
+  .scrim { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, 0.3); }
+  .dlg { position: fixed; z-index: 91; left: 50%; top: 30%; transform: translateX(-50%); width: min(420px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 8px; padding: 18px 20px 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35); outline: none; }
+  .dlg p { margin: 0; color: var(--fg2); line-height: 1.45; }
+  .dlg .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+  .b { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); font-size: 13px; }
+  .b.danger { border: 0; background: var(--todo); color: #fff; font-weight: 600; }
   .hint { margin: 0; padding: 8px 12px 10px; font-size: 11px; line-height: 1.45; color: var(--fg3); border-top: 1px solid var(--line); }
 </style>

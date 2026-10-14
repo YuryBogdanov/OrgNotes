@@ -3,7 +3,8 @@
 
 import { store } from './store.svelte';
 import { openView, openViewNew, type Tab } from './layout';
-import { sortTags, tagCounts } from './tags';
+import { perFile, retag, sortTags, tagCounts } from './tags';
+import { parseHeadings } from './org';
 import { asNamed } from './themes';
 
 export const TAGS = 'tags';
@@ -86,6 +87,84 @@ class TagsState {
   }
   setNoInherit(list: string[]) {
     return this.save((t) => void (t.noInherit = [...new Set(list.map((x) => x.replace(/:/g, '').trim()).filter(Boolean))]));
+  }
+
+  // ---- the tag's menu (ТЗ 38 §5): renamed, merged, removed in every file — one edit, one ⌘Z ----------------------------
+  /** What a rename (or a removal: `to` null) would change: headings, files, the list by file; how many headings
+   *  have `to` already (they merge). */
+  preview(from: string, to: string | null) {
+    const per: { name: string; n: number }[] = [];
+    let n = 0;
+    let files = 0;
+    for (const f of store.files) {
+      const r = retag(f.text, f.headings.map((h) => h.line), from, to);
+      if (r.n || r.file) files++;
+      n += r.n;
+      if (r.n) per.push({ name: f.name, n: r.n });
+    }
+    const k = to ? key(to) : '';
+    const have = to && k !== key(from) ? store.files.reduce((s, f) => s + f.headings.filter((h) => h.tags.some((t) => key(t) === k)).length, 0) : 0;
+    return { n, files, list: perFile(per), have };
+  }
+  private async retagAll(label: string, from: string, to: string | null) {
+    return store.transaction(label, (tx) => {
+      for (const f of store.files) {
+        if (retag(f.text, f.headings.map((h) => h.line), from, to).text === f.text) continue;
+        tx.update(f.path, (t, wf) => retag(t, parseHeadings(t, wf).map((h) => h.line), from, to).text);
+      }
+    });
+  }
+  /** «Переименовать во всех файлах…» / «Объединить с…»: the headings and #+FILETAGS (one ⌘Z); its colour, «не
+   *  наследовать» and the agendas' conditions follow it; the tabs that show it too. */
+  async rename(from: string, to: string) {
+    const p = this.preview(from, to);
+    const step = await this.retagAll(`Тег :${from}: → :${to}:`, from, to);
+    if (!step && p.n) return false;
+    const color = this.colorOf(from);
+    await store.updateConfig((raw) => {
+      let o: any = {};
+      try {
+        o = raw ? JSON.parse(raw) : {};
+      } catch {
+        o = {};
+      }
+      const t = o.tags ?? {};
+      if (t.colors) {
+        for (const k of Object.keys(t.colors)) if (key(k) === key(from)) delete t.colors[k];
+        if (color && !Object.keys(t.colors).some((k) => key(k) === key(to))) t.colors[to] = color;
+      }
+      if (Array.isArray(t.noInherit)) t.noInherit = [...new Set(t.noInherit.map((x: string) => (key(x) === key(from) ? to : x)))];
+      if (Object.keys(t).length) o.tags = t;
+      for (const a of Array.isArray(o.agendas) ? o.agendas : [])
+        for (const b of a?.blocks ?? []) for (const c of b?.conds ?? []) if (c?.field === 'tag' && Array.isArray(c.values)) c.values = [...new Set(c.values.map((v: string) => (key(v) === key(from) ? to : v)))];
+      return JSON.stringify(o, null, 2) + '\n';
+    });
+    for (const pane of store.layout.panes)
+      for (const tab of pane.tabs)
+        if (tab.kind === TAGS) {
+          const d = tab.data as TagTab;
+          if (d.tags.some((x) => key(x) === key(from))) tab.data = { ...d, tags: [...new Set(d.tags.map((x) => (key(x) === key(from) ? to : x)))] };
+        }
+    store.note(`Тег :${from}: → :${to}: · ${p.n} ${p.n % 10 === 1 && p.n % 100 !== 11 ? 'заголовок' : p.n % 10 >= 2 && p.n % 10 <= 4 && (p.n % 100 < 12 || p.n % 100 > 14) ? 'заголовка' : 'заголовков'}`, step ? [{ label: 'Отменить', run: () => void store.undo(step) }] : undefined, 8000);
+    return true;
+  }
+  /** «Убрать из всех файлов…»: the tag off every heading and #+FILETAGS (the headings stay); one ⌘Z. */
+  async remove(tag: string) {
+    const step = await this.retagAll(`Убрать тег :${tag}:`, tag, null);
+    if (!step) return false;
+    if (this.colorOf(tag) || this.noInheritSet.has(key(tag)))
+      await this.save((t) => {
+        for (const k of Object.keys(t.colors)) if (key(k) === key(tag)) delete t.colors[k];
+        t.noInherit = t.noInherit.filter((x) => key(x) !== key(tag));
+      });
+    for (const pane of store.layout.panes)
+      for (const tab of pane.tabs)
+        if (tab.kind === TAGS) {
+          const d = tab.data as TagTab;
+          if (d.tags.some((x) => key(x) === key(tag))) tab.data = { ...d, tags: d.tags.filter((x) => key(x) !== key(tag)) };
+        }
+    store.note(`Тег :${tag}: убран`, [{ label: 'Отменить', run: () => void store.undo(step) }], 8000);
+    return true;
   }
 
   // ---- the tab «Тег» ------------------------------------------------------------------------------------------------
