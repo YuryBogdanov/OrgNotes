@@ -17,7 +17,7 @@ import { registerTodayBlock } from '../todayBlocks';
 import PluginTodayBlock from '../PluginTodayBlock.svelte';
 import { fuzzy } from '../fuzzy';
 import { runAgenda, statusKey, type Agenda, type Cond as CoreCond } from '../agendas';
-import { DEFAULT_SEQUENCE, DEFAULT_WORKFLOW, namedFor, type Heading, type WorkflowDef } from '../org';
+import { DEFAULT_SEQUENCE, DEFAULT_WORKFLOW, namedFor, type Heading, type OrgDate, type WorkflowDef } from '../org';
 import { parseTheme, type Theme } from '../themes';
 import { displayName, isArchive } from '../names';
 import type { Tx as CoreTx } from '../journal';
@@ -1168,7 +1168,17 @@ function findHeading(hs: Heading[], ref: HeadingRef) {
   return hs.find((h) => h.line === ref.line && h.title === ref.title) ?? hs.filter((h) => h.title === ref.title).sort((a, b) => Math.abs(a.line - ref.line) - Math.abs(b.line - ref.line))[0];
 }
 /** A heading's own parts the plugins read since 1.7: its event, its properties. */
-const extraOf = (text: string, h: Heading) => ({ ...(h.event ? { event: { ...h.event } } : {}), properties: propertiesOf(text, h) });
+// an event: the stamp under the heading (the core's), else one in its title (the calendar writes them there)
+const STAMP = /<(\d{4})-(\d{2})-(\d{2})(?:\s+[^\s\d>]+)?(?:\s+(\d{2}:\d{2}))?[^>]*>/;
+function eventOf(h: Heading): OrgDate | undefined {
+  if (h.event) return { ...h.event };
+  const m = STAMP.exec(h.title);
+  return m ? { y: +m[1], m: +m[2], d: +m[3], ...(m[4] ? { time: m[4] } : {}) } : undefined;
+}
+const extraOf = (text: string, h: Heading) => {
+  const event = eventOf(h);
+  return { ...(event ? { event } : {}), properties: propertiesOf(text, h) };
+};
 function infoOf(f: (typeof store.files)[number], h: Heading): HeadingInfo {
   const inherited = new Set<string>(f.filetags);
   for (let p = h.parent; p >= 0; p = f.headings[p].parent) for (const t of f.headings[p].tags) inherited.add(t);

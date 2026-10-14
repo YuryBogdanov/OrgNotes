@@ -10,7 +10,9 @@ const DIST = fileURLToPath(new URL('../../panopticon-week/dist/', import.meta.ur
 const built = existsSync(DIST + 'main.js');
 test.skip(!built, 'the plugin «Неделя» is not built next to the app (../panopticon-week: npm run build)');
 
-const WORK = ['* Работа', '** TODO Подготовить слайды', 'DEADLINE: <' + new Date().toISOString().slice(0, 10) + '>', ''].join('\n');
+const DAY = new Date().toISOString().slice(0, 10);
+// a meeting with its stamp in the title, as the calendar writes it: an event for the API
+const WORK = ['* Работа', '** TODO Подготовить слайды', 'DEADLINE: <' + DAY + '>', '** Синк с CTO <' + DAY + ' 11:00>', ''].join('\n');
 
 async function open(page: Page, files: Record<string, string> = {}) {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -64,6 +66,7 @@ test('the tab «Неделя»: the goals, «+ Цель», «Сделать за
   await expect.poll(() => disk(page, '/mock/weeks.org')).toContain('*** TODO Согласовать бюджет');
   await expect(view.locator('.wk-goal').first().locator('.wk-cap')).toHaveText('TODO');
   await expect(view.locator('.wk-day.today')).toContainText('дедлайн: Подготовить слайды');
+  await expect(view.locator('.wk-day.today')).toContainText('Синк с CTO');
   await view.getByRole('button', { name: 'Следующая неделя' }).click();
   await expect(view.locator('.wk-kick')).toContainText('ВПЕРЕДИ');
   await expect(view.getByRole('button', { name: 'Запланировать…' })).toBeVisible();

@@ -40,7 +40,7 @@ export interface HeadingInfo {
   scheduled?: OrgDate;
   deadline?: OrgDate;
   closed?: OrgDate;
-  /** A bare active timestamp right under the heading: an event (a meeting), its time if it has one. Since 1.7. */
+  /** An event (a meeting): a bare active timestamp right under the heading, else one in its title; its time if it has one. Since 1.7. */
   event?: OrgDate;
   /** Its own :PROPERTIES: (keys in upper case: `ID`, `RESULT`…), not the inherited ones. Since 1.7. */
   properties: Record<string, string>;
