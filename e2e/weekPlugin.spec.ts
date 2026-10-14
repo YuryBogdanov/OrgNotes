@@ -137,3 +137,65 @@ test('after its time a week not reviewed is skipped quietly; a past week opens t
   await expect(view.getByRole('region', { name: 'Итоги недели' })).toContainText('- Стенд поднят');
   await expect(view.getByRole('region', { name: 'Неделя в цифрах' })).toBeVisible();
 });
+
+// ---- the calendar's buttons, the quarter's goals in the plan, «перенесено» (ТЗ 36, PR C2; API 1.8) ------------------
+
+const W41_DONE = ['* 2026-W41 · 5–11 октября', '** Цели', '*** Запустить нагрузочное', '** Итоги', ':PROPERTIES:', ':REVIEWED: [2026-10-12 Пн 09:40]', ':END:', ''].join('\n');
+const cell = (page: Page, week: number) => page.getByRole('application', { name: 'Календарь' }).locator('.month .wk', { hasText: String(week) }).locator('button.wk-cb');
+
+test('the calendar: a button by every week — reviewed, now, to plan; the card of the week now; the review from Friday', async ({ page }) => {
+  await open(page, { '/mock/weeks.org': W41_DONE + W42 }, '2026-10-14T10:00:00'); // Wednesday
+  await page.keyboard.press('Meta+3');
+  await expect(cell(page, 41)).toHaveClass(/\bok\b/);
+  await expect(cell(page, 41)).toHaveAttribute('title', '41 неделя — итоги подведены · открыть');
+  await expect(cell(page, 42)).toHaveClass(/\bnow\b/);
+  await expect(cell(page, 43)).toHaveAttribute('title', '43 неделя — запланировать');
+  await cell(page, 42).click();
+  const card = page.getByRole('dialog', { name: '42 неделя' });
+  await expect(card).toContainText('12–18 октября · сейчас');
+  await expect(card).toContainText('Цели: 3 · одна уже выполнена');
+  await expect(card.locator('.done')).toHaveText('1. Закрыть найм SRE');
+  await expect(card.getByRole('button', { name: 'Итоги с пятницы' })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(card).toHaveCount(0);
+  await cell(page, 43).click();
+  await expect(page.getByRole('dialog', { name: 'План на 43 неделю' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await cell(page, 41).click();
+  await expect(page.locator('.wk-view .wk-kick')).toContainText('41 НЕДЕЛЯ · ПРОШЛА');
+});
+
+test('the calendar on Friday: «Подвести итоги» in the card opens the review; in the week view the button is by the title', async ({ page }) => {
+  await open(page, { '/mock/weeks.org': W42 }, '2026-10-16T16:30:00');
+  await page.keyboard.press('Meta+3');
+  await cell(page, 42).click();
+  await page.getByRole('dialog', { name: '42 неделя' }).getByRole('button', { name: 'Подвести итоги' }).click();
+  await expect(page.getByRole('region', { name: 'Итоги 42 недели' })).toBeVisible();
+  await page.keyboard.press('Meta+3');
+  const cal = page.getByRole('application', { name: 'Календарь' });
+  await cal.getByRole('tab', { name: 'Неделя' }).click();
+  await expect(cal.locator('.hslot button.wk-cb')).toHaveClass(/\bnow\b/);
+});
+
+test('on Monday the last week not reviewed is due: its button opens the review', async ({ page }) => {
+  await open(page, { '/mock/weeks.org': W42 }, '2026-10-19T09:40:00');
+  await page.keyboard.press('Meta+3');
+  await expect(cell(page, 42)).toHaveClass(/\bdue\b/);
+  await cell(page, 42).click();
+  await expect(page.getByRole('region', { name: 'Итоги 42 недели' })).toBeVisible();
+});
+
+test('the plan shows my active goals of the quarter («Цели квартала» on); the review counts the tasks moved in the week', async ({ page }) => {
+  const { FILES, CONFIG } = await import('./goalsFixture');
+  const work = ['* TODO Отчёт', 'SCHEDULED: <2026-10-16 Пт>', ':LOGBOOK:', '- Rescheduled from "<2026-10-13 Вт>" on [2026-10-13 Tue 18:00]', ':END:', ''].join('\n');
+  await open(page, { ...FILES({ ...CONFIG, behavior: { logbook: true } }), '/mock/weeks.org': W42, '/mock/work.org': work }, '2026-10-16T16:30:00');
+  await page.keyboard.press('Meta+3');
+  await cell(page, 43).click();
+  const quarter = page.getByRole('dialog', { name: 'План на 43 неделю' }).getByLabel('Цели квартала');
+  await expect(quarter).toContainText('Провести перформанс-ревью без переносов');
+  await expect(quarter).toContainText('Запустить гильдию тимлидов');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+Meta+7');
+  await page.getByRole('button', { name: 'Подвести итоги…' }).click();
+  await expect(page.locator('.wk-stats')).toContainText('1перенесено');
+});
