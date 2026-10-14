@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.8.0';
+export const API_VERSION = '1.9.0';
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;
@@ -424,8 +424,20 @@ export interface Ctx {
      *  3 активных») and a button. Since 1.4. */
     oneOnOne(spec: { line?(path: string): string | null | Promise<string | null>; action?: { label: string; available?(path: string): boolean | Promise<boolean>; run(path: string): void } }): Dispose;
     /** A view of a file the manifest declares (`fileViews`): the tab of the file shows it instead of the text («Доска»).
-     *  `render(el, { path }, { showText })`; `defaultFor(text)` — a file opened the first time is shown so. Since 1.5. */
-    fileView(id: string, spec: { render(el: HTMLElement, file: { path: string }, view: { showText(): void }): Dispose | void; defaultFor?(text: string): boolean }): Dispose;
+     *  `render(el, { path, heading? }, { showText })`; `defaultFor(text)` — a file opened the first time is shown so.
+     *  `heading`: the tab shows one branch of the file (`openFileView` with a heading); `setHeading` — that heading is
+     *  now there or so named (the tab's name follows), since 1.9. Since 1.5. */
+    fileView(id: string, spec: { render(el: HTMLElement, file: { path: string; heading?: HeadingRef }, view: { showText(): void; setHeading(h: HeadingRef): void }): Dispose | void; defaultFor?(text: string): boolean }): Dispose;
+    /** A file in a view of the plugin, in a tab of its own: the whole file, or — `heading` — one branch («Ветка как
+     *  mindmap»: the tab is named «file › heading», «Текст» shows the heading in the editor). A tab that shows that
+     *  branch in that view already is shown again. false — no such file or heading. Since 1.9. */
+    openFileView(viewId: string, file: { path: string; heading?: HeadingRef }, where?: 'here' | 'beside'): Promise<boolean>;
+    /** The heading the user is at: the caret's in the editor, the branch of a view on one heading; null — none. Since
+     *  1.9. */
+    currentHeading(): HeadingRef | null;
+    /** An item of the menu of a heading — in the navigator's outline and in the editor on a heading's line — where
+     *  `when` says so. Since 1.9. */
+    headingAction(spec: { label: string; when?(h: HeadingInfo): boolean; run(h: HeadingRef): void }): Dispose;
     /** The file tab shown now goes to a view of the plugin (null: the text); false — the tab is not a file's. Since 1.5. */
     showAs(viewId: string | null): Promise<boolean>;
     /** A link at the end of the lines of the editor it names («Открыть доску ⌥⌘B» right of «#+BOARD»); the file does

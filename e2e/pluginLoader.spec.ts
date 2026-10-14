@@ -81,7 +81,7 @@ test('a broken plugin is off with its reason, the others work; an incompatible o
   await expect(card(page, 'Jira').getByRole('alert')).toContainText('Выключен после ошибки: нет токена');
   await card(page, 'Jira').getByRole('button', { name: 'Подробнее' }).click();
   await expect(card(page, 'Jira').locator('.stack')).toContainText('нет токена');
-  await expect(card(page, 'Из будущего')).toContainText('нужно API 2.0, в приложении 1.8.0');
+  await expect(card(page, 'Из будущего')).toContainText('нужно API 2.0, в приложении 1.9.0');
   await expect(card(page, 'Из будущего').getByRole('switch')).toBeDisabled();
   await expect(card(page, 'bad')).toContainText('manifest.json — не JSON');
   await expect(card(page, 'empty')).toContainText('в папке нет manifest.json');

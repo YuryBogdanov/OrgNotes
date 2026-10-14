@@ -18,7 +18,7 @@ describe('the installed plugins', () => {
     expect(by('jira')).toMatchObject({ enabled: false, problems: [] });
     expect(by('bad').problems).toEqual(['manifest.json — не JSON']);
     expect(by('empty').problems).toEqual(['в папке нет manifest.json']);
-    expect(by('other').problems).toEqual(['нужно API 2.0, в приложении 1.8.0']);
+    expect(by('other').problems).toEqual(['нужно API 2.0, в приложении 1.9.0']);
     expect(by('wrong-dir').problems).toEqual(['id «named» не совпадает с папкой «wrong-dir»']);
     expect(by('hello').problems).toEqual(['id «hello» занят встроенным плагином']);
     expect(installedEntries(list, builtinEntries, { jira: true, other: true }).filter((e) => e.enabled).map((e) => e.dir)).toEqual(['jira']);

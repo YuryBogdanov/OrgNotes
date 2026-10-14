@@ -311,7 +311,7 @@ class Store {
       return;
     }
     const pi = other ? 1 - L.active : L.active;
-    const find = (p: number) => L.panes[p]?.tabs.findIndex((t) => t.kind === 'file' && t.path === path) ?? -1;
+    const find = (p: number) => L.panes[p]?.tabs.findIndex((t) => t.kind === 'file' && t.path === path && !t.scope) ?? -1;
     if (find(pi) >= 0) return focus(pi, find(pi));
     const elsewhere = L.panes.findIndex((_, i) => i !== pi && find(i) >= 0);
     if (!other && elsewhere >= 0) return focus(elsewhere, find(elsewhere));

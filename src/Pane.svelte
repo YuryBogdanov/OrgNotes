@@ -38,7 +38,7 @@
   });
   const core = (k: string) => k === 'file' || k === 'agenda' || k === 'untitled';
   /** A feature's tab: its view's name; a kind nobody registers (the feature is off): the name it had. */
-  const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : t.kind === 'file' ? displayName(t.path ?? '') : (viewOf(t.kind)?.label(t) ?? t.label ?? plugins.pluginOfView(t.kind)?.manifest?.contributes.views.find((v) => v.id === t.kind)?.title ?? 'Функция выключена'));
+  const label = (t: Tab) => (t.kind === 'agenda' ? 'Агенда' : t.kind === 'untitled' ? (t.title ?? 'Без названия') : t.kind === 'file' ? displayName(t.path ?? '') + (t.scope && t.view ? ` › ${t.scope.title}` : '') : (viewOf(t.kind)?.label(t) ?? t.label ?? plugins.pluginOfView(t.kind)?.manifest?.contributes.views.find((v) => v.id === t.kind)?.title ?? 'Функция выключена'));
   // a puzzle piece: the tab of a feature that is off
   const OFF_ICON = 'M8 3h4v2.5a1.5 1.5 0 0 0 3 0V3h2v5h-2.5a1.5 1.5 0 0 0 0 3H17v6H3V11h2.5a1.5 1.5 0 0 0 0-3H3V3h5z';
   // a file deleted on disk stays open: an italic name, and the tooltip says why

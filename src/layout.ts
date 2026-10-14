@@ -28,6 +28,7 @@ export interface Tab {
   data?: any; // a feature's tab: its state (JSON), kept after a restart
   label?: string; // a tab of a kind nobody registers: the name it had
   view?: string; // a file tab: how it is shown — '' text, else a view of a plugin («Доска», ТЗ 33); unset: as the file was last
+  scope?: { line: number; title: string }; // a file tab of a plugin's view on one heading and its subtree (a mindmap of a branch, ТЗ 39)
 }
 export interface Pane {
   id: string;
@@ -96,8 +97,9 @@ export function addPane(L: Layout, side: 'left' | 'right', tab: Tab): number {
  */
 export function openFile(L: Layout, pi: number, path: string, line: number, opts: { replace?: boolean; focus?: boolean } = {}): Tab {
   const p = L.panes[pi];
-  let i = p.tabs.findIndex((t) => t.kind === 'file' && t.path === path);
-  if (i < 0 && opts.replace && p.tabs[p.active]?.kind === 'file') i = p.active;
+  // a tab of a view on one heading (ТЗ 39) stays that heading's: a file opens beside it
+  let i = p.tabs.findIndex((t) => t.kind === 'file' && t.path === path && !t.scope);
+  if (i < 0 && opts.replace && p.tabs[p.active]?.kind === 'file' && !p.tabs[p.active].scope) i = p.active;
   if (i >= 0) {
     const t = p.tabs[i];
     t.path = path;
@@ -125,6 +127,12 @@ export function openAgenda(L: Layout, pi: number): Tab {
 }
 
 /** A feature's tab in the pane, one per pane (as the agenda): shown if there is one (`update` changes it), else made. */
+/** A file tab of a plugin's view on one heading (ТЗ 39): always a new tab, after the active one. */
+export function openScoped(L: Layout, pi: number, path: string, view: string, scope: { line: number; title: string }): Tab {
+  const t: Tab = { ...newTab('file', path, scope.line), view, scope };
+  insertAfterActive(L.panes[pi], t);
+  return t;
+}
 /** A new tab of a kind, after the active one, even when the pane has one («Открыть в новой вкладке»). */
 export function openViewNew(L: Layout, pi: number, kind: string, data: unknown): Tab {
   const p = L.panes[pi];
