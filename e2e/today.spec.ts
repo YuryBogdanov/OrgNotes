@@ -70,13 +70,13 @@ test('«По команде»: it does not open by itself', async ({ page }) => 
   await expect(screen(page)).toHaveCount(0);
 });
 
-test('the tab stays first: rows open after it; it is not moved to the other pane; a restart keeps it pinned', async ({ page }) => {
+test('the tab stays first: rows open after it (a double click); it is not moved to the other pane; a restart keeps it pinned', async ({ page }) => {
   await open(page);
-  await screen(page).getByRole('region', { name: 'Задачи' }).getByText('Ответить HR по вакансии SRE').click();
+  await screen(page).getByRole('region', { name: 'Задачи' }).getByText('Ответить HR по вакансии SRE').dblclick(); // a click chooses, a double click opens (ТЗ 34)
   await expect(tabs(page)).toHaveCount(2);
   await expect(page.locator('.cm-activeLine')).toContainText('Ответить HR');
   await page.getByRole('tab', { name: /Сегодня/ }).click();
-  await screen(page).getByRole('region', { name: 'Агенда на сегодня' }).getByText('Стендап платформы').click();
+  await screen(page).getByRole('region', { name: 'Агенда на сегодня' }).getByText('Стендап платформы').dblclick();
   await expect(tabs(page)).toHaveCount(3);
   await expect(tabs(page).nth(0)).toHaveText(/Сегодня/);
   await expect(tabs(page).nth(1)).toHaveText(/work/);
