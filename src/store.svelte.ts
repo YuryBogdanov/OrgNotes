@@ -225,20 +225,24 @@ class Store {
    * format set; an :ID: the heading lacks is added (one step of ⌘Z). Null: no such file, or the :ID: not written.
    */
   async headingLinkAt(path: string, line: number): Promise<{ link: string; label: string } | null> {
+    const p = this.headingLinkPlan(path, line);
+    if (!p || (p.write && !(await p.write()))) return null;
+    return { link: p.link, label: p.label };
+  }
+  /** The link at once and what is still to write for it (an :ID: the heading lacks): the picker puts the link in the
+   *  text first, then writes the :ID: (ТЗ 35 §3). */
+  headingLinkPlan(path: string, line: number): { target: string; label: string; link: string; write: (() => Promise<boolean>) | null } | null {
     const f = this.files.find((x) => x.path === path);
     if (!f) return null;
     const hi = headingAt(f.headings, line);
-    if (hi < 0) return { link: fileLink(f.name, displayName(f.name)), label: displayName(f.name) };
+    if (hi < 0) return { target: `file:${f.name}`, label: displayName(f.name), link: fileLink(f.name, displayName(f.name)), write: null };
     const h = f.headings[hi];
-    if (this.linkFormat === 'title') return { link: headingLink(h, { file: f.name }), label: labelOf(h) };
-    let id = h.id;
-    if (!id) {
-      const made = newId();
-      const step = await this.transaction(`ID: ${labelOf(h)}`, (tx) => tx.setProperty({ path: f.path, line: h.line, title: h.title }, 'ID', made));
-      if (!step) return null;
-      id = made;
-    }
-    return { link: headingLink(h, { id }), label: labelOf(h) };
+    const label = labelOf(h);
+    if (this.linkFormat === 'title') return { target: `file:${f.name}::*${label}`, label, link: headingLink(h, { file: f.name }), write: null };
+    const id = h.id ?? newId();
+    const ref = { path: f.path, line: h.line, title: h.title };
+    const write = h.id ? null : async () => !!(await this.transaction(`ID: ${label}`, (tx) => tx.setProperty(ref, 'ID', id)));
+    return { target: `id:${id}`, label, link: headingLink(h, { id }), write };
   }
   /** ⌃C L: the link in the clipboard (text), and a word of it at the bottom of the window. */
   async copyHeadingLink(path: string, line: number): Promise<boolean> {
@@ -2582,4 +2586,22 @@ linkHooks.copyHeading = (p, line) => {
   if (!f) return false;
   void store.copyHeadingLink(f.path, line);
   return true;
+};
+linkHooks.key = (id) => store.keyHint(id);
+/** The tooltip over a link: where it goes («billing.org › Ревью архитектуры»), an address, or «не найден». */
+linkHooks.describe = (link, p) => {
+  const fi = store.files.findIndex((f) => f.name === p || f.path === p);
+  if (fi < 0) return { text: link.raw, missing: false };
+  const t = resolveLink(link, fi, store.files);
+  if (t.kind === 'url') return { text: t.url, missing: false };
+  if (t.kind === 'missing') return { text: link.type === 'id' || link.raw.includes('::') ? 'Заголовок не найден' : `Не найдено: ${t.what}`, missing: true };
+  const f = store.files[t.file];
+  const h = t.line != null ? f.headings.find((x) => x.line === t.line) : undefined;
+  if (t.missingSection) return { text: `${displayName(f.name)} › раздел «${t.missingSection.replace(/^[*#]/, '')}» не найден`, missing: true };
+  return { text: [f.name, h ? labelOf(h) : ''].filter(Boolean).join(' › '), missing: false };
+};
+linkHooks.headingAt = (p, line) => {
+  const f = fileNamed(p);
+  const hi = f ? headingAt(f.headings, line) : -1;
+  return f && hi >= 0 ? labelOf(f.headings[hi]) : null;
 };

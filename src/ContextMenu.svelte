@@ -6,6 +6,7 @@
         checked?: boolean; icon?: string; dot?: boolean; italic?: boolean; // icon: 'file' | 'agenda' | 'untitled', or an SVG path (a feature's tab)
         sub?: MenuItem[]; // a submenu, opened by hovering or a click («Показать как ›»)
         subWidth?: number; // its least width
+        detail?: string; // a grey second line: what exactly it does («https://wiki…», «Ревью архитектуры»), ТЗ 35
         capsule?: string; // the label as a status capsule: the tone's style (`--tl:…`), as the agenda draws it (ТЗ 34)
       }
     | { note: string } // a grey line, not a command («Виды добавляют плагины»)
@@ -65,7 +66,11 @@
         {#if it.capsule}
           <span class="lb"><span class="capsule tone-chip" style={it.capsule}>{it.label}</span></span>
         {:else}
-          <span class="lb" class:it={it.italic}>{it.label}</span>
+          {#if it.detail}
+            <span class="lb two"><span class="l1" class:it={it.italic}>{it.label}</span><span class="dt">{it.detail}</span></span>
+          {:else}
+            <span class="lb" class:it={it.italic}>{it.label}</span>
+          {/if}
         {/if}
         {#if it.dot}<span class="dot" aria-label="не сохранено"></span>{/if}
         {#if it.shortcut}<span class="kb">{it.shortcut}</span>{/if}
@@ -105,6 +110,9 @@
   .menu button.open { background: var(--acc); color: var(--onacc); }
   .more { padding-left: 12px; }
   .menu.tall button { align-items: center; min-height: 28px; padding: 0 10px; }
+  .lb.two { display: flex; flex-direction: column; padding: 3px 0; }
+  .dt { font-size: 11.5px; color: var(--fg3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .menu button:hover:not(:disabled) .dt { color: inherit; opacity: 0.8; }
   /* a status or a priority as its capsule (ТЗ 34): rounded 4 pt, a tint of its colour; on the hovered row it stays */
   .capsule { display: inline-block; padding: 1px 5px; border-radius: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; }
   .menu button:hover:not(:disabled) .capsule { background: color-mix(in srgb, var(--onacc) 88%, transparent); }

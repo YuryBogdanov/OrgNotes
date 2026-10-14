@@ -1,5 +1,6 @@
 <script lang="ts">
   import './features'; // the built-in features register their tabs, sections and keys (roadmap 0.3)
+  import './linkPicker'; // «Ссылка на» for the editors (ТЗ 35)
   import { onMount, untrack } from 'svelte';
   import { cubicOut } from 'svelte/easing';
   import { store } from './store.svelte';
