@@ -155,8 +155,43 @@ class Host {
     this.declareAll();
     await this.activate(e);
   }
-  /** The sheet before an installed plugin is first turned on (or asks for other rights): what it gets. */
-  trustReq = $state<{ entry: Entry; resolve: (ok: boolean) => void } | null>(null);
+  /** The sheet before an installed plugin is first turned on (or asks for other rights): what it gets; `update` —
+   *  before a new version with other rights is installed (ТЗ 37): its version. */
+  trustReq = $state<{ entry: Entry; update?: string; resolve: (ok: boolean) => void } | null>(null);
+  /** A new version asks for other rights: shown before it is installed; yes — they are let in. */
+  askRights(m: Manifest, version: string) {
+    return new Promise<boolean>((resolve) => {
+      this.trustReq?.resolve(false);
+      this.trustReq = {
+        entry: { dir: m.id, builtin: false, manifest: m, problems: [], enabled: true },
+        update: version,
+        resolve: (ok) => {
+          this.trustReq = null;
+          if (ok) trust(m);
+          resolve(ok);
+        },
+      };
+    });
+  }
+  /** Updates of plugins wait (set by pluginUpdates: the host knows nothing of the network). */
+  updatesWaiting = $state<() => boolean>(() => false);
+  /** Installed with «Включить сразу» (ТЗ 37): the rights shown before are let in, the plugin on. */
+  allow(m: Manifest) {
+    trust(m);
+    saveChoice(m.id, true);
+  }
+  /** Whether a manifest's rights are the ones let in for its id (an update asks again when not). */
+  sameRights(m: Manifest) {
+    return trusted(m);
+  }
+  /** The folder of plugins read again after an install, an update, a removal: a plugin changed is taken back, the
+   *  ones on are started (the others keep running). */
+  async refreshInstalled() {
+    await this.listInstalled();
+    await Promise.all(this.entries.filter((e) => e.enabled).map((e) => this.activate(e)));
+    await Promise.all(this.loading.splice(0));
+    store.resetMissingThemes();
+  }
   private askTrust(entry: Entry) {
     return new Promise<boolean>((resolve) => {
       this.trustReq?.resolve(false);
@@ -181,7 +216,7 @@ class Host {
   // ---- what the manifests declare, before any code ---------------------------------------------------------------
   declare() {
     this.declareAll(true);
-    registerSettings({ id: 'Плагины', icon: PLUG, order: 85, component: PluginsSettings });
+    registerSettings({ id: 'Плагины', icon: PLUG, order: 85, component: PluginsSettings, dot: () => this.updatesWaiting() });
     // the core's tab of a plugin's review; its sheets wait the window's keys
     registerView({
       kind: REVIEW_KIND, icon: 'M4 4h12v12H4zM7 8h6M7 11h4', component: PluginReview, transient: true, single: true,

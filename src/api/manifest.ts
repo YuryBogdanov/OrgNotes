@@ -82,6 +82,8 @@ export interface Manifest {
   styles?: string;
   /** A built-in plugin that is off until turned on (an example). */
   defaultEnabled?: boolean;
+  /** Its icon: an SVG path in 20×20, a line (the list of plugins, the catalog; ТЗ 37). */
+  icon?: string;
   permissions: Permission[];
   net: string[];
   contributes: {
@@ -231,6 +233,7 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
       minAppVersion: isStr(j.minAppVersion) ? j.minAppVersion : undefined,
       main: isStr(j.main) ? j.main : undefined, styles: isStr(j.styles) ? j.styles : undefined,
       defaultEnabled: typeof j.defaultEnabled === 'boolean' ? j.defaultEnabled : undefined,
+      icon: isStr(j.icon) && /^[MmLlHhVvCcSsQqTtAaZz0-9.,\s-]+$/.test(j.icon) ? j.icon : undefined,
       permissions: permissions as Permission[], net,
       contributes: { commands, navSections, views, todayBlocks, fileViews, settings, statusSets, themes: arr(c.themes).filter(isStr) as string[], slots },
       exports,

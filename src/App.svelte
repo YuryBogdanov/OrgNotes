@@ -57,6 +57,7 @@
   import { today } from './todayState.svelte';
   import EndDay from './EndDay.svelte';
   import { plugins } from './api/host.svelte';
+  import { pluginUpdates } from './pluginUpdates.svelte';
   import PluginSheets from './PluginSheets.svelte';
   import TaskListHost from './TaskListHost.svelte';
 
@@ -270,7 +271,7 @@
     if (isCaptureWindow || isMiniWindow) return; // a thin panel: no files, no menu
     store.load();
     store.listen();
-    void plugins.start(); // the plugins' code (roadmap 1.1), once the window is up
+    void plugins.start().then(() => pluginUpdates.check()); // the plugins' code (roadmap 1.1), once the window is up; their updates once a day (ТЗ 37)
     // closing the window only hides it (Rust side): the text stays in memory, so nothing to ask; quitting asks
     const key = keyHandler(runWindow);
     window.addEventListener('keydown', key, true);

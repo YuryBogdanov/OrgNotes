@@ -166,7 +166,69 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           // the installed plugins (roadmap 1.2): folders under /config/plugins/<dir>/
           if (cmd === 'list_plugins') {
             const dirs = [...new Set(Object.keys(disk).filter((k) => k.startsWith('/config/plugins/')).map((k) => k.split('/')[3]))].sort();
-            return dirs.map((dir) => ({ dir, manifest: disk[`/config/plugins/${dir}/manifest.json`] ?? null }));
+            return dirs.map((dir) => ({ dir, manifest: disk[`/config/plugins/${dir}/manifest.json`] ?? null, source: disk[`/config/plugins/${dir}/.source.json`] ?? null }));
+          }
+          // where plugins come from (ТЗ 37): a test's fixtures in window.__sources —
+          //   catalog: { plugins, stats }, raw: { 'repo/file': text }, releases: { 'repo@version': { file: text } },
+          //   git: { url: { refs, refsFor?: { ref: files } } } — files of a ref: { 'manifest.json': text, … }
+          if (['catalog_fetch', 'catalog_raw', 'catalog_releases', 'plugin_install_release', 'plugin_cancel', 'plugin_remove', 'git_refs', 'git_probe', 'plugin_install_git'].includes(cmd)) {
+            const src = w.__sources ?? {};
+            w.__log.push([cmd, args]);
+            const put = (id: string, files: Record<string, string>, source: object) => {
+              for (const k of Object.keys(disk)) if (k.startsWith(`/config/plugins/${id}/`)) delete disk[k];
+              for (const [f, t] of Object.entries(files)) disk[`/config/plugins/${id}/${f}`] = t;
+              disk[`/config/plugins/${id}/.source.json`] = JSON.stringify(source);
+              return files['manifest.json'];
+            };
+            const refFiles = (url: string, ref: string) => {
+              const g = src.git?.[url];
+              if (!g) throw 'Репозиторий не найден или нет доступа: проверьте ссылку, ключ SSH или вход в git на этом Mac';
+              const files = g.refsFor?.[ref];
+              if (!files) throw 'В репозитории нет manifest.json (ни в корне, ни в dist/)';
+              return files as Record<string, string>;
+            };
+            if (cmd === 'catalog_fetch') {
+              if (!src.catalog) throw 'нет связи с GitHub';
+              return { plugins: JSON.stringify(src.catalog.plugins), stats: JSON.stringify(src.catalog.stats ?? {}), fetched: Date.now(), repo: 'Panopticon-Org-Notes/plugins' };
+            }
+            if (cmd === 'catalog_raw') {
+              const t = src.raw?.[`${args.repo}/${args.file}`];
+              if (t === undefined) throw 'не найдено';
+              return t;
+            }
+            if (cmd === 'catalog_releases') return JSON.stringify(src.releaseList?.[args.repo] ?? []);
+            if (cmd === 'plugin_install_release') {
+              const files = src.releases?.[`${args.repo}@${args.version}`];
+              if (!files) throw `нет релиза ${args.version} в ${args.repo}`;
+              return put(args.id, files, { kind: 'catalog', repo: args.repo, version: args.version });
+            }
+            if (cmd === 'plugin_cancel') return null;
+            if (cmd === 'plugin_remove') {
+              const ks = Object.keys(disk).filter((k) => k.startsWith(`/config/plugins/${args.id}/`));
+              if (!ks.length) throw `нет плагина «${args.id}»`;
+              for (const k of ks) delete disk[k];
+              return null;
+            }
+            if (cmd === 'git_refs') {
+              if (!src.git?.[args.url]) throw 'Репозиторий не найден или нет доступа: проверьте ссылку, ключ SSH или вход в git на этом Mac';
+              return src.git[args.url].refs;
+            }
+            if (cmd === 'git_probe') {
+              const g = src.git?.[args.url];
+              const refs = g?.refs ?? { head: null, tags: [], branches: [] };
+              const ref = args.ref ?? refs.tags.find(([t]: [string]) => !t.includes('-'))?.[0] ?? refs.head;
+              const files = refFiles(args.url, ref);
+              const track = refs.tags.some(([t]: [string]) => t === ref) ? 'tag' : 'branch';
+              const commit = (track === 'tag' ? refs.tags : refs.branches).find(([t]: [string]) => t === ref)?.[1] ?? '';
+              return { refs, ref, track, commit, manifest: files['manifest.json'], dir: '' };
+            }
+            if (cmd === 'plugin_install_git') {
+              const files = refFiles(args.url, args.ref);
+              const m = JSON.parse(files['manifest.json']);
+              const refs = src.git[args.url].refs;
+              const commit = (args.track === 'tag' ? refs.tags : refs.branches).find(([t]: [string]) => t === args.ref)?.[1] ?? '';
+              return put(m.id, files, { kind: 'git', url: args.url, track: args.track, ref: args.ref, commit, checkUpdates: args.checkUpdates });
+            }
           }
           if (cmd === 'read_plugin_file') {
             if (String(args.file).split('/').includes('..')) throw 'a plugin reads only its own folder';

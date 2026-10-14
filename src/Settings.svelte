@@ -362,6 +362,7 @@
         <button role="tab" data-section={t} aria-selected={t === tab} tabindex={t === tab ? 0 : -1} class:on={t === tab} disabled={!READY.includes(t)} title={READY.includes(t) ? '' : 'Пока не реализовано'} onclick={() => store.showSection(t)}>
           <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICON[t] ?? settingsOf(t)?.icon} /></svg>
           <span>{t}</span>
+          {#if settingsOf(t)?.dot?.()}<i class="updot" aria-hidden="true" title="Есть обновления"></i>{/if}
         </button>
       {/each}
       <div class="sidehelp">{store.keyHint('settings') || '⌘,'} — открыть · ⎋ — закрыть<br />⌘[ ⌘] — предыдущий / следующий раздел</div>
@@ -918,4 +919,5 @@
   .lseg { display: flex; padding: 2px; gap: 2px; border-radius: 7px; background: var(--field); }
   .lseg button { height: 22px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 12px; }
   .lseg button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); font-weight: 500; }
+  .updot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--acc); }
 </style>

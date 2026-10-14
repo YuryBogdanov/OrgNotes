@@ -1,3 +1,5 @@
+mod plugin_sources;
+
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -1016,6 +1018,8 @@ struct ListedPlugin {
     dir: String,
     /// The text of `manifest.json`; none when there is no readable one.
     manifest: Option<String>,
+    /// The text of `.source.json`: where it came from (the catalog, a git link; ТЗ 37); none — put there by hand.
+    source: Option<String>,
 }
 
 /// The folders of the installed plugins with their manifests.
@@ -1031,7 +1035,7 @@ fn list_plugins(app: AppHandle) -> Vec<ListedPlugin> {
             if name.starts_with('.') {
                 return None;
             }
-            Some(ListedPlugin { manifest: fs::read_to_string(e.path().join("manifest.json")).ok(), dir: name })
+            Some(ListedPlugin { manifest: fs::read_to_string(e.path().join("manifest.json")).ok(), source: fs::read_to_string(e.path().join(".source.json")).ok(), dir: name })
         })
         .collect();
     out.sort_by(|a, b| a.dir.cmp(&b.dir));
@@ -1606,6 +1610,15 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            plugin_sources::catalog_fetch,
+            plugin_sources::catalog_raw,
+            plugin_sources::catalog_releases,
+            plugin_sources::plugin_install_release,
+            plugin_sources::plugin_cancel,
+            plugin_sources::plugin_remove,
+            plugin_sources::git_refs,
+            plugin_sources::git_probe,
+            plugin_sources::plugin_install_git,
             get_notes_dir,
             notes_dir_status,
             retry_notes_dir,
