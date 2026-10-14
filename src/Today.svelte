@@ -286,20 +286,24 @@
       </div>
     </header>
 
-    {#if layout.top.length}
-      <div class="row">
-        {#each layout.top as id (id)}{@render block(id)}{/each}
-      </div>
-    {/if}
+    {#each layout.rows as r, ri (ri)}
+      {#if r.kind === 'top'}
+        <div class="row">
+          {#each r.ids as id (id)}{@render block(id)}{/each}
+        </div>
+      {:else if r.kind === 'full'}
+        <!-- a plugin's row of the whole width (a banner, «Цели недели», API 1.7) -->
+        <div class="row full">{@render block(r.id)}</div>
+      {:else}
+        <div class="row cols">
+          {#each r.cols as col (col.join())}
+            <div class="col">{#each col as id (id)}{@render block(id)}{/each}</div>
+          {/each}
+        </div>
+      {/if}
+    {/each}
     {#if resting.length}
       <div hidden>{#each resting as id (id)}{@const b = todayBlockOf(id)}{#if b?.component}<b.component id={b.id} />{/if}{/each}</div>
-    {/if}
-    {#if layout.cols.length}
-      <div class="row cols">
-        {#each layout.cols as col (col.join())}
-          <div class="col">{#each col as id (id)}{@render block(id)}{/each}</div>
-        {/each}
-      </div>
     {/if}
   </div>
 </div>
@@ -460,6 +464,7 @@
   .ico:hover { color: var(--fg); }
   .row { display: flex; gap: 16px; flex-wrap: wrap; }
   .row.cols { align-items: flex-start; }
+  .row.full > :global(.card) { flex: 1 1 100%; }
   .row:not(.cols) > :global(.card:first-child) { flex: 1.25 1 420px; }
   .row:not(.cols) > :global(.card) { flex: 1 1 360px; }
   .col { flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }

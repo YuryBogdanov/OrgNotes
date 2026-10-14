@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.6.0';
+export const API_VERSION = '1.7.0';
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;
@@ -40,6 +40,10 @@ export interface HeadingInfo {
   scheduled?: OrgDate;
   deadline?: OrgDate;
   closed?: OrgDate;
+  /** An event (a meeting): a bare active timestamp right under the heading, else one in its title; its time if it has one. Since 1.7. */
+  event?: OrgDate;
+  /** Its own :PROPERTIES: (keys in upper case: `ID`, `RESULT`…), not the inherited ones. Since 1.7. */
+  properties: Record<string, string>;
 }
 export interface FileInfo {
   path: string;
@@ -100,6 +104,8 @@ export interface Tx {
   setStatus(h: HeadingRef, keyword: string | null): void;
   setPlanning(h: HeadingRef, kind: 'SCHEDULED' | 'DEADLINE', date: Date | null): void;
   setTags(h: HeadingRef, tags: string[]): void;
+  /** Rename the heading (its stars, status, priority and tags stay). Since 1.7. */
+  setTitle(h: HeadingRef, title: string): void;
   setProperty(h: HeadingRef, key: string, value: string | null): void;
   /** Org text of one heading with its subtree, its stars relevelled to the place: under a heading (its first or last
    *  child — the last before the blank lines ending the parent — or right before one of its children), at the top or
@@ -439,6 +445,9 @@ export interface Ctx {
   index?: {
     query(q: Query): Promise<HeadingInfo[]>;
     heading(ref: HeadingRef): Promise<HeadingInfo | null>;
+    /** The text under a heading (after its planning and drawers, up to its first subheading); null — not found.
+     *  Since 1.7. */
+    body(ref: HeadingRef): Promise<string | null>;
     outline(path: string): Promise<HeadingInfo[]>;
     files(): Promise<FileInfo[]>;
     /** The named colour of a status in the sets of the file (the plugin draws with var(--p-<colour>)). */

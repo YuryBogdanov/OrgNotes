@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORKFLOW, parseHeadings } from './org';
-import { insertHeading, replaceBody, setProperty, treeOf } from './orgOps';
+import { insertHeading, propertiesOf, replaceBody, setProperty, setTitle, treeOf } from './orgOps';
 import { Tx } from './journal';
 
 const H = (t: string, i = 0) => parseHeadings(t, DEFAULT_WORKFLOW)[i];
@@ -92,5 +92,19 @@ describe('beside another heading (ТЗ 33)', async () => {
   it('a new heading after another one\'s subtree, at its level', () => {
     expect(insertAfter(T, b, '* TODO New')).toEqual({ text: '#+TITLE: x\n* TODO A\nтело A\n* TODO B\n** sub B\n* TODO New\n* TODO C\n', line: 5 });
     expect(insertAfter(T, c, '* TODO Last')!.text).toBe('#+TITLE: x\n* TODO A\nтело A\n* TODO B\n** sub B\n* TODO C\n* TODO Last\n'); // before the file's ending
+  });
+});
+
+describe('the plugins\' reads and renames (API 1.7)', () => {
+  const T = ['* TODO [#A] Старое название :work:q4:', 'SCHEDULED: <2026-10-14 Ср>', ':PROPERTIES:', ':ID: abc', ':RESULT:   done', ':END:', 'Заметка.', '** Под'].join('\n');
+  const h = parseHeadings(T, DEFAULT_WORKFLOW)[0];
+  it('setTitle keeps the status, the priority and the tags', () => {
+    expect(setTitle(T, h, '  Новое   название ').split('\n')[0]).toBe('* TODO [#A] Новое название :work:q4:');
+    const P = '* Просто :t:\n';
+    expect(setTitle(P, parseHeadings(P, DEFAULT_WORKFLOW)[0], 'Другое').split('\n')[0]).toBe('* Другое :t:');
+  });
+  it('propertiesOf: its own drawer under the planning line, keys in upper case', () => {
+    expect(propertiesOf(T, h)).toEqual({ ID: 'abc', RESULT: 'done' });
+    expect(propertiesOf('* А\nтекст\n', parseHeadings('* А\nтекст\n', DEFAULT_WORKFLOW)[0])).toEqual({});
   });
 });

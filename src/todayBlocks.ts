@@ -14,6 +14,11 @@ export interface TodayBlockSpec {
   wide?: boolean;
   /** Goes under the block before it, in its column («1-1 сегодня» under the agenda). */
   attach?: boolean;
+  /** A row of its own, the screen's whole width, where the order puts it (a plugin's banner, «Цели недели»). */
+  full?: boolean;
+  /** Where it goes in the order when it is new there: before or after this block (else at the end). */
+  before?: string;
+  after?: string;
   /** Drawn by its feature (none: one of the core's, drawn by the screen). */
   component?: Component;
   /** Nothing to show now: the block is left out and the others take its place. */
@@ -27,16 +32,50 @@ export function registerTodayBlock(b: TodayBlockSpec) {
 export const todayBlockOf = (id: string) => blocks.get(id);
 export const allTodayBlocks = () => [...blocks.values()];
 
-/** The blocks as the screen lays them out: the first row, then the columns. */
-export function arrange(order: { id: string; on: boolean }[], shown: (id: string) => TodayBlockSpec | undefined): { top: string[]; cols: string[][] } {
+export type Row = { kind: 'top'; ids: string[] } | { kind: 'full'; id: string } | { kind: 'cols'; cols: string[][] };
+/**
+ * The blocks as the screen lays them out: the first row (the wide ones), then the columns; a `full` block is a row
+ * of its own where the order puts it (above the first row, between it and the columns…). `top` and `cols` — all of
+ * them, as before the full rows came.
+ */
+export function arrange(order: { id: string; on: boolean }[], shown: (id: string) => TodayBlockSpec | undefined): { top: string[]; cols: string[][]; rows: Row[] } {
   const top: string[] = [];
   const cols: string[][] = [];
+  const rows: Row[] = [];
+  let topRow: { kind: 'top'; ids: string[] } | null = null;
+  let colRow: { kind: 'cols'; cols: string[][] } | null = null;
   for (const o of order) {
     const b = o.on ? shown(o.id) : undefined;
     if (!b) continue;
-    if (b.wide) top.push(b.id);
-    else if (b.attach && cols.length) cols[cols.length - 1].push(b.id);
-    else cols.push([b.id]);
+    if (b.full) {
+      rows.push({ kind: 'full', id: b.id });
+      topRow = colRow = null;
+    } else if (b.wide) {
+      top.push(b.id);
+      if (!topRow) rows.push((topRow = { kind: 'top', ids: [] }));
+      topRow.ids.push(b.id);
+    } else {
+      const attach = b.attach && cols.length && colRow?.cols.length;
+      if (attach) {
+        cols[cols.length - 1].push(b.id);
+        colRow!.cols[colRow!.cols.length - 1].push(b.id);
+      } else {
+        cols.push([b.id]);
+        if (!colRow) rows.push((colRow = { kind: 'cols', cols: [] }));
+        colRow.cols.push([b.id]);
+      }
+    }
   }
-  return { top, cols };
+  return { top, cols, rows };
+}
+/** The order with the blocks new to it put where they ask (`before` / `after` a block), else at the end. */
+export function withNew(saved: { id: string; on: boolean }[], all: TodayBlockSpec[]): { id: string; on: boolean }[] {
+  const out = [...saved];
+  for (const b of all) {
+    if (out.some((s) => s.id === b.id)) continue;
+    const at = b.before ? out.findIndex((s) => s.id === b.before) : b.after ? out.findIndex((s) => s.id === b.after) + 1 : -1;
+    if (at >= 0 && (b.before || at > 0)) out.splice(at, 0, { id: b.id, on: true });
+    else out.push({ id: b.id, on: true });
+  }
+  return out;
 }
