@@ -7,6 +7,7 @@ import { today } from './todayState.svelte';
 import { fuzzy, better, type Match } from './fuzzy';
 import { displayName, isArchive } from './names';
 import { clipTarget } from './linkEdit';
+import { focusedEditor } from './editorKeys';
 import { parseDate, weekdayNames } from './edits';
 import { shiftDate } from './calendar';
 import type { Heading, OrgDate } from './org';
@@ -205,8 +206,10 @@ register({
   when: onHeading, hint: (c) => (c.heading!.deadline ? short(c.heading!.deadline) : ''), run: (c) => dateStep(c, 'DEADLINE'),
 });
 register({
-  id: 'tags', title: 'Изменить теги…', icon: 'tag', group: 'heading', synonyms: ['тег', 'теги', 'метки', 'tags'],
-  when: onHeading, hint: (c) => c.heading!.tags.join(', '), run: tagsStep,
+  id: 'tags', title: 'Теги…', icon: 'tag', group: 'heading', synonyms: ['тег', 'теги', 'метки', 'tags', 'изменить теги'],
+  when: onHeading, hint: (c) => c.heading!.tags.join(', '),
+  // in a file's editor: the field of the heading's tags (ТЗ 38 §6), once the palette has given the focus back
+  run: (c) => (store.tab?.kind === 'file' ? void inEditor('tags', c.heading!.line) : tagsStep(c)),
 });
 register({
   id: 'copyLink', title: 'Копировать ссылку на заголовок', icon: 'goto', group: 'heading', synonyms: ['ссылка', 'link', 'id'],
@@ -480,6 +483,14 @@ export function headingStep(c: Ctx, kind: 'status' | 'priority' | 'schedule' | '
   return kind === 'status' ? statusStep(c) : kind === 'priority' ? priorityStep(c) : kind === 'tags' ? tagsStep(c) : dateStep(c, kind === 'schedule' ? 'SCHEDULED' : 'DEADLINE');
 }
 
+/** A command of the editor once the palette has given it the focus back (a few frames at most). */
+function inEditor(id: string, line?: number, tries = 10) {
+  setTimeout(() => {
+    const ed = focusedEditor();
+    if (ed) ed.run(id, line);
+    else if (tries > 0) inEditor(id, line, tries - 1);
+  }, 30);
+}
 function tagsStep(c: Ctx): Step {
   const before = c.heading!.tags;
   return {

@@ -22,6 +22,10 @@
   import { registerEditor } from './editorKeys';
   import { clipTarget, linkHooks, linkPaste } from './linkEdit';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
+  import TagPop from './TagPop.svelte';
+  import { tagsState } from './tagsState.svelte';
+  import { lineTags, withTags } from './tags';
+  import { autocompletion, type CompletionContext } from '@codemirror/autocomplete';
 
   let { text, fileKey, path = '', wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
     path?: string; // the file's name in the folder: what a plugin's link at the end of a line is run with (ТЗ 33)
@@ -423,6 +427,7 @@
       wf: words, heads: headingSet, drawers: drawerMap,
       links: (doc) => linksIn(doc).map((l) => ({ from: l.from, to: l.to })),
       onPick: (p) => onrich?.(p),
+      onTag: (t) => tagsState.open([t]),
     });
   }
 
@@ -488,7 +493,7 @@
   const status = (v: EditorView, f: (w: Workflow, k: string | null) => string | null) => onHeading(v) && run(v, changeStatusAt(docText(v), sel(v).head, f, curWords));
   const shift = (v: EditorView, d: -1 | 1) => onHeading(v) && run(v, shiftHeading(docText(v), sel(v).head, d));
   const shiftTree = (v: EditorView, d: -1 | 1) => onHeading(v) && run(v, shiftSubtree(docText(v), sel(v).head, d));
-  const commands: Record<string, (v: EditorView) => boolean> = {
+  const commands: Record<string, (v: EditorView, line?: number) => boolean> = {
     newHeading: (v) => newHeading(v, false, curWords),
     newTask: (v) => newHeading(v, true, curWords),
     // heading lines only, so Option+arrows keep moving by word inside text (as in Org on a Mac)
@@ -516,6 +521,13 @@
     },
     // ⌃C L: the link to the heading the caret is in (above the first one — to the file), ТЗ 35
     copyLink: (v) => linkHooks.copyHeading(path, v.state.doc.lineAt(v.state.selection.main.head).number - 1),
+    // ⌃C Q: the heading's tags in a field with the folder's tags (ТЗ 38 §6)
+    tags: (v, line?: number) => {
+      const l = line !== undefined && line >= 0 && line < v.state.doc.lines ? v.state.doc.line(line + 1) : v.state.doc.lineAt(v.state.selection.main.head);
+      if (!headLine(l.text)) return false;
+      openTagPop(v, l.number);
+      return true;
+    },
     // ⌥⇧⌘V: the clipboard's text in place of the selection, never a link
     pasteText: (v) => {
       void linkHooks.readClip().then((t) => {
@@ -616,11 +628,74 @@
       if (!s.empty) items.push('sep');
       items.push({ label: 'Копировать ссылку на заголовок', shortcut: key('copyLink'), detail: `«${heading}»`, action: () => linkHooks.copyHeading(path, v.state.doc.lineAt(s.head).number - 1) });
     }
+    const hl = v.state.doc.lineAt(s.head);
+    if (s.empty && headLine(hl.text)) items.push({ label: 'Теги…', shortcut: key('tags'), action: () => openTagPop(v, hl.number) });
     menu = { x: e.clientX, y: e.clientY, items };
   }
   function portal(node: HTMLElement) {
     document.body.appendChild(node);
     return { destroy: () => node.remove() };
+  }
+
+  const headLine = (t: string) => /^\*+\s/.test(t);
+  // ---- «Теги заголовка» (ТЗ 38 §6): each change in the line at once, kept out of the undo history; on closing, the
+  // whole change is put in as one step — one ⌘Z per opening ----------------------------------------------------------
+  let tagPop = $state<{ v: EditorView; line: number; orig: string; tags: string[]; x: number; y: number } | null>(null);
+  function openTagPop(v: EditorView, lineNo: number) {
+    const l = v.state.doc.line(lineNo);
+    const { tags, at } = lineTags(l.text);
+    const c = v.coordsAtPos(l.from + Math.min(at, l.length)) ?? v.coordsAtPos(l.to);
+    if (!c) return;
+    tagPop = { v, line: lineNo, orig: l.text, tags, x: Math.round(c.left), y: Math.round(c.bottom + 6) };
+  }
+  function tagsChanged(tags: string[]) {
+    const p = tagPop;
+    if (!p) return;
+    const l = p.v.state.doc.line(p.line);
+    p.v.dispatch({ changes: { from: l.from, to: l.to, insert: withTags(l.text, tags) }, annotations: Transaction.addToHistory.of(false) });
+    tagPop = { ...p, tags };
+  }
+  function closeTagPop() {
+    const p = tagPop;
+    tagPop = null;
+    if (!p) return;
+    const l = p.v.state.doc.line(p.line);
+    if (l.text !== p.orig) {
+      const now = l.text;
+      p.v.dispatch({ changes: { from: l.from, to: l.to, insert: p.orig }, annotations: Transaction.addToHistory.of(false) });
+      const back = p.v.state.doc.line(p.line);
+      p.v.dispatch({ changes: { from: back.from, to: back.to, insert: now }, annotations: isolateHistory.of('full'), userEvent: 'input' });
+    }
+    p.v.focus();
+  }
+
+  // ---- typing tags in a heading's line: after « :» the folder's tags are offered (ТЗ 38 §6) --------------------------
+  function tagSource(ctx: CompletionContext) {
+    const line = ctx.state.doc.lineAt(ctx.pos);
+    if (!headLine(line.text) || line.text.slice(ctx.pos - line.from).trim()) return null;
+    const before = line.text.slice(0, ctx.pos - line.from);
+    const m = /\s:((?:[^\s:]+:)*)([^\s:]*)$/u.exec(before);
+    if (!m || (!ctx.explicit && !m[2] && !before.endsWith(':'))) return null;
+    const have = new Set(m[1].split(':').filter(Boolean).map((t) => t.toLowerCase()));
+    return {
+      from: ctx.pos - m[2].length,
+      options: tagsState.list.filter((t) => !have.has(t.tag.toLowerCase())).map((t) => ({ label: t.tag, detail: String(t.n), apply: t.tag + ':', type: 'tag', boost: Math.min(99, t.n) })),
+      validFor: /^[\p{L}\p{N}_@#%]*$/u,
+    };
+  }
+  const tagComplete = autocompletion({ override: [tagSource], icons: false, closeOnBlur: true, tooltipClass: () => 'cm-tag-complete' });
+
+  /** ⌘-click on a tag of a heading (in plain text): the tag under the pointer. */
+  function tagAt(v: EditorView, pos: number): string | null {
+    const l = v.state.doc.lineAt(pos);
+    if (!headLine(l.text)) return null;
+    const { tags, at } = lineTags(l.text);
+    let p = l.from + at + 1;
+    for (const t of tags) {
+      if (pos >= p - 1 && pos <= p + t.length) return t;
+      p += t.length + 1;
+    }
+    return null;
   }
   /** Over a link for ~400 ms: where it goes, and how to open it. */
   const linkTip = hoverTooltip(
@@ -715,6 +790,16 @@
             return true;
           },
           mousedown(e, v) {
+            // ⌘-click on a tag of a heading: its tab «Тег» (ТЗ 38)
+            if ((e.metaKey || e.ctrlKey) && (e.target as HTMLElement).closest?.('.cm-tags')) {
+              const at = v.posAtCoords({ x: e.clientX, y: e.clientY });
+              const t = at == null ? null : tagAt(v, at);
+              if (t) {
+                e.preventDefault();
+                tagsState.open([t]);
+                return true;
+              }
+            }
             // ⌘-click follows a link; drawn as «Оформленный текст», a plain click on it does (ТЗ 32)
             const plain = e.button === 0 && !e.shiftKey && !e.altKey && v.dom.classList.contains('cm-rich') && !!(e.target as HTMLElement).closest?.('.cm-link');
             if (!(e.metaKey || e.ctrlKey || plain)) return false;
@@ -727,6 +812,7 @@
           },
         }),
         EditorView.lineWrapping,
+        tagComplete,
         // the configurable keys are run by the window's handler (editorKeys.ts); here only the fixed ones
         keymap.of([
           ...foldKeymap, ...historyKeymap, ...defaultKeymap,
@@ -799,7 +885,7 @@
       },
     });
     const v = view;
-    const unregister = registerEditor(v.dom, { run: (id) => commands[id]?.(v) ?? false, onHeading: () => onHeading(v) });
+    const unregister = registerEditor(v.dom, { run: (id, line) => commands[id]?.(v, line) ?? false, onHeading: () => onHeading(v) });
     return () => {
       unregister();
       cancelAnimationFrame(topFrame);
@@ -937,6 +1023,7 @@
 </script>
 
 <div class="host" bind:this={host}></div>
+{#if tagPop}<TagPop tags={tagPop.tags} x={tagPop.x} y={tagPop.y} onchange={tagsChanged} onclose={closeTagPop} />{/if}
 {#if menu}<div use:portal><ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} width={300} tall /></div>{/if}
 
 <style>

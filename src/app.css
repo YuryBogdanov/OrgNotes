@@ -166,3 +166,13 @@ button { cursor: default; }
 .cm-linktip .lt-t { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cm-linktip .lt-miss { color: var(--todo); }
 .cm-linktip .lt-h { color: var(--fg3); }
+
+/* the tags offered while typing in a heading's line (ТЗ 38, @codemirror/autocomplete) */
+.cm-tooltip.cm-tooltip-autocomplete { background: var(--pop, var(--bg)); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22); padding: 4px; }
+.cm-tooltip.cm-tooltip-autocomplete > ul { font: 12.5px var(--mono); max-height: 220px; min-width: 200px; }
+.cm-tooltip.cm-tooltip-autocomplete > ul > li { display: flex; align-items: center; gap: 12px; height: 26px; padding: 0 8px; border-radius: 5px; color: var(--fg); }
+.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] { background: var(--sel); color: var(--fg); }
+.cm-tooltip.cm-tooltip-autocomplete .cm-completionLabel::before { content: ':'; color: var(--fg3); }
+.cm-tooltip.cm-tooltip-autocomplete .cm-completionLabel::after { content: ':'; color: var(--fg3); }
+.cm-tooltip.cm-tooltip-autocomplete .cm-completionMatchedText { text-decoration: none; font-weight: 700; color: var(--acc); }
+.cm-tooltip.cm-tooltip-autocomplete .cm-completionDetail { margin-left: auto; font: 11.5px var(--ui, system-ui); font-style: normal; color: var(--fg3); }

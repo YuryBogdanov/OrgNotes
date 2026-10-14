@@ -79,7 +79,7 @@ test.describe('modes', () => {
     await expect(plate).toContainText('[#A] Подготовить бюджет 2027');
     await expect(plate.locator('.right')).toHaveText('work · строка 4');
     expect(await groups(page)).toEqual(['К ЗАГОЛОВКУ', 'ОБЩИЕ']);
-    expect(await titles(page)).toEqual(['Сменить статус…', 'Запланировать…', 'Поставить дедлайн…', 'Изменить теги…', 'Копировать ссылку на заголовок', 'Перенести в другой файл…', 'Создать файл…', 'Создать папку…', 'Новая задача', 'Перейти к файлу…', 'Показать структуру файла', 'Оформленный текст', 'Навигатор: свернуть всё', 'Навигатор: развернуть всё', 'Мини-окно: открыть текущую заметку', 'Мини-окно: показать', 'Открыть «Сегодня»', 'Завершить день…', 'Настройки…', 'Календарь', 'Показать как доску / текст', 'Показать как доску', 'Добавить цели…']); // the plugins' commands after the core's
+    expect(await titles(page)).toEqual(['Сменить статус…', 'Запланировать…', 'Поставить дедлайн…', 'Теги…', 'Копировать ссылку на заголовок', 'Перенести в другой файл…', 'Создать файл…', 'Создать папку…', 'Новая задача', 'Перейти к файлу…', 'Показать структуру файла', 'Оформленный текст', 'Навигатор: свернуть всё', 'Навигатор: развернуть всё', 'Мини-окно: открыть текущую заметку', 'Мини-окно: показать', 'Открыть «Сегодня»', 'Завершить день…', 'Настройки…', 'Календарь', 'Показать как доску / текст', 'Показать как доску', 'Добавить цели…']); // the plugins' commands after the core's
     await expect(selected(page)).toHaveText('Сменить статус…');
   });
 
@@ -91,7 +91,7 @@ test.describe('modes', () => {
     await expect(row('Сменить статус').locator('.hint')).toHaveText('сейчас TODO');
     await expect(row('Запланировать').locator('.hint')).toHaveText('14 окт');
     await expect(row('Поставить дедлайн').locator('.hint')).toHaveText('24 окт');
-    await expect(row('Изменить теги').locator('.hint')).toHaveText('budget, finance');
+    await expect(row('Теги…').locator('.hint')).toHaveText('budget, finance');
     await expect(row('Создать файл').locator('.key')).toHaveText('⇧⌘N');
     await expect(row('Перейти к файлу').locator('.key')).toHaveText('⇧⌘O');
     await expect(row('Новая задача').locator('.hint')).toHaveText('в work');
@@ -187,7 +187,7 @@ test.describe('search', () => {
     await page.keyboard.type('дед');
     expect(await titles(page)).toEqual(['Поставить дедлайн…']);
     await field(page).fill('теги');
-    expect(await titles(page)).toEqual(['Изменить теги…']);
+    expect(await titles(page)).toEqual(['Теги…']);
     expect(await groups(page)).toEqual(['К ЗАГОЛОВКУ']);
   });
 
@@ -310,16 +310,18 @@ test.describe('steps', () => {
     await expect(rows(page)).toHaveText(['Не похоже на дату']);
   });
 
-  test('«Изменить теги…» starts with the current tags', async ({ page }) => {
+  test('«Теги…» opens the field of the heading\'s tags in the editor (ТЗ 38)', async ({ page }) => {
     await open(page);
     await at(page, 'Подготовить бюджет');
     await palette(page);
     await page.keyboard.type('теги');
+    await pal(page).getByRole('option', { name: /^Теги…/ }).click();
+    const pop = page.getByRole('dialog', { name: 'Теги заголовка' });
+    await expect(pop.locator('.chip')).toHaveText([/:budget:/, /:finance:/]);
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('q4');
     await page.keyboard.press('Enter');
-    await expect(field(page)).toHaveValue('budget finance');
-    await field(page).fill('budget q4');
-    await expect(selected(page)).toHaveText('Сохранить теги: budget, q4');
-    await page.keyboard.press('Enter');
+    await page.keyboard.press('Escape');
     await expect(page.locator('.cm-line', { hasText: 'Подготовить бюджет' })).toHaveText('** TODO [#A] Подготовить бюджет 2027 :budget:q4:');
   });
 

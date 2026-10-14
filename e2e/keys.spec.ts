@@ -114,13 +114,13 @@ test.describe('recording', () => {
     await open(page);
     await keysSheet(page);
     await page.getByRole('radio', { name: 'Как в macOS' }).click();
-    await expect(chips(page, 'tags')).toHaveText(['Назначить']);
+    await expect(chips(page, 'tags')).toHaveText(['⌃C Q']); // ТЗ 38: «Теги…» in both sets
     await chips(page, 'tags').click();
     await page.keyboard.press('Control+c');
     await expect(row(page, 'tags').locator('.chip.rec')).toHaveText('⌃C …');
     await page.keyboard.press('g');
     await expect(chips(page, 'tags')).toHaveText(['⌃C G']);
-    await expect(row(page, 'tags').locator('.sub')).toHaveText('Аккорд: ⌃C, затем G');
+    await expect(row(page, 'tags').locator('.sub')).toHaveText('Аккорд: ⌃C, затем G · Поле тегов заголовка с подсказками из всех заметок');
     await chips(page, 'outline').click();
     await page.keyboard.press('Control+Alt+o');
     await expect(chips(page, 'outline')).toHaveText(['⌃⌥O'], { timeout: 3000 });
@@ -129,7 +129,7 @@ test.describe('recording', () => {
     await onHeading(page, 'Подготовить бюджет');
     await page.keyboard.press('Control+c');
     await page.keyboard.press('g');
-    await expect(page.locator('.pal input')).toHaveAttribute('placeholder', 'Теги через пробел');
+    await expect(page.getByRole('dialog', { name: 'Теги заголовка' })).toBeVisible(); // the field of the heading's tags
   });
 });
 

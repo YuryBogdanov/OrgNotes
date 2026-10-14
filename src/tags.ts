@@ -159,3 +159,18 @@ export function perFile(counts: { name: string; n: number }[], shown = 4): strin
   const pl = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? 'файл' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'файла' : 'файлов');
   return [...l.slice(0, shown).map((c) => `${c.name} ${c.n}`), ...(rest > 0 ? [`ещё ${rest} ${pl(rest)}`] : [])].join(' · ');
 }
+
+const LINE_TAGS = /^(.*?)(\s+):((?:[^\s:]+:)+)\s*$/;
+/** The tags at the end of a heading line, and where they start (the column of the first «:»); none — its end. */
+export function lineTags(line: string): { tags: string[]; at: number } {
+  const m = LINE_TAGS.exec(line);
+  return m ? { tags: m[3].split(':').filter(Boolean), at: m[1].length + m[2].length } : { tags: [], at: line.trimEnd().length };
+}
+/** A heading line with these tags: the spaces before the old ones kept (one space when there were none); none left —
+ *  the line ends at its title. */
+export function withTags(line: string, tags: string[]): string {
+  const m = LINE_TAGS.exec(line);
+  const base = m ? m[1] : line.trimEnd();
+  if (!tags.length) return base;
+  return `${base}${m ? m[2] : ' '}:${tags.join(':')}:`;
+}

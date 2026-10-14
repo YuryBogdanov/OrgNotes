@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORKFLOW, parseHeadings } from './org';
-import { bareTag, foundText, headingsWith, oftenWith, perFile, retag, sortTags, tagCounts, tagOk, tagsOf, type TagFile } from './tags';
+import { bareTag, foundText, headingsWith, lineTags, oftenWith, perFile, retag, sortTags, tagCounts, tagOk, tagsOf, withTags, type TagFile } from './tags';
 
 const file = (name: string, text: string, filetags: string[] = []): TagFile => ({ name, headings: parseHeadings(text, DEFAULT_WORKFLOW), filetags });
 const P = file('platform.org', ['* Инфраструктура :infra:', '** TODO Обновить Kafka', '** NEXT Переезд в новый ДЦ :dc:', '*** TODO Учения по откату', '* 1-1 :1on1:', '** TODO План дежурств', ''].join('\n'));
@@ -52,5 +52,15 @@ describe('renaming and removing a tag (ТЗ 38 B)', () => {
   it('the files by how many change', () => {
     expect(perFile([{ name: 'a.org', n: 1 }, { name: 'b.org', n: 9 }, { name: 'c.org', n: 5 }, { name: 'd.org', n: 3 }, { name: 'e.org', n: 2 }, { name: 'f.org', n: 2 }, { name: 'g.org', n: 0 }]))
       .toBe('b.org 9 · c.org 5 · d.org 3 · e.org 2 · ещё 2 файла');
+  });
+});
+
+describe('the tags of a heading line (ТЗ 38 C)', () => {
+  it('read, written with the spaces kept, removed', () => {
+    expect(lineTags('* TODO Переезд     :infra:dc:')).toEqual({ tags: ['infra', 'dc'], at: 19 });
+    expect(lineTags('* Без тегов  ')).toEqual({ tags: [], at: 11 });
+    expect(withTags('* TODO Переезд     :infra:dc:', ['infra', 'dc', 'sla'])).toBe('* TODO Переезд     :infra:dc:sla:');
+    expect(withTags('* Без тегов', ['x'])).toBe('* Без тегов :x:');
+    expect(withTags('* TODO Переезд     :infra:', [])).toBe('* TODO Переезд');
   });
 });
