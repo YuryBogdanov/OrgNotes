@@ -261,7 +261,7 @@ test.describe('settings → Inbox', () => {
 
   test('the shortcut: «Inbox» leads to «Клавиши», recorded there, for any program or not; a taken one says so', async ({ page }) => {
     await installTauriMock(page, FILES());
-    await page.addInitScript(() => ((window as any).__shortcutTaken = 'Alt+CmdOrCtrl+KeyK'));
+    await page.addInitScript(() => ((window as any).__shortcutTaken = 'Alt+CmdOrCtrl+KeyY'));
     await page.goto('/');
     await openSettingsSheet(page, 'Inbox');
     await expect(page.getByText('⇧⌘I — изменить в разделе «Клавиши»')).toBeVisible();
@@ -279,7 +279,7 @@ test.describe('settings → Inbox', () => {
     await page.getByRole('switch', { name: 'Работает из любой программы' }).click();
     await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab', { name: 'Клавиши' }).click();
     await row.getByRole('button', { name: 'Изменить сочетание ⌃⌘N' }).click();
-    await page.keyboard.press('Alt+Meta+k');
+    await page.keyboard.press('Alt+Meta+y'); // ⌥⌘K is «Изменить ссылку…» now (ТЗ 35)
     await expect(row.locator('.hint.err')).toHaveText('Занято другой программой');
   });
 });

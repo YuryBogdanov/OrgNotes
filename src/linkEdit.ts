@@ -1,7 +1,7 @@
 // Making links (ТЗ 35): ⌘V on a selection with a link in the clipboard makes the selection its label; a link to a
 // heading as it is copied (⌃C L). Pure: the text in, the change out; the editor and the store apply it.
 
-import { dirname, extractLinks, normalize } from './links';
+import { dirname, extractLinks, normalize, type OrgLink } from './links';
 import type { Heading } from './org';
 
 const SCHEMES = /^(https?:\/\/|mailto:|file:|id:)\S/i;
@@ -84,4 +84,12 @@ export const linkHooks = {
   readClip: async (): Promise<string> => '',
   /** «Копировать ссылку на заголовок» at a line of the editor's file. False: not a file of the folder. */
   copyHeading: (_path: string, _line: number): boolean => false,
+  /** The palette «Ссылка на» (linkPicker.ts): `apply` puts the link in place of the selection or of the link edited. */
+  pick: (_o: { path: string; sel: string; edit: { label: string | null } | null; apply: (insert: string) => void }) => {},
+  /** The title of the heading a line of the editor's file is in (the menu's «Копировать ссылку…»), null — none. */
+  headingAt: (_path: string, _line: number): string | null => null,
+  /** A shortcut as set now («⌃C ⌃L»), '' none: the editor's menu and tooltip show them. */
+  key: (_id: string) => '',
+  /** Where a link goes, in words: «billing.org › Ревью», an address; `missing` — not found. */
+  describe: (_link: OrgLink, _path: string): { text: string; missing: boolean } => ({ text: _link.raw, missing: false }),
 };

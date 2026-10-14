@@ -5,7 +5,8 @@
 import { store, type NoteFile } from './store.svelte';
 import { today } from './todayState.svelte';
 import { fuzzy, better, type Match } from './fuzzy';
-import { displayName } from './names';
+import { displayName, isArchive } from './names';
+import { clipTarget } from './linkEdit';
 import { parseDate, weekdayNames } from './edits';
 import { shiftDate } from './calendar';
 import type { Heading, OrgDate } from './org';
@@ -102,6 +103,7 @@ export interface Row {
   level?: number; // headings: the indent
   prefer?: boolean; // selected when the list first shows (the heading the cursor is in)
   note?: string; // grey after the group's header (the task of «ВЫДЕЛЕННАЯ ЗАДАЧА»)
+  alt?: () => Step | void; // ⌘↩ on it («Ссылка на»: the label is the heading's title)
   run?: () => Step | void;
 }
 export type Plate =
@@ -489,6 +491,51 @@ function tagsStep(c: Ctx): Step {
     },
   };
 }
+
+// ---- «Ссылка на» (ТЗ 35 §3): a heading of any file, or an address --------------------------------------------------
+
+const LINK_FOOT: [string, string][] = [['↑ ↓', 'выбрать'], ['↩', 'вставить ссылку'], ['⌘↩', 'подпись — название заголовка'], ['⎋', 'закрыть']];
+/** The palette «Ссылка на»: `heading(path, line, own)` — a heading chosen (`own`: ⌘↩, its title the label);
+ *  `address` — what is typed, when it is one. */
+export function linkStep(o: { sel: string; edit: { label: string | null } | null; heading: (path: string, line: number, own: boolean) => void; address: (target: string) => void }): Step {
+  const note = o.edit ? (o.edit.label ? `Подпись остаётся: «${o.edit.label}»` : '') : o.sel ? `Подпись ссылки — выделенный текст: «${o.sel}»` : '';
+  return {
+    placeholder: 'Заголовок или адрес',
+    token: { icon: 'goto', text: 'Ссылка на' },
+    plate: () => (note ? { kind: 'text', text: note } : null),
+    foot: o.edit ? LINK_FOOT.filter(([k]) => k !== '⌘↩') : LINK_FOOT,
+    rows: (q) => {
+      const query = q.trim();
+      const found: { row: Row; m: Match | null; i: number }[] = [];
+      let i = 0;
+      for (const f of store.files) {
+        if (isArchive(f.name)) continue;
+        for (const h of f.headings) {
+          const title = labelOfTitle(h.title);
+          const m = query ? fuzzy(query, title) : null;
+          if (query && !m) continue;
+          found.push({
+            m, i: i++,
+            row: {
+              id: `lh:${f.path}:${h.line}`, group: 'ЗАГОЛОВКИ', title, at: m?.at, icon: 'head',
+              hint: [displayName(f.name), ...h.path.map(labelOfTitle)].join(' › ') + (h.keyword ? ` · ${h.keyword}` : ''),
+              run: () => o.heading(f.path, h.line, false),
+              alt: o.edit ? undefined : () => o.heading(f.path, h.line, true),
+            },
+          });
+        }
+      }
+      if (query) found.sort((a, b) => (a.m!.wordStart !== b.m!.wordStart ? (a.m!.wordStart ? -1 : 1) : a.m!.span - b.m!.span || a.i - b.i));
+      const rows = found.slice(0, 40).map((x) => x.row);
+      const target = clipTarget(query);
+      rows.push(target
+        ? { id: 'addr', group: 'ИЛИ АДРЕС', title: `Вставить адрес ${target}`, icon: 'goto', run: () => o.address(target) }
+        : { id: 'addr-hint', group: 'ИЛИ АДРЕС', title: 'Вставьте адрес — https://…, mailto:, file:' });
+      return rows;
+    },
+  };
+}
+const labelOfTitle = (t: string) => t.replace(/\s*\[\d*(?:\/\d*|%)\]/g, '').replace(/\s+/g, ' ').trim();
 
 export function nameStep(c: Ctx, kind: 'file' | 'folder'): Step {
   const where = folderName(c);

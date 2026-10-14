@@ -159,3 +159,10 @@ button { cursor: default; }
 .cm-find-ticks { position: absolute; top: 0; right: 0; bottom: 0; width: 8px; pointer-events: none; z-index: 5; }
 .cm-find-ticks span { position: absolute; right: 1px; width: 6px; height: 2px; border-radius: 1px; background: var(--hlCur); opacity: 0.8; }
 .cm-find-ticks span.cur { height: 3px; opacity: 1; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hlCur) 60%, #000); }
+
+/* over a link in the editor (ТЗ 35 §5): where it goes, and how to open it */
+.cm-tooltip.cm-tooltip-hover:has(.cm-linktip) { border: 1px solid var(--line); border-radius: 7px; background: var(--bg); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
+.cm-linktip { display: flex; flex-direction: column; gap: 2px; padding: 7px 10px; font: 12px var(--ui); max-width: 520px; }
+.cm-linktip .lt-t { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-linktip .lt-miss { color: var(--todo); }
+.cm-linktip .lt-h { color: var(--fg3); }

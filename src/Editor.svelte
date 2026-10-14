@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Compartment, EditorState, MapMode, RangeSetBuilder, StateEffect, StateField, Transaction, type Range } from '@codemirror/state';
-  import { Decoration, EditorView, ViewPlugin, WidgetType, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+  import { Decoration, EditorView, ViewPlugin, WidgetType, hoverTooltip, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
   import { codeFolding, foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
   import { drawerRanges, headingLines, toneFor, type DrawerRange, type Workflow } from './org';
@@ -14,7 +14,8 @@
   import { orgRich, type RichPick } from './orgRich';
   import { findExtension, findField, foundInfo, moveFind, setFind, type FindQuery } from './findView';
   import { registerEditor } from './editorKeys';
-  import { linkHooks, linkPaste } from './linkEdit';
+  import { clipTarget, linkHooks, linkPaste } from './linkEdit';
+  import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
 
   let { text, fileKey, path = '', wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
     path?: string; // the file's name in the folder: what a plugin's link at the end of a line is run with (ТЗ 33)
@@ -513,6 +514,14 @@
       });
       return true;
     },
+    // ⌃C ⌃L: the palette «Ссылка на»; ⌥⌘K: the same for the link under the caret (its label stays), ТЗ 35
+    insertLink: (v) => (pickLink(v, null), true),
+    editLink: (v) => {
+      const l = linkAt(v.state.doc, v.state.selection.main.head);
+      if (!l) return false;
+      pickLink(v, l);
+      return true;
+    },
     followLink: (v) => {
       const l = linkAt(v.state.doc, v.state.selection.main.head);
       if (!l) return false;
@@ -520,6 +529,114 @@
       return true;
     },
   };
+
+  // ---- links (ТЗ 35): the palette «Ссылка на», the editor's menu, the tooltip over a link ---------------------------
+  /** The palette «Ссылка на»: the link goes in place of the selection (its label) or of the link `l` (its label kept). */
+  function pickLink(v: EditorView, l: OrgLink | null) {
+    const s = v.state.selection.main;
+    const text = v.state.sliceDoc(s.from, s.to);
+    const sel = !l && text && !/\n|\[\[|\]\]/.test(text) ? text : '';
+    const at = l ? { from: l.from, to: l.to } : { from: s.from, to: s.to };
+    const len = v.state.doc.length;
+    linkHooks.pick({
+      path, sel, edit: l ? { label: l.desc ?? null } : null,
+      apply: (insert) => {
+        if (v.state.doc.length !== len) return; // the text changed meanwhile
+        v.dispatch({ changes: { ...at, insert }, selection: { anchor: at.from + insert.length }, userEvent: 'input', scrollIntoView: true });
+        v.focus();
+      },
+    });
+  }
+  /** Put text in place of the selection (the menu's «Вставить»: a link on a selection, as ⌘V does). */
+  function insertText(v: EditorView, t: string, asLink: boolean) {
+    const s = v.state.selection.main;
+    const r = asLink ? linkPaste(v.state.doc.toString(), s.from, s.to, t, linkHooks.rel(path)) : null;
+    if (r) {
+      v.dispatch({ changes: { from: r.from, to: r.to, insert: r.insert }, selection: { anchor: r.caret }, userEvent: 'input.paste', scrollIntoView: true });
+      linkHooks.pasted();
+    } else v.dispatch({ changes: { from: s.from, to: s.to, insert: t }, selection: { anchor: s.from + t.length }, userEvent: 'input.paste', scrollIntoView: true });
+    v.focus();
+  }
+  const copyText = (t: string) => void navigator.clipboard?.writeText(t).catch(() => {});
+  let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  /** Right click (⌃-click): inside the selection it stays, elsewhere the caret goes there; then the menu of §4. */
+  async function openMenu(e: MouseEvent, v: EditorView) {
+    const pos = v.posAtCoords({ x: e.clientX, y: e.clientY });
+    let s = v.state.selection.main;
+    if (pos != null && (s.empty || pos < s.from || pos > s.to)) {
+      v.dispatch({ selection: { anchor: pos } });
+      s = v.state.selection.main;
+    }
+    const clip = await linkHooks.readClip();
+    const text = v.state.sliceDoc(s.from, s.to);
+    const target = clip ? clipTarget(clip) : null;
+    const key = (id: string) => linkHooks.key(id) || undefined;
+    const l = linkAt(v.state.doc, s.head);
+    const short = (t: string) => (t.length > 46 ? t.slice(0, 45) + '…' : t);
+    const heading = linkHooks.headingAt(path, v.state.doc.lineAt(s.head).number - 1);
+    const items: MenuItem[] = [];
+    if (l) {
+      items.push(
+        { label: 'Открыть ссылку', shortcut: key('followLink'), action: () => onfollow(l) },
+        { label: 'Изменить ссылку…', shortcut: key('editLink'), action: () => pickLink(v, l) },
+        { label: 'Копировать адрес', action: () => copyText(l.raw) },
+        { label: 'Убрать ссылку', action: () => v.dispatch({ changes: { from: l.from, to: l.to, insert: l.desc ?? l.raw }, userEvent: 'input' }) },
+        'sep',
+      );
+    }
+    if (!s.empty) {
+      items.push(
+        { label: 'Вырезать', shortcut: '⌘X', action: () => (copyText(text), v.dispatch({ changes: { from: s.from, to: s.to }, userEvent: 'delete.cut' })) },
+        { label: 'Копировать', shortcut: '⌘C', action: () => copyText(text) },
+        { label: 'Вставить', shortcut: '⌘V', disabled: !clip, action: () => insertText(v, clip, true) },
+        'sep',
+      );
+      if (target && !text.includes('\n')) items.push({ label: 'Сделать ссылкой из буфера', shortcut: '⌘V', detail: short(target), action: () => insertText(v, clip, true) });
+      items.push({ label: 'Ссылка на заголовок…', shortcut: key('insertLink'), action: () => pickLink(v, null) });
+      if (clip) items.push({ label: 'Вставить как текст', shortcut: key('pasteText'), action: () => insertText(v, clip, false) });
+    } else {
+      items.push(
+        { label: 'Вставить', shortcut: '⌘V', disabled: !clip, action: () => insertText(v, clip, false) },
+        'sep',
+        { label: 'Вставить ссылку на заголовок…', shortcut: key('insertLink'), action: () => pickLink(v, null) },
+      );
+    }
+    if (heading) {
+      if (!s.empty) items.push('sep');
+      items.push({ label: 'Копировать ссылку на заголовок', shortcut: key('copyLink'), detail: `«${heading}»`, action: () => linkHooks.copyHeading(path, v.state.doc.lineAt(s.head).number - 1) });
+    }
+    menu = { x: e.clientX, y: e.clientY, items };
+  }
+  function portal(node: HTMLElement) {
+    document.body.appendChild(node);
+    return { destroy: () => node.remove() };
+  }
+  /** Over a link for ~400 ms: where it goes, and how to open it. */
+  const linkTip = hoverTooltip(
+    (v, pos) => {
+      const l = linkAt(v.state.doc, pos);
+      if (!l) return null;
+      return {
+        pos: l.from, end: l.to, above: false,
+        create: () => {
+          const d = linkHooks.describe(l, path);
+          const dom = document.createElement('div');
+          dom.className = 'cm-linktip';
+          const a = document.createElement('span');
+          a.className = d.missing ? 'lt-t lt-miss' : 'lt-t';
+          a.textContent = d.text;
+          const b = document.createElement('span');
+          b.className = 'lt-h';
+          const open = linkHooks.key('followLink');
+          const change = linkHooks.key('editLink');
+          b.textContent = `⌘-клик${open ? ` или ${open}` : ''} — открыть${change ? ` · ${change} — изменить` : ''}`;
+          dom.append(a, b);
+          return { dom };
+        },
+      };
+    },
+    { hoverTime: 400 },
+  );
 
   function makeState(doc: string, words: Workflow) {
     curWords = words;
@@ -562,7 +679,13 @@
         ...(gutter ? [foldGutter()] : []), plugin, ...lineLinkExt(), selectionClass, note.of(noteExt(lineNote)), structure.of(structureExt(words)),
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
+        linkTip,
         EditorView.domEventHandlers({
+          contextmenu(e, v) {
+            e.preventDefault();
+            void openMenu(e, v);
+            return true;
+          },
           // ⌘V on a selection with a link in the clipboard: the selection becomes its label (ТЗ 35)
           paste(e, v) {
             const clip = e.clipboardData?.getData('text/plain') ?? '';
@@ -767,6 +890,7 @@
 </script>
 
 <div class="host" bind:this={host}></div>
+{#if menu}<div use:portal><ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} width={300} tall /></div>{/if}
 
 <style>
   .host { height: 100%; min-height: 0; overflow: hidden; }

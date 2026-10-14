@@ -144,7 +144,8 @@
       move(e.key === 'ArrowDown' ? 1 : -1);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      run(current);
+      // ⌘↩: a row's other action («Ссылка на»: the heading's title as the label)
+      run(e.metaKey && current?.alt ? { ...current, run: current.alt } : current);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       close();
