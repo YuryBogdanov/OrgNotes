@@ -60,6 +60,12 @@ export interface ManifestTodayBlock {
   before?: string;
   after?: string;
 }
+/** A place of the plugin's drawing other plugins put their pieces in (`ui.slot`; it draws them with `ui.drawSlot`).
+ *  Since 1.8. */
+export interface ManifestSlot {
+  id: string;
+  hint?: string;
+}
 export interface ManifestStatusSet {
   name: string;
   states: string; // «IDEA DOING | DONE»
@@ -87,7 +93,10 @@ export interface Manifest {
     settings: ManifestSettings[];
     statusSets: ManifestStatusSet[];
     themes: string[];
+    slots: ManifestSlot[];
   };
+  /** The functions other plugins may call (`ctx.plugins.call`; the plugin gives them with `ctx.exports`). Since 1.8. */
+  exports: string[];
   /** Things allowed but left out (a reserved key): shown in the list of plugins. */
   warnings: string[];
 }
@@ -175,6 +184,16 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
     if (!isStr(x.title)) problems.push(`блок «${x.id}»: нет title`);
     todayBlocks.push({ id: x.id as string, title: String(x.title ?? ''), ...(isStr(x.hint) ? { hint: x.hint } : {}), ...(x.attach === true ? { attach: true } : {}), ...(x.width === 'full' ? { width: 'full' as const } : {}), ...(isStr(x.before) ? { before: x.before } : {}), ...(isStr(x.after) ? { after: x.after } : {}) });
   }
+  const slots: ManifestSlot[] = [];
+  for (const x of arr(c.slots).map(obj)) {
+    if (!own('место', x.id)) continue;
+    slots.push({ id: x.id as string, ...(isStr(x.hint) ? { hint: x.hint } : {}) });
+  }
+  const exports: string[] = [];
+  for (const x of arr(j.exports)) {
+    if (typeof x === 'string' && /^[A-Za-z_$][\w$]*$/.test(x)) exports.push(x);
+    else problems.push(`exports: «${String(x)}» — имя функции`);
+  }
   const fileViews: ManifestFileView[] = [];
   for (const x of arr(c.fileViews).map(obj)) {
     if (!own('вид файла', x.id)) continue;
@@ -213,7 +232,8 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
       main: isStr(j.main) ? j.main : undefined, styles: isStr(j.styles) ? j.styles : undefined,
       defaultEnabled: typeof j.defaultEnabled === 'boolean' ? j.defaultEnabled : undefined,
       permissions: permissions as Permission[], net,
-      contributes: { commands, navSections, views, todayBlocks, fileViews, settings, statusSets, themes: arr(c.themes).filter(isStr) as string[] },
+      contributes: { commands, navSections, views, todayBlocks, fileViews, settings, statusSets, themes: arr(c.themes).filter(isStr) as string[], slots },
+      exports,
       warnings,
     },
   };

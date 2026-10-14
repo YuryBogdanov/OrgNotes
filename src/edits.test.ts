@@ -68,3 +68,20 @@ describe('new task', () => {
     expect(appendTask('', 'NEW')).toEqual({ text: '* NEW \n', line: 0 });
   });
 });
+
+describe('a reschedule in the journal (ТЗ 36)', () => {
+  const at = new Date(2026, 9, 14, 9, 5);
+  it('a SCHEDULED moved to another day is noted on top of :LOGBOOK: (after the properties), as Org does', () => {
+    const t = '* TODO A\nSCHEDULED: <2026-10-12 Пн>\n:PROPERTIES:\n:ID: x\n:END:\n:LOGBOOK:\n- State "TODO" from "" [2026-10-10 Сб 10:00]\n:END:\n';
+    const x = setPlanning(t, hs(t)[0], 'SCHEDULED', new Date(2026, 9, 15), at);
+    expect(x).toBe('* TODO A\nSCHEDULED: <2026-10-15 Чт>\n:PROPERTIES:\n:ID: x\n:END:\n:LOGBOOK:\n- Rescheduled from "<2026-10-12 Пн>" on [2026-10-14 Wed 09:05]\n- State "TODO" from "" [2026-10-10 Сб 10:00]\n:END:\n');
+  });
+  it('no note: without the journal, a first date, the same day, a removed date, a deadline', () => {
+    const t = '* TODO A\nSCHEDULED: <2026-10-12 Пн>\n';
+    expect(setPlanning(t, hs(t)[0], 'SCHEDULED', new Date(2026, 9, 15))).not.toContain('LOGBOOK');
+    expect(setPlanning('* TODO A\n', hs('* TODO A\n')[0], 'SCHEDULED', new Date(2026, 9, 15), at)).not.toContain('LOGBOOK');
+    expect(setPlanning(t, hs(t)[0], 'SCHEDULED', new Date(2026, 9, 12), at)).not.toContain('LOGBOOK');
+    expect(setPlanning(t, hs(t)[0], 'SCHEDULED', null, at)).not.toContain('LOGBOOK');
+    expect(setPlanning(t, hs(t)[0], 'DEADLINE', new Date(2026, 9, 20), at)).not.toContain('LOGBOOK');
+  });
+});

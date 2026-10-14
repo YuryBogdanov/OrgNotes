@@ -467,7 +467,10 @@ function setProperty(lines: string[], h: Heading, key: string, value: string) {
 /** Add a `- State "NEW" from "OLD" [stamp]` entry on top of the heading's :LOGBOOK: drawer, creating it if needed. */
 function logState(lines: string[], h: Heading, to: string, from: string | null, now: Date) {
   const q = (w: string) => `"${w}"`.padEnd(12);
-  const entry = `- State ${q(to)} from ${q(from ?? '')} ${inactiveStamp(now)}`;
+  logNote(lines, h, `- State ${q(to)} from ${q(from ?? '')} ${inactiveStamp(now)}`);
+}
+/** An entry on top of the heading's :LOGBOOK: drawer (after its planning and properties), the drawer made if needed. */
+export function logNote(lines: string[], h: Heading, entry: string) {
   let i = h.line + 1;
   if (/^\s*(SCHEDULED|DEADLINE|CLOSED):/.test(lines[i] ?? '')) i++;
   if (/^\s*:PROPERTIES:\s*$/i.test(lines[i] ?? '')) {

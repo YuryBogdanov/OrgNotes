@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORKFLOW, parseHeadings } from './org';
-import { insertHeading, propertiesOf, replaceBody, setProperty, setTitle, treeOf } from './orgOps';
+import { insertHeading, propertiesOf, replaceBody, reschedulesOf, setProperty, setTitle, treeOf } from './orgOps';
 import { Tx } from './journal';
 
 const H = (t: string, i = 0) => parseHeadings(t, DEFAULT_WORKFLOW)[i];
@@ -106,5 +106,17 @@ describe('the plugins\' reads and renames (API 1.7)', () => {
   it('propertiesOf: its own drawer under the planning line, keys in upper case', () => {
     expect(propertiesOf(T, h)).toEqual({ ID: 'abc', RESULT: 'done' });
     expect(propertiesOf('* А\nтекст\n', parseHeadings('* А\nтекст\n', DEFAULT_WORKFLOW)[0])).toEqual({});
+  });
+});
+
+describe('reschedulesOf (ТЗ 36)', () => {
+  it('the moves its drawers note (ours and Emacs\'s), not those of the text or of a child', () => {
+    const t = ['* TODO A', 'SCHEDULED: <2026-10-15 Чт>', ':LOGBOOK:', '- Rescheduled from "<2026-10-13 Вт>" on [2026-10-14 Wed 09:05]', '- Rescheduled from "<2026-10-12 Mon 10:00>" on [2026-10-12 Mon 18:40]', ':END:', '- Rescheduled from "<2026-01-01>" on [2026-01-02]', '** B', ':LOGBOOK:', '- Rescheduled from "<2026-10-01>" on [2026-10-02]', ':END:', ''].join('\n');
+    const [a, b] = parseHeadings(t, DEFAULT_WORKFLOW);
+    expect(reschedulesOf(t, a)).toEqual([
+      { from: { y: 2026, m: 10, d: 13 }, at: { y: 2026, m: 10, d: 14, time: '09:05' } },
+      { from: { y: 2026, m: 10, d: 12, time: '10:00' }, at: { y: 2026, m: 10, d: 12, time: '18:40' } },
+    ]);
+    expect(reschedulesOf(t, b)).toEqual([{ from: { y: 2026, m: 10, d: 1 }, at: { y: 2026, m: 10, d: 2 } }]);
   });
 });

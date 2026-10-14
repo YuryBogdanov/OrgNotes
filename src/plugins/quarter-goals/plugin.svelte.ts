@@ -34,6 +34,7 @@ export default definePlugin({
     goals.readStored();
     statusSets(ctx);
     await core.load();
+    ctx.exports({ myActiveGoals: () => goals.myActiveGoals() });
 
     // the sources and the thresholds changed (here, or the notes folder): read again
     const stored = () => {

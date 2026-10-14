@@ -1509,7 +1509,7 @@ class Store {
     if (f && h) this.setText(fn(f.text, h, f.wf), f.path);
   }
   setPriority(p: string | null) { this.patch((t, h) => setPriority(t, h, p)); }
-  setPlanning(kind: 'SCHEDULED' | 'DEADLINE', date: Date | null) { this.patch((t, h) => setPlanning(t, h, kind, date)); }
+  setPlanning(kind: 'SCHEDULED' | 'DEADLINE', date: Date | null) { this.patch((t, h, wf) => setPlanning(t, h, kind, date, wf.behavior?.logbook ? new Date() : undefined)); }
   setTags(tags: string[]) { this.patch((t, h) => setTags(t, h, tags)); }
 
   // ---- «Перенести»: a heading with its subtree into a file, under a heading there or at its 1st level ----------

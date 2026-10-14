@@ -47,6 +47,28 @@
   }
   const move = (n: number) => pick(new Date(sel.getFullYear(), sel.getMonth(), sel.getDate() + n));
 
+  // ---- «calendar.weekCell» (API 1.8): what the plugins put by a week's number --------------------------------------
+  /** The week of a row (any of its days): its ISO year and number, its Monday, the view. */
+  const cellOf = (d: Date, view: 'month' | 'week') => {
+    const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
+    const thu = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 3);
+    return { year: thu.getFullYear(), week: weekNumber(thu), monday: isoDay(mon), view };
+  };
+  type Cell = ReturnType<typeof cellOf>;
+  function weekCell(node: HTMLElement, cell: Cell) {
+    let key = JSON.stringify(cell);
+    const h = calendar.ctx.ui.drawSlot(node, 'calendar.weekCell', cell);
+    return {
+      update(c: Cell) {
+        if (JSON.stringify(c) === key) return;
+        key = JSON.stringify(c);
+        h.update(c);
+      },
+      destroy: () => h.dispose(),
+    };
+  }
+  const thisWeek = $derived(cellOf(new Date(), 'month').monday);
+
   // ---- the size of a cell: how many entries fit (three at least) -------------------------------------------------
   let rowH = $state(112);
   // lines of 23 under the number; three entries at least, and «… ещё N» takes a line of its own
@@ -220,11 +242,22 @@
   </button>
 {/snippet}
 
+{#snippet wkNum(w: Date[])}
+  {@const c = cellOf(w[0], 'month')}
+  <div class="wk" class:now={c.monday === thisWeek}>
+    <span title="Неделя {c.week}">{c.week}</span>
+    <div class="wkslot" use:weekCell={c}></div>
+  </div>
+{/snippet}
+
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 <div class="cal" bind:this={root} tabindex="0" role="application" aria-label="Календарь" onkeydown={key}>
   <header>
     <div class="ttl">
-      <h1>{cal.view === 'month' ? monthTitle(sel) : `Неделя ${weekNumber(sel)}`}</h1>
+      <div class="tline">
+        <h1>{cal.view === 'month' ? monthTitle(sel) : `Неделя ${weekNumber(sel)}`}</h1>
+        {#if cal.view === 'week'}<div class="hslot" use:weekCell={cellOf(sel, 'week')}></div>{/if}
+      </div>
       <span>{cal.view === 'month' ? monthSub(sel) : weekSub(allWeek)}</span>
     </div>
     <div class="nav">
@@ -244,12 +277,12 @@
       {#each weeks as w, wi (wi)}
         {#if wi === 0}
           <div class="row" bind:clientHeight={rowH}>
-            {#if cfg.weekNumbers}<span class="wk" title="Неделя {weekNumber(w[0])}">{weekNumber(w[0])}</span>{/if}
+            {#if cfg.weekNumbers}{@render wkNum(w)}{/if}
             {#each shownDays(w) as d (isoDay(d))}{@render cell(d)}{/each}
           </div>
         {:else}
           <div class="row">
-            {#if cfg.weekNumbers}<span class="wk" title="Неделя {weekNumber(w[0])}">{weekNumber(w[0])}</span>{/if}
+            {#if cfg.weekNumbers}{@render wkNum(w)}{/if}
             {#each shownDays(w) as d (isoDay(d))}{@render cell(d)}{/each}
           </div>
         {/if}
@@ -347,6 +380,7 @@
   .cal { flex: 1; height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--bg); outline: none; } /* the whole tab of a plugin's view */
   header { flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
   .ttl { display: flex; flex-direction: column; }
+  .tline { display: flex; align-items: center; gap: 8px; }
   h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
   .ttl span { font-size: 12.5px; color: var(--fg2); }
   .nav { display: flex; align-items: center; gap: 4px; margin-left: 8px; }
@@ -365,7 +399,12 @@
   .cell.other .num { color: var(--fg3); }
   .cell.sel { background: var(--sel); box-shadow: inset 0 0 0 1.5px var(--acc); }
   .cell.over, .allday.over { background: color-mix(in srgb, var(--acc) 14%, transparent); box-shadow: inset 0 0 0 1.5px var(--acc); }
-  .wk { flex: 0 0 28px; box-sizing: border-box; padding-top: 8px; text-align: center; font-size: 10.5px; font-style: normal; color: var(--fg3); border-right: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .wk { flex: 0 0 28px; min-width: 0; box-sizing: border-box; padding-top: 8px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-size: 10.5px; font-style: normal; color: var(--fg3); border-right: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .wk.now > span { color: var(--acc); font-weight: 700; }
+  .wkslot, .hslot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .hslot { flex-direction: row; align-self: center; }
+  /* a plugin's piece by the numbers: the column wider */
+  .month:has(:global(.wkslot > [data-plugin] > *)) .wk, .cal:has(:global(.wkslot > [data-plugin] > *)) .wd .wk { flex-basis: 32px; }
   .droptime { position: absolute; left: 2px; right: 2px; height: 0; border-top: 2px solid var(--acc); font-size: 10.5px; font-weight: 700; color: var(--acc); padding-left: 4px; pointer-events: none; z-index: 2; }
   .modal { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.25); }
   .dlg { width: 380px; max-width: calc(100vw - 32px); padding: 18px 20px 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35); }

@@ -39,6 +39,14 @@ describe('parseManifest', () => {
     expect(r.manifest.contributes.views[0].icon).toBeTruthy();
     expect(r.manifest.contributes.views.map((v) => !!v.toolbar)).toEqual([false, true, false]); // a button in the toolbar: only `true` (ТЗ 29)
   });
+  it('places for the others (`slots`, own ids) and functions for them (`exports`, names) — API 1.8', () => {
+    const r = parseManifest({ ...base, exports: ['myGoals'], contributes: { slots: [{ id: 'hello.cell', hint: 'ячейка' }] } });
+    expect(r.ok && r.manifest.contributes.slots).toEqual([{ id: 'hello.cell', hint: 'ячейка' }]);
+    expect(r.ok && r.manifest.exports).toEqual(['myGoals']);
+    const bad = parseManifest({ ...base, exports: ['my goals'], contributes: { slots: [{ id: 'other.cell' }] } });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.problems.join(' · ')).toMatch(/место «other\.cell».*exports: «my goals»/);
+  });
   it('says every problem at once', () => {
     const r = parseManifest({ id: 'Hello World', version: 'x', permissions: ['root'], net: ['a.ru'], contributes: { commands: [{ id: 'other.x', title: 'X' }, { id: 'other.x', title: 'Y' }] } });
     expect(r.ok).toBe(false);
