@@ -941,10 +941,10 @@ class Store {
   /** ⌘S while the builder is open: «Сохранить агенду» (the builder watches this). */
   builderSave = $state(0);
   /** «Новая агенда»: opens the builder with an empty agenda (nothing is saved until «Сохранить агенду»). */
-  newAgendaInBuilder(from?: Element | null) {
+  newAgendaInBuilder(from?: Element | null, draft?: Agenda) {
     if (this.builder) return;
     this.builderFrom = from ?? (document.activeElement as Element | null);
-    this.builder = { draft: newAgenda(), orig: null, n: Date.now() };
+    this.builder = { draft: draft ?? newAgenda(), orig: null, n: Date.now() };
   }
   editAgenda(id: string, from?: Element | null) {
     const a = this.agendas.find((x) => x.id === id);

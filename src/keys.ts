@@ -87,6 +87,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('insp', 'Инспектор', 'view', 'window', ['⌥⌘0']),
   C('navFiles', 'Навигатор: файлы', 'view', 'window', ['⌃⌘1']),
   C('navAgendas', 'Навигатор: агенды', 'view', 'window', ['⌃⌘3']),
+  C('navTags', 'Навигатор: теги', 'view', 'window', ['⌃⌘8'], { synonyms: ['теги', 'метки', 'tags'] }),
   C('navSearch', 'Навигатор: поиск', 'view', 'window', ['⌃⌘6']),
   C('navCollapse', 'Навигатор: свернуть всё', 'view', 'window', [], { synonyms: ['дерево', 'папки'] }),
   C('navExpand', 'Навигатор: развернуть всё', 'view', 'window', [], { synonyms: ['дерево', 'папки'] }),

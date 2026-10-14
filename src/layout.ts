@@ -125,6 +125,13 @@ export function openAgenda(L: Layout, pi: number): Tab {
 }
 
 /** A feature's tab in the pane, one per pane (as the agenda): shown if there is one (`update` changes it), else made. */
+/** A new tab of a kind, after the active one, even when the pane has one («Открыть в новой вкладке»). */
+export function openViewNew(L: Layout, pi: number, kind: string, data: unknown): Tab {
+  const p = L.panes[pi];
+  const t = { ...newTab(kind), data };
+  insertAfterActive(p, t);
+  return t;
+}
 export function openView(L: Layout, pi: number, kind: string, data: () => unknown, update?: (t: Tab) => void): Tab {
   const p = L.panes[pi];
   const i = p.tabs.findIndex((t) => t.kind === kind);

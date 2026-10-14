@@ -60,7 +60,7 @@ export const OPS: Record<Field, { id: string; label: string }[]> = {
   status: [{ id: 'in', label: 'одно из' }, { id: 'notin', label: 'не одно из' }],
   scheduled: [{ id: 'eq', label: 'равно' }, { id: 'before', label: 'раньше' }, { id: 'after', label: 'позже' }, { id: 'none', label: 'не задано' }],
   deadline: [{ id: 'eq', label: 'равно' }, { id: 'before', label: 'раньше' }, { id: 'after', label: 'позже' }, { id: 'none', label: 'не задано' }],
-  tag: [{ id: 'has', label: 'содержит' }, { id: 'hasnot', label: 'не содержит' }],
+  tag: [{ id: 'has', label: 'содержит' }, { id: 'all', label: 'все из' }, { id: 'hasnot', label: 'не содержит' }],
   priority: [{ id: 'eq', label: 'равен' }, { id: 'higher', label: 'выше' }, { id: 'lower', label: 'ниже' }, { id: 'none', label: 'не задан' }],
   path: [{ id: 'in', label: 'находится в' }, { id: 'notin', label: 'не находится в' }],
   title: [{ id: 'has', label: 'содержит' }, { id: 'hasnot', label: 'не содержит' }],
@@ -327,6 +327,8 @@ export function matches(t: Task, c: Cond, today: Date): boolean {
       return n >= lo && n <= hi;
     }
     case 'tag': {
+      // «все из» (ТЗ 38: the tab «Тег» saved as an agenda): every tag at once
+      if (c.op === 'all') return (c.values ?? []).every((v) => t.tags.includes(v));
       const hit = (c.values ?? []).some((v) => t.tags.includes(v));
       return c.op === 'hasnot' ? !hit : hit;
     }
@@ -524,7 +526,7 @@ export function query(b: Block): string {
         break;
       }
       case 'tag':
-        parts.push(`${c.op === 'hasnot' ? 'not ' : ''}tag:${list(c.values ?? [])}`);
+        parts.push(c.op === 'all' ? (c.values ?? []).map((v) => `tag:${v}`).join(' ') : `${c.op === 'hasnot' ? 'not ' : ''}tag:${list(c.values ?? [])}`);
         break;
       case 'priority':
         parts.push(c.op === 'none' ? 'not priority' : `priority:${c.op === 'higher' ? '>' : c.op === 'lower' ? '<' : ''}${c.prio}`);

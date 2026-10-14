@@ -52,7 +52,7 @@ export interface NavSpec {
   icon: string;
   /** The command that shows it (its shortcut is shown in the tip). */
   key?: string;
-  /** The place in the bar: Файлы 0, Inbox 10, Задачи 20, Агенда 30, Цели 40, Календарь 50, Теги 60, Поиск 70. */
+  /** The place in the bar: Файлы 0, Inbox 10, Агенда 30, Цели 40, Календарь 50, Теги 60, Поиск 70. */
   order: number;
   component: Component;
   /** A number on the button (the Inbox's count); 0 shows nothing. */

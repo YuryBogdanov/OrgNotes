@@ -36,6 +36,7 @@ fn every_default_accelerator_parses() {
         "Control+CmdOrCtrl+Digit1",
         "Control+CmdOrCtrl+Digit3",
         "Control+CmdOrCtrl+Digit6",
+        "Control+CmdOrCtrl+Digit8",
         "Control+CmdOrCtrl+KeyJ",
         "Control+CmdOrCtrl+KeyW",
         "Control+Shift+CmdOrCtrl+ArrowRight",
