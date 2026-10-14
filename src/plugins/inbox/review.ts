@@ -4,7 +4,8 @@
 import { inboxItems, type InboxItem } from './list';
 import { sequenceFor, type Heading, type OrgDate, type Workflow } from '@panopticon/api/org';
 
-export type Result = 'done' | 'cancel' | 'move' | 'defer' | 'skip' | 'delete';
+// 'next': «Далее» — gone through as it is now, with what was done on the card (fix to ТЗ 18)
+export type Result = 'done' | 'cancel' | 'move' | 'defer' | 'skip' | 'delete' | 'next';
 export interface ReviewItem {
   id: string;
   path: string; // where the task is now (the target file after «Перенести»)

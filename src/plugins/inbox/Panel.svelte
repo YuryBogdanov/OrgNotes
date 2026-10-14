@@ -62,7 +62,7 @@
   const oldest = $derived(Math.max(0, ...pending.map((x) => ageDays(x.created) ?? 0)));
   const handled = $derived(review ? review.items.filter((x) => x.result && x.result !== 'skip').length : 0);
   const skippedN = $derived(review ? review.items.filter((x) => x.result === 'skip').length : 0);
-  const MARK: Record<string, string> = { done: 'var(--done)', cancel: 'var(--fg3)', move: 'var(--acc)', defer: 'var(--ts)', delete: 'var(--fg3)' };
+  const MARK: Record<string, string> = { done: 'var(--done)', cancel: 'var(--fg3)', move: 'var(--acc)', defer: 'var(--ts)', delete: 'var(--fg3)', next: 'var(--acc)' };
   const SEG: Record<string, string> = { ...MARK, skip: 'var(--wait)' };
   const segColor = (it: ReviewItem, i: number) => (it.result ? SEG[it.result] : i === review?.cur ? 'var(--fg2)' : 'var(--field)');
   const closed = (it: ReviewItem) => it.result === 'done' || it.result === 'cancel' || it.result === 'move' || it.result === 'delete';
@@ -161,12 +161,13 @@
           <span class="mark" class:skip={it.result === 'skip'} style:background={c ?? 'transparent'} style:border-color={c ?? (it.result === 'skip' ? 'var(--wait)' : 'var(--fg3)')} aria-hidden="true">
             {#if it.result === 'done'}<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg>
             {:else if it.result === 'cancel' || it.result === 'delete'}<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" /></svg>
+            {:else if it.result === 'next'}<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h11M11 5l5 5-5 5" /></svg>
             {:else if it.result === 'move'}<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h11M11 6l4 4-4 4" /></svg>
             {:else if it.result === 'defer'}<svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M10 5v5l3 2" /></svg>{/if}
           </span>
           <div class="main">
             <span class="t" class:strike={it.result === 'done' || it.result === 'cancel' || it.result === 'delete'}>{it.title}</span>
-            <span class="sub" style:color={it.result === 'skip' ? 'var(--wait)' : it.result === 'move' ? 'var(--acc)' : it.result === 'defer' ? 'var(--ts)' : ''}>{subLabel(it, i === review.cur)}</span>
+            <span class="sub" style:color={it.result === 'skip' ? 'var(--wait)' : it.result === 'move' || it.result === 'next' ? 'var(--acc)' : it.result === 'defer' ? 'var(--ts)' : ''}>{subLabel(it, i === review.cur)}</span>
           </div>
           <span class="when" class:stale={isStale(it)}>{ageShort(it.created)}</span>
         </div>

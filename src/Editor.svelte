@@ -414,10 +414,12 @@
   }
 
   // ---- narrowing to one subtree ----------------------------------------------------------------------
-  /** The shown part: from the start of the first line to the end of the last non-blank one. */
-  function narrowRange(doc: Text, n: { line: number; end: number }) {
+  /** The shown part: from the start of the first line to the end of the last non-blank one — but never above `keep`
+   *  (the caret, the end shown already): blank lines typed here stay while the card is open (fix to ТЗ 18, Enter). */
+  function narrowRange(doc: Text, n: { line: number; end: number; keep?: number }) {
     let last = Math.min(n.end, doc.lines) - 1;
-    while (last > n.line && doc.line(last + 1).text.trim() === '') last--;
+    const floor = n.keep !== undefined ? Math.min(last, doc.lineAt(Math.min(n.keep, doc.length)).number - 1) : n.line;
+    while (last > Math.max(n.line, floor) && doc.line(last + 1).text.trim() === '') last--;
     return { from: doc.line(Math.min(n.line + 1, doc.lines)).from, to: doc.line(Math.max(last, n.line) + 1).to };
   }
   const hiddenOutside = (st: EditorState, r: { from: number; to: number } | null) => {
@@ -428,14 +430,14 @@
     return Decoration.set(out);
   };
   /** The heading's lines again (it grew or moved by a change from elsewhere: the mini window, ТЗ 31). */
-  const setNarrow = StateEffect.define<{ line: number; end: number }>();
+  const setNarrow = StateEffect.define<{ line: number; end: number; keep?: number }>();
   let narrowField: StateField<{ from: number; to: number }> | null = null;
   function narrowing(n: { line: number; end: number }) {
     const field = StateField.define<{ from: number; to: number }>({
       create: (st) => narrowRange(st.doc, n),
       update: (r, tr) => {
         const reset = tr.effects.find((e) => e.is(setNarrow));
-        if (reset) return narrowRange(tr.state.doc, reset.value as { line: number; end: number });
+        if (reset) return narrowRange(tr.state.doc, reset.value as { line: number; end: number; keep?: number });
         // typing at either edge stays inside
         return tr.docChanged ? { from: tr.changes.mapPos(r.from, -1), to: tr.changes.mapPos(r.to, 1) } : r;
       },
@@ -675,9 +677,11 @@
     const n = narrow;
     const t = text;
     if (!view || !n || !narrowField || view.state.doc.toString() !== t) return;
-    const want = narrowRange(view.state.doc, n);
+    // the caret's line and the lines shown already stay: Enter at the end makes a line that is not cut off
     const now = view.state.field(narrowField);
-    if (want.from !== now.from || want.to !== now.to) view.dispatch({ effects: setNarrow.of({ line: n.line, end: n.end }) });
+    const keep = Math.max(now.to, view.state.selection.main.head);
+    const want = narrowRange(view.state.doc, { ...n, keep });
+    if (want.from !== now.from || want.to !== now.to) view.dispatch({ effects: setNarrow.of({ line: n.line, end: n.end, keep }) });
   });
 
   $effect(() => {

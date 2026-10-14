@@ -17,6 +17,7 @@
       { "id": "inbox.move", "title": "Разбор: Перенести…", "keys": ["⌘3"], "scope": "review" },
       { "id": "inbox.defer", "title": "Разбор: Отложить…", "keys": ["⌘4"], "scope": "review" },
       { "id": "inbox.skip", "title": "Разбор: Пропустить", "keys": ["⌘5"], "scope": "review" },
+      { "id": "inbox.next", "title": "Разбор: Далее", "keys": ["⌘↩"], "scope": "review", "synonyms": ["разобрана", "дальше"], "note": "На ссылке ⌘↩ в разборе не открывает её — используйте клик" },
       { "id": "inbox.back", "title": "Разбор: Назад", "keys": ["⌘["], "scope": "review" },
       { "id": "inbox.calendar", "title": "Разбор: Показать / скрыть календарь", "keys": ["⌘K"], "synonyms": ["календарь"], "scope": "review" }
     ],

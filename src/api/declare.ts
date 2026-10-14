@@ -135,7 +135,7 @@ export function declareKeys(m: Manifest) {
     registerGroup({ id: viewGroup(m.id), title: w.toUpperCase(), note: `только в виде «${w}»` });
   }
   registerKeys(m.contributes.commands.map((c) =>
-    C(c.id, c.title, c.scope === 'view' ? viewGroup(m.id) : groupOf(m.id), c.scope === 'review' ? reviewScope(m.id) : c.scope === 'view' ? viewScope(m.id) : 'window', c.keys ?? [], { synonyms: c.synonyms }),
+    C(c.id, c.title, c.scope === 'view' ? viewGroup(m.id) : groupOf(m.id), c.scope === 'review' ? reviewScope(m.id) : c.scope === 'view' ? viewScope(m.id) : 'window', c.keys ?? [], { synonyms: c.synonyms, ...(c.note ? { note: c.note } : {}) }),
   ));
 }
 export function undeclareKeys(m: Manifest) {

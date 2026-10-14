@@ -18,6 +18,8 @@ export interface ManifestCommand {
   scope?: 'review' | 'view';
   /** From the palette it asks in the palette (`ui.choose` at once): the next step of the same window. */
   step?: boolean;
+  /** A grey line under it in «Клавиши» (1.6). */
+  note?: string;
 }
 export interface ManifestNav {
   id: string;
@@ -147,7 +149,7 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
     const ok = keys.filter((k) => !RESERVED_KEYS.includes(k));
     for (const k of keys) if (!ok.includes(k)) warnings.push(`${k} у «${String(x.title)}» занято приложением`);
     if (x.scope !== undefined && x.scope !== 'review' && x.scope !== 'view') problems.push(`команда «${x.id}»: scope — review или view`);
-    commands.push({ id: x.id as string, title: String(x.title ?? ''), keys: ok, synonyms: arr(x.synonyms).filter(isStr), ...(x.scope === 'review' || x.scope === 'view' ? { scope: x.scope } : {}), ...(x.step === true ? { step: true } : {}) });
+    commands.push({ id: x.id as string, title: String(x.title ?? ''), keys: ok, synonyms: arr(x.synonyms).filter(isStr), ...(x.scope === 'review' || x.scope === 'view' ? { scope: x.scope } : {}), ...(x.step === true ? { step: true } : {}), ...(isStr(x.note) && x.note ? { note: x.note } : {}) });
   }
   const navSections: ManifestNav[] = [];
   for (const x of arr(c.navSections).map(obj)) {

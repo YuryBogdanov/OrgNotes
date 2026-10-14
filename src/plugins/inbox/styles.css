@@ -21,6 +21,9 @@
 .creview.review .a.on { background: var(--sel); border-color: var(--acc); }
 .creview.review .done-b { background: var(--done); border-color: var(--done); color: var(--onacc); }
 .creview.review .move-b { background: var(--acc); border-color: var(--acc); color: var(--onacc); }
+/* «Далее» (fix to ТЗ 18): outlined in the accent; filled once the card was edited — the main action then */
+.creview.review .next-b { border-color: var(--acc); color: var(--acc); }
+.creview.review .next-b.edited { background: var(--acc); color: var(--onacc); }
 /* off (the task is done already): no fill, so it reads as off in the dark theme too (#105) */
 .creview.review .done-b:disabled { background: var(--bg); border-color: var(--line); color: var(--fg3); opacity: 1; }
 .creview.review .done-b:disabled .hint { color: var(--done); }

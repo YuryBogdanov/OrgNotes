@@ -89,6 +89,10 @@
 <button class="a" onclick={() => session.act(() => session.skip())}>
   <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5l6 5-6 5M13 5v10" /></svg>Пропустить{#if kbd('inbox.skip')}<kbd>{kbd('inbox.skip')}</kbd>{/if}
 </button>
+<!-- «Далее»: outlined in the accent; once the card was edited — filled, the main action -->
+<button class="a next-b" class:edited={session.edited} onclick={() => session.act(() => session.pass())}>
+  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h11M11 5l5 5-5 5" /></svg>Далее{#if kbd('inbox.next')}<kbd>{kbd('inbox.next')}</kbd>{/if}
+</button>
 
 {#if session.defer}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->

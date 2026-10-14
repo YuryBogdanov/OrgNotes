@@ -97,6 +97,7 @@ class Session {
         { id: 'move', label: 'Перенести…', command: 'inbox.move', run: () => this.act(() => this.move()) },
         { id: 'defer', label: 'Отложить…', command: 'inbox.defer', run: () => this.act(() => void (this.defer = this.defer ? null : { sel: 0 })) },
         { id: 'skip', label: 'Пропустить', command: 'inbox.skip', run: () => this.act(() => this.skip()) },
+        { id: 'next', label: 'Далее', command: 'inbox.next', run: () => this.act(() => this.pass()) },
         { id: 'calendar', label: 'Календарь', command: 'inbox.calendar', run: () => this.act(() => this.toggleCal()) },
       ],
     });
@@ -192,6 +193,40 @@ class Session {
     it.result = 'skip';
     this.next();
   }
+  /** «Далее» (fix to ТЗ 18): done with the task as it is — nothing is written (the card's edits are in the file
+   *  already); it stays in the Inbox and does not come back in this review. «Отменить» puts it back in the queue. */
+  pass() {
+    const r = this.run;
+    const it = this.item;
+    if (!r || !it) return;
+    const before = { result: it.result, note: it.note };
+    const at = r.cur;
+    const now = data.find(it);
+    const d = now?.h.scheduled ?? now?.h.deadline;
+    const when = d ? `${short(new Date(d.y, d.m - 1, d.d))}${d.time ? ' ' + d.time : ''}` : '';
+    it.result = 'next';
+    it.note = ['Разобрана', now?.h.keyword ?? it.keyword, when].filter(Boolean).join(' · ');
+    this.next();
+    data.ctx.ui.notify(`Разобрана: ${it.title}`, [{
+      label: 'Отменить',
+      run: () => {
+        if (this.run !== r) return;
+        Object.assign(it, before);
+        this.show(at);
+      },
+    }]);
+  }
+  /** The card's task as it was shown first: «Далее» is the main action once it was edited there. */
+  private seen = $state<{ id: string; text: string } | null>(null);
+  private subtree(it: ReviewItem): string | null {
+    const r = data.find(it);
+    return r ? r.f.text.split('\n').slice(r.h.line, r.h.end).join('\n') : null;
+  }
+  get edited(): boolean {
+    const it = this.item;
+    const s = this.seen;
+    return !!it && !!s && s.id === it.id && this.subtree(it) !== s.text;
+  }
   /** «Перенести…»: the core's move over the tab; ⎋ comes back to the same card. */
   async move() {
     const r = this.run;
@@ -261,6 +296,7 @@ class Session {
   sync(h: HeadingInfo) {
     const it = this.item;
     if (!it || it.path !== h.ref.path) return;
+    if (this.seen?.id !== it.id) this.seen = { id: it.id, text: this.subtree(it) ?? '' };
     const r = data.find(it);
     const now = r ? { line: r.h.line, title: r.h.title } : !it.created && h.ref.line === it.line ? h.ref : null;
     if (now && (it.line !== now.line || it.title !== now.title)) {
