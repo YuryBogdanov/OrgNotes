@@ -1404,6 +1404,27 @@ fn remind_end_day(app: AppHandle) -> bool {
     }
 }
 
+/// The text of the clipboard (ТЗ 35): the page cannot read it without WebKit asking the user.
+#[tauri::command]
+fn clipboard_text() -> String {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        extern "C" {
+            fn clip_text() -> *mut std::os::raw::c_char;
+            fn free(p: *mut std::ffi::c_void);
+        }
+        let p = clip_text();
+        if p.is_null() {
+            return String::new();
+        }
+        let s = std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned();
+        free(p as *mut std::ffi::c_void);
+        s
+    }
+    #[cfg(not(target_os = "macos"))]
+    String::new()
+}
+
 /// On the main thread, as AppKit wants it: at once when this is it (a sync command, a shortcut's handler), else
 /// sent there and waited for.
 fn on_main<R: Send + 'static>(app: &AppHandle, f: impl FnOnce() -> R + Send + 'static) -> Option<R> {
@@ -1613,6 +1634,7 @@ pub fn run() {
             mini_options,
             remind_prepare,
             remind_end_day,
+            clipboard_text,
             show_main_window,
             list_themes,
             write_theme,

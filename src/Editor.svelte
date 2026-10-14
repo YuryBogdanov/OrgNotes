@@ -14,6 +14,7 @@
   import { orgRich, type RichPick } from './orgRich';
   import { findExtension, findField, foundInfo, moveFind, setFind, type FindQuery } from './findView';
   import { registerEditor } from './editorKeys';
+  import { linkHooks, linkPaste } from './linkEdit';
 
   let { text, fileKey, path = '', wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
     path?: string; // the file's name in the folder: what a plugin's link at the end of a line is run with (ТЗ 33)
@@ -501,6 +502,17 @@
       const d = drawerMap(v.state.doc).get(l.number - 1);
       return d ? toggleDrawer(v, d) : false; // the first line of a drawer: that drawer only
     },
+    // ⌃C L: the link to the heading the caret is in (above the first one — to the file), ТЗ 35
+    copyLink: (v) => linkHooks.copyHeading(path, v.state.doc.lineAt(v.state.selection.main.head).number - 1),
+    // ⌥⇧⌘V: the clipboard's text in place of the selection, never a link
+    pasteText: (v) => {
+      void linkHooks.readClip().then((t) => {
+        if (!t) return;
+        const r = v.state.selection.main;
+        v.dispatch({ changes: { from: r.from, to: r.to, insert: t }, selection: { anchor: r.from + t.length }, userEvent: 'input.paste', scrollIntoView: true });
+      });
+      return true;
+    },
     followLink: (v) => {
       const l = linkAt(v.state.doc, v.state.selection.main.head);
       if (!l) return false;
@@ -551,6 +563,17 @@
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         EditorView.domEventHandlers({
+          // ⌘V on a selection with a link in the clipboard: the selection becomes its label (ТЗ 35)
+          paste(e, v) {
+            const clip = e.clipboardData?.getData('text/plain') ?? '';
+            const s = v.state.selection.main;
+            const r = linkPaste(v.state.doc.toString(), s.from, s.to, clip, linkHooks.rel(path));
+            if (!r) return false;
+            e.preventDefault();
+            v.dispatch({ changes: { from: r.from, to: r.to, insert: r.insert }, selection: { anchor: r.caret }, userEvent: 'input.paste', scrollIntoView: true });
+            linkHooks.pasted();
+            return true;
+          },
           mousedown(e, v) {
             // ⌘-click follows a link; drawn as «Оформленный текст», a plain click on it does (ТЗ 32)
             const plain = e.button === 0 && !e.shiftKey && !e.altKey && v.dom.classList.contains('cm-rich') && !!(e.target as HTMLElement).closest?.('.cm-link');

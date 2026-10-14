@@ -57,7 +57,9 @@ export async function installMenu(actions: MenuActions, accel: (id: string) => s
         {
           text: 'Правка',
           items: [
-            { item: 'Undo' }, { item: 'Redo' }, sep, { item: 'Cut' }, { item: 'Copy' }, { item: 'Paste' }, { item: 'SelectAll' }, sep,
+            { item: 'Undo' }, { item: 'Redo' }, sep, { item: 'Cut' }, { item: 'Copy' }, { item: 'Paste' },
+            it('pasteText', 'Вставить как текст'), { item: 'SelectAll' }, sep,
+            it('copyLink', 'Копировать ссылку на заголовок'), sep,
             {
               text: 'Найти',
               items: [

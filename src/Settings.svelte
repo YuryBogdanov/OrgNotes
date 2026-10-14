@@ -521,6 +521,15 @@
             </div>
           </div>
           <p class="help">Блоки :PROPERTIES:, :LOGBOOK: и другие показываются одной строкой с «…», в том числе новые — от Inbox и смены статуса. Tab на этой строке или клик по «…» разворачивает. Только вид: файл не меняется. Настройка хранится на этом Mac.</p>
+          <div class="cap">ССЫЛКИ</div>
+          <div class="opt">
+            <span id="links-l">Ссылки на заголовки</span>
+            <div class="lseg" role="radiogroup" aria-labelledby="links-l">
+              <button role="radio" aria-checked={store.linkFormat === 'id'} class:on={store.linkFormat === 'id'} onclick={() => store.setLinkFormat('id')}>По ID</button>
+              <button role="radio" aria-checked={store.linkFormat === 'title'} class:on={store.linkFormat === 'title'} onclick={() => store.setLinkFormat('title')}>По названию</button>
+            </div>
+          </div>
+          <p class="help">{store.linkFormat === 'id' ? 'Ссылка не ломается при переименовании и переносе. К заголовку добавляется свойство :ID:.' : 'Файл не меняется, но ссылка ломается, если заголовок переименовать.'} «Копировать ссылку на заголовок» — ⌃C L; выделите текст и нажмите ⌘V, чтобы сделать его ссылкой. Настройка хранится на этом Mac.</p>
           <div class="cap">КЛАВИШИ</div>
           <div class="opt">
             <div class="folder">
@@ -905,4 +914,8 @@
   .btns button { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--field); }
   .btns .primary { background: var(--acc); color: var(--onacc); font-weight: 600; }
   .btns .danger-b { background: var(--todo); color: var(--onacc); font-weight: 600; }
+  /* «По ID / По названию» (ТЗ 35) */
+  .lseg { display: flex; padding: 2px; gap: 2px; border-radius: 7px; background: var(--field); }
+  .lseg button { height: 22px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 12px; }
+  .lseg button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); font-weight: 500; }
 </style>

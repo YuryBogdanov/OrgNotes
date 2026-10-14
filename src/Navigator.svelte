@@ -214,6 +214,14 @@
   ];
 
   function rowMenu(e: MouseEvent, r: Row) {
+    // a heading: the link to it (ТЗ 35)
+    if (r.kind === 'heading' && r.file !== undefined && r.line !== undefined) {
+      e.preventDefault();
+      e.stopPropagation();
+      const path = store.files[r.file]?.path;
+      if (path) menu = { x: e.clientX, y: e.clientY, items: [{ label: 'Копировать ссылку на заголовок', shortcut: store.keyHint('copyLink') || undefined, action: () => void store.copyHeadingLink(path, r.line!) }] };
+      return;
+    }
     if (!store.canManageFiles || r.kind === 'heading' || r.kind === 'new') return;
     e.preventDefault();
     e.stopPropagation();

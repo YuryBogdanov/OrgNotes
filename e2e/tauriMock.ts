@@ -296,6 +296,7 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             return null;
           }
           if (cmd === 'show_main_window') return null;
+          if (cmd === 'clipboard_text') return (window as any).__clipText ?? ''; // the test sets what the clipboard holds
           if (cmd === 'plugin:opener|open_url') {
             w.__log.push(['open_url', args.url]);
             return;

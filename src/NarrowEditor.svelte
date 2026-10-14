@@ -21,5 +21,5 @@
   } = $props();
 </script>
 
-<Editor text={file.text} {fileKey} wf={file.wf} {reveal} narrow={{ line, end }} {drawers} {folded} {lineNote} {gutter} levels={store.levels}
+<Editor text={file.text} {fileKey} path={file.name} wf={file.wf} {reveal} narrow={{ line, end }} {drawers} {folded} {lineNote} {gutter} levels={store.levels}
   onchange={(t) => store.setText(t, file.path)} oncursor={(l, c) => store.setTabCursor(tab, l, c)} {onnarrow} onfollow={(l: OrgLink) => store.follow(l)} />
