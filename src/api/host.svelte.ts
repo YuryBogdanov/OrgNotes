@@ -24,7 +24,7 @@ import type { Tx as CoreTx } from '../journal';
 import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSchema';
 import { builtinEntries, declareKeys, entries, viewScope, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, type Entry, type Listed } from './declare';
 import PluginsSettings from '../PluginsSettings.svelte';
-import { hostAllowed, hostOf, type Manifest, type ManifestSettings } from './manifest';
+import { hostAllowed, hostOf, iconOf, type Manifest, type ManifestSettings } from './manifest';
 import type { MenuItem as ApiMenuItem, Ctx, Dispose, Named, SheetSpec, EventName, FormSpec, HeadingInfo, HeadingRef, Place, Plugin, Query, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
 import PluginInspector from '../PluginInspector.svelte';
@@ -387,7 +387,7 @@ class Host {
     for (const c of m.contributes.commands.filter((x) => x.scope !== 'review' && !navKeys.has(x.id) && !this.inPalette.has(x.id))) {
       this.inPalette.add(c.id);
       registerPalette({
-        id: c.id, title: c.title, icon: 'plug', group: 'general', synonyms: c.synonyms,
+        id: c.id, title: c.title, icon: 'plug', group: 'general', synonyms: c.synonyms, plugin: m.name, ...(iconOf(m) ? { iconPath: iconOf(m) } : {}),
         when: () => !!actionOf(c.id) && (c.scope !== 'view' || viewShown()), // the palette has the focus itself
         run: () => {
           // a command that asks in the palette: run now, its choice is the palette's next step (no gap to type into)
@@ -434,7 +434,7 @@ class Host {
     }
     m.contributes.settings.forEach((s, i) => {
       const schema = this.schemaOf(m, s, i);
-      if (s.section) this.keep(id, registerSettings({ id: s.section, icon: s.icon ?? PLUG, order: 81 + i, schema })); // after the core's, before «Плагины»
+      if (s.section) this.keep(id, registerSettings({ id: s.section, icon: s.icon ?? PLUG, order: 81 + i, schema, plugin: id })); // after the core's, before «Плагины»
       else if (s.block) this.keep(id, registerSettingsBlock({ section: s.block, order: 50 + i, schema }));
     });
     if (m.contributes.themes.length) this.loading.push(this.declareThemes(m));

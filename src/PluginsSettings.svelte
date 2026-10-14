@@ -10,7 +10,7 @@
   import CatalogItem from './CatalogItem.svelte';
   import InstallSheet from './InstallSheet.svelte';
   import UrlSheet from './UrlSheet.svelte';
-  import type { Manifest } from './api/manifest';
+  import { iconOf, type Manifest } from './api/manifest';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import { onMount } from 'svelte';
   import { portal } from './portal';
@@ -100,13 +100,19 @@
   <div class="pl" role="group" aria-label={m?.name ?? e.dir}>
     <div class="top">
       <span class="nm">
-        {#if m?.icon}<svg class="ic" width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={m.icon} /></svg>{/if}
+        {#if m && iconOf(m)}<svg class="ic" width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={iconOf(m)} /></svg>{/if}
         <b>{m?.name ?? e.dir}</b>
         {#if m}<span class="ver">{m.version}</span>{/if}
         {#if e.builtin}<span class="tag">встроенный</span>{:else}<span class="src" title={e.source?.kind === 'git' ? e.source.url : ''}>{sourceLabel(e.source)}</span>{/if}
       </span>
       {#if u}
         <button class="upd" disabled={!!busy} onclick={() => void up.update(id)}>{busy === 'update' ? 'Обновляем…' : `Обновить · ${u.version}`}</button>
+      {/if}
+      {#if e.enabled && m?.contributes.settings.some((x) => x.section)}
+        {@const sec = m.contributes.settings.find((x) => x.section)!.section!}
+        <button class="gear" title="Настройки плагина" aria-label="Настройки плагина {m.name}" onclick={() => store.showSection(sec)}>
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" /></svg>
+        </button>
       {/if}
       {#if !e.builtin}
         <button class="dots" aria-label="Ещё: {m?.name ?? e.dir}" disabled={!!busy} onclick={(ev) => more(ev, e)}>{busy === 'check' ? '…' : '•••'}</button>
@@ -229,7 +235,8 @@
   .src { font-size: 11.5px; color: var(--fg3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .upd { height: 24px; padding: 0 10px; border: 1px solid var(--acc); border-radius: 6px; background: transparent; color: var(--acc); font-size: 12px; white-space: nowrap; }
   .dots { height: 24px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); font-size: 10px; letter-spacing: 1px; }
-  .dots:hover { background: var(--field); }
+  .dots:hover, .gear:hover { background: var(--field); }
+  .gear { height: 24px; width: 26px; padding: 0; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); }
   .layer { color: var(--fg); }
   .scrim { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, 0.3); }
   .dlg { position: fixed; z-index: 91; left: 50%; top: 30%; transform: translateX(-50%); width: min(400px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 8px; padding: 18px 20px 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35); font-size: 13px; outline: none; }
