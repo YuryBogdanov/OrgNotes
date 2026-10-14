@@ -266,6 +266,12 @@ export function moveSubtree(text: string, caret: number, dir: -1 | 1): Result | 
 
 const RING = ['A', 'B', 'C'];
 
+/** The priority after ⇧↑ / ⇧↓ (a list's keys too, ТЗ 34). */
+export function priorityAfter(p: string | null, dir: 'up' | 'down'): string {
+  const cur = p ? RING.indexOf(p) : -1;
+  return cur < 0 ? 'B' : RING[(cur + (dir === 'up' ? -1 : 1) + RING.length) % RING.length];
+}
+
 /**
  * Org-like priority cycling: no priority starts at the default B; up goes towards A and wraps to C,
  * down goes towards C and wraps to A.
@@ -276,8 +282,7 @@ export function cyclePriority(text: string, caret: number, dir: 'up' | 'down', w
   if (!c.real.has(ln)) return null;
   const h = parseHeadings(text, wf).find((x) => x.line === ln);
   if (!h) return null;
-  const cur = h.priority ? RING.indexOf(h.priority) : -1;
-  const next = cur < 0 ? 'B' : RING[(cur + (dir === 'up' ? -1 : 1) + RING.length) % RING.length];
+  const next = priorityAfter(h.priority, dir);
   const updated = setPriority(text, h, next).split('\n')[ln];
   const old = c.lines[ln];
   // where the priority cookie sits: after the stars and the keyword

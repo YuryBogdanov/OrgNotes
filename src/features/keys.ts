@@ -21,3 +21,23 @@ registerKeys([
   C('today', 'Открыть «Сегодня»', 'today', 'window', ['⇧⌘H'], { synonyms: ['сегодня', 'утро', 'обзор', 'день'] }),
   C('endDay', 'Завершить день…', 'today', 'window', [], { synonyms: ['вечер', 'журнал', 'итоги', 'на завтра'] }),
 ]);
+
+// ---- a task chosen in a list (ТЗ 34): the agenda, «Сегодня», the calendar, the navigator's «Задачи» -------------------
+registerGroup({ id: 'list', title: 'ЗАДАЧИ В СПИСКАХ', note: 'в агенде, календаре, «Сегодня» и навигаторе' });
+registerScope({ id: 'list', name: 'в списке задач', over: ['window', 'editor', 'heading'], outside: { scopes: ['window'], word: 'Вне списка' }, rank: 20, alone: true });
+registerKeys([
+  C('taskOpen', 'Открыть задачу', 'list', 'list', ['↩']),
+  C('taskOpenOther', 'Открыть во второй панели', 'list', 'list', ['⌥↩']),
+  C('taskStatusNext', 'Следующий статус', 'list', 'list', ['⇧→']),
+  C('taskStatusPrev', 'Предыдущий статус', 'list', 'list', ['⇧←']),
+  C('taskPrioUp', 'Приоритет выше', 'list', 'list', ['⇧↑']),
+  C('taskPrioDown', 'Приоритет ниже', 'list', 'list', ['⇧↓']),
+  C('taskDateNext', 'Дата +1 день', 'list', 'list', ['⌥⇧→'], { note: 'Та дата, по которой задача стоит в списке' }),
+  C('taskDatePrev', 'Дата −1 день', 'list', 'list', ['⌥⇧←']),
+  C('taskSchedule', 'Запланировать…', 'list', 'list', ['⌃C S'], { synonyms: ['scheduled', 'дата'] }),
+  C('taskDeadline', 'Дедлайн…', 'list', 'list', ['⌃C D'], { synonyms: ['срок'] }),
+  C('taskTags', 'Теги…', 'list', 'list', ['⌃C Q'], { synonyms: ['метки'] }),
+  C('taskRefile', 'Перенести в другой файл…', 'list', 'list', [], { emacs: ['⌃C ⌃W'], mac: [], synonyms: ['refile', 'переместить'] }),
+  C('taskRefresh', 'Обновить список', 'list', 'list', ['⌘R']),
+  C('taskDeselect', 'Снять выделение', 'list', 'list', ['⎋']),
+]);

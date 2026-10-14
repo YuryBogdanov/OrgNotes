@@ -218,7 +218,7 @@
   {/if}
   <div class="list" id="pal-list" role="listbox" aria-label="Результаты" bind:this={list} class:none={!!step.calendar}>
     {#each rows as r, i (r.id + i)}
-      {#if r.group && r.group !== rows[i - 1]?.group}<div class="gh" role="presentation">{r.group}</div>{/if}
+      {#if r.group && r.group !== rows[i - 1]?.group}<div class="gh" role="presentation">{r.group}{#if r.note}<span class="gn">{r.note}</span>{/if}</div>{/if}
       {#if r.run}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="row" id={'pal-' + r.id} role="option" aria-selected={current === r} aria-label={label(r)} class:on={current === r}
@@ -268,6 +268,8 @@
   kbd { font: 11px var(--mono); padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--fg2); }
   .list { flex: 0 1 auto; min-height: 0; overflow-y: auto; padding: 6px 8px 8px; display: flex; flex-direction: column; }
   .gh { padding: 10px 10px 4px; font-size: 11px; font-weight: 600; color: var(--fg2); letter-spacing: 0.02em; }
+  /* «ВЫДЕЛЕННАЯ ЗАДАЧА» and its task in grey (ТЗ 34) */
+  .gn { margin-left: 8px; font-weight: 400; letter-spacing: 0; color: var(--fg3); }
   .row { flex: 0 0 40px; display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 10px; border-radius: 8px; color: var(--fg); cursor: default; }
   .row.on { background: var(--pacc); color: var(--onpacc); }
   .row.empty { color: var(--fg2); }

@@ -109,6 +109,22 @@ export function setPlanning(text: string, h: Heading, kind: 'SCHEDULED' | 'DEADL
   return lines.join('\n');
 }
 
+/**
+ * An event's timestamp (the line right under the heading) moved by `days`: its time, end time and repeater kept;
+ * both ends of a range move, so it keeps its length (ТЗ 34, ⌥⇧← → in a list).
+ */
+export function shiftEvent(text: string, h: Heading, days: number): string {
+  const lines = text.split('\n');
+  const at = h.line + 1;
+  if (!/^\s*<\d{4}-/.test(lines[at] ?? '')) return text;
+  const names = weekdayNames(text);
+  lines[at] = lines[at].replace(/<(\d{4})-(\d{2})-(\d{2})(?:\s+[^\s\d>]+)?([^>]*)>/g, (_, y: string, m: string, d: string, tail: string) => {
+    const to = new Date(+y, +m - 1, +d + days);
+    return `<${to.getFullYear()}-${pad(to.getMonth() + 1)}-${pad(to.getDate())} ${names[to.getDay()]}${tail}>`;
+  });
+  return lines.join('\n');
+}
+
 /** Replace the tags of a heading: «:a:b:» at the end of its line, none for an empty list. */
 export function setTags(text: string, h: Heading, tags: string[]): string {
   const lines = text.split('\n');

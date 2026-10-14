@@ -30,7 +30,7 @@ test.describe('the list', () => {
   test('every command by groups, with its shortcuts; the review row tells what ⌘1 does elsewhere', async ({ page }) => {
     await open(page);
     await keysSheet(page);
-    await expect(sheet(page).locator('.gt')).toHaveText(['ГЛОБАЛЬНЫЕ', 'ПРИЛОЖЕНИЕ И ОКНО', 'ФАЙЛ И ВКЛАДКИ', 'ПОИСК', 'ВИД И ПАНЕЛИ', 'ПЕРЕХОДЫ', 'ЗАГОЛОВКИ И ЗАДАЧИ', 'БЫСТРЫЙ ВВОД', 'МИНИ-ОКНО', 'СЕГОДНЯ', 'КАЛЕНДАРЬ', 'КАНБАН', 'ДОСКА', 'ЦЕЛИ КВАРТАЛА', 'INBOX']); // the plugins' groups: their names, in the order of the plugins
+    await expect(sheet(page).locator('.gt')).toHaveText(['ГЛОБАЛЬНЫЕ', 'ПРИЛОЖЕНИЕ И ОКНО', 'ФАЙЛ И ВКЛАДКИ', 'ПОИСК', 'ВИД И ПАНЕЛИ', 'ПЕРЕХОДЫ', 'ЗАГОЛОВКИ И ЗАДАЧИ', 'БЫСТРЫЙ ВВОД', 'МИНИ-ОКНО', 'СЕГОДНЯ', 'ЗАДАЧИ В СПИСКАХ', 'КАЛЕНДАРЬ', 'КАНБАН', 'ДОСКА', 'ЦЕЛИ КВАРТАЛА', 'INBOX']); // the plugins' groups: their names, in the order of the plugins
     await expect(chips(page, 'capture')).toHaveText(['⇧⌘I']);
     await expect(chips(page, 'findNext')).toHaveText(['⌘G']);
     await expect(chips(page, 'searchPrev')).toHaveText(['⌥⇧⌘G']);
@@ -55,7 +55,7 @@ test.describe('the list', () => {
     await search.fill('cmd g');
     expect(await shown()).toEqual(['Найти далее']);
     await search.fill('refile');
-    expect(await shown()).toEqual(['Перенести в другой файл…']);
+    expect(await shown()).toEqual(['Перенести в другой файл…', 'Перенести в другой файл…']); // in the text and in a list (ТЗ 34)
     await search.fill('ничегонет');
     await expect(sheet(page).getByText('Ничего не найдено')).toBeVisible();
     await page.keyboard.press('Escape'); // the query first

@@ -138,8 +138,8 @@ describe('search', () => {
     expect(hit('найти далее')).toEqual(['findNext']);
     expect(hit('⌘G')).toEqual(['findNext']);
     expect(hit('cmd g')).toEqual(['findNext']);
-    expect(hit('ctrl c s')).toEqual(['schedule']);
-    expect(hit('refile')).toEqual(['refile']);
+    expect(hit('ctrl c s')).toEqual(['schedule', 'taskSchedule']); // in the text and in a list (ТЗ 34)
+    expect(hit('refile')).toEqual(['refile', 'taskRefile']);
     expect(hit('ё')).toEqual(hit('е'));
   });
 });

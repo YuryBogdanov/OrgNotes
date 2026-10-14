@@ -5,6 +5,8 @@
         // the tab list of a pane: a check at the active one, the tab's icon, a dot at an unsaved one
         checked?: boolean; icon?: string; dot?: boolean; italic?: boolean; // icon: 'file' | 'agenda' | 'untitled', or an SVG path (a feature's tab)
         sub?: MenuItem[]; // a submenu, opened by hovering or a click («Показать как ›»)
+        subWidth?: number; // its least width
+        capsule?: string; // the label as a status capsule: the tone's style (`--tl:…`), as the agenda draws it (ТЗ 34)
       }
     | { note: string } // a grey line, not a command («Виды добавляют плагины»)
     | 'sep';
@@ -13,7 +15,8 @@
 <script lang="ts">
   import Self from './ContextMenu.svelte';
 
-  let { x, y, items, onclose, nested = false }: { x: number; y: number; items: MenuItem[]; onclose: () => void; nested?: boolean } = $props();
+  // `width`: the least width; `tall`: rows of 28 pt (the task menu of the lists, ТЗ 34)
+  let { x, y, items, onclose, nested = false, width = 200, tall = false }: { x: number; y: number; items: MenuItem[]; onclose: () => void; nested?: boolean; width?: number; tall?: boolean } = $props();
   // the submenu open: its item's index and where it goes
   let sub = $state<{ i: number; x: number; y: number } | null>(null);
   function openSub(e: Event, i: number) {
@@ -41,7 +44,7 @@
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div class="scrim" onmousedown={onclose} oncontextmenu={(e) => { e.preventDefault(); onclose(); }}></div>
 {/if}
-<div class="menu" role="menu" bind:this={el} style="left:{pos.left}px;top:{pos.top}px">
+<div class="menu" class:tall role="menu" bind:this={el} style="left:{pos.left}px;top:{pos.top}px;min-width:{width}px">
   {#each items as it, i}
     {#if it === 'sep'}
       <div class="sep"></div>
@@ -59,7 +62,11 @@
             {#if it.icon === 'agenda'}<rect x="3" y="4" width="14" height="13" rx="2.5" /><path d="M3 8h14M7 2.5v3M13 2.5v3" />{:else if it.icon === 'file' || it.icon === 'untitled'}<path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" />{:else}<path d={it.icon} />{/if}
           </svg>
         {/if}
-        <span class="lb" class:it={it.italic}>{it.label}</span>
+        {#if it.capsule}
+          <span class="lb"><span class="capsule tone-chip" style={it.capsule}>{it.label}</span></span>
+        {:else}
+          <span class="lb" class:it={it.italic}>{it.label}</span>
+        {/if}
         {#if it.dot}<span class="dot" aria-label="не сохранено"></span>{/if}
         {#if it.shortcut}<span class="kb">{it.shortcut}</span>{/if}
         {#if it.sub}<span class="kb more" aria-hidden="true">›</span>{/if}
@@ -69,7 +76,7 @@
 </div>
 {#if sub}
   {@const host = items[sub.i]}
-  {#if host !== 'sep' && !('note' in host) && host.sub}<Self x={sub.x} y={sub.y} items={host.sub} {onclose} nested />{/if}
+  {#if host !== 'sep' && !('note' in host) && host.sub}<Self x={sub.x} y={sub.y} items={host.sub} {onclose} nested width={host.subWidth ?? 200} {tall} />{/if}
 {/if}
 
 <style>
@@ -97,4 +104,8 @@
   .note { padding: 4px 10px 3px; font-size: 11px; line-height: 1.4; color: var(--fg3); }
   .menu button.open { background: var(--acc); color: var(--onacc); }
   .more { padding-left: 12px; }
+  .menu.tall button { align-items: center; min-height: 28px; padding: 0 10px; }
+  /* a status or a priority as its capsule (ТЗ 34): rounded 4 pt, a tint of its colour; on the hovered row it stays */
+  .capsule { display: inline-block; padding: 1px 5px; border-radius: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; }
+  .menu button:hover:not(:disabled) .capsule { background: color-mix(in srgb, var(--onacc) 88%, transparent); }
 </style>
