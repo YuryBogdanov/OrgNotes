@@ -495,9 +495,27 @@ fn list_org_files(state: State<AppState>) -> Result<Vec<OrgFile>, String> {
     Ok(out)
 }
 
-/// A note: an `.org` file, or its archive as Emacs makes them (`.org_archive`, ТЗ 33).
+/// A note: an `.org` file, or its archive as Emacs makes them (`.org_archive`, ТЗ 33), or a file of a type a plugin
+/// declares (`fileTypes`, «.canvas» of «Холст», ТЗ 39).
 fn is_org(p: &Path) -> bool {
-    matches!(p.extension().and_then(|x| x.to_str()), Some("org" | "org_archive"))
+    match p.extension().and_then(|x| x.to_str()) {
+        Some("org" | "org_archive") => true,
+        Some(x) => NOTE_TYPES.lock().unwrap().iter().any(|t| t.eq_ignore_ascii_case(x)),
+        None => false,
+    }
+}
+
+/// The extensions of the plugins' file types (without the dot), as the window last set them.
+static NOTE_TYPES: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// An extension a plugin may declare: letters and digits, not the app's own.
+fn note_type_ok(x: &str) -> bool {
+    !x.is_empty() && x.len() <= 16 && x.chars().all(|c| c.is_ascii_alphanumeric()) && !matches!(x.to_ascii_lowercase().as_str(), "org" | "org_archive")
+}
+
+#[tauri::command]
+fn set_note_types(types: Vec<String>) {
+    *NOTE_TYPES.lock().unwrap() = types.into_iter().filter(|t| note_type_ok(t)).map(|t| t.to_ascii_lowercase()).collect();
 }
 
 /// Atomic write (temp file + rename) restricted to .org files inside the notes folder.
@@ -578,15 +596,15 @@ mod tests {
     #[test]
     fn creates_files_and_folders() {
         let d = tmp("create");
-        let f = create_in(&d, d.to_str().unwrap(), "План", false).unwrap();
+        let f = create_in(&d, d.to_str().unwrap(), "План", false, None).unwrap();
         assert!(f.ends_with("План.org"));
         assert_eq!(fs::read_to_string(&f).unwrap(), "#+TITLE: План\n\n");
-        let dir = create_in(&d, d.to_str().unwrap(), "Команда", true).unwrap();
+        let dir = create_in(&d, d.to_str().unwrap(), "Команда", true, None).unwrap();
         assert!(Path::new(&dir).is_dir());
-        let nested = create_in(&d, &dir, "a.org", false).unwrap();
+        let nested = create_in(&d, &dir, "a.org", false, None).unwrap();
         assert!(nested.ends_with("Команда/a.org"));
         assert_eq!(
-            create_in(&d, d.to_str().unwrap(), "План", false),
+            create_in(&d, d.to_str().unwrap(), "План", false, None),
             Err("exists".to_string())
         );
     }
@@ -597,18 +615,18 @@ mod tests {
         let other = tmp("names-other");
         for bad in ["", "  ", "..", ".hidden", "a/b", "a\\b", "a:b"] {
             assert!(
-                create_in(&d, d.to_str().unwrap(), bad, false).is_err(),
+                create_in(&d, d.to_str().unwrap(), bad, false, None).is_err(),
                 "{bad:?}"
             );
         }
-        assert!(create_in(&d, other.to_str().unwrap(), "x", false).is_err());
+        assert!(create_in(&d, other.to_str().unwrap(), "x", false, None).is_err());
     }
 
     #[test]
     fn renames_keeping_extension_and_refusing_overwrite() {
         let d = tmp("rename");
-        let a = create_in(&d, d.to_str().unwrap(), "a", false).unwrap();
-        let b = create_in(&d, d.to_str().unwrap(), "b", false).unwrap();
+        let a = create_in(&d, d.to_str().unwrap(), "a", false, None).unwrap();
+        let b = create_in(&d, d.to_str().unwrap(), "b", false, None).unwrap();
         let r = rename_in(&d, &a, "c").unwrap();
         assert!(r.ends_with("c.org") && Path::new(&r).exists() && !Path::new(&a).exists());
         assert_eq!(rename_in(&d, &r, "b"), Err("exists".to_string()));
@@ -620,14 +638,14 @@ mod tests {
     fn moves_into_folders_but_not_into_itself() {
         let d = tmp("move");
         let root = d.to_str().unwrap();
-        let team = create_in(&d, root, "Team", true).unwrap();
-        let sub = create_in(&d, &team, "Sub", true).unwrap();
-        let note = create_in(&d, root, "n", false).unwrap();
+        let team = create_in(&d, root, "Team", true, None).unwrap();
+        let sub = create_in(&d, &team, "Sub", true, None).unwrap();
+        let note = create_in(&d, root, "n", false, None).unwrap();
         let moved = move_in(&d, &note, &team).unwrap();
         assert!(moved.ends_with("Team/n.org") && Path::new(&moved).exists());
         assert!(move_in(&d, &team, &sub).is_err());
         // a name clash is refused, nothing is overwritten
-        let again = create_in(&d, root, "n", false).unwrap();
+        let again = create_in(&d, root, "n", false, None).unwrap();
         assert_eq!(move_in(&d, &again, &team), Err("exists".to_string()));
         assert!(Path::new(&again).exists());
         // moving a folder carries its content
@@ -684,6 +702,13 @@ mod tests {
         assert!(emacs_service(".#x.org") && emacs_service("#x.org#") && emacs_service("x.org~") && !emacs_service("x.org"));
         // a note: .org, or its archive as Emacs makes them (ТЗ 33)
         assert!(is_org(Path::new("a.org")) && is_org(Path::new("a.org_archive")) && !is_org(Path::new("a.md")) && !is_org(Path::new("a.org.tmp")));
+        // a plugin's file type (ТЗ 39): listed, written, made with its own empty text
+        assert!(!is_org(Path::new("b.canvas")));
+        set_note_types(vec!["canvas".into(), "bad.ext".into(), "org".into()]);
+        assert!(is_org(Path::new("b.canvas")) && is_org(Path::new("b.CANVAS")) && !is_org(Path::new("b.md")));
+        assert_eq!(*NOTE_TYPES.lock().unwrap(), vec!["canvas".to_string()]);
+        assert_eq!(with_org("b.canvas".into()), "b.canvas");
+        set_note_types(vec![]);
         assert_eq!((with_org("a".into()), with_org("a.org".into()), with_org("a.org_archive".into())), ("a.org".into(), "a.org".into(), "a.org_archive".into()));
         let _ = fs::remove_dir_all(&d);
     }
@@ -716,8 +741,8 @@ mod tests {
     fn lists_folders_including_empty_ones() {
         let d = tmp("dirs");
         let root = d.to_str().unwrap();
-        let a = create_in(&d, root, "A", true).unwrap();
-        create_in(&d, &a, "B", true).unwrap();
+        let a = create_in(&d, root, "A", true, None).unwrap();
+        create_in(&d, &a, "B", true, None).unwrap();
         fs::create_dir(d.join(".git")).unwrap();
         let mut out = Vec::new();
         dirs_in(&d, &d, &mut out);
@@ -763,14 +788,14 @@ fn as_known(root: &Path, canon: &Path) -> String {
 }
 
 fn with_org(name: String) -> String {
-    if name.ends_with(".org") || name.ends_with(".org_archive") {
+    if name.ends_with(".org") || name.ends_with(".org_archive") || is_org(Path::new(&name)) {
         name
     } else {
         format!("{name}.org")
     }
 }
 
-fn create_in(root: &Path, parent: &str, name: &str, is_dir: bool) -> Result<String, String> {
+fn create_in(root: &Path, parent: &str, name: &str, is_dir: bool, text: Option<&str>) -> Result<String, String> {
     let parent = inside(root, Path::new(parent))?;
     if !parent.is_dir() {
         return Err("parent is not a folder".into());
@@ -783,6 +808,11 @@ fn create_in(root: &Path, parent: &str, name: &str, is_dir: bool) -> Result<Stri
     }
     if is_dir {
         fs::create_dir(&target).map_err(|e| e.to_string())?;
+    } else if let Some(text) = text {
+        // a plugin's file type: its empty file (a canvas with nothing on it)
+        fs::write(&target, text).map_err(|e| e.to_string())?;
+    } else if !name.ends_with(".org") {
+        fs::write(&target, "").map_err(|e| e.to_string())?;
     } else {
         let title = name.trim_end_matches(".org");
         fs::write(&target, format!("#+TITLE: {title}\n\n")).map_err(|e| e.to_string())?;
@@ -886,8 +916,9 @@ fn create_entry(
     parent: String,
     name: String,
     is_dir: bool,
+    text: Option<String>,
 ) -> Result<String, String> {
-    create_in(&root_of(&state)?, &parent, &name, is_dir)
+    create_in(&root_of(&state)?, &parent, &name, is_dir, text.as_deref())
 }
 
 #[tauri::command]
@@ -1610,6 +1641,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            set_note_types,
             plugin_sources::catalog_fetch,
             plugin_sources::catalog_raw,
             plugin_sources::catalog_releases,

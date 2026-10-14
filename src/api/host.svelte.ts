@@ -8,6 +8,8 @@ import { mount, unmount, untrack, type Component } from 'svelte';
 import { store } from '../store.svelte';
 import { newTab, openFile, openFromAgenda, openScoped, openView } from '../layout';
 import { headingActions } from '../headingActions.svelte';
+import { newId } from '../endDay';
+import { registerFileType } from '../fileTypes.svelte';
 import { register as registerPalette } from '../commands';
 import { registerAction, registerFileView, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf, viewOf } from '../views';
 import { setLineLink } from '../lineLinks';
@@ -418,6 +420,7 @@ class Host {
         defaultFor: (f) => !!this.guard(id, () => this.fileViews.get(v.id)?.spec.defaultFor?.(f.text), false),
       }));
     }
+    for (const t of m.contributes.fileTypes) this.keep(id, registerFileType({ ...t, plugin: id }));
     for (const b of m.contributes.todayBlocks) {
       this.keep(id, registerTodayBlock({
         id: b.id, title: b.title, hint: b.hint, attach: b.attach, full: b.width === 'full', before: b.before, after: b.after, component: PluginTodayBlock as unknown as Component,
@@ -1103,6 +1106,12 @@ class Host {
           const h = f && findHeading(f.headings, ref);
           return f && h ? bodyOf(f.text, h) : null;
         },
+        byId: async (id) => {
+          const want = String(id).trim();
+          for (const f of store.files)
+            for (const h of f.headings) if (h.id === want) return { path: f.name, line: h.line, title: h.title };
+          return null;
+        },
         outline: async (path) => {
           const f = fileOf(path);
           return f ? f.headings.map((h) => infoOf(f, h)) : [];
@@ -1496,6 +1505,17 @@ function apiTx(tx: CoreTx, ev: Changed[]) {
       ev.push([h, 'moved'])
     ),
     remove: (h: HeadingRef) => (tx.remove(coreRef(h)), ev.push([h, 'removed'])),
+    ensureId: (h: HeadingRef) => {
+      const r = coreRef(h);
+      const x = tx.heading(r);
+      if (!x) return null;
+      const have = txInfo(tx, r, x).properties.ID;
+      if (have) return have;
+      const id = newId();
+      tx.setProperty(r, 'ID', id);
+      ev.push([h, 'property']);
+      return id;
+    },
     update: (path: string, fn: (text: string) => string | null) =>
       tx.update(corePath(path), (t) => {
         try {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { draggedHeading, setDragged } from './dragData';
   import { tick } from 'svelte';
   import { store } from './store.svelte';
   import { toneFor } from './org';
@@ -146,7 +147,8 @@
             {#each g.all ? g.hits : g.hits.slice(0, SHOWN) as h, i (i)}
               {@const f = fileOf(g.path)}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <div class="hit" class:sel={isSel(gi, i)} role="option" tabindex="-1" aria-selected={isSel(gi, i)} onclick={() => pick(gi, i)}>
+              <div class="hit" class:sel={isSel(gi, i)} role="option" tabindex="-1" aria-selected={isSel(gi, i)} onclick={() => pick(gi, i)}
+                draggable="true" ondragstart={(e) => { const under = h.under !== null ? f?.headings[h.under] : undefined; const d = under ? draggedHeading(g.path, under.line) : null; setDragged(e.dataTransfer, d ?? { kind: 'file', path: f?.name ?? g.name }); }}>
                 <div class="w">
                   {#if h.heading}<svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 4.5h8M6 9h8M9 13.5h8" /></svg>{/if}
                   <span class="wp">{h.where}</span><span class="ln">стр. {h.line + 1}</span>

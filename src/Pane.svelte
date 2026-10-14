@@ -6,6 +6,7 @@
   import { plugins } from './api/host.svelte';
   import { allFileViews, fileViewOf, viewOf } from './views';
   import PluginFileView from './PluginFileView.svelte';
+  import { fileTypeOf } from './fileTypes.svelte';
   import RichMenu from './RichMenu.svelte';
   import FindBar from './FindBar.svelte';
   import { setPlanning, weekdayNames } from './edits';
@@ -141,10 +142,10 @@
       { label: 'Продублировать в соседнем редакторе', shortcut: store.keyHint(to > pi ? 'dupRight' : 'dupLeft'), disabled: to < 0 || t.kind === 'untitled' || !!viewOf(t.kind)?.single || isPinned(t), action: () => store.duplicateTab(pi, idx(t)) },
     ];
     if (hasFile) {
-      // «Показать как ›»: the text and the views of the plugins (ТЗ 33)
+      // «Показать как ›»: the text and the views of the plugins (ТЗ 33); a plugin's file type has its one view
       const now = store.viewOf(t);
       items.push('sep');
-      items.push({
+      if (!fileTypeOf(t.path)) items.push({
         label: 'Показать как', action: () => {},
         sub: [
           { label: 'Текст', checked: now === '', action: () => store.showAs(t, '') },
@@ -359,7 +360,7 @@
         {/if}
       </div>
     {/if}
-  {:else if tab && fviewSpec && (file || fviewPath)}
+  {:else if tab && (fviewSpec || fileTypeOf(tab.path)) && (file || fviewPath)}
     <!-- one component, not the spec's: a spec registered anew (the plugins declared again) must not draw the view anew -->
     <div class="content"><PluginFileView id={fview} path={file?.name ?? fviewPath} {tab} pane={pi} /></div>
   {:else if file && tab}

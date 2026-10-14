@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { draggedHeading, setDragged } from './dragData';
   import { SvelteSet } from 'svelte/reactivity';
   import { store } from './store.svelte';
   import { subtreeProgress, toneFor } from './org';
@@ -117,7 +118,8 @@
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div class="row" id={'ol-' + r.i} data-i={r.i} role="treeitem" aria-selected={r.i === current} aria-expanded={r.kids ? r.open : undefined}
             aria-level={r.level} class:cur={r.i === current} class:kb={r.i === cursor && r.i !== current} class:dim={r.done}
-            style="padding-left:{6 + (r.level - 1) * 14}px" onclick={() => go(r.i, false)} ondblclick={() => go(r.i, true)}>
+            style="padding-left:{6 + (r.level - 1) * 14}px" onclick={() => go(r.i, false)} ondblclick={() => go(r.i, true)}
+            draggable="true" ondragstart={(e) => { const d = f && f.headings[r.i] ? draggedHeading(f.path, f.headings[r.i].line) : null; if (d) setDragged(e.dataTransfer, d); }}>
             <button class="chev" class:hide={!r.kids} tabindex="-1" aria-label="Свернуть или развернуть" onclick={(e) => { e.stopPropagation(); fold(r); }}>
               <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate({r.open ? 90 : 0}deg)"><path d="M4 2l4 4-4 4" /></svg>
             </button>
