@@ -625,11 +625,14 @@ class Store {
   }
   closeSettings() {
     this.settingsOpen = false;
+    this.settingsCrumb = null;
     this.keyRecording = false;
     this.themeEditing = null;
   }
+  /** A page inside a section, after its name in the sheet's title («Каталог», ТЗ 37). */
+  settingsCrumb = $state<string | null>(null);
   showSection(section: SettingsSection) {
-    if (section !== this.settingsSection) this.themeEditing = null;
+    if (section !== this.settingsSection) (this.themeEditing = null), (this.settingsCrumb = null);
     this.settingsSection = section;
     lsSet('settings:section', section);
   }
