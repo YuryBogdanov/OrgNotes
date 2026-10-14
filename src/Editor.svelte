@@ -23,7 +23,7 @@
   import { clipTarget, linkHooks, linkPaste } from './linkEdit';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
 
-  let { text, fileKey, path = '', wf, reveal, initial, initialTop, ontop, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
+  let { text, fileKey, path = '', wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
     path?: string; // the file's name in the folder: what a plugin's link at the end of a line is run with (ТЗ 33)
     levels?: LevelView; // «Структурный вид»: one star per level, text moved by level
     drawers?: boolean; // drawers folded when a file opens and when the app adds one (:PROPERTIES:, :LOGBOOK:)
@@ -46,6 +46,8 @@
     initial?: { line: number; col: number }; // where the caret of this tab was (restored when the tab is shown)
     initialTop?: number; // the first line that was in view (the scroll comes back with the tab)
     ontop?: (line: number) => void; // the first line in view, after a scroll
+    initialFolds?: number[]; // the headings folded when the tab was last shown (their lines)
+    onfolds?: (lines: number[]) => void; // the headings folded now, after a fold or an unfold
     onchange: (t: string) => void;
     oncursor: (line: number, col: number) => void;
     onfollow: (link: OrgLink) => void;
@@ -174,7 +176,8 @@
   });
   /** Fold these heading lines (a card of goals: «Отметки», shown on the right). */
   function foldLines(v: EditorView, lines: number[]) {
-    const effects = lines.flatMap((l) => {
+    // in order: CodeMirror takes ranges sorted (nested folds come after their parent's in `foldedRanges`)
+    const effects = [...new Set(lines)].sort((a, b) => a - b).flatMap((l) => {
       if (l + 1 > v.state.doc.lines) return [];
       const ln = v.state.doc.line(l + 1);
       const r = foldable(v.state, ln.from, ln.to);
@@ -688,6 +691,12 @@
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         linkTip,
+        // the tab keeps its folded headings (S-Tab, ⇥): shown again, it comes back folded as it was
+        EditorView.updateListener.of((u) => {
+          // a fold changed, or an edit moved the lines of the folds
+          if (!onfolds || (!u.docChanged && foldedRanges(u.state) === foldedRanges(u.startState))) return;
+          onfolds(foldedHeadings(u.state));
+        }),
         EditorView.domEventHandlers({
           contextmenu(e, v) {
             e.preventDefault();
@@ -748,6 +757,16 @@
     const top = initialTop !== undefined && initialTop > 0 ? doc.line(Math.min(initialTop + 1, doc.lines)).from : -1;
     view.dispatch({ selection: { anchor: pos }, effects: top >= 0 ? EditorView.scrollIntoView(top, { y: 'start' }) : EditorView.scrollIntoView(pos, { y: 'center' }) });
   }
+  /** The headings folded now (a heading's fold starts on its line; drawers are left out: they fold by themselves). */
+  function foldedHeadings(st: EditorState): number[] {
+    const heads = headingSet(st.doc);
+    const out: number[] = [];
+    foldedRanges(st).between(0, st.doc.length, (from) => {
+      const l = st.doc.lineAt(from).number - 1;
+      if (heads.has(l)) out.push(l);
+    });
+    return out.sort((a, b) => a - b);
+  }
   /** The first line in view, told after a scroll (once a frame). */
   let topFrame = 0;
   function scrolled() {
@@ -768,6 +787,7 @@
     lastKey = fileKey;
     lastLevels = viewKey();
     lastReset = resetOn;
+    if (initialFolds?.length) foldLines(view, initialFolds);
     restoreCaret(); // a pending reveal, if any, is applied right after by its own effect
     view.scrollDOM.addEventListener('scroll', scrolled, { passive: true });
     onapi?.({
@@ -796,6 +816,7 @@
       lastReset = r;
       view.setState(makeState(t, w));
       foldAllDrawers(view);
+      if (initialFolds?.length) foldLines(view, initialFolds);
       restoreCaret();
     } else if (r !== lastReset) {
       // reloaded from disk (no edits here): the caret keeps its line and column, the scroll stays, and ⌘Z

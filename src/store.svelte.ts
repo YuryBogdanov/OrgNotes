@@ -1807,6 +1807,11 @@ class Store {
   setTabTop(tab: Tab, line: number) {
     if (tab.top !== line) tab.top = line;
   }
+  /** The headings folded in a file tab (S-Tab folds them all, ⇥ one): a tab shown again comes back folded so. */
+  setTabFolds(tab: Tab, lines: number[]) {
+    const was = tab.folds ?? [];
+    if (was.length !== lines.length || was.some((x, i) => x !== lines[i])) tab.folds = lines;
+  }
   setTabCursor(tab: Tab, line: number, col: number) {
     tab.cursor = { line, col };
     if (tab.kind === 'file' && tab.path) this.lastCursor[tab.path] = { line, col };

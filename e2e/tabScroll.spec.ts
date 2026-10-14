@@ -38,3 +38,31 @@ test('back on a tab its scroll is where it was, the caret where it was; after a 
   await expect(page.locator('.cm-content').first()).toContainText('строка');
   await expect.poll(() => firstLine(page)).toBe(was);
 });
+
+const SECTIONS = Array.from({ length: 10 }, (_, i) => `* Раздел ${i + 1}\nтекст ${i + 1}\n** Подраздел ${i + 1}\nещё ${i + 1}`).join('\n');
+
+test('folded headings stay folded: S-Tab folds all, ⇥ opens one; another tab and back, a restart — as it was', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await installTauriMock(page, { '/mock/long.org': SECTIONS, '/mock/short.org': '* Коротко\n' });
+  await page.goto('/');
+  await row(page, 'long').click();
+  await page.locator('.cm-line', { hasText: 'Раздел 1' }).first().click();
+  await page.keyboard.press('Shift+Tab'); // everything folded
+  await expect(page.locator('.cm-line', { hasText: 'текст' })).toHaveCount(0);
+  await page.locator('.cm-line', { hasText: 'Раздел 3' }).click();
+  await page.keyboard.press('Tab'); // one opened
+  await expect(page.locator('.cm-line', { hasText: 'текст 3' })).toBeVisible();
+  const shown = async () => (await page.locator('section.pane.active .cm-line').allInnerTexts()).map((t) => t.trim()).filter(Boolean);
+  const was = await shown();
+  expect(was).toContain('текст 3');
+  expect(was).not.toContain('текст 1');
+  await page.keyboard.press('Meta+t');
+  await row(page, 'short').click();
+  await expect(page.locator('.cm-content').first()).toContainText('Коротко');
+  await page.locator('section.pane.active .tab', { hasText: 'long' }).click();
+  await expect.poll(shown).toEqual(was);
+  await page.waitForTimeout(300);
+  await page.reload();
+  await expect(page.locator('.cm-content').first()).toContainText('Раздел');
+  await expect.poll(shown).toEqual(was);
+});
