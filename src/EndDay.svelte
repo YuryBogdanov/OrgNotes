@@ -240,10 +240,11 @@
   .cap span { font-weight: 400; letter-spacing: 0; color: var(--fg3); }
   .none { margin-top: 6px; color: var(--fg2); }
   .chips { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
-  .dchip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 13px; background: color-mix(in srgb, var(--done) 13%, transparent); font-size: 12.5px; }
+  .dchip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 4px; background: color-mix(in srgb, var(--done) 13%, transparent); font-size: 12.5px; }
   .dchip .ck { color: var(--done); font-weight: 700; }
   .dchip.more { color: var(--fg2); }
-  .kw { flex: 0 0 auto; font-size: 11px; font-weight: 700; }
+  /* a status as a capsule (ТЗ 32, the design's update) */
+  .kw { flex: 0 0 auto; padding: 1px 5px; border-radius: 4px; font-size: 10.5px; font-weight: 700; line-height: 15px; letter-spacing: 0.02em; color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); }
   .t { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .lrow { display: flex; align-items: center; gap: 8px; min-height: 32px; border-bottom: 1px solid var(--line); }
   .seg { display: flex; gap: 6px; }

@@ -134,3 +134,20 @@ test('«Настройки → Сегодня»: after «Основные»; a b
   await expect(screen(page).getByRole('region', { name: 'Просрочено' })).toHaveCount(0);
   await expect(screen(page).getByRole('region', { name: 'Задачи' })).toContainText('Ждём ответа');
 });
+
+test('«Время напоминания»: 15:00–21:00 by a quarter of an hour, 17:30 by default; off while the reminder is off; statuses are capsules', async ({ page }) => {
+  await open(page);
+  await expect(screen(page).getByRole('region', { name: 'Задачи' }).locator('.kw').first()).toHaveCSS('border-radius', '4px');
+  await screen(page).getByRole('button', { name: 'Настроить экран' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Настройки' });
+  const time = sheet.getByLabel('Время напоминания');
+  await expect(time).toHaveValue('17:30');
+  const opts = await time.locator('option').allInnerTexts();
+  expect(opts[0]).toBe('15:00');
+  expect(opts[1]).toBe('15:15');
+  expect(opts[opts.length - 1]).toBe('21:00');
+  expect(opts).toHaveLength(25);
+  await expect(time).toBeDisabled(); // the tests turn the reminder off
+  await sheet.getByRole('switch', { name: 'Напоминать завершить день' }).click();
+  await expect(time).toBeEnabled();
+});

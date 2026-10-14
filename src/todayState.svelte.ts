@@ -198,10 +198,15 @@ export const showSchema: Schema = {
     ],
   }],
 };
-const TIMES = Array.from({ length: 15 }, (_, i) => {
-  const t = `${String(15 + Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`;
+// 15:00 … 21:00 by a quarter of an hour (ТЗ 32 §5); a time set before outside them stays in the list
+const TIMES = Array.from({ length: 25 }, (_, i) => {
+  const t = `${String(15 + Math.floor(i / 4)).padStart(2, '0')}:${String((i % 4) * 15).padStart(2, '0')}`;
   return { value: t, label: t };
-}); // 15:00 … 22:00
+});
+const timesWith = (v: Values) => {
+  const now = typeof v.remindAt === 'string' ? v.remindAt : '';
+  return now && !TIMES.some((o) => o.value === now) ? [...TIMES, { value: now, label: now }].sort((a, b) => a.value.localeCompare(b.value)) : TIMES;
+};
 export const moreSchema: Schema = {
   id: 'today', label: 'Сегодня', values: both, set: put,
   groups: [
@@ -219,7 +224,7 @@ export const moreSchema: Schema = {
       fields: [
         { key: 'journal', type: 'file', where: 'folder', label: 'Журнал', show: (rel) => rel ?? DEFAULT_FOLDER.journal },
         { key: 'remind', type: 'switch', where: 'local', label: 'Напоминать завершить день', hint: 'Уведомление macOS' },
-        { key: 'remindAt', type: 'choice', look: 'menu', where: 'local', label: 'Время напоминания', hint: 'Обычно за полчаса до конца рабочего дня', options: TIMES },
+        { key: 'remindAt', type: 'choice', look: 'menu', where: 'local', label: 'Время напоминания', hint: 'Обычно за полчаса до конца рабочего дня', options: timesWith, disabled: (v) => v.remind === false },
       ],
       help: 'Журнал — дерево дат: год › месяц › день › «На завтра». Напоминание — по будням, пока приложение открыто.',
     },

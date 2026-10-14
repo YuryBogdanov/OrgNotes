@@ -18,6 +18,8 @@ interface Base {
   /** A line under the label; a function sees the values (a hint that follows the choice). */
   hint?: string | ((v: Values) => string);
   where: Where;
+  /** Off while the values say so (the time of a reminder that is off). */
+  disabled?: (v: Values) => boolean;
 }
 export type Field =
   /** Buttons in a row (a few short options) or a menu. */
