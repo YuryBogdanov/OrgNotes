@@ -1,5 +1,5 @@
 // Text edits behind the palette commands: dates, tags, moving a subtree to another file, a new task.
-import type { Heading } from './org';
+import { inactiveStamp, logNote, type Heading } from './org';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const WD_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
@@ -87,8 +87,12 @@ const PLANNING = /^\s*(SCHEDULED|DEADLINE|CLOSED):/;
 /** The day names a file writes in its stamps (English if it already has an English one). */
 export const weekdayNames = (text: string) => (/<\d{4}-\d{2}-\d{2} (Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/.test(text) ? WD_EN : WD_RU);
 
-/** Set or remove SCHEDULED: / DEADLINE: of a heading. The time and repeater of an existing stamp are kept. */
-export function setPlanning(text: string, h: Heading, kind: 'SCHEDULED' | 'DEADLINE', date: Date | null): string {
+/**
+ * Set or remove SCHEDULED: / DEADLINE: of a heading. The time and repeater of an existing stamp are kept. `log` (the
+ * workflow's journal on): a SCHEDULED moved to another day is noted in :LOGBOOK: as Org's `org-log-reschedule` does —
+ * `- Rescheduled from "<old>" on [now]`.
+ */
+export function setPlanning(text: string, h: Heading, kind: 'SCHEDULED' | 'DEADLINE', date: Date | null, log?: Date): string {
   const lines = text.split('\n');
   const names = weekdayNames(text);
   const has = PLANNING.test(lines[h.line + 1] ?? '');
@@ -106,6 +110,10 @@ export function setPlanning(text: string, h: Heading, kind: 'SCHEDULED' | 'DEADL
     if (next.trim()) lines[h.line + 1] = next;
     else lines.splice(h.line + 1, 1);
   } else if (next.trim()) lines.splice(h.line + 1, 0, next);
+  const was = kind === 'SCHEDULED' && log && date ? new RegExp(`SCHEDULED:\\s*(<(\\d{4})-(\\d{2})-(\\d{2})[^>]*>)`).exec(line) : null;
+  if (was && (+was[2] !== date!.getFullYear() || +was[3] !== date!.getMonth() + 1 || +was[4] !== date!.getDate())) {
+    logNote(lines, h, `- Rescheduled from "${was[1]}" on ${inactiveStamp(log!)}`);
+  }
   return lines.join('\n');
 }
 

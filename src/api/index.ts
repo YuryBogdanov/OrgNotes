@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.7.0';
+export const API_VERSION = '1.8.0';
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;
@@ -44,6 +44,9 @@ export interface HeadingInfo {
   event?: OrgDate;
   /** Its own :PROPERTIES: (keys in upper case: `ID`, `RESULT`…), not the inherited ones. Since 1.7. */
   properties: Record<string, string>;
+  /** The moves of its SCHEDULED its :LOGBOOK: notes (`- Rescheduled from "<…>" on […]`): from which day, when (its
+   *  time too). The app writes them while the file's workflow keeps a journal (`workflow().logbook`). Since 1.8. */
+  reschedules?: { from: OrgDate; at: OrgDate }[];
 }
 export interface FileInfo {
   path: string;
@@ -440,6 +443,12 @@ export interface Ctx {
     /** An action of the plugin on a task («действия с задачей», ТЗ 34): an item of the menu of a task in every list
      *  and a command of the palette's «ВЫДЕЛЕННАЯ ЗАДАЧА», where `when` says so. Since 1.6. */
     taskAction(spec: { label: string; when?(h: HeadingInfo): boolean; run(h: HeadingRef): void }): Dispose;
+    /** A piece of the plugin in a place another plugin declares (`contributes.slots` of its manifest), e.g.
+     *  `calendar.weekCell`: `render` draws it for each item of that place with the place's `data`. Since 1.8. */
+    slot<D = unknown>(id: string, render: (el: HTMLElement, data: D) => Dispose | void): Dispose;
+    /** Draw in `el` the pieces the plugins put into a place of this plugin (one child each, in the plugins' order;
+     *  drawn again when one comes or goes); `update` gives them new data. Since 1.8. */
+    drawSlot<D = unknown>(el: HTMLElement, id: string, data: D): { update(data: D): void; dispose(): void };
   };
   /** Needs `index.read`. */
   index?: {
@@ -459,7 +468,7 @@ export interface Ctx {
      *  keeps on this Mac per folder. */
     folder(): Promise<string | null>;
     /** The statuses the file knows: open and done keywords (for `@panopticon/api/org`), and its sets in order. */
-    workflow(path: string): Promise<{ open: string[]; done: string[]; sets: StatusSet[] }>;
+    workflow(path: string): Promise<{ open: string[]; done: string[]; sets: StatusSet[]; logbook: boolean }>;
   };
   /** Needs `files.read` (or `files.edit`). */
   files?: { read(path: string): Promise<string> };
@@ -471,6 +480,13 @@ export interface Ctx {
     /** A file of the folder, made empty when it is not there yet (an archive, `<file>_archive`); false — not made.
      *  Since 1.5. */
     ensureFile(path: string): Promise<boolean>;
+  };
+  /** The functions the manifest's `exports` names, for the other plugins. Since 1.8. */
+  exports(fns: Record<string, (...args: never[]) => unknown>): Dispose;
+  plugins: {
+    /** A function another plugin exports; undefined when that plugin is off, not there, or does not give it. The
+     *  arguments and the result are data (copied). Since 1.8. */
+    call<T = unknown>(id: string, fn: string, ...args: unknown[]): Promise<T | undefined>;
   };
   /** The plugin's own: in the notes folder (goes with the notes) and on this Mac. */
   storage: { folder: Store; local: Store };

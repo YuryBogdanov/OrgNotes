@@ -70,6 +70,15 @@ class Goals {
       })
       .sort((a, b) => Number(!!b.src.me) - Number(!!a.src.me) || a.name.localeCompare(b.name, 'ru')),
   );
+  /** «Мои цели» in work this quarter, for the other plugins (`exports`: «Неделя» shows them in its plan). */
+  myActiveGoals(): { title: string; ref: HeadingRef; deadline: string | null }[] {
+    const me = this.goalPeople.find((p) => p.src.me && p.found);
+    if (!me) return [];
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return goalsIn(me.data, quarterOf(new Date()))
+      .filter((g) => g.keyword === GOAL_STATES.active)
+      .map((g) => ({ title: g.title, ref: { path: me.src.file, line: g.line, title: g.title }, deadline: g.deadline ? iso(g.deadline) : null }));
+  }
   /** The open goals of the shown quarter: what «Перенести незакрытые» offers. */
   openGoalsOf(p: GoalPerson): Goal[] {
     const done = p.file?.wf.done ?? [];

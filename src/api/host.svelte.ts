@@ -32,7 +32,7 @@ import PluginNav from '../PluginNav.svelte';
 import PluginReview from '../PluginReview.svelte';
 import { mountWidget } from './widgets.svelte';
 import { lists } from '../taskLists.svelte';
-import { bodyOf, propertiesOf } from '../orgOps';
+import { bodyOf, propertiesOf, reschedulesOf } from '../orgOps';
 
 const isTauri = '__TAURI_INTERNALS__' in window;
 const invoke = async <T,>(cmd: string, args?: Record<string, unknown>) => (await import('@tauri-apps/api/core')).invoke<T>(cmd, args);
@@ -97,6 +97,10 @@ class Host {
   todayRenders = new SvelteMap<string, { plugin: string; render: (el: HTMLElement, block: { setHidden(hidden: boolean): void }) => Dispose | void }>();
   todayHidden = new SvelteMap<string, true>();
   oneOnOnes = new SvelteMap<string, Parameters<Ctx['ui']['oneOnOne']>[0]>();
+  /** The pieces the plugins put into the places other plugins declare (API 1.8): by place, in the order they came. */
+  slots = new SvelteMap<string, SlotPiece[]>();
+  /** The functions a plugin gives the others (its manifest's `exports`). */
+  private exported = new Map<string, Record<string, (...args: never[]) => unknown>>();
   /** The views of a file (ТЗ 33): their drawings by the plugins. */
   fileViews = new SvelteMap<string, { plugin: string; spec: Parameters<Ctx['ui']['fileView']>[1] }>();
   /** A tab drawn anew (`ui.open` with a new state for a tab shown): its number. */
@@ -606,6 +610,53 @@ class Host {
     });
   }
 
+  /** A place of a plugin drawn: a child per piece of the plugins on (display: contents), kept as they come and go. */
+  private drawSlot<D>(el: HTMLElement, place: string, data: D) {
+    let now = clone(data);
+    const drawn = new Map<SlotPiece, { node: HTMLElement; dispose: Dispose | void }>();
+    const draw = (p: SlotPiece, node: HTMLElement) => this.guard(p.plugin, () => p.render(node, clone(now)), undefined);
+    const drop = (p: SlotPiece) => {
+      const d = drawn.get(p)!;
+      this.guard(p.plugin, () => d.dispose?.(), undefined);
+      d.node.remove();
+      drawn.delete(p);
+    };
+    const stop = $effect.root(() => {
+      $effect(() => {
+        const list = (this.slots.get(place) ?? []).filter((p) => this.live(p.plugin));
+        untrack(() => {
+          for (const p of [...drawn.keys()]) if (!list.includes(p)) drop(p);
+          for (const p of list) {
+            let d = drawn.get(p);
+            if (!d) {
+              const node = document.createElement('div');
+              node.style.display = 'contents';
+              node.dataset.plugin = p.plugin;
+              d = { node, dispose: undefined };
+              drawn.set(p, d);
+              el.append(node);
+              d.dispose = draw(p, node);
+            } else el.append(d.node); // the plugins' order
+          }
+        });
+      });
+    });
+    return {
+      update: (d: D) => {
+        now = clone(d);
+        for (const [p, x] of drawn) {
+          this.guard(p.plugin, () => x.dispose?.(), undefined);
+          x.node.replaceChildren();
+          x.dispose = draw(p, x.node);
+        }
+      },
+      dispose: () => {
+        stop();
+        for (const p of [...drawn.keys()]) drop(p);
+      },
+    };
+  }
+
   // ---- ctx ----------------------------------------------------------------------------------------------------
   private ctxOf(m: Manifest): Ctx {
     const id = m.id;
@@ -684,6 +735,15 @@ class Host {
             this.todayRenders.delete(blk);
             this.todayHidden.delete(blk);
           });
+        },
+        slot: (place, render) => {
+          const piece: SlotPiece = { plugin: id, render: render as SlotPiece['render'] };
+          this.slots.set(place, [...(this.slots.get(place) ?? []), piece]);
+          return keep(() => this.slots.set(place, (this.slots.get(place) ?? []).filter((x) => x !== piece)));
+        },
+        drawSlot: (el, place, data) => {
+          declared('места', m.contributes.slots.some((x) => x.id === place), place);
+          return this.drawSlot(el, place, data);
         },
         oneOnOne: (spec) => {
           this.oneOnOnes.set(id, spec);
@@ -888,6 +948,23 @@ class Host {
           }),
         notify: (text, actions) => store.note(text, actions?.map((a) => ({ label: a.label, run: () => this.guard(id, () => a.run(), undefined) })), actions?.length ? 8000 : 4000),
       },
+      exports: (fns) => {
+        for (const k of Object.keys(fns)) declared('функции', m.exports.includes(k), k);
+        this.exported.set(id, fns);
+        return keep(() => void (this.exported.get(id) === fns && this.exported.delete(id)));
+      },
+      plugins: {
+        call: async <T>(other: string, fn: string, ...args: unknown[]) => {
+          const f = this.live(other) && this.active.has(other) ? this.exported.get(other)?.[fn] : undefined;
+          if (!f) return undefined;
+          try {
+            const r = await this.guard(other, () => (f as (...a: unknown[]) => unknown)(...clone(args)), undefined);
+            return clone(r) as T | undefined;
+          } catch {
+            return undefined;
+          }
+        },
+      },
       storage: { folder: this.storeOf(id, 'folder', 'data', keep), local: this.storeOf(id, 'local', 'data', keep) },
       events: { on: (e, fn) => keep(this.listen(id, e, fn)) },
       statusSets: {
@@ -956,6 +1033,7 @@ class Host {
           return {
             open: [...(f?.wf.open ?? DEFAULT_WORKFLOW.open)], done: [...(f?.wf.done ?? DEFAULT_WORKFLOW.done)],
             sets: seqs.map((q) => ({ name: q.name, states: q.states.map((x) => ({ name: x.name, done: !!x.done, ...(x.color ? { color: x.color as Named } : {}) })) })),
+            logbook: !!(f?.wf.behavior ?? store.config.behavior).logbook,
           };
         },
       };
@@ -1148,6 +1226,10 @@ export const rightsText = (m: Manifest) =>
 
 // ---- helpers --------------------------------------------------------------------------------------------------
 
+interface SlotPiece {
+  plugin: string;
+  render: (el: HTMLElement, data: unknown) => Dispose | void;
+}
 const clone = <T>(v: T): T => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 /** An effect outside any component: `fn` with the new value when it changes (not at first). */
 function watch<T>(read: () => T, fn: (v: T) => void): Dispose {
@@ -1175,9 +1257,14 @@ function eventOf(h: Heading): OrgDate | undefined {
   const m = STAMP.exec(h.title);
   return m ? { y: +m[1], m: +m[2], d: +m[3], ...(m[4] ? { time: m[4] } : {}) } : undefined;
 }
+// the lines of the text read last: a file's headings ask for them one after another
+let seen: { text: string; lines: string[] } = { text: '', lines: [''] };
+const linesOf = (text: string) => (seen.text === text ? seen.lines : (seen = { text, lines: text.split('\n') }).lines);
 const extraOf = (text: string, h: Heading) => {
   const event = eventOf(h);
-  return { ...(event ? { event } : {}), properties: propertiesOf(text, h) };
+  const lines = linesOf(text);
+  const moved = reschedulesOf(lines, h);
+  return { ...(event ? { event } : {}), properties: propertiesOf(lines, h), ...(moved.length ? { reschedules: moved } : {}) };
 };
 function infoOf(f: (typeof store.files)[number], h: Heading): HeadingInfo {
   const inherited = new Set<string>(f.filetags);

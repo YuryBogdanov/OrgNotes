@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Месяц и неделя всех записей с датами: слои и файлы в навигаторе, выбранный день в инспекторе, перенос мышью, «+ Задача» и «+ Событие».",
   "author": "Panopticon",
-  "api": "^1.6",
+  "api": "^1.8",
   "minAppVersion": "1.1.0",
   "main": "main.js",
   "permissions": ["index.read", "files.edit"],
@@ -15,6 +15,9 @@
     ],
     "navSections": [
       { "id": "calendar", "title": "Календарь", "icon": "M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3M7 12h.01M10 12h.01M13 12h.01", "key": "calendar.nav" }
+    ],
+    "slots": [
+      { "id": "calendar.weekCell", "hint": "Под номером недели в месяце (колонка становится шире) и рядом с заголовком в виде «Неделя». Данные: { year, week, monday: \"YYYY-MM-DD\", view: \"month\" | \"week\" }" }
     ],
     "views": [
       { "id": "calendar.view", "title": "Календарь", "icon": "M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3M10 12.5h.01", "toolbar": true }

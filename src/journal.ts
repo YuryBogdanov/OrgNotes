@@ -128,7 +128,7 @@ export class Tx {
     this.on(ref, (t, h, wf) => setKeyword(t, h, kw, wf));
   }
   setPlanning(ref: HeadingRef, kind: 'SCHEDULED' | 'DEADLINE', date: Date | null) {
-    this.on(ref, (t, h) => setPlanning(t, h, kind, date));
+    this.on(ref, (t, h, wf) => setPlanning(t, h, kind, date, wf.behavior?.logbook ? new Date() : undefined));
   }
   setTags(ref: HeadingRef, tags: string[]) {
     this.on(ref, (t, h) => setTags(t, h, tags));

@@ -1,7 +1,7 @@
 // Org operations of a transaction (ТЗ 26 §5.4) that the core did not have: a property, a new heading with its
 // subtree, the body of a heading. Pure, on the text; the moves are refile.ts's.
 
-import { headingLines, type Heading } from './org';
+import { headingLines, type Heading, type OrgDate } from './org';
 import { place, relevel } from './refile';
 
 const PLANNING = /^\s*(SCHEDULED|DEADLINE|CLOSED):/;
@@ -125,8 +125,8 @@ export function setTitle(text: string, h: Heading, title: string): string {
 }
 
 /** The heading's own properties (its :PROPERTIES: drawer under the heading or its planning line), keys in upper case. */
-export function propertiesOf(text: string, h: Heading): Record<string, string> {
-  const lines = text.split('\n');
+export function propertiesOf(text: string | string[], h: Heading): Record<string, string> {
+  const lines = typeof text === 'string' ? text.split('\n') : text;
   let i = h.line + 1;
   if (/^\s*(SCHEDULED|DEADLINE|CLOSED):/.test(lines[i] ?? '')) i++;
   const out: Record<string, string> = {};
@@ -134,6 +134,20 @@ export function propertiesOf(text: string, h: Heading): Record<string, string> {
   for (i++; i < lines.length && !/^\s*:END:\s*$/i.test(lines[i]) && !/^\*+\s/.test(lines[i]); i++) {
     const m = /^\s*:([^\s:]+):\s*(.*?)\s*$/.exec(lines[i]);
     if (m) out[m[1].toUpperCase()] = m[2];
+  }
+  return out;
+}
+
+/** The moves of a heading's SCHEDULED noted in its drawers (`- Rescheduled from "<…>" on […]`, as Org writes them). */
+export function reschedulesOf(text: string | string[], h: Heading): { from: OrgDate; at: OrgDate }[] {
+  const lines = typeof text === 'string' ? text.split('\n') : text;
+  const date = (m: RegExpExecArray | null): OrgDate | null => (m ? { y: +m[1], m: +m[2], d: +m[3], ...(m[4] ? { time: m[4] } : {}) } : null);
+  const out: { from: OrgDate; at: OrgDate }[] = [];
+  for (let i = h.line + 1, end = afterMeta(lines, h); i < end; i++) {
+    const r = /^\s*-\s+Rescheduled from "(<[^>]*>)" on (\[[^\]]*\])/.exec(lines[i]);
+    const from = r && date(/(\d{4})-(\d{2})-(\d{2})(?:\s+[^\s\d>\]]+)?(?:\s+(\d{2}:\d{2}))?/.exec(r[1]));
+    const at = r && date(/(\d{4})-(\d{2})-(\d{2})(?:\s+[^\s\d>\]]+)?(?:\s+(\d{1,2}:\d{2}))?/.exec(r[2]));
+    if (from && at) out.push({ from, at });
   }
   return out;
 }
