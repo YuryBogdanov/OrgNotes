@@ -4,9 +4,15 @@
   import { APP_VERSION, type Entry } from './api/declare';
   import { codeUrl, sourceLabel } from './api/sources';
   import { pluginUpdates as up } from './pluginUpdates.svelte';
-  import { openExternal } from './store.svelte';
+  import { openExternal, store } from './store.svelte';
+  import { catalog, type CatalogEntry, type CatState } from './pluginCatalog.svelte';
+  import Catalog from './Catalog.svelte';
+  import CatalogItem from './CatalogItem.svelte';
+  import InstallSheet from './InstallSheet.svelte';
+  import type { Manifest } from './api/manifest';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import { onMount } from 'svelte';
+  import { portal } from './portal';
 
   // «Настройки → Плагины» (ТЗ 26 §7, roadmap 1.2): the built-in plugins and the installed ones, each on or off at
   // once; why one cannot be turned on; what a plugin is allowed; the folder of the plugins and «Перезагрузить».
@@ -28,6 +34,23 @@
   onMount(() => {
     void up.check();
   });
+  // ТЗ 37: the catalog and a plugin's page inside this section («Плагины › Каталог» in the sheet's title)
+  let page = $state<'list' | 'catalog' | CatalogEntry>('list');
+  $effect(() => {
+    store.settingsCrumb = page === 'list' ? null : page === 'catalog' ? 'Каталог' : `Каталог › ${page.name}`;
+  });
+  let installing = $state<{ e: CatalogEntry; m: Manifest } | null>(null);
+  /** The button of a plugin in the catalog: install (rights first), or update (other rights asked first). */
+  async function act(e: CatalogEntry, st: CatState) {
+    const m = await catalog.manifestOf(e);
+    if (!m) return;
+    if (st.kind === 'install') installing = { e, m };
+    else if (st.kind === 'update') {
+      const have = plugins.entry(e.id);
+      if (have?.enabled && !plugins.sameRights(m) && !(await plugins.askRights(m, m.version))) return;
+      void catalog.install(e, !!have?.enabled);
+    }
+  }
   // «…» of an installed plugin; «Удалить…» asks first
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   let removing = $state<Entry | null>(null);
@@ -109,6 +132,15 @@
 {/snippet}
 
 <div class="body">
+  {#if page !== 'list'}
+  <section class="general" aria-label={page === 'catalog' ? 'Каталог плагинов' : page.name}>
+    {#if page === 'catalog'}
+      <Catalog back={() => (page = 'list')} open={(e) => (page = e)} {act} />
+    {:else}
+      {#key page.id}<CatalogItem e={page} back={() => (page = 'catalog')} {act} />{/key}
+    {/if}
+  </section>
+  {:else}
   <section class="general" aria-label="Плагины">
     <div class="bar">
       <label class="find">
@@ -116,6 +148,7 @@
         <input bind:value={query} placeholder="Найти плагин" aria-label="Найти плагин" spellcheck="false" />
       </label>
       <button class="change" onclick={folder}>Открыть папку плагинов</button>
+      <button class="change pri" onclick={() => (page = 'catalog')}>Каталог плагинов…</button>
     </div>
     {#if builtin.length}
       <div class="cap">ВСТРОЕННЫЕ <span>— идут с приложением</span></div>
@@ -129,7 +162,7 @@
     {:else if query.trim() && anyInstalled}
       <p class="help">Ничего не найдено</p>
     {:else}
-      <p class="help">Плагинов пока нет. Положите папку плагина — <code>manifest.json</code> и <code>main.js</code> — в папку плагинов и нажмите «Перезагрузить плагины». Новый плагин появляется выключенным.</p>
+      <p class="help">Плагинов пока нет — откройте <button class="more inline" onclick={() => (page = 'catalog')}>каталог</button> или положите папку плагина (<code>manifest.json</code> и <code>main.js</code>) в папку плагинов и нажмите «Перезагрузить плагины».</p>
     {/if}
     <div class="acts">
       <button class="change" disabled={busy} onclick={reload}>Перезагрузить плагины</button>
@@ -137,10 +170,13 @@
     </div>
     <p class="help">Плагин работает внутри приложения: права защищают от ошибок, но не от намеренно вредного кода. Включайте плагины только из источников, которым доверяете. Какие плагины включены — хранится на этом Mac.</p>
   </section>
+  {/if}
 </div>
+{#if installing}<InstallSheet e={installing.e} m={installing.m} onclose={() => (installing = null)} />{/if}
 {#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
 {#if removing}
   {@const m = removing.manifest}
+  <div class="layer" use:portal>
   <div class="scrim" aria-hidden="true"></div>
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Удаление плагина" tabindex="-1"
@@ -152,6 +188,7 @@
       <!-- svelte-ignore a11y_autofocus -->
       <button class="change danger" autofocus onclick={() => { const id = idOf(removing!); removing = null; void up.remove(id); }}>Удалить</button>
     </div>
+  </div>
   </div>
 {/if}
 
@@ -178,6 +215,8 @@
   .acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .change { height: 26px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
   .change:disabled { opacity: 0.5; }
+  .change.pri { border: 0; background: var(--acc); color: var(--onacc); font-weight: 600; }
+  .more.inline { margin: 0; font-size: inherit; }
   .bar { display: flex; align-items: center; gap: 8px; }
   .find { flex: 1; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: 6px; background: var(--field); color: var(--fg3); }
   .find input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--fg); font-size: 12.5px; }
@@ -188,6 +227,7 @@
   .upd { height: 24px; padding: 0 10px; border: 1px solid var(--acc); border-radius: 6px; background: transparent; color: var(--acc); font-size: 12px; white-space: nowrap; }
   .dots { height: 24px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); font-size: 10px; letter-spacing: 1px; }
   .dots:hover { background: var(--field); }
+  .layer { color: var(--fg); }
   .scrim { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, 0.3); }
   .dlg { position: fixed; z-index: 91; left: 50%; top: 30%; transform: translateX(-50%); width: min(400px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 8px; padding: 18px 20px 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35); font-size: 13px; outline: none; }
   .dlg p { margin: 0; color: var(--fg2); line-height: 1.45; }
