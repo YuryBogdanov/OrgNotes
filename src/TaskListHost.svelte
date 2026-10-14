@@ -5,7 +5,12 @@
 
   // The window's part of the lists of tasks (ТЗ 34): the context menu of a task and the field of its tags. Both give
   // the focus back to the list they came from.
-  const back = (id: string | undefined) => queueMicrotask(() => lists.spec(id ?? null)?.el()?.focus({ preventScroll: true }));
+  const back = (id: string | undefined) =>
+    queueMicrotask(() => {
+      const el = lists.spec(id ?? null)?.el();
+      // the chosen row when it takes the focus itself («Сегодня»), else the list
+      (el?.querySelector<HTMLElement>('[data-k].sel') ?? el)?.focus({ preventScroll: true });
+    });
   function closeMenu() {
     const id = lists.active ?? undefined;
     lists.menu = null;

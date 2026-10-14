@@ -3,12 +3,12 @@
   import { lists } from './taskLists.svelte';
 
   // The toast of a list after a change (ТЗ 34): at the bottom of the list, in the middle, for 6 seconds.
-  let { list }: { list: string } = $props();
+  let { list, bottom = 38 }: { list: string; bottom?: number } = $props();
   const t = $derived(lists.toast?.list === list ? lists.toast : null);
 </script>
 
 {#if t}
-  <div class="at">
+  <div class="at" style:bottom="{bottom}px">
     <div class="ltoast" role="status" transition:fly={{ y: 6, duration: 140 }}>
       <span class="tx">{t.text}</span>
       <span class="sub">скроется при обновлении</span>

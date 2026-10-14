@@ -13,13 +13,17 @@
   import { allTodayBlocks, arrange, todayBlockOf } from './todayBlocks';
   import { newMeeting, oneOnOnes, type OneOnOne } from './oneOnOne';
   import { plugins } from './api/host.svelte';
+  import { untrack } from 'svelte';
+  import { lists, type DateKind, type ListTask } from './taskLists.svelte';
+  import ListToast from './ListToast.svelte';
   import {
     agendaRows, dateTitle, doneStatus, focusRows, journalDays, kicker, lastDay, noteLines, noteWhen, overdue, overdueWords, taskGroups, whenChosen,
     type OverdueRow, type TaskRow,
   } from './today';
 
   // «Сегодня» (ТЗ 32 §2): the morning's overview — the note from yesterday and the choice for today (from the
-  // journal), the agenda of the day, the tasks, the overdue ones; a click on a row opens its heading in a tab.
+  // journal), the agenda of the day, the tasks, the overdue ones. A click on a row chooses its task, a double click
+  // or ↩ opens it in a tab (ТЗ 34): the rows of all the blocks are one list of tasks.
   let { pane = 0 }: { pane?: number } = $props();
 
   const cfg = $derived(today.folder);
@@ -32,14 +36,47 @@
   };
   const base = (p: string) => p.split('/').pop() ?? p;
 
+  // ---- the rows as one list of tasks (ТЗ 34) ----
+  /** Which of the headings with its title in its file a row's task is: its name whatever its line. */
+  function nOf(path: string, line: number, title: string) {
+    const f = files.find((x) => x.path === path);
+    let n = 0;
+    for (const h of f?.headings ?? []) {
+      if (h.line === line) return n;
+      if (h.title === title) n++;
+    }
+    return 0;
+  }
+  type Row = { path: string; line: number; title: string; kw: string | null; slot: string; n: number; stale?: boolean; gone?: boolean };
+  /** Rows changed from the list stay as they were until a refresh (`frozen`): drawn with the task's values now. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the rows of three kinds, as they were drawn
+  let frozen = $state.raw<{ agenda: any[]; groups: { file: string; rows: any[] }[]; late: any[]; texts: Map<string, string> } | null>(null);
+  function shownRows<T extends { path: string; line: number; title: string; kw: string | null }>(block: string, live: T[], was: (T & Row)[] | undefined): (T & Row)[] {
+    const rows = live.map((r) => {
+      const n = nOf(r.path, r.line, r.title);
+      return { ...r, n, slot: `${block}|${r.path}|${r.title}|${n}` };
+    });
+    if (!was) return rows;
+    const now = new Map(rows.map((r) => [r.slot, r]));
+    return was.flatMap((r) => {
+      const hit = now.get(r.slot);
+      if (hit) return [hit];
+      const f = store.files.find((x) => x.path === r.path);
+      const h = f?.headings.filter((x) => x.title === r.title)[r.n];
+      if (!f || !h) return [];
+      return [{ ...r, line: h.line, kw: h.keyword ?? '', prio: h.priority, stale: true, gone: !!h.keyword && f.wf.done.includes(h.keyword) }];
+    });
+  }
+
   // ---- the journal: yesterday's note and choice ----
   const journal = $derived(files.find((f) => f.name === cfg.journal));
   const jd = $derived(journal ? lastDay(journalDays(journal), day) : null);
   const focus = $derived(jd ? focusRows(jd.focus, files, day) : []);
+  const focusRows2 = $derived(focus.map((f) => ({ ...f, task: f.task ? { ...f.task, slot: `f|${f.task.path}|${f.task.title}|${nOf(f.task.path, f.task.line, f.task.title)}`, n: 0 } : null })));
 
   // ---- the agenda of the day ----
   const agendaId = $derived(store.agendas.some((a) => a.id === cfg.agenda) ? cfg.agenda : '');
-  const agenda = $derived.by(() => {
+  const agendaLive = $derived.by(() => {
     let list = entriesIn(files, day, day);
     const a = store.agendas.find((x) => x.id === agendaId);
     if (a) {
@@ -48,12 +85,109 @@
     }
     return agendaRows(list, files, day, now, cfg.tag);
   });
+  const agenda = $derived(shownRows('a', agendaLive, frozen?.agenda));
 
   // ---- the tasks, the overdue ones ----
-  const groups = $derived(taskGroups(files, cfg.statuses, today.taskFiles));
+  const groupsLive = $derived(taskGroups(files, cfg.statuses, today.taskFiles));
+  const groups = $derived(groupsLive.map((g, gi) => ({ ...g, rows: shownRows('t' + g.file, g.rows, frozen?.groups[gi]?.file === g.file ? frozen.groups[gi].rows : undefined) })));
   const tasksTotal = $derived(groups.reduce((n, g) => n + g.total, 0));
-  const late = $derived(overdue(cfg.overdueAll ? files : files.filter((f) => today.taskFiles.includes(f.name)), day));
+  const lateLive = $derived(overdue(cfg.overdueAll ? files : files.filter((f) => today.taskFiles.includes(f.name)), day));
+  const late = $derived(shownRows('o', lateLive, frozen?.late));
   const LATE_CAP = 6;
+
+  function freeze() {
+    if (!frozen) frozen = { agenda, groups: groups.map((g) => ({ file: g.file, rows: g.rows })), late, texts: new Map(store.files.map((f) => [f.path, f.text])) };
+  }
+  function refresh() {
+    frozen = null;
+  }
+  // a change not made from the lists (the box of «Главное», «Завтра» of an overdue task, the editor): computed again
+  $effect(() => {
+    const fz = frozen;
+    if (!fz) return;
+    const all = store.files;
+    if (all.length !== fz.texts.size || all.some((f) => { const was = fz.texts.get(f.path); return was === undefined || (f.text !== was && lists.own.get(f.path) !== f.text); })) untrack(refresh);
+  });
+  $effect(() => {
+    void day.getTime();
+    untrack(refresh);
+  });
+
+  // the chosen row: its slot; the task and the date it stands by come from the row
+  let selKey = $state('');
+  let el: HTMLDivElement | undefined = $state();
+  const chosen = $derived.by((): (ListTask & { slot: string }) | null => {
+    if (!selKey) return null;
+    const pick = (r: Row, dk: DateKind | null) => ({ path: r.path, line: r.line, title: r.title, dk, slot: r.slot });
+    for (const f of focusRows2) if (f.task?.slot === selKey) return pick(f.task, null);
+    for (const a of agenda) if (a.slot === selKey) return pick(a, a.kind === 'event' ? 'event' : a.kind === 'deadline' ? 'DEADLINE' : 'SCHEDULED');
+    for (const g of groups) for (const r of g.rows) if (r.slot === selKey) return pick(r, null);
+    for (const r of late) if (r.slot === selKey) return pick(r, r.kind);
+    return null;
+  });
+  // a task gone: the selection goes
+  $effect(() => {
+    if (selKey && !chosen) untrack(() => (selKey = ''));
+  });
+  const rowsOnScreen = () => [...(el?.querySelectorAll<HTMLElement>('[data-k]') ?? [])];
+  function choose(k: string) {
+    selKey = k;
+    queueMicrotask(() => {
+      const b = rowsOnScreen().find((x) => x.dataset.k === k);
+      b?.focus({ preventScroll: true });
+      b?.scrollIntoView({ block: 'nearest' });
+    });
+  }
+  function keydown(e: KeyboardEvent) {
+    if ((e.key !== 'ArrowDown' && e.key !== 'ArrowUp') || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) {
+      if (e.code === 'KeyZ' && e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && lists.canUndo) {
+        e.preventDefault();
+        void lists.undo();
+      }
+      return;
+    }
+    const rows = rowsOnScreen();
+    if (!rows.length) return;
+    e.preventDefault();
+    const i = rows.findIndex((x) => x.dataset.k === selKey);
+    const j = i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)));
+    choose(rows[j].dataset.k!);
+  }
+  function clickEmpty(e: MouseEvent) {
+    if (!(e.target as HTMLElement).closest('[data-k], button, a, input')) selKey = '';
+  }
+  function openChosen(other: boolean) {
+    const t = chosen;
+    if (!t) return;
+    const fi = store.files.findIndex((f) => f.path === t.path);
+    if (other) store.openFromAgenda(pane, fi, t.line, 'neighbor-focus');
+    else open(t.path, t.line);
+  }
+  function menu(e: MouseEvent, k: string) {
+    choose(k);
+    const sp = lists.spec(listId);
+    if (sp) queueMicrotask(() => lists.openMenu(e, sp));
+    e.preventDefault();
+  }
+  const listId = $derived('today:' + pane);
+  $effect(() => {
+    const id = 'today:' + pane;
+    return untrack(() =>
+      lists.register({
+        id,
+        el: () => el,
+        tab: () => store.layout.panes[pane]?.tabs[store.layout.panes[pane].active],
+        selected: () => {
+          const t = chosen;
+          return t ? { path: t.path, line: t.line, title: t.title, dk: t.dk } : null;
+        },
+        open: openChosen,
+        clear: () => (selKey = ''),
+        refresh,
+        freeze,
+      }),
+    );
+  });
 
   // ---- 1-1: the meetings of the day; what the plugins add to a card (the goals' line, «Разбор целей») ----
   const meetings = $derived(oneOnOnes(files, day, cfg.tag));
@@ -132,7 +266,9 @@
   const key = $derived(store.keyHint('today'));
 </script>
 
-<div class="today" role="region" aria-label="Сегодня">
+<div class="host">
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div class="today" role="region" aria-label="Сегодня" tabindex="-1" bind:this={el} onkeydown={keydown} onclick={clickEmpty}>
   <div class="wrap">
     <header>
       <div class="ttl">
@@ -166,6 +302,8 @@
       </div>
     {/if}
   </div>
+</div>
+<ListToast list={listId} bottom={16} />
 </div>
 
 {#snippet block(id: string)}
@@ -221,12 +359,12 @@
         <span class="name">Главное на сегодня</span>
         {#if jd && focus.length}<span class="sub">выбрано {whenChosen(jd.date, day)}</span>{/if}
       </div>
-      {#each focus as f (f.id)}
+      {#each focusRows2 as f (f.id)}
         {#if f.task}
           {@const t = f.task}
           <div class="frow" class:done={t.done}>
             <button class="box" role="checkbox" aria-checked={t.done} aria-label="Выполнено: {t.title}" onclick={() => void tick(t)}>{#if t.done}✓{/if}</button>
-            <button class="rowbtn" onclick={() => open(t.path, t.line)}>
+            <button class="rowbtn" class:sel={selKey === t.slot} data-k={t.slot} onclick={() => choose(t.slot)} ondblclick={() => open(t.path, t.line)} oncontextmenu={(e) => menu(e, t.slot)}>
               <span class="kw tone" style={tone(t.kw, t.path)}>{t.kw}</span>
               <span class="t">{t.title}</span>
               <span class="meta" class:red={t.late && !t.done}>{t.meta}</span>
@@ -246,7 +384,8 @@
         <button class="link" onclick={openAgenda}>Открыть агенду ›</button>
       </div>
       {#each agenda as a (a.key)}
-        <button class="arow" class:past={a.past} onclick={() => open(a.path, a.line)}>
+        <button class="arow" class:past={a.past} class:sel={selKey === a.slot} class:stale={a.stale} class:gone={a.gone} data-k={a.slot}
+          onclick={() => choose(a.slot)} ondblclick={() => open(a.path, a.line)} oncontextmenu={(e) => menu(e, a.slot)}>
           <span class="time" class:strong={!a.past}>{a.time}</span>
           <span class="dot" class:ev={a.kind === 'event'}></span>
           <span class="t">{#if a.kind === 'task' && a.kw}<span class="kw tone" style={tone(a.kw, a.path)}>{a.kw}</span> {/if}{a.title}</span>
@@ -268,7 +407,8 @@
           <div class="trow none">Файл не найден</div>
         {/if}
         {#each g.rows as r (r.key)}
-          <button class="trow" onclick={() => open(r.path, r.line)}>
+          <button class="trow" class:sel={selKey === r.slot} class:stale={r.stale} class:gone={r.gone} data-k={r.slot}
+            onclick={() => choose(r.slot)} ondblclick={() => open(r.path, r.line)} oncontextmenu={(e) => menu(e, r.slot)}>
             <span class="kw col tone" style={tone(r.kw, r.path)}>{r.kw}</span>
             <span class="t">{r.title}</span>
             {#if r.prio}<span class="meta">[#{r.prio}]</span>{/if}
@@ -284,8 +424,8 @@
     <section class="card" aria-label="Просрочено">
       <div class="head"><span class="name">Просрочено</span><span class="count">{late.length}</span></div>
       {#each late.slice(0, LATE_CAP) as r (r.key)}
-        <div class="orow" transition:slide={{ duration: 180 }}>
-          <button class="rowbtn" onclick={() => open(r.path, r.line)}>
+        <div class="orow" class:stale={r.stale} class:gone={r.gone} transition:slide={{ duration: 180 }}>
+          <button class="rowbtn" class:sel={selKey === r.slot} data-k={r.slot} onclick={() => choose(r.slot)} ondblclick={() => open(r.path, r.line)} oncontextmenu={(e) => menu(e, r.slot)}>
             <span class="kw tone" style={tone(r.kw, r.path)}>{r.kw}</span><span class="t">{r.title}</span>
           </button>
           <div class="ofoot">
@@ -304,6 +444,8 @@
 {/snippet}
 
 <style>
+  .host { position: relative; height: 100%; container-type: inline-size; }
+  .today:focus { outline: none; }
   .today { height: 100%; overflow: auto; background: var(--stage); color: var(--fg); font-family: var(--ui); font-size: 13px; }
   .wrap { max-width: 1340px; margin: 0 auto; padding: 22px 32px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; }
   header { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
@@ -338,6 +480,15 @@
   .meta.red { color: var(--todo); }
   button.arow, button.trow, button.rowbtn { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: default; }
   .arow:hover .t, .trow:hover .t, .rowbtn:hover .t { color: var(--acc); }
+  /* a row is a task of the list (ТЗ 34): chosen — the selection's colour and a ring while the screen has the focus */
+  [data-k] { margin-inline: -6px; padding-inline: 6px !important; width: calc(100% + 12px) !important; box-sizing: border-box; border-radius: 6px; }
+  .frow [data-k] { margin-inline: 0 -6px; width: calc(100% + 6px) !important; padding-inline: 4px 6px !important; }
+  [data-k]:focus { outline: none; }
+  [data-k].sel { background: color-mix(in srgb, var(--fg) 9%, transparent); }
+  .today:focus-within [data-k].sel { background: var(--sel); box-shadow: inset 0 0 0 1.5px var(--acc); }
+  /* changed from the list, no longer of the screen: dimmed until a refresh; done: struck through too */
+  .stale { opacity: 0.55; }
+  .gone .t { text-decoration: line-through; }
 
   .ntext { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; font-size: 14px; line-height: 1.45; }
   .nl { display: flex; gap: 8px; }
