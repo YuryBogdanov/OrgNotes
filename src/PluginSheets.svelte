@@ -182,18 +182,22 @@
   {@const m = t.entry.manifest!}
   <div class="scrim" aria-hidden="true"></div>
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div class="pform trust" role="alertdialog" aria-modal="true" aria-label="Включить плагин «{m.name}»" tabindex="-1"
+  <div class="pform trust" role="alertdialog" aria-modal="true" aria-label={t.update ? `Обновить плагин «${m.name}»` : `Включить плагин «${m.name}»`} tabindex="-1"
     onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); t.resolve(false); } }}>
-    <header><b>Включить плагин «{m.name}»?</b></header>
+    <header><b>{t.update ? `Обновить «${m.name}» до ${t.update}?` : `Включить плагин «${m.name}»?`}</b></header>
     <div class="body">
-      <p>Плагин «{m.name}»{m.author ? ` (${m.author})` : ''} получит доступ: {m.permissions.length ? rightsText(m) : 'только к своим настройкам'}.</p>
+      {#if t.update}
+        <p>Новой версии нужны другие права. Плагин получит доступ: {m.permissions.length ? rightsText(m) : 'только к своим настройкам'}.</p>
+      {:else}
+        <p>Плагин «{m.name}»{m.author ? ` (${m.author})` : ''} получит доступ: {m.permissions.length ? rightsText(m) : 'только к своим настройкам'}.</p>
+      {/if}
       <p class="fine">Плагин работает внутри приложения: права защищают от ошибок, но не от намеренно вредного кода. Включайте плагины только из источников, которым доверяете.</p>
     </div>
     <footer>
       <span class="kh"></span>
       <button onclick={() => t.resolve(false)}>Отмена</button>
       <!-- svelte-ignore a11y_autofocus -->
-      <button class="pri" autofocus onclick={() => t.resolve(true)}>Включить</button>
+      <button class="pri" autofocus onclick={() => t.resolve(true)}>{t.update ? 'Обновить' : 'Включить'}</button>
     </footer>
   </div>
 {/each}

@@ -5,6 +5,7 @@
 import { C, registerGroup, registerKeys, registerScope, unregisterKeys } from '../keys';
 import { API_VERSION } from './index';
 import { incompatible, parseManifest, type Manifest } from './manifest';
+import { parseSource, type Source } from './sources';
 import pkg from '../../package.json';
 
 export const APP_VERSION: string = pkg.version;
@@ -18,6 +19,8 @@ export interface Entry {
   problems: string[];
   /** On (the user's choice, else the manifest's default) and can run. */
   enabled: boolean;
+  /** Where an installed one came from (ТЗ 37): the catalog, a git link; none — put there by hand. */
+  source?: Source | null;
 }
 
 const BUILTIN = import.meta.glob('../plugins/*/manifest.json', { eager: true, import: 'default' }) as Record<string, unknown>;
@@ -59,6 +62,8 @@ export function entryOf(dir: string, raw: unknown, builtin: boolean, choices: Re
 export interface Listed {
   dir: string;
   manifest: string | null;
+  /** `.source.json` (ТЗ 37). */
+  source?: string | null;
 }
 const INSTALLED_KEY = 'plugins:installed';
 /** The installed plugins as last listed: their commands' keys are declared at once, before the store reads the
@@ -92,7 +97,7 @@ export function installedEntries(list: Listed[], builtin: Entry[], choices = rea
       } catch {
         return { dir: l.dir, builtin: false, manifest: null, problems: ['manifest.json — не JSON'], enabled: false };
       }
-      const e = entryOf(l.dir, raw, false, choices);
+      const e: Entry = { ...entryOf(l.dir, raw, false, choices), source: parseSource(l.source) };
       if (e.manifest && taken.has(e.manifest.id)) return { ...e, problems: [...e.problems, `id «${e.manifest.id}» занят встроенным плагином`], enabled: false };
       return e;
     })

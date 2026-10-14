@@ -75,6 +75,8 @@ export interface SettingsSpec {
   /** Its own component, or a schema the core draws (roadmap 0.6). */
   component?: Component;
   schema?: Schema;
+  /** A dot by its name: something waits there (updates of plugins, ТЗ 37). */
+  dot?(): boolean;
 }
 const sections = new SvelteMap<string, SettingsSpec>();
 export function registerSettings(s: SettingsSpec) {

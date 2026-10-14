@@ -93,7 +93,7 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
   return invoke<T>(cmd, args);
 }
 
-async function openExternal(url: string) {
+export async function openExternal(url: string) {
   if (isTauri) {
     const { openUrl } = await import('@tauri-apps/plugin-opener');
     await openUrl(url);
