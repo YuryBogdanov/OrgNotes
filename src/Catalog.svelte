@@ -5,7 +5,7 @@
 
   // «Каталог плагинов» (ТЗ 37 §5): the catalog's plugins — a search, the order, the categories, a card each with
   // the state of its button; a click on a card opens its page.
-  let { back, open, act }: { back: () => void; open: (e: CatalogEntry) => void; act: (e: CatalogEntry, s: CatState) => void } = $props();
+  let { back, open, act, link }: { back: () => void; open: (e: CatalogEntry) => void; act: (e: CatalogEntry, s: CatState) => void; link: () => void } = $props();
   let query = $state('');
   let sort = $state<'popular' | 'new' | 'name'>('popular');
   let cat = $state<string | null>(null);
@@ -39,6 +39,7 @@
         {#if catalog.loading}загружаем список плагинов…{:else if catalog.offline}нет связи — список от {new Date(catalog.fetched).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} · <button class="lnk" onclick={() => void catalog.load(true)}>↻ Повторить</button>{:else if catalog.fetched}{ago(catalog.fetched)} · <button class="lnk" onclick={() => void catalog.load(true)}>↻ Обновить</button>{/if}
       </div>
     </div>
+    <button class="bylink" onclick={link}>Установить по ссылке…</button>
   </div>
   <div class="tools">
     <label class="find">
@@ -97,6 +98,7 @@
   .lnk { font-size: inherit; }
   .head { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
   .ttl { flex: 1; min-width: 0; }
+  .bylink { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
   h2 { margin: 0; font-size: 18px; font-weight: 700; }
   .st { font-size: 12px; color: var(--fg2); margin-top: 2px; }
   code { font-family: var(--mono); }
