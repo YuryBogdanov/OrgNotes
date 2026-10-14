@@ -14,8 +14,9 @@ const DAY = new Date().toISOString().slice(0, 10);
 // a meeting with its stamp in the title, as the calendar writes it: an event for the API
 const WORK = ['* Работа', '** TODO Подготовить слайды', 'DEADLINE: <' + DAY + '>', '** Синк с CTO <' + DAY + ' 11:00>', ''].join('\n');
 
-async function open(page: Page, files: Record<string, string> = {}) {
+async function open(page: Page, files: Record<string, string> = {}, at?: string) {
   await page.setViewportSize({ width: 1440, height: 900 });
+  if (at) await page.clock.setFixedTime(new Date(at));
   await page.addInitScript(() => {
     localStorage.setItem('plugins:enabled', JSON.stringify({ week: true }));
     localStorage.setItem('plugins:trusted', JSON.stringify({ week: JSON.stringify([['files.edit', 'index.read'], []]) }));
@@ -70,4 +71,69 @@ test('the tab «Неделя»: the goals, «+ Цель», «Сделать за
   await view.getByRole('button', { name: 'Следующая неделя' }).click();
   await expect(view.locator('.wk-kick')).toContainText('ВПЕРЕДИ');
   await expect(view.getByRole('button', { name: 'Запланировать…' })).toBeVisible();
+});
+
+// ---- the review (ТЗ 36 §4, PR B): the time fixed — W42 is 12–18 October 2026 ----------------------------------------
+
+const W42 = ['* 2026-W42 · 12–18 октября', '** Цели', '*** DONE Закрыть найм SRE', '*** Согласовать бюджет', 'Ждём финансы', '*** Не брать встречи после 17:00', ''].join('\n');
+const W42_WORK = ['* Работа', '** DONE Слайды', 'CLOSED: [2026-10-13 Вт 12:00]', '** TODO Отчёт', 'DEADLINE: <2026-10-14 Ср>', '** Синк с CTO <2026-10-15 Чт 11:00>', ''].join('\n');
+
+test('Friday: the banner on «Сегодня»; the review marks the goals, writes the answers, :REVIEWED:; then the plan of the next week with the goal carried', async ({ page }) => {
+  await open(page, { '/mock/weeks.org': W42, '/mock/work.org': W42_WORK }, '2026-10-16T16:30:00');
+  const banner = today(page).locator('[data-block="week.banner"]');
+  await expect(banner).toContainText('Итоги 42 недели не подведены');
+  await banner.getByRole('button', { name: 'Подвести итоги' }).click();
+  const rv = page.getByRole('region', { name: 'Итоги 42 недели' });
+  await expect(rv).toContainText('Пятница, 16:30');
+  await expect(rv.getByRole('radio', { name: 'Да' }).first()).toHaveAttribute('aria-checked', 'true'); // the task done
+  await expect(rv.locator('.wk-stats')).toContainText('1задача закрыта');
+  await expect(rv.locator('.wk-stats')).toContainText('1просрочено');
+  await expect(rv.locator('.wk-stats')).toContainText('1встреча');
+  await rv.getByRole('radiogroup', { name: 'Оценка: Согласовать бюджет' }).getByRole('radio', { name: 'Частично' }).click();
+  await expect.poll(() => disk(page, '/mock/weeks.org')).toMatch(/\*\*\* Согласовать бюджет\n:PROPERTIES:\n:RESULT: +partial\n:END:\nЖдём финансы/);
+  await rv.getByRole('radiogroup', { name: 'Оценка: Не брать встречи после 17:00' }).getByRole('radio', { name: 'Нет' }).click();
+  await rv.getByLabel('Что получилось').fill('- Оффер у Марии');
+  await rv.getByLabel('Что меняю на следующей неделе').fill('Созвоны с США — только вт и чт');
+  await expect.poll(() => disk(page, '/mock/weeks.org')).toMatch(/\*\* Итоги\n\*\*\* Что получилось\n- Оффер у Марии\n\*\*\* Что меняю на следующей неделе\nСозвоны с США/);
+  await page.keyboard.press('Meta+Enter');
+  const sheet = page.getByRole('dialog', { name: 'План на 43 неделю' });
+  await expect(sheet).toContainText('шаг 2 из 2');
+  await expect(sheet).toContainText('не достигнуты по итогам');
+  await expect(sheet.getByRole('checkbox', { name: /Согласовать бюджет/ })).toBeChecked();
+  await expect(sheet.getByRole('checkbox', { name: /Не брать встречи/ })).not.toBeChecked();
+  const text = (await disk(page, '/mock/weeks.org'))!;
+  expect(text).toMatch(/\*\* Итоги\n:PROPERTIES:\n:REVIEWED: +\[2026-10-16 Пт 16:30\]\n:END:/);
+  expect(text).toMatch(/\*\*\* DONE Закрыть найм SRE\n:PROPERTIES:\n:RESULT: +done/);
+  await sheet.getByLabel('Цель 1').fill('Запустить нагрузочное');
+  await page.keyboard.press('Meta+Enter');
+  await expect.poll(() => disk(page, '/mock/weeks.org')).toMatch(/\* 2026-W43 · 19–25 октября\n\*\* Цели\n\*\*\* Согласовать бюджет\nЖдём финансы\n\*\*\* Запустить нагрузочное/);
+  await expect(banner).toBeHidden();
+  // the tab is back at the week, its review made
+  await expect(page.locator('.wk-view')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Итоги…' })).toBeVisible();
+});
+
+test('Monday: «Пропустить неделю» on the banner writes :SKIPPED: and the banner goes', async ({ page }) => {
+  await open(page, { '/mock/weeks.org': W42 }, '2026-10-19T09:40:00');
+  const banner = today(page).locator('[data-block="week.banner"]');
+  await expect(banner).toContainText('Итоги 42 недели не подведены');
+  await banner.getByRole('button', { name: 'Пропустить неделю' }).click();
+  await expect.poll(() => disk(page, '/mock/weeks.org')).toMatch(/\*\* Итоги\n:PROPERTIES:\n:SKIPPED: +\[2026-10-19 Пн 09:40\]/);
+  await expect(banner).toBeHidden();
+});
+
+test('after its time a week not reviewed is skipped quietly; a past week opens to read — the review or «Итоги не подводились»', async ({ page }) => {
+  const W41 = ['* 2026-W41 · 5–11 октября', '** Цели', '*** Запустить нагрузочное', ':PROPERTIES:', ':RESULT: partial', ':END:', '** Итоги', ':PROPERTIES:', ':REVIEWED: [2026-10-12 Пн 09:40]', ':END:', '*** Что получилось', '- Стенд поднят', ''].join('\n');
+  await open(page, { '/mock/weeks.org': W41 + W42 }, '2026-10-22T10:00:00');
+  await expect.poll(() => disk(page, '/mock/weeks.org')).toMatch(/\* 2026-W42[^]*\*\* Итоги\n:PROPERTIES:\n:SKIPPED: +\[2026-10-22 Чт 10:00\]/);
+  await expect(today(page).locator('[data-block="week.banner"]')).toBeHidden();
+  await page.keyboard.press('Control+Meta+7');
+  const view = page.locator('.wk-view');
+  await view.getByRole('button', { name: 'Предыдущая неделя' }).click();
+  await expect(view.locator('.wk-kick')).toContainText('42 НЕДЕЛЯ · ПРОШЛА');
+  await expect(view.getByRole('region', { name: 'Итоги недели' })).toContainText('Итоги не подводились');
+  await view.getByRole('button', { name: 'Предыдущая неделя' }).click();
+  await expect(view.locator('.wk-goal')).toContainText('Частично');
+  await expect(view.getByRole('region', { name: 'Итоги недели' })).toContainText('- Стенд поднят');
+  await expect(view.getByRole('region', { name: 'Неделя в цифрах' })).toBeVisible();
 });
