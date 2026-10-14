@@ -28,6 +28,7 @@ export const GROUPS: { id: GroupId; title: string; note?: string }[] = [
   { id: 'search', title: 'ПОИСК' },
   { id: 'view', title: 'ВИД И ПАНЕЛИ' },
   { id: 'go', title: 'ПЕРЕХОДЫ' },
+  { id: 'editor', title: 'РЕДАКТОР' },
   { id: 'heading', title: 'ЗАГОЛОВКИ И ЗАДАЧИ', note: 'в редакторе, курсор на заголовке' },
   { id: 'inbox', title: 'БЫСТРЫЙ ВВОД' },
 ];
@@ -96,6 +97,8 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('back', 'Назад', 'go', 'window', ['⌘[']),
   C('followLink', 'Открыть ссылку под курсором', 'go', 'editor', ['⌘↩'], { synonyms: ['ссылка'] }),
 
+  C('pasteText', 'Вставить как текст', 'editor', 'editor', ['⌥⇧⌘V'], { note: '⌘V на выделенный текст со ссылкой в буфере делает его ссылкой', synonyms: ['вставить без ссылки'] }),
+
   C('newHeading', 'Новый заголовок того же уровня', 'heading', 'editor', ['⌥↩'], { note: 'В списке — новый пункт', synonyms: ['пункт списка'] }),
   C('newTask', 'Новая задача того же уровня', 'heading', 'editor', ['⌥⇧↩'], { note: 'В списке — новый пункт с чекбоксом' }),
   C('promote', 'Повысить уровень', 'heading', 'heading', ['⌥←']),
@@ -116,6 +119,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('schedule', 'Запланировать…', 'heading', 'heading', [], { emacs: ['⌃C S'], mac: [], synonyms: ['scheduled', 'дата'] }),
   C('deadline', 'Поставить дедлайн…', 'heading', 'heading', [], { emacs: ['⌃C D'], mac: [], synonyms: ['срок'] }),
   C('tags', 'Изменить теги…', 'heading', 'heading', [], { emacs: ['⌃C ⌃Q'], mac: [], synonyms: ['метки'] }),
+  C('copyLink', 'Копировать ссылку на заголовок', 'heading', 'editor', ['⌃C L'], { synonyms: ['ссылка', 'link', 'org-store-link'] }),
   C('refile', 'Перенести в другой файл…', 'heading', 'heading', [], { emacs: ['⌃C ⌃W'], mac: [], synonyms: ['refile', 'переместить'] }),
 
   C('captureHere', 'Новая задача в Inbox (внутри окна)', 'inbox', 'window', [], { synonyms: ['быстрый ввод'] }),

@@ -218,7 +218,7 @@
     {/if}
     {#if shown && note && (note.whole || found)}
       {#key gen}
-        <Editor text={shown.text} fileKey={'mini|' + gen + '|' + shown.path} wf={shown.wf} {reveal} gutter={false} levels={store.levels}
+        <Editor text={shown.text} fileKey={'mini|' + gen + '|' + shown.path} path={shown.path} wf={shown.wf} {reveal} gutter={false} levels={store.levels}
           narrow={note.whole || !found ? null : { line: found.h.line, end: found.h.end }}
           onchange={(t) => {
             const path = shown!.path;

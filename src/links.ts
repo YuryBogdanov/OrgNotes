@@ -138,7 +138,9 @@ function findLine(f: NoteRef, search: string): number | null {
   const low = s.toLowerCase();
   if (s.startsWith('*')) {
     const t = s.slice(1).trim().toLowerCase();
-    return f.headings.find((h) => h.title.toLowerCase() === t)?.line ?? null;
+    // as written, else without a progress cookie on either side («Чек-лист» finds «Чек-лист [2/5]»)
+    const bare = (x: string) => x.replace(/\s*\[\d*(?:\/\d*|%)\]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    return (f.headings.find((h) => h.title.toLowerCase() === t) ?? f.headings.find((h) => bare(h.title) === bare(t)))?.line ?? null;
   }
   if (s.startsWith('#')) {
     const id = s.slice(1);

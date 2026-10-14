@@ -51,6 +51,7 @@
     };
   });
   import { keyHandler, menuMayRun } from './keyDispatch';
+  import { focusedEditor } from './editorKeys';
   import { actionOf, allNavs, allViews, viewOf } from './views';
   import { today } from './todayState.svelte';
   import EndDay from './EndDay.svelte';
@@ -127,6 +128,12 @@
   let menu = $state<AppMenu | null>(null);
   const actions: Record<string, () => void> = {
     settings: () => store.openSettings(),
+    // «Правка» (ТЗ 35): in the editor with the focus; «Копировать ссылку» also at the caret of the file shown
+    pasteText: () => void focusedEditor()?.run('pasteText'),
+    copyLink: () => {
+      if (focusedEditor()?.run('copyLink')) return;
+      if (store.curPath) void store.copyHeadingLink(store.curPath, store.cursor.line);
+    },
     newFolder: () => store.canManageFiles && store.openPalette('newFolder'),
     outline: () => store.showOutline(),
     captureHere: () => store.openCapture(),

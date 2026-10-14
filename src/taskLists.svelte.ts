@@ -10,7 +10,6 @@ import { setPlanning, setTags, shiftEvent } from './edits';
 import { priorityAfter, rotateStatus } from './outline';
 import { bare, headingStep, setListTask, setMoreTaskCommands, taskCommands, type Ctx, type HeadingAct, type Icon, type TaskCommand, type TaskCtx } from './commands';
 import { toneStyle } from './colors';
-import { newId } from './endDay';
 import type { MenuItem } from './ContextMenu.svelte';
 import type { NoteFile } from './store.svelte';
 import type { Tab } from './layout';
@@ -243,21 +242,17 @@ class TaskLists {
       return h ? setTags(text, h, tags) : null;
     }));
   }
-  /** «Копировать ссылку»: `[[id:…][Название]]`; a task without :ID: gets one (as «Сегодня» does, ТЗ 32). */
+  /** «Копировать ссылку»: the link to the task as ⌃C L makes it (ТЗ 35: by :ID: — added when missing — or by title). */
   async copyLink(list: string, t: ListTask) {
     const r = resolve(t);
     if (!r) return;
-    let id = r.h.id;
-    if (!id) {
-      id = newId();
-      const made = id;
-      const step = await store.transaction('ID задачи', (tx) => tx.setProperty(t, 'ID', made));
-      if (!step) return;
-      for (const c of step.changes) this.own.set(c.path, c.after);
-    }
+    const res = await store.headingLinkAt(r.f.path, r.h.line);
+    if (!res) return;
+    const now = store.files.find((f) => f.path === r.f.path)?.text;
+    if (now !== undefined && now !== r.f.text) this.own.set(r.f.path, now); // the :ID: added: not a change from outside
     try {
-      await navigator.clipboard.writeText(`[[id:${id}][${bare(r.h.title)}]]`);
-      this.say(list, `«${bare(r.h.title)}» — ссылка скопирована`);
+      await navigator.clipboard.writeText(res.link);
+      this.say(list, `«${res.label}» — ссылка скопирована`);
     } catch (e) {
       store.say('Не удалось скопировать ссылку: ' + e);
     }

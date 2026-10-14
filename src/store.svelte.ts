@@ -17,6 +17,8 @@ import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, them
 import { allFileViews, fileViewOf, navOf, viewOf } from './views';
 import { mini as miniSettings } from './miniOptions.svelte';
 import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
+import { fileLink, headingLink, labelOf, linkHooks } from './linkEdit';
+import { newId } from './endDay';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow, type WorkflowDef } from './org';
 
@@ -33,6 +35,8 @@ export interface NoteFile {
 }
 
 const isTauri = '__TAURI_INTERNALS__' in window;
+/** A link (ТЗ 35): the icon of its toasts. */
+const LINK_ICON = 'M8.5 11.5a3.5 3.5 0 0 0 5 0l2.5-2.5a3.5 3.5 0 0 0-5-5l-1 1M11.5 8.5a3.5 3.5 0 0 0-5 0L4 11a3.5 3.5 0 0 0 5 5l1-1';
 /** The note of the mini window (ТЗ 31): a heading of a file (by its title near its line), or the file whole. */
 export interface MiniNote {
   path: string; // the file's name in the notes folder
@@ -209,6 +213,54 @@ class Store {
   setRichNumbers(on: boolean) {
     this.richNumbers = on;
     lsSet('editor:richNumbers', on ? '1' : '0');
+  }
+  /** «Ссылки на заголовки» (ТЗ 35): by :ID: (added to the heading) or by the title (the file does not change). */
+  linkFormat = $state<'id' | 'title'>(lsGet('editor:links') === 'title' ? 'title' : 'id');
+  setLinkFormat(f: 'id' | 'title') {
+    this.linkFormat = f;
+    lsSet('editor:links', f);
+  }
+  /**
+   * The link to the heading at `line` of a file (the one the line is in; above the first heading — the file), in the
+   * format set; an :ID: the heading lacks is added (one step of ⌘Z). Null: no such file, or the :ID: not written.
+   */
+  async headingLinkAt(path: string, line: number): Promise<{ link: string; label: string } | null> {
+    const f = this.files.find((x) => x.path === path);
+    if (!f) return null;
+    const hi = headingAt(f.headings, line);
+    if (hi < 0) return { link: fileLink(f.name, displayName(f.name)), label: displayName(f.name) };
+    const h = f.headings[hi];
+    if (this.linkFormat === 'title') return { link: headingLink(h, { file: f.name }), label: labelOf(h) };
+    let id = h.id;
+    if (!id) {
+      const made = newId();
+      const step = await this.transaction(`ID: ${labelOf(h)}`, (tx) => tx.setProperty({ path: f.path, line: h.line, title: h.title }, 'ID', made));
+      if (!step) return null;
+      id = made;
+    }
+    return { link: headingLink(h, { id }), label: labelOf(h) };
+  }
+  /** ⌃C L: the link in the clipboard (text), and a word of it at the bottom of the window. */
+  async copyHeadingLink(path: string, line: number): Promise<boolean> {
+    const r = await this.headingLinkAt(path, line);
+    if (!r) return false;
+    try {
+      await navigator.clipboard.writeText(r.link);
+    } catch (e) {
+      this.say('Не удалось скопировать ссылку: ' + e);
+      return false;
+    }
+    this.note(`Ссылка на «${r.label}» скопирована · выделите текст и нажмите ⌘V`, undefined, 3000, LINK_ICON);
+    return true;
+  }
+  /** The text in the clipboard: the app reads it itself (WebKit asks before giving it to a page). */
+  async readClipboard(): Promise<string> {
+    try {
+      if (isTauri) return await invoke<string>('clipboard_text');
+      return await navigator.clipboard.readText();
+    } catch {
+      return '';
+    }
   }
   /** Drawers folded when a file opens and when the app adds one (a preference of this Mac). */
   foldDrawers = $state(lsGet('editor:drawers') !== '0');
@@ -2518,3 +2570,16 @@ export type DiskAnswer = 'disk' | 'mine' | 'later' | 'saveas' | 'keep' | 'close'
 const CONFLICT = 'файл на диске изменён другой программой';
 
 export const store = new Store();
+
+// the editor's part of links (ТЗ 35): it does not import the store
+// the editor knows its file by its name in the folder (its path in a tab of a file that is not in it)
+const fileNamed = (p: string) => store.files.find((f) => f.name === p || f.path === p);
+linkHooks.rel = (p) => fileNamed(p)?.name ?? '';
+linkHooks.pasted = () => store.note('Ссылка вставлена · ⌘Z — вернуть текст', undefined, 3000, LINK_ICON);
+linkHooks.readClip = () => store.readClipboard();
+linkHooks.copyHeading = (p, line) => {
+  const f = fileNamed(p);
+  if (!f) return false;
+  void store.copyHeadingLink(f.path, line);
+  return true;
+};

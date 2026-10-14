@@ -202,6 +202,10 @@ register({
   when: onHeading, hint: (c) => c.heading!.tags.join(', '), run: tagsStep,
 });
 register({
+  id: 'copyLink', title: 'Копировать ссылку на заголовок', icon: 'goto', group: 'heading', synonyms: ['ссылка', 'link', 'id'],
+  when: onHeading, hint: (c) => bare(c.heading!.title), run: (c) => void setTimeout(() => store.copyHeadingLink(c.file!.path, c.line)),
+});
+register({
   id: 'refile', title: 'Перенести в другой файл…', icon: 'refile', group: 'heading', synonyms: ['переместить', 'refile'],
   when: onHeading, run: () => store.startRefile(),
 });
