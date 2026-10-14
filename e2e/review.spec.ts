@@ -189,7 +189,7 @@ test.describe('the actions', () => {
     const done = page.locator('.review .done');
     await expect(done.locator('h2')).toHaveText('Разбор закончен');
     await expect(done.locator('p')).toHaveText('Осталась 1 пропущенная задача. Её можно разобрать сейчас или в следующий раз.');
-    expect(await done.locator('.stat').allInnerTexts()).toEqual(['2\nвыполнено', '1\nотменено', '0\nперенесено', '1\nотложено', '1\nпропущено']);
+    expect(await done.locator('.stat').allInnerTexts()).toEqual(['2\nвыполнено', '1\nотменено', '0\nперенесено', '1\nотложено', '1\nпропущено', '0\nразобрано']);
     await expect(page.locator('.review .bar')).toHaveCount(0);
     await expect(panel(page).locator('.prog')).toContainText('Разобрано 4 из 5');
     await expect(queue(page).first().locator('.sub')).toHaveText('Пропущена');

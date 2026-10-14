@@ -11,6 +11,7 @@
     { n: count('move'), t: 'перенесено', c: 'var(--acc)' },
     { n: count('defer'), t: 'отложено', c: 'var(--ts)' },
     { n: count('skip'), t: 'пропущено', c: 'var(--wait)' },
+    { n: count('next'), t: 'разобрано', c: 'var(--next)' },
   ]);
   const skipped = $derived(run?.items.filter((x) => x.result === 'skip') ?? []);
   const added = $derived(session.added);
