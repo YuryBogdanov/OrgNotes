@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORKFLOW, parseHeadings } from './org';
-import { bareTag, foundText, headingsWith, oftenWith, sortTags, tagCounts, tagOk, tagsOf, type TagFile } from './tags';
+import { bareTag, foundText, headingsWith, oftenWith, perFile, retag, sortTags, tagCounts, tagOk, tagsOf, type TagFile } from './tags';
 
 const file = (name: string, text: string, filetags: string[] = []): TagFile => ({ name, headings: parseHeadings(text, DEFAULT_WORKFLOW), filetags });
 const P = file('platform.org', ['* Инфраструктура :infra:', '** TODO Обновить Kafka', '** NEXT Переезд в новый ДЦ :dc:', '*** TODO Учения по откату', '* 1-1 :1on1:', '** TODO План дежурств', ''].join('\n'));
@@ -32,5 +32,25 @@ describe('tags (ТЗ 38)', () => {
     expect(foundText([{ hits: [found[1].hits[0]] }])).toBe('1 заголовок в 1 файле');
     expect(tagOk('dc_2@#%') && !tagOk('a b') && !tagOk('a:b') && !tagOk('')).toBe(true);
     expect(bareTag(' :infra: ')).toBe('infra');
+  });
+});
+
+describe('renaming and removing a tag (ТЗ 38 B)', () => {
+  const T = ['#+FILETAGS: :infra:work:', '* Инфраструктура        :infra:', '** TODO Переезд :infra:platform:', '#+BEGIN_SRC org', '* пример :infra:', '#+END_SRC', '* Другое :dc:', ''].join('\n');
+  const lines = (t: string) => parseHeadings(t, DEFAULT_WORKFLOW).map((h) => h.line);
+  it('renamed in the headings (the spaces kept; twice — once) and in #+FILETAGS; a block untouched', () => {
+    const r = retag(T, lines(T), 'INFRA', 'platform');
+    expect(r.n).toBe(2);
+    expect(r.file).toBe(true);
+    expect(r.text).toBe(['#+FILETAGS: :platform:work:', '* Инфраструктура        :platform:', '** TODO Переезд :platform:', '#+BEGIN_SRC org', '* пример :infra:', '#+END_SRC', '* Другое :dc:', ''].join('\n'));
+  });
+  it('removed: the last tag of a heading takes its spaces with it', () => {
+    const r = retag(T, lines(T), 'infra', null);
+    expect(r.text.split('\n').slice(0, 3)).toEqual(['#+FILETAGS: :work:', '* Инфраструктура', '** TODO Переезд :platform:']);
+    expect(retag('#+FILETAGS: :infra:\n', [], 'infra', null).text).toBe('#+FILETAGS:\n');
+  });
+  it('the files by how many change', () => {
+    expect(perFile([{ name: 'a.org', n: 1 }, { name: 'b.org', n: 9 }, { name: 'c.org', n: 5 }, { name: 'd.org', n: 3 }, { name: 'e.org', n: 2 }, { name: 'f.org', n: 2 }, { name: 'g.org', n: 0 }]))
+      .toBe('b.org 9 · c.org 5 · d.org 3 · e.org 2 · ещё 2 файла');
   });
 });
