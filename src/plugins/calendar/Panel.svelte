@@ -32,7 +32,9 @@
   {#if calendar.cfg.undated}
   <div class="cap">БЕЗ ДАТЫ</div>
   {#each tasks as t (t.path + t.line)}
-    <button class="ud" title="{t.title} — {base(t.file)}" onclick={() => calendar.openEntry(t)} draggable="true"
+    <button class="ud" class:picked={calendar.isPicked({ path: t.path, line: t.line, layer: 'undated' })} title="{t.title} — {base(t.file)}" draggable="true"
+      onclick={(ev) => (ev.metaKey ? calendar.openEntry(t, true) : calendar.pick({ path: t.path, line: t.line, layer: 'undated' }))}
+      ondblclick={() => calendar.openEntry(t)} oncontextmenu={(ev) => calendar.menuOf(ev, { path: t.path, line: t.line, layer: 'undated' })}
       ondragstart={(e) => { calendar.drag = { path: t.path, line: t.line, layer: 'undated', repeat: false, title: t.title, dy: 0 }; e.dataTransfer?.setData('text/plain', t.title); }}
       ondragend={() => (calendar.drag = null)}>
       <span class="kw tone-chip" style={wfOf(t.path) ? toneVars(t.keyword, wfOf(t.path)!) : ''}>{t.keyword}</span>
@@ -59,4 +61,5 @@
   .hint { margin: 0; padding: 2px 4px; font-size: 11.5px; color: var(--fg2); }
   .hint.drag { padding-top: 6px; color: var(--fg3); }
   .ud[draggable='true'] { cursor: grab; }
+  .ud.picked { border-color: var(--acc); box-shadow: inset 0 0 0 1px var(--acc); }
 </style>

@@ -53,7 +53,7 @@ test('layers and files in the navigator filter the entries and are kept', async 
   await expect(page.getByRole('checkbox', { name: 'inbox' })).not.toBeChecked();
 });
 
-test('«… ещё N»: the list of the day by the pointer; a click opens the file in a new tab, ⌘-click in the neighbour pane', async ({ page }) => {
+test('«… ещё N»: the list of the day by the pointer; a click chooses, a double click opens the file in a new tab, ⌘-click in the neighbour pane', async ({ page }) => {
   await open(page);
   const more = cell(page, '2026-10-16').locator('.more');
   await expect(more).toHaveText('… ещё 2');
@@ -63,7 +63,10 @@ test('«… ещё N»: the list of the day by the pointer; a click opens the fi
   await expect(list.locator('.dh')).toHaveText(/Пт, 16 октября\s*5 записей/);
   await expect(list.locator('.k')).toHaveText(['15:00', 'СРОК', 'TODO', 'TODO', 'NEXT']);
   await expect(list.locator('.w').nth(3)).toHaveText('work › Q4 2026');
-  await list.getByRole('option', { name: /Согласовать с финансами/ }).click();
+  await list.getByRole('option', { name: /Согласовать с финансами/ }).click(); // a click chooses (ТЗ 34)
+  await expect(list.getByRole('option', { name: /Согласовать с финансами/ })).toHaveClass(/picked/);
+  await expect(list.locator('.foot')).toHaveText('Клик — выбрать · двойной клик или ↩ — открыть · ⌘-клик — в соседней панели');
+  await list.getByRole('option', { name: /Согласовать с финансами/ }).dblclick();
   await expect(list).toHaveCount(0);
   await expect(page.locator('section.pane.active .tab.on .lbl')).toHaveText('work');
   await expect(page.locator('section.pane.active .status')).toContainText('Стр. 6');

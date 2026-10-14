@@ -29,7 +29,10 @@
     cal = { ...cal, ...c };
     setState(cal);
   };
-  const pick = (d: Date) => set({ date: isoDay(d) });
+  const pick = (d: Date) => {
+    calendar.picked = null; // a click on a day, not on an entry: the entry chosen goes (ТЗ 34)
+    set({ date: isoDay(d) });
+  };
   /** A double click on a day (not on an entry): «+ Задача» on it. */
   function dbl(ev: MouseEvent, d: Date) {
     if ((ev.target as Element).closest('.ch, .more, .evb')) return;
@@ -80,8 +83,52 @@
 
   // ---- the keyboard ------------------------------------------------------------------------------------------------
   let root: HTMLDivElement | undefined = $state();
+  // the calendar is a list of tasks of the core (ТЗ 34): a click chooses an entry, the core's menu, keys, palette
+  onMount(() => {
+    if (!root) return;
+    const tasks = calendar.ctx.ui.taskList(root, {
+      selected: () => {
+        const p = calendar.picked;
+        const ref = calendar.pickedRef();
+        return p && ref ? { ref, date: p.layer === 'event' ? 'event' : p.layer === 'deadline' ? 'DEADLINE' : 'SCHEDULED' } : null;
+      },
+      open: (other) => {
+        const p = calendar.picked;
+        if (p) calendar.openEntry(p, other);
+      },
+      clear: () => (calendar.picked = null),
+    });
+    calendar.tasks = tasks;
+    return () => {
+      tasks.dispose();
+      if (calendar.tasks === tasks) calendar.tasks = null;
+    };
+  });
+  /** A click on an entry: chosen, its day the chosen day; ⌘-click opens it in the neighbour pane, as before. */
+  function choose(ev: MouseEvent, e: CalEntry) {
+    ev.stopPropagation();
+    if (ev.metaKey) return calendar.openEntry(e, true);
+    calendar.pick(e);
+    set({ date: e.day });
+    root?.focus({ preventScroll: true });
+  }
+  function open(ev: MouseEvent, e: CalEntry) {
+    ev.stopPropagation();
+    calendar.openEntry(e);
+  }
   function key(e: KeyboardEvent) {
     if (pop || (e.target as HTMLElement).closest('input, textarea')) return;
+    // an entry chosen: ↑ ↓ go over the entries of its day; ← → to another day, as before (ТЗ 24), and let it go
+    const p = calendar.picked;
+    if (p?.day && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      const list = at(fromIso(p.day));
+      const i = list.findIndex((x) => calendar.isPicked(x));
+      const n = list[Math.max(0, Math.min(list.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+      if (n) calendar.pick(n);
+      return;
+    }
+    if (p && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) calendar.picked = null;
     const arrows: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
     if (e.metaKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
       e.preventDefault();
@@ -162,7 +209,7 @@
 {#snippet chip(e: CalEntry)}
   <button class="ch {e.layer}" class:past={past(e) && e.layer === 'event'} style={e.layer === 'task' || e.layer === 'wait' || e.layer === 'done' ? toneOf(e) : ''}
     draggable={canDrag(e)} ondragstart={(ev) => dragStart(ev, e)} ondragend={dragEnd}
-    title="{title(e)} — {e.where}" onclick={(ev) => { ev.stopPropagation(); calendar.openEntry(e, ev.metaKey); }}>
+    class:picked={calendar.isPicked(e)} title="{title(e)} — {e.where}" onclick={(ev) => choose(ev, e)} ondblclick={(ev) => open(ev, e)} oncontextmenu={(ev) => calendar.menuOf(ev, e)}>
     {#if e.layer === 'deadline'}
       <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17V3M5 4h10l-2 3 2 3H5" /></svg>
     {:else if e.layer !== 'event'}
@@ -246,7 +293,7 @@
               {#each layoutEvents(at(d)) as x (x.e.path + x.e.line + x.e.time)}
                 {@const top = Math.min(hours.length * HOUR - 18, Math.max(0, (x.start - cfg.from * 60) * (HOUR / 60)))}
                 <button class="evb" class:past={past(x.e)} draggable="true" ondragstart={(ev) => dragStart(ev, x.e)} ondragend={dragEnd} style="top:{top}px;height:{Math.max(18, (x.end - x.start) * (HOUR / 60) - 2)}px;left:calc({(x.col / x.cols) * 100}% + 3px);width:calc({100 / x.cols}% - 6px)"
-                  title="{x.e.title} — {x.e.where}" onclick={(ev) => { ev.stopPropagation(); calendar.openEntry(x.e, ev.metaKey); }}>
+                  class:picked={calendar.isPicked(x.e)} title="{x.e.title} — {x.e.where}" onclick={(ev) => choose(ev, x.e)} ondblclick={(ev) => open(ev, x.e)} oncontextmenu={(ev) => calendar.menuOf(ev, x.e)}>
                   <b>{x.e.time}{x.e.end ? ` – ${x.e.end}` : ` – ${String(Math.floor(x.end / 60)).padStart(2, '0')}:${String(x.end % 60).padStart(2, '0')}`}</b>
                   <span>{x.e.title}</span>
                 </button>
@@ -338,6 +385,9 @@
   .ch.event.past { background: color-mix(in srgb, var(--acc) 8%, transparent); color: var(--fg3); }
   .ch.done .tx { text-decoration: line-through; }
   .ch.done { color: var(--fg3); }
+  /* the entry chosen (ТЗ 34): a ring of the accent while the calendar has the focus, grey otherwise */
+  .ch.picked, .evb.picked { box-shadow: inset 0 0 0 1.5px var(--acc); }
+  .cal:not(:focus-within) :is(.ch, .evb).picked { box-shadow: inset 0 0 0 1.5px var(--fg3); }
   .tm { flex: 0 0 auto; font-weight: 700; color: var(--acc); }
   .past .tm { color: var(--fg3); }
   .tx { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
