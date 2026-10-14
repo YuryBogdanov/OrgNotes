@@ -26,6 +26,8 @@ export interface RichDeps {
   drawers: (doc: Text) => Map<number, DrawerRange>;
   links: (doc: Text) => Span[];
   onPick: (p: RichPick) => void;
+  /** A click on a tag's capsule: its tab «Тег» (ТЗ 38). */
+  onTag?: (tag: string) => void;
 }
 
 const MAX_LEVEL = 6;
@@ -98,7 +100,7 @@ class Cap extends WidgetType {
 }
 /** Tags, one capsule each (at the right end of a heading). */
 class Tags extends WidgetType {
-  constructor(readonly tags: string[], readonly right: boolean) {
+  constructor(readonly tags: string[], readonly right: boolean, readonly onTag?: (tag: string) => void) {
     super();
   }
   eq(o: Tags) {
@@ -111,6 +113,8 @@ class Tags extends WidgetType {
       const c = document.createElement('span');
       c.className = 'cm-r-cap tag';
       c.textContent = t;
+      c.dataset.tag = t;
+      if (this.onTag) clickable(c, `Тег ${t}`, () => this.onTag!(t));
       s.appendChild(c);
     }
     return s;
@@ -320,7 +324,7 @@ function build(view: EditorView, deps: RichDeps): DecorationSet {
         const tg = /\s(:(?:[^\s:]+:)+)\s*$/.exec(t);
         if (tg) {
           const tags = tg[1].split(':').filter(Boolean);
-          hide(ln.from + tg.index, ln.to, new Tags(tags, true));
+          hide(ln.from + tg.index, ln.to, new Tags(tags, true, deps.onTag));
         }
         continue;
       }
@@ -343,7 +347,7 @@ function build(view: EditorView, deps: RichDeps): DecorationSet {
         line(ln.from, 'cm-r-ftags');
         if (!isRaw) {
           const tags = t.slice(ftags[0].length).split(':').map((x) => x.trim()).filter(Boolean);
-          hide(ln.from, ln.to, new Tags(tags, false));
+          hide(ln.from, ln.to, new Tags(tags, false, deps.onTag));
         }
         continue;
       }

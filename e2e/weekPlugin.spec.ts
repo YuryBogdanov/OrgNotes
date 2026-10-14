@@ -10,7 +10,8 @@ const DIST = fileURLToPath(new URL('../../panopticon-week/dist/', import.meta.ur
 const built = existsSync(DIST + 'main.js');
 test.skip(!built, 'the plugin «Неделя» is not built next to the app (../panopticon-week: npm run build)');
 
-const DAY = new Date().toISOString().slice(0, 10);
+const now = new Date();
+const DAY = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; // the local day (not UTC's: after midnight they differ)
 // a meeting with its stamp in the title, as the calendar writes it: an event for the API
 const WORK = ['* Работа', '** TODO Подготовить слайды', 'DEADLINE: <' + DAY + '>', '** Синк с CTO <' + DAY + ' 11:00>', ''].join('\n');
 

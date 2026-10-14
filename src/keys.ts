@@ -121,7 +121,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('status', 'Сменить статус…', 'heading', 'heading', [], { emacs: ['⌃C ⌃T'], mac: [], synonyms: ['todo', 'состояние'] }),
   C('schedule', 'Запланировать…', 'heading', 'heading', [], { emacs: ['⌃C S'], mac: [], synonyms: ['scheduled', 'дата'] }),
   C('deadline', 'Поставить дедлайн…', 'heading', 'heading', [], { emacs: ['⌃C D'], mac: [], synonyms: ['срок'] }),
-  C('tags', 'Изменить теги…', 'heading', 'heading', [], { emacs: ['⌃C ⌃Q'], mac: [], synonyms: ['метки'] }),
+  C('tags', 'Теги…', 'heading', 'editor', ['⌃C Q'], { emacs: ['⌃C Q', '⌃C ⌃Q'], synonyms: ['метки', 'изменить теги'], note: 'Поле тегов заголовка с подсказками из всех заметок' }),
   C('copyLink', 'Копировать ссылку на заголовок', 'heading', 'editor', ['⌃C L'], { synonyms: ['ссылка', 'link', 'org-store-link'] }),
   C('refile', 'Перенести в другой файл…', 'heading', 'heading', [], { emacs: ['⌃C ⌃W'], mac: [], synonyms: ['refile', 'переместить'] }),
 
