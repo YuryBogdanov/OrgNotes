@@ -16,6 +16,8 @@ export interface Tab {
   kind: TabKind;
   path?: string; // file tabs
   cursor: Cursor;
+  /** The first line in view (0-based): the scroll comes back with the tab, wherever the caret is. */
+  top?: number;
   reveal?: { line: number; n: number; focus: boolean; col?: number } | null; // a request to move the caret there and scroll to it
   fromAgenda?: { line: number; title: string } | null; // "Открыто из агенды" caption
   title?: string; // untitled tabs: "Без названия", "Без названия 2", …
@@ -371,7 +373,7 @@ export function serialize(L: Layout): string {
         active: Math.max(0, tabs.indexOf(act)),
         tabs: tabs.map((t) => {
           const label = core(t.kind) ? undefined : (viewOf(t.kind)?.label(t) ?? t.label);
-          return { kind: t.kind, path: t.path, cursor: t.cursor, ...(t.view !== undefined ? { view: t.view } : {}), ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.data !== undefined ? { data: t.data } : {}), ...(label ? { label } : {}) };
+          return { kind: t.kind, path: t.path, cursor: t.cursor, ...(t.top ? { top: t.top } : {}), ...(t.view !== undefined ? { view: t.view } : {}), ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.data !== undefined ? { data: t.data } : {}), ...(label ? { label } : {}) };
         }),
       };
     }),
@@ -400,6 +402,7 @@ export function restore(raw: string | null, exists: (path: string) => boolean): 
         } else if (st?.kind === 'file' && typeof st.path === 'string' && exists(st.path)) {
           const t = newTab('file', st.path, st.cursor?.line ?? 0);
           t.cursor = { line: st.cursor?.line ?? 0, col: st.cursor?.col ?? 0 };
+          if (typeof st.top === 'number' && st.top > 0) t.top = st.top;
           t.reveal = null; // the editor restores the caret, column included
           if (typeof st.view === 'string') t.view = st.view;
           tabs.push(t);

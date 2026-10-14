@@ -1803,6 +1803,10 @@ class Store {
     this.layout.active = pi;
   }
   /** The editor of a tab reports its caret; leaving the heading opened from the agenda drops the caption. */
+  /** The first line in view of a file tab, as it was scrolled (a tab shown again comes back there). */
+  setTabTop(tab: Tab, line: number) {
+    if (tab.top !== line) tab.top = line;
+  }
   setTabCursor(tab: Tab, line: number, col: number) {
     tab.cursor = { line, col };
     if (tab.kind === 'file' && tab.path) this.lastCursor[tab.path] = { line, col };
