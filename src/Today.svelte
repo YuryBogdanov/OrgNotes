@@ -409,7 +409,7 @@
         {#each g.rows as r (r.key)}
           <button class="trow" class:sel={selKey === r.slot} class:stale={r.stale} class:gone={r.gone} data-k={r.slot}
             onclick={() => choose(r.slot)} ondblclick={() => open(r.path, r.line)} oncontextmenu={(e) => menu(e, r.slot)}>
-            <span class="kw col tone" style={tone(r.kw, r.path)}>{r.kw}</span>
+            <span class="kwc"><span class="kw tone" style={tone(r.kw, r.path)}>{r.kw}</span></span>
             <span class="t">{r.title}</span>
             {#if r.prio}<span class="meta">[#{r.prio}]</span>{/if}
           </button>
@@ -472,9 +472,11 @@
   .link { margin-left: auto; border: 0; background: none; padding: 0; font: inherit; font-size: 12px; color: var(--acc); cursor: default; }
   .link:hover { text-decoration: underline; }
   .none { color: var(--fg2); padding: 8px 0 6px; }
-  .count { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 8px; background: color-mix(in srgb, var(--todo) 12%, transparent); color: var(--todo); }
-  .kw { flex: 0 0 auto; font-size: 11px; font-weight: 700; }
-  .kw.col { flex-basis: 40px; }
+  .count { font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: color-mix(in srgb, var(--todo) 12%, transparent); color: var(--todo); }
+  /* a status as a capsule (ТЗ 32, the design's update): as the marks of statuses in the navigator and the agenda */
+  .kw { flex: 0 0 auto; padding: 1px 5px; border-radius: 4px; font-size: 10.5px; font-weight: 700; line-height: 15px; letter-spacing: 0.02em; color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); }
+  .kwc { flex: 0 0 46px; display: flex; }
+  .t .kw { display: inline-block; vertical-align: 1px; margin-right: 2px; }
   .t { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; }
   .meta { flex: 0 0 auto; font-size: 11.5px; color: var(--fg3); }
   .meta.red { color: var(--todo); }

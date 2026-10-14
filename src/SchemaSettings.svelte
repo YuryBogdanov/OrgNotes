@@ -64,7 +64,7 @@
                   {/each}
                 </div>
               {:else}
-                <select id={id(f)} class="sel" value={optValue(v[f.key])} onchange={(e) => set(f.key, optOf(opts, e.currentTarget.value))}>
+                <select id={id(f)} class="sel" disabled={f.disabled?.(v) ?? false} value={optValue(v[f.key])} onchange={(e) => set(f.key, optOf(opts, e.currentTarget.value))}>
                   {#each opts as o, i (i)}<option value={optValue(o.value)} disabled={o.disabled}>{o.label}</option>{/each}
                 </select>
               {/if}
