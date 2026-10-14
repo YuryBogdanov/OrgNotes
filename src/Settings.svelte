@@ -305,7 +305,11 @@
   // the core's sections, in the order of the mockup; the features' (Календарь) come from the registry (views.ts)
   const CORE: [SettingsSection, number][] = [['Основные', 0], ['Оформление', 10], ['Статусы', 20], ['Теги', 30], ['Агенды', 40], ['Inbox', 60], ['Файлы', 70], ['Клавиши', 80]];
   // a plugin turned on while the sheet is open brings its section at once (the registry is reactive)
-  const sections = $derived([...CORE, ...allSettings().map((x): [SettingsSection, number] => [x.id, x.order])].sort((a, b) => a[1] - b[1]).map(([id]) => id));
+  // three groups (ТЗ 37): what comes with Panopticon, «ПЛАГИНЫ», «НАСТРОЙКИ ПЛАГИНОВ» — the plugins' own sections
+  const own = $derived([...CORE, ...allSettings().filter((x) => !x.plugin && x.id !== 'Плагины').map((x): [SettingsSection, number] => [x.id, x.order])].sort((a, b) => a[1] - b[1]).map(([id]) => id));
+  const ofPlugins = $derived(allSettings().filter((x) => x.plugin).map((x) => x.id).sort((a, b) => a.localeCompare(b, 'ru')));
+  const sections = $derived([...own, ...(settingsOf('Плагины') ? ['Плагины'] : []), ...ofPlugins]);
+  const HEADS: Record<string, string> = $derived({ ...(settingsOf('Плагины') ? { Плагины: 'ПЛАГИНЫ' } : {}), ...(ofPlugins.length ? { [ofPlugins[0]]: 'НАСТРОЙКИ ПЛАГИНОВ' } : {}) });
   const READY = $derived<SettingsSection[]>(['Основные', 'Оформление', 'Статусы', 'Агенды', 'Inbox', 'Клавиши', ...allSettings().map((x) => x.id)]);
   const ICON: Record<SettingsSection, string> = {
     Основные: 'M10 7.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2zM10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2',
@@ -359,6 +363,7 @@
     <!-- svelte-ignore a11y_interactive_supports_focus -->
     <div class="sections" role="tablist" aria-orientation="vertical" aria-label="Разделы настроек" tabindex="-1" onkeydown={sideKey}>
       {#each sections as t (t)}
+        {#if HEADS[t]}<div class="shead" role="presentation">{HEADS[t]}</div>{/if}
         <button role="tab" data-section={t} aria-selected={t === tab} tabindex={t === tab ? 0 : -1} class:on={t === tab} disabled={!READY.includes(t)} title={READY.includes(t) ? '' : 'Пока не реализовано'} onclick={() => store.showSection(t)}>
           <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICON[t] ?? settingsOf(t)?.icon} /></svg>
           <span>{t}</span>
@@ -433,7 +438,7 @@
       </div>
     {:else if settingsOf(tab)}
       {@const spec = settingsOf(tab)!}
-      {#if spec.schema}<SchemaSettings schema={spec.schema} />{:else if spec.component}<spec.component />{/if}
+      {#if spec.schema}<SchemaSettings schema={spec.schema} plugin={spec.plugin} />{:else if spec.component}<spec.component />{/if}
     {:else if tab === 'Агенды'}
       <div class="body">
         <section class="general" aria-label="Агенды">
@@ -920,4 +925,5 @@
   .lseg button { height: 22px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 12px; }
   .lseg button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); font-weight: 500; }
   .updot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--acc); }
+  .shead { padding: 14px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--fg3); }
 </style>

@@ -1,11 +1,12 @@
 <script lang="ts">
+  import PluginHead from './PluginHead.svelte';
   import Picker from './Picker.svelte';
   import FormField from './FormField.svelte';
   import { WHERE_NOTE, WIDE, hintOf, optOf, optValue, optionsOf, whereOfGroup, type Field, type Schema } from './settingsSchema';
 
   // A feature's settings drawn from its schema (roadmap 0.6), in the settings sheet's look: a section of its own or,
   // `embedded`, a block inside another section («Цели квартала» in «Агенды»).
-  let { schema, embedded = false, where: sayWhere = true }: { schema: Schema; embedded?: boolean; where?: boolean } = $props();
+  let { schema, embedded = false, where: sayWhere = true, plugin }: { schema: Schema; embedded?: boolean; where?: boolean; plugin?: string } = $props();
 
   const v = $derived(schema.values());
   const id = (f: Field) => `${schema.id}-${f.key}`;
@@ -92,7 +93,7 @@
   {@render groups()}
 {:else}
   <div class="body">
-    <section class="general" aria-label={schema.label}>{@render groups()}</section>
+    <section class="general" aria-label={schema.label}>{#if plugin}<PluginHead id={plugin} />{/if}{@render groups()}</section>
   </div>
 {/if}
 {#each picking ? [picking] : [] as f (f.key)}

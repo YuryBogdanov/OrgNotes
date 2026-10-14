@@ -263,3 +263,6 @@ export function hostAllowed(net: string[], host: string): boolean {
     return x.startsWith('*.') ? host.endsWith(x.slice(1)) : host === x;
   });
 }
+
+/** A plugin's icon: its own, else its section's of the navigator, else its first tab's or file view's; none. */
+export const iconOf = (m: Manifest): string | undefined => m.icon ?? m.contributes.navSections[0]?.icon ?? m.contributes.views[0]?.icon ?? m.contributes.fileViews[0]?.icon;

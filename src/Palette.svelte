@@ -159,7 +159,7 @@
   const keepFocus = (e: MouseEvent) => {
     if (e.target !== input) e.preventDefault();
   };
-  const label = (r: Row) => [r.title, r.hint, r.key].filter(Boolean).join(', ');
+  const label = (r: Row) => [r.title, r.hint, r.plugin && `плагин «${r.plugin}»`, r.key].filter(Boolean).join(', ');
   const fileLine = (f: { name: string }, line: number) => `${displayName(f.name)} · строка ${line + 1}`;
 </script>
 
@@ -224,9 +224,12 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="row" id={'pal-' + r.id} role="option" aria-selected={current === r} aria-label={label(r)} class:on={current === r}
           style:padding-left={10 + (r.level ?? 0) * 18 + 'px'} onmousemove={() => hover(i)} onclick={() => run(r)}>
-          {#if r.icon}<svg class="ic" width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICONS[r.icon]} /></svg>{/if}
+          {#if r.icon || r.iconPath}
+            <span class="ico"><svg class="ic" width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={r.iconPath ?? ICONS[r.icon!]} /></svg>{#if r.plugin}<i class="pm" title="Команда плагина"></i>{/if}</span>
+          {/if}
           <span class="t" class:it={r.italic}>{#each runs(r.title, r.at ?? []) as part}{#if part.hit}<b>{part.s}</b>{:else}{part.s}{/if}{/each}</span>
           {#if r.hint}<span class="hint">{r.hint}</span>{/if}
+          {#if r.plugin}<span class="plug">{r.plugin}</span>{/if}
           {#if r.key}<span class="key">{r.key}</span>{/if}
         </div>
       {:else}
@@ -288,4 +291,10 @@
   .foot { flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; row-gap: 4px; column-gap: 16px; padding: 8px 16px; background: var(--side); border-top: 1px solid var(--line); font-size: 11.5px; color: var(--fg2); }
   .foot span { display: flex; align-items: center; gap: 5px; }
   .foot kbd { padding: 0 5px; color: var(--fg); }
+  /* a plugin's command (ТЗ 37): a purple mark on its icon, its plugin's name as a capsule */
+  .ico { position: relative; flex: 0 0 17px; display: flex; }
+  .pm { position: absolute; right: -4px; bottom: -4px; width: 10px; height: 10px; box-sizing: border-box; border-radius: 3px; background: var(--purple); border: 2px solid var(--pop, var(--bg)); }
+  .plug { flex: 0 0 auto; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--purple); background: color-mix(in srgb, var(--purple) 14%, transparent); }
+  .row.on .pm { background: var(--onpacc); border-color: var(--pacc); }
+  .row.on .plug { color: var(--onpacc); background: rgba(255, 255, 255, 0.22); }
 </style>

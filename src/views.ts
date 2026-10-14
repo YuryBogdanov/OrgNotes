@@ -77,6 +77,8 @@ export interface SettingsSpec {
   schema?: Schema;
   /** A dot by its name: something waits there (updates of plugins, ТЗ 37). */
   dot?(): boolean;
+  /** The plugin whose section it is: under «НАСТРОЙКИ ПЛАГИНОВ», with the plugin's head. */
+  plugin?: string;
 }
 const sections = new SvelteMap<string, SettingsSpec>();
 export function registerSettings(s: SettingsSpec) {

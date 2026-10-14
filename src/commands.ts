@@ -104,6 +104,8 @@ export interface Row {
   prefer?: boolean; // selected when the list first shows (the heading the cursor is in)
   note?: string; // grey after the group's header (the task of «ВЫДЕЛЕННАЯ ЗАДАЧА»)
   alt?: () => Step | void; // ⌘↩ on it («Ссылка на»: the label is the heading's title)
+  plugin?: string; // a plugin's command: its name as a purple capsule, a mark on the icon
+  iconPath?: string; // its own icon, an SVG path (over `icon`)
   run?: () => Step | void;
 }
 export type Plate =
@@ -143,6 +145,9 @@ export interface Command {
   when: (c: Ctx) => boolean;
   hint?: (c: Ctx) => string;
   run: (c: Ctx) => Step | void;
+  /** A plugin's command: its name (a purple capsule in the row) and its own icon (an SVG path). */
+  plugin?: string;
+  iconPath?: string;
 }
 
 const GROUPS = { heading: 'К ЗАГОЛОВКУ', general: 'ОБЩИЕ' } as const;
@@ -348,7 +353,7 @@ export function mainStep(c: Ctx): Step {
         if (q.trim()) found.sort(rank);
         for (const { cmd, hit } of found)
           rows.push({
-            id: cmd.id, group: c.task && g === 'general' ? 'ВСЕ КОМАНДЫ' : GROUPS[g], title: cmd.title, at: hit!.at, icon: cmd.icon, hint: cmd.hint?.(c) || undefined, key: store.keyHint(cmd.keyId ?? cmd.id) || undefined,
+            id: cmd.id, group: c.task && g === 'general' ? 'ВСЕ КОМАНДЫ' : GROUPS[g], title: cmd.title, at: hit!.at, icon: cmd.icon, hint: cmd.hint?.(c) || undefined, key: store.keyHint(cmd.keyId ?? cmd.id) || undefined, plugin: cmd.plugin, iconPath: cmd.iconPath,
             run: () => {
               remember(cmd.id);
               return cmd.run(c);

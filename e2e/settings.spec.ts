@@ -185,7 +185,7 @@ test.describe('table', () => {
 
   test('sections are in the order of the mockup, including Оформление, Календарь and Клавиши', async ({ page }) => {
     await openSettings(page);
-    expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Сегодня', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Файлы', 'Мини-окно', 'Клавиши', 'Календарь', 'Канбан', 'Плагины']);
+    expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Сегодня', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Файлы', 'Мини-окно', 'Клавиши', 'Плагины', 'Календарь', 'Канбан']);
   });
 });
 
@@ -540,7 +540,7 @@ test.describe('sheet', () => {
     await openSettings(page);
     const sheet = page.getByRole('dialog', { name: 'Настройки' });
     const on = sheet.getByRole('tab', { selected: true });
-    await expect(sheet.getByRole('tab')).toHaveText(['Основные', 'Сегодня', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Файлы', 'Мини-окно', 'Клавиши', 'Календарь', 'Канбан', 'Плагины']);
+    await expect(sheet.getByRole('tab')).toHaveText(['Основные', 'Сегодня', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Файлы', 'Мини-окно', 'Клавиши', 'Плагины', 'Календарь', 'Канбан']);
     await expect(on).toHaveText('Статусы');
     await page.keyboard.press('Meta+BracketRight');
     await expect(on).toHaveText('Агенды'); // «Теги» is not made yet
@@ -554,7 +554,7 @@ test.describe('sheet', () => {
     await expect(sheet.locator('.t2')).toHaveText('Основные');
     await on.focus();
     await page.keyboard.press('ArrowUp');
-    await expect(on).toHaveText('Плагины'); // round to the last
+    await expect(on).toHaveText('Канбан'); // round to the last: a plugin's section, under «НАСТРОЙКИ ПЛАГИНОВ»
     await expect(on).toBeFocused();
     await page.keyboard.press('ArrowDown');
     await expect(on).toHaveText('Основные');
