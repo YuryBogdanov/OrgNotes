@@ -6,7 +6,8 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { mount, unmount, untrack, type Component } from 'svelte';
 import { store } from '../store.svelte';
-import { newTab, openFile, openFromAgenda, openView } from '../layout';
+import { newTab, openFile, openFromAgenda, openScoped, openView } from '../layout';
+import { headingActions } from '../headingActions.svelte';
 import { register as registerPalette } from '../commands';
 import { registerAction, registerFileView, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf, viewOf } from '../views';
 import { setLineLink } from '../lineLinks';
@@ -17,7 +18,7 @@ import { registerTodayBlock } from '../todayBlocks';
 import PluginTodayBlock from '../PluginTodayBlock.svelte';
 import { fuzzy } from '../fuzzy';
 import { runAgenda, statusKey, type Agenda, type Cond as CoreCond } from '../agendas';
-import { DEFAULT_SEQUENCE, DEFAULT_WORKFLOW, namedFor, type Heading, type OrgDate, type WorkflowDef } from '../org';
+import { DEFAULT_SEQUENCE, DEFAULT_WORKFLOW, headingAt, namedFor, type Heading, type OrgDate, type WorkflowDef } from '../org';
 import { parseTheme, type Theme } from '../themes';
 import { displayName, isArchive } from '../names';
 import type { Tx as CoreTx } from '../journal';
@@ -753,6 +754,54 @@ class Host {
           declared('вида файла', m.contributes.fileViews.some((x) => x.id === fv), fv);
           this.fileViews.set(fv, { plugin: id, spec });
           return keep(() => void (this.fileViews.get(fv)?.spec === spec && this.fileViews.delete(fv)));
+        },
+        openFileView: async (fv, file, where = 'here') => {
+          declared('вида файла', m.contributes.fileViews.some((x) => x.id === fv), fv);
+          const f = fileOf(String(file?.path ?? ''));
+          if (!f) return false;
+          const L = store.layout;
+          if (where === 'beside' && L.panes.length < 2) store.splitRight();
+          const pi = where === 'beside' ? 1 : L.active;
+          const h = file.heading ? findHeading(f.headings, { path: f.path, line: Number(file.heading.line), title: String(file.heading.title) }) : undefined;
+          if (file.heading && !h) return false;
+          const p = L.panes[pi];
+          if (h) {
+            // one tab per branch and view: shown again, not opened twice
+            const i = p.tabs.findIndex((t) => t.kind === 'file' && t.path === f.path && t.view === fv && t.scope?.title === h.title);
+            if (i >= 0) {
+              p.active = i;
+              p.tabs[i].scope = { line: h.line, title: h.title };
+            } else openScoped(L, pi, f.path, fv, { line: h.line, title: h.title });
+          } else store.showAs(openFile(L, pi, f.path, 0, { focus: true }), fv);
+          L.active = pi;
+          return true;
+        },
+        currentHeading: () => {
+          const t = store.tab;
+          const f = store.fileOf(t);
+          if (!t || !f) return null;
+          // a view on a branch: its heading; the text: the heading at the caret
+          if (t.scope && t.view) return apiRef({ path: f.path, line: t.scope.line, title: t.scope.title });
+          const h = f.headings[headingAt(f.headings, t.cursor.line)];
+          return h ? { path: f.name, line: h.line, title: h.title } : null;
+        },
+        headingAction: (spec) => {
+          const key = `${id}.${++this.listN}`;
+          headingActions.set(key, {
+            label: String(spec.label),
+            when: (path, line) => {
+              if (!spec.when) return true;
+              const f = fileOf(path);
+              const h = f?.headings.find((x) => x.line === line);
+              return !!f && !!h && !!this.guard(id, () => spec.when!(infoOf(f, h)), false);
+            },
+            run: (path, line) => {
+              const f = fileOf(path);
+              const h = f?.headings.find((x) => x.line === line);
+              if (f && h) this.guard(id, () => spec.run({ path: f.name, line: h.line, title: h.title }), undefined);
+            },
+          });
+          return keep(() => void headingActions.delete(key));
         },
         showAs: async (fv) => {
           if (fv !== null) declared('вида файла', m.contributes.fileViews.some((x) => x.id === fv), fv);

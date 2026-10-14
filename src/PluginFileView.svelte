@@ -18,9 +18,26 @@
     const p = path;
     void tabId; // the tab, not its object: the layout may give the same tab anew
     if (!node || !entry || off) return;
-    const ctl = { showText: () => store.showAs(untrack(() => tab), '') };
+    // «Текст»: a tab on one heading (ТЗ 39) becomes the file's text at that heading
+    const ctl = {
+      showText: () => {
+        const t = untrack(() => tab);
+        if (t.scope) {
+          t.reveal = { line: t.scope.line, n: Date.now(), focus: true };
+          t.scope = undefined;
+        }
+        store.showAs(t, '');
+      },
+      // the branch's heading moved or was renamed: the tab's name and «Текст» follow it
+      setHeading: (h: { line: number; title: string }) => {
+        const t = untrack(() => tab);
+        if (t.scope && h) t.scope = { line: Number(h.line), title: String(h.title) };
+      },
+    };
+    const scope = untrack(() => tab.scope);
+    const file = { path: p, ...(scope ? { heading: { path: p, line: scope.line, title: scope.title } } : {}) };
     // what the plugin reads while drawing is its own: not a reason to draw it again
-    const dispose = untrack(() => plugins.guard(entry.plugin, () => entry.spec.render(node, { path: p }, ctl), undefined));
+    const dispose = untrack(() => plugins.guard(entry.plugin, () => entry.spec.render(node, file, ctl), undefined));
     return () => {
       plugins.guard(entry.plugin, () => dispose?.(), undefined);
       node.replaceChildren();

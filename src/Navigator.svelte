@@ -5,6 +5,7 @@
   import { subtreeProgress, toneFor } from './org';
   import { toneStyle } from './colors';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
+  import { headingActionsFor } from './headingActions.svelte';
   import { buttons, expandAll, folderKey, headingKey, pathKeys, readOpen, subtreeKeys, treeNodes, writeOpen } from './navTree';
 
   type Row = {
@@ -218,8 +219,12 @@
     if (r.kind === 'heading' && r.file !== undefined && r.line !== undefined) {
       e.preventDefault();
       e.stopPropagation();
-      const path = store.files[r.file]?.path;
-      if (path) menu = { x: e.clientX, y: e.clientY, items: [{ label: 'Копировать ссылку на заголовок', shortcut: store.keyHint('copyLink') || undefined, action: () => void store.copyHeadingLink(path, r.line!) }] };
+      const f = store.files[r.file];
+      if (!f) return;
+      const line = r.line;
+      // the plugins' items on a heading (ТЗ 39: «Показать ветку как mindmap»)
+      const more = headingActionsFor(f.name, line).map((a): MenuItem => ({ label: a.label, action: () => a.run(f.name, line) }));
+      menu = { x: e.clientX, y: e.clientY, items: [{ label: 'Копировать ссылку на заголовок', shortcut: store.keyHint('copyLink') || undefined, action: () => void store.copyHeadingLink(f.path, line) }, ...(more.length ? ['sep' as const, ...more] : [])] };
       return;
     }
     if (!store.canManageFiles || r.kind === 'heading' || r.kind === 'new') return;

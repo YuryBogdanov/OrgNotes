@@ -23,6 +23,7 @@
   import { clipTarget, linkHooks, linkPaste } from './linkEdit';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import TagPop from './TagPop.svelte';
+  import { headingActionsFor } from './headingActions.svelte';
   import { tagsState } from './tagsState.svelte';
   import { lineTags, withTags } from './tags';
   import { autocompletion, type CompletionContext } from '@codemirror/autocomplete';
@@ -629,7 +630,12 @@
       items.push({ label: 'Копировать ссылку на заголовок', shortcut: key('copyLink'), detail: `«${heading}»`, action: () => linkHooks.copyHeading(path, v.state.doc.lineAt(s.head).number - 1) });
     }
     const hl = v.state.doc.lineAt(s.head);
-    if (s.empty && headLine(hl.text)) items.push({ label: 'Теги…', shortcut: key('tags'), action: () => openTagPop(v, hl.number) });
+    if (s.empty && headLine(hl.text)) {
+      items.push({ label: 'Теги…', shortcut: key('tags'), action: () => openTagPop(v, hl.number) });
+      // the plugins' items on a heading (ТЗ 39)
+      const more = headingActionsFor(path, hl.number - 1);
+      if (more.length) items.push('sep', ...more.map((a): MenuItem => ({ label: a.label, action: () => a.run(path, hl.number - 1) })));
+    }
     menu = { x: e.clientX, y: e.clientY, items };
   }
   function portal(node: HTMLElement) {
