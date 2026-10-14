@@ -97,7 +97,44 @@
   onMount(() => {
     kanban.ask = ask;
   });
+  // the board is a list of tasks of the core (ТЗ 34): its menu of a card, the keys of «Задачи в списках», the palette
+  const chosen = () => {
+    for (const c of board?.columns ?? []) {
+      const k = c.cards.find((x) => x.key === selected);
+      if (k) return { key: k.key, line: k.line, title: k.title, heading: k.heading, keyword: c.keyword };
+    }
+    return null;
+  };
+  let tasks: { menu(at: { x: number; y: number }): void; dispose(): void } | null = null;
+  onMount(() => {
+    if (!root) return;
+    tasks = kanban.ctx.ui.taskList(root, {
+      selected: () => {
+        const k = chosen();
+        return k ? { ref: { path, line: k.line, title: k.heading } } : null;
+      },
+      open: (other) => {
+        const k = chosen();
+        if (!k) return;
+        if (!other) return openPeek({ line: k.line, title: k.heading });
+        showText();
+        void kanban.ctx.commands.run('file.open', { path, line: k.line });
+      },
+      otherLabel: 'Открыть в тексте файла',
+      clear: () => select(null),
+      more: () => {
+        const k = chosen();
+        if (!k) return [];
+        const card = { key: k.key, line: k.line, title: k.heading, keyword: k.keyword };
+        return [
+          { label: 'В архив', run: () => void kanban.archiveCard(path, card) },
+          { label: 'Удалить', danger: true, run: () => void kanban.removeCard(path, card) },
+        ];
+      },
+    });
+  });
   onDestroy(() => {
+    tasks?.dispose();
     if (kanban.ask === ask) kanban.ask = null;
     kanban.shown.delete(path);
   });
@@ -186,8 +223,8 @@
     drag = null;
     if (!p) return;
     if (!d) {
-      select(p.key); // a click: chosen and opened at the side
-      openPeek({ line: p.line, title: p.title });
+      select(p.key); // a click chooses; a double click or ↩ opens it at the side (ТЗ 34)
+      if (opened && peek) openPeek({ line: p.line, title: p.title }); // the side panel open: it follows the choice
       return;
     }
     select(p.key);
@@ -349,7 +386,8 @@
                 {@const k = c.cards[row.i]}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <div class="kb-card" class:done={k.done} class:sel={selected === k.key} class:ghost={drag?.key === k.key} role="button" tabindex="-1" aria-label={k.title} data-line={k.line} data-key={k.key}
-                  onpointerdown={(e) => down(e, k, c.keyword)}>
+                  onpointerdown={(e) => down(e, k, c.keyword)} ondblclick={() => openPeek({ line: k.line, title: k.heading })}
+                  oncontextmenu={(e) => { e.preventDefault(); select(k.key); root?.focus({ preventScroll: true }); tasks?.menu({ x: e.clientX, y: e.clientY }); }}>
                   <div class="kb-t">{@html titleHtml(k.title)}</div>
                   {#if k.priority || k.date || k.progress || k.tags.length}
                     <div class="kb-meta">

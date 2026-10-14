@@ -8,7 +8,7 @@ import { Tx, type HeadingRef, type Step } from './journal';
 import { firstDone, sequenceFor, setKeyword, setPriority, toJs, toneFor, type Heading } from './org';
 import { setPlanning, setTags, shiftEvent } from './edits';
 import { priorityAfter, rotateStatus } from './outline';
-import { bare, headingStep, setListTask, taskCommands, type Ctx, type HeadingAct, type Icon, type TaskCtx } from './commands';
+import { bare, headingStep, setListTask, setMoreTaskCommands, taskCommands, type Ctx, type HeadingAct, type Icon, type TaskCommand, type TaskCtx } from './commands';
 import { toneStyle } from './colors';
 import { newId } from './endDay';
 import type { MenuItem } from './ContextMenu.svelte';
@@ -39,6 +39,14 @@ export interface ListSpec {
   freeze: () => void;
   /** More at the end of the menu (the board's «В архив», «Удалить»). */
   more?: (t: ListTask) => MenuItem[];
+}
+
+/** An action of a plugin on a task («действия с задачей», API 1.6): in the menu and in the palette's group. */
+export interface TaskAction {
+  key: string; // plugin + its id
+  label: string;
+  when: (f: NoteFile, h: Heading) => boolean;
+  run: (t: HeadingRef) => void;
 }
 
 const PRIO: Record<string, string> = { A: '--tl:var(--todo)', B: '--tl:var(--wait)', C: '--tl:var(--fg2)' };
@@ -87,6 +95,17 @@ class TaskLists {
   /** The texts the lists wrote: a list does not take them for a change from outside. */
   own = new Map<string, string>();
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The plugins' actions on a task. */
+  actions = $state.raw<TaskAction[]>([]);
+  addAction(a: TaskAction): () => void {
+    this.actions = [...this.actions.filter((x) => x.key !== a.key), a];
+    return () => void (this.actions = this.actions.filter((x) => x !== a));
+  }
+  /** The plugins' actions that apply to the task. */
+  actionsFor(t: ListTask): TaskAction[] {
+    const r = resolve(t);
+    return r ? this.actions.filter((a) => a.when(r.f, r.h)) : [];
+  }
 
   register(spec: ListSpec): () => void {
     this.specs = [...this.specs.filter((s) => s.id !== spec.id), spec];
@@ -101,8 +120,10 @@ class TaskLists {
   }
   /** The list with the focus in it now (its keys work), if any. */
   focused(): ListSpec | undefined {
-    const a = typeof document !== 'undefined' ? document.activeElement : null;
-    return a ? this.specs.find((s) => s.el()?.contains(a)) : undefined;
+    const a = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+    // a field typed in, an editor or a panel inside a list (the board's new card, its card at the side) keep their keys
+    if (!a || a.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return undefined;
+    return this.specs.find((s) => s.el()?.contains(a));
   }
   /** The task chosen in the active list (the palette's group). */
   current(): { spec: ListSpec; task: ListTask } | null {
@@ -305,11 +326,15 @@ class TaskLists {
 
   /** Right click (or ⌃-click) on a chosen task: the menu at the pointer. */
   openMenu(e: MouseEvent, spec: ListSpec) {
+    e.preventDefault();
+    this.openMenuAt(spec, e.clientX, e.clientY);
+  }
+  /** The menu of the list's chosen task at a point (a plugin's list, ⌃-click or its own key). */
+  openMenuAt(spec: ListSpec, x: number, y: number) {
     const t = spec.selected();
     if (!t) return;
-    e.preventDefault();
     this.active = spec.id;
-    this.menu = { x: e.clientX, y: e.clientY, items: this.menuItems(spec, t) };
+    this.menu = { x, y, items: this.menuItems(spec, t) };
   }
   menuItems(spec: ListSpec, t: ListTask): MenuItem[] {
     const r = resolve(t);
@@ -329,8 +354,13 @@ class TaskLists {
       'sep',
       { label: 'Перенести в другой файл…', shortcut: hint('taskRefile'), action: () => this.refile(t) },
       { label: 'Копировать ссылку', action: () => void this.copyLink(L, t) },
+      ...this.pluginItems(t),
       ...(spec.more?.(t) ?? []),
     ];
+  }
+  private pluginItems(t: ListTask): MenuItem[] {
+    const acts = this.actionsFor(t);
+    return acts.length ? ['sep', ...acts.map((a): MenuItem => ({ label: a.label, action: () => a.run(t) }))] : [];
   }
   /** The statuses of the task's set (an event: of the default one), a check at the current, ⇧→ ⇧← at the neighbours. */
   private statusItems(L: string, t: ListTask, r: { f: NoteFile; h: Heading }): MenuItem[] {
@@ -420,3 +450,13 @@ task('task.open', 'Задача: открыть', 'goto', (_t, L) => void setTim
 
 // the keys of the scope «list» work while the focus is in a list (not while its menu or the tags field is open)
 store.setScopeKeys('list', { active: () => !!lists.focused() && !lists.menu && !lists.tagsReq, run: (id) => lists.run(id) });
+
+// the plugins' actions in «ВЫДЕЛЕННАЯ ЗАДАЧА»: «Задача: добавить отметку…»
+setMoreTaskCommands((): TaskCommand[] => {
+  const cur = lists.current();
+  if (!cur) return [];
+  return lists.actionsFor(cur.task).map((a) => ({
+    id: 'task.' + a.key, title: 'Задача: ' + a.label[0].toLowerCase() + a.label.slice(1), icon: 'plug' as Icon, keyId: '',
+    run: () => void setTimeout(() => a.run(cur.task)),
+  }));
+});

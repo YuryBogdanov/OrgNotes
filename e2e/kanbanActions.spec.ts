@@ -76,8 +76,7 @@ test('the keys: ← → ↑ ↓ choose, ⇧→ ⇧← the status, ⌥↓ ⌥↑ 
   await open(page);
   await card(page, 'Миграция логов в ClickHouse').click();
   await expect(card(page, 'Миграция логов в ClickHouse')).toHaveClass(/sel/);
-  await page.keyboard.press('Escape'); // a click opens it at the side (part C): back to the board, the card still chosen
-  await expect(card(page, 'Миграция логов в ClickHouse')).toHaveClass(/sel/);
+  await expect(board(page).getByRole('dialog', { name: 'Карточка' })).toHaveCount(0); // a click only chooses (ТЗ 34)
   await page.keyboard.press('ArrowRight');
   await expect(card(page, 'Нагрузочное тестирование биллинга')).toHaveClass(/sel/);
   await page.keyboard.press('ArrowDown');

@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.5.0';
+export const API_VERSION = '1.6.0';
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;
@@ -212,6 +212,21 @@ export interface MenuItem {
   /** A grey line under it, not a command; since 1.5. */
   hint?: string;
 }
+/** A list of tasks the plugin draws (the board's cards, ТЗ 34). Since 1.6. */
+export interface TaskListSpec {
+  /** The task chosen in it now (null: none), and the date its place in the list stands by: ⌥⇧← → moves that one. */
+  selected(): { ref: HeadingRef; date?: 'SCHEDULED' | 'DEADLINE' | 'event' } | null;
+  /** ↩ and the menu's «Открыть» (false); ⌥↩ and its second item (true). */
+  open(other: boolean): void;
+  /** The second item's name (by default «Открыть во второй панели»). */
+  otherLabel?: string;
+  /** ⎋: the choice let go. */
+  clear(): void;
+  /** ⌘R. */
+  refresh?(): void;
+  /** More at the end of the menu (the board's «В архив», «Удалить»). */
+  more?(h: HeadingRef): (MenuItem | 'sep')[];
+}
 export interface ChooseItem {
   id: string;
   label: string;
@@ -411,6 +426,14 @@ export interface Ctx {
      *  go to the file at once, the Org keys work. `onRef` — where the heading is now (its line, its title as edited).
      *  Since 1.5. */
     editor(el: HTMLElement, h: HeadingRef, o?: { onRef?(h: HeadingRef): void }): { focus(): void; dispose(): void };
+    /** A list of tasks in the plugin's element (ТЗ 34): while the focus is in `el`, the keys of «Задачи в списках»,
+     *  the palette's «ВЫДЕЛЕННАЯ ЗАДАЧА» and the inspector act on the task the list has chosen; `menu(at)` shows the
+     *  core's menu of that task (status, priority, dates, tags, refile, link, the plugins' actions, `more`). The
+     *  changes are the core's transactions, one step of ⌘Z each. Since 1.6. */
+    taskList(el: HTMLElement, spec: TaskListSpec): { menu(at: { x: number; y: number }): void; dispose(): void };
+    /** An action of the plugin on a task («действия с задачей», ТЗ 34): an item of the menu of a task in every list
+     *  and a command of the palette's «ВЫДЕЛЕННАЯ ЗАДАЧА», where `when` says so. Since 1.6. */
+    taskAction(spec: { label: string; when?(h: HeadingInfo): boolean; run(h: HeadingRef): void }): Dispose;
   };
   /** Needs `index.read`. */
   index?: {
