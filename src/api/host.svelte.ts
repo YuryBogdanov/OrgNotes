@@ -25,12 +25,13 @@ import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSc
 import { builtinEntries, declareKeys, entries, viewScope, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, type Entry, type Listed } from './declare';
 import PluginsSettings from '../PluginsSettings.svelte';
 import { hostAllowed, hostOf, type Manifest, type ManifestSettings } from './manifest';
-import type { Ctx, Dispose, Named, SheetSpec, EventName, FormSpec, HeadingInfo, HeadingRef, Place, Plugin, Query, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
+import type { MenuItem as ApiMenuItem, Ctx, Dispose, Named, SheetSpec, EventName, FormSpec, HeadingInfo, HeadingRef, Place, Plugin, Query, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
 import PluginInspector from '../PluginInspector.svelte';
 import PluginNav from '../PluginNav.svelte';
 import PluginReview from '../PluginReview.svelte';
 import { mountWidget } from './widgets.svelte';
+import { lists } from '../taskLists.svelte';
 
 const isTauri = '__TAURI_INTERNALS__' in window;
 const invoke = async <T,>(cmd: string, args?: Record<string, unknown>) => (await import('@tauri-apps/api/core')).invoke<T>(cmd, args);
@@ -290,6 +291,14 @@ class Host {
       if (ti >= 0) store.closeTab(pi, ti);
     }
   }
+  /** A plugin's menu items as the core's menu draws them. */
+  private coreMenu(id: string, items: (ApiMenuItem | 'sep')[]): CoreMenuItem[] {
+    return items.flatMap((it): CoreMenuItem[] => (it === 'sep' ? ['sep'] : [
+      { label: it.label, danger: it.danger, disabled: it.disabled, checked: it.checked, action: () => this.guard(id, () => it.run(), undefined) },
+      ...(it.hint ? [{ note: it.hint }] : []),
+    ]));
+  }
+  private listN = 0;
   private keep(id: string, d: Dispose) {
     if (!this.disposers.has(id)) this.disposers.set(id, []);
     this.disposers.get(id)!.push(d);
@@ -740,14 +749,47 @@ class Host {
             this.sheetReq = { plugin: id, spec, resolve: (b) => ((this.sheetReq = null), resolve(b)) };
           }),
         menu: (items, at) => {
-          this.menuReq = {
-            plugin: id, x: at.x, y: at.y,
-            items: items.flatMap((it): CoreMenuItem[] => (it === 'sep' ? ['sep'] : [
-              { label: it.label, danger: it.danger, disabled: it.disabled, checked: it.checked, action: () => this.guard(id, () => it.run(), undefined) },
-              ...(it.hint ? [{ note: it.hint }] : []),
-            ])),
+          this.menuReq = { plugin: id, x: at.x, y: at.y, items: this.coreMenu(id, items) };
+        },
+        taskList: (el, spec) => {
+          const lid = `plugin:${id}:${++this.listN}`;
+          const off = lists.register({
+            id: lid,
+            el: () => el,
+            // the inspector shows its task while the tab it is in is the active one
+            tab: () => (document.querySelector('section.pane.active')?.contains(el) ? store.tab : undefined),
+            selected: () => {
+              const s = this.guard(id, () => spec.selected(), null);
+              return s ? { ...coreRef(s.ref), dk: s.date ?? null } : null;
+            },
+            open: (other) => this.guard(id, () => spec.open(other), undefined),
+            otherLabel: spec.otherLabel,
+            clear: () => this.guard(id, () => spec.clear(), undefined),
+            refresh: () => this.guard(id, () => spec.refresh?.(), undefined),
+            freeze: () => {}, // a card goes to its column, an entry to its day at once (ТЗ 34, decided)
+            more: (t) => {
+              const items = spec.more ? this.guard(id, () => spec.more!(apiRef(t)!), []) : [];
+              return items.length ? ['sep', ...this.coreMenu(id, items)] : [];
+            },
+          });
+          keep(off);
+          return {
+            menu: (at) => {
+              const sp = lists.spec(lid);
+              if (sp) lists.openMenuAt(sp, at.x, at.y);
+            },
+            dispose: off,
           };
         },
+        taskAction: (spec) =>
+          keep(
+            lists.addAction({
+              key: `${id}.${++this.listN}`,
+              label: spec.label,
+              when: (f, h) => (spec.when ? this.guard(id, () => spec.when!(infoOf(f, h)), false) : true),
+              run: (t) => this.guard(id, () => spec.run(apiRef(t)!), undefined),
+            }),
+          ),
         choose: (o) =>
           new Promise((resolve) => {
             let done = false;

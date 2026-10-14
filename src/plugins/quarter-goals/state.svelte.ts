@@ -14,6 +14,8 @@ import {
 } from './goals';
 import { addGoal, addMark, carryOver, moveGoal } from './ops';
 
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 /** A source of goals as the views use it. */
 export interface GoalPerson {
   src: GoalSource;
@@ -294,6 +296,36 @@ class Goals {
     });
     if (ok) r.moved++;
     return ok;
+  }
+  /** The goal at this heading, if it is one (by its title, the nearest to its line): its person and the goal. */
+  goalAt(ref: HeadingRef) {
+    const p = this.goalPeople.find((x) => x.found && x.file?.name === ref.path);
+    let best: Goal | null = null;
+    for (const q of p?.data.quarters ?? [])
+      for (const g of q.goals) if (g.title === ref.title && (!best || Math.abs(g.line - ref.line) < Math.abs(best.line - ref.line))) best = g;
+    return p && best ? { p, goal: best } : null;
+  }
+  /** «Добавить отметку…» of a task's menu in a list (ТЗ 34): the text and the day in the core's sheet, then the mark. */
+  async markFromList(ref: HeadingRef): Promise<boolean> {
+    const at = this.goalAt(ref);
+    if (!at?.p.file) return false;
+    const v = await this.ctx.ui.form({
+      title: `Отметка: ${at.goal.title}`,
+      groups: [{ fields: [
+        { type: 'textarea', key: 'text', label: 'Отметка', placeholder: 'Что сделано, что мешает' },
+        { type: 'date', key: 'day', label: 'День', look: 'chip' },
+      ] }],
+      submit: 'Добавить',
+      initial: { text: '', day: iso(new Date()) },
+      validate: (x) => (String(x.text ?? '').trim() ? null : 'Напишите отметку'),
+    });
+    if (!v) return false;
+    const day = typeof v.day === 'string' ? new Date(+v.day.slice(0, 4), +v.day.slice(5, 7) - 1, +v.day.slice(8, 10)) : new Date();
+    const f = at.p.file;
+    const h = f.headings.find((x) => x.line === at.goal.line);
+    if (!h) return false;
+    const goal = { path: f.path, line: h.line, title: h.title };
+    return this.write(`Отметка: ${at.goal.title}`, f.path, (tx, names) => addMark(tx, goal, day, String(v.text), names));
   }
   /** «Квартал»: the goal goes under another quarter; the card follows it (the core finds it by its title). */
   async goalMoveQuarter(ref: HeadingRef, to: Quarter): Promise<boolean> {

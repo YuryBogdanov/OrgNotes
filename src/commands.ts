@@ -85,6 +85,9 @@ export const taskCommands: TaskCommand[] = [];
 /** The list's task chosen now, if a list is active (taskLists sets it: no import of it here). */
 let listTask: () => TaskCtx | null = () => null;
 export const setListTask = (fn: () => TaskCtx | null) => (listTask = fn);
+/** The plugins' actions on the task, for the group (taskLists sets it). */
+let moreTaskCommands: () => TaskCommand[] = () => [];
+export const setMoreTaskCommands = (fn: () => TaskCommand[]) => (moreTaskCommands = fn);
 
 /** One line of the list. Without `run` it is not selectable ("Ничего не найдено", a prompt). */
 export interface Row {
@@ -316,7 +319,7 @@ export function mainStep(c: Ctx): Step {
       const rows: Row[] = [];
       if (c.task) {
         const t = c.task;
-        const found = taskCommands
+        const found = [...taskCommands, ...moreTaskCommands()]
           .map((c0, i) => ({ c0, cmd: { ...c0, title: typeof c0.title === 'function' ? c0.title(t) : c0.title }, i }))
           .map(({ c0, cmd, i }) => ({ c0, cmd, i, hit: (c0.when?.(t) ?? true) ? matchCommand(q, cmd) : null }))
           .filter((x) => x.hit)

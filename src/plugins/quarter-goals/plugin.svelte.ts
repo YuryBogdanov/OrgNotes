@@ -94,5 +94,7 @@ export default definePlugin({
       },
       action: { label: 'Разбор целей', available: (path) => !!personOf(path), run: (path) => void (personOf(path) && startReview(personOf(path)!.key)) },
     });
+    // «действия с задачей» (ТЗ 34): a goal chosen in a list — the agenda, «Сегодня», the board
+    ctx.ui.taskAction({ label: 'Добавить отметку…', when: (h) => !!goals.goalAt(h.ref), run: (ref) => void goals.markFromList(ref) });
   },
 });

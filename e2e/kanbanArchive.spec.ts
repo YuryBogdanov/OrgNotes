@@ -61,15 +61,14 @@ test('«Удалить»: the card and its subtree out of the file, «Карто
   await expect(toast(page)).toContainText('Карточка удалена');
   await page.keyboard.press('Meta+z');
   await expect.poll(() => disk(page)).toBe(before);
-  await card(page, 'Алерты v2: дизайн').click();
-  await page.keyboard.press('Escape'); // the side panel closes; the card stays chosen
+  await card(page, 'Алерты v2: дизайн').click(); // chosen (ТЗ 34: a click opens nothing)
   await page.keyboard.press('Meta+Backspace');
   await expect.poll(() => disk(page)).not.toContain('Алерты v2');
 });
 
-test('the card at the side: a click opens it, its subtree edited right there goes to the file; the status menu, «В файле ›», ⎋', async ({ page }) => {
+test('the card at the side: a double click opens it (a click with it open switches it), its subtree edited right there goes to the file; the status menu, «В файле ›», ⎋', async ({ page }) => {
   await open(page);
-  await card(page, 'Переезд в новый ДЦ').click();
+  await card(page, 'Переезд в новый ДЦ').dblclick();
   const peek = board(page).getByRole('dialog', { name: 'Карточка' });
   await expect(peek).toBeVisible();
   await expect(peek.locator('.kb-pt')).toHaveText('Переезд в новый ДЦ');
@@ -88,7 +87,7 @@ test('the card at the side: a click opens it, its subtree edited right there goe
   await peek.locator('.cm-content').click();
   await page.keyboard.press('Escape');
   await expect(peek).toHaveCount(0);
-  await card(page, 'Обновить Kafka до 3.8').click();
+  await card(page, 'Обновить Kafka до 3.8').dblclick();
   await board(page).getByRole('button', { name: 'В файле ›' }).click();
   await expect(board(page)).toHaveCount(0);
   await expect(page.locator('.cm-activeLine')).toContainText('Обновить *Kafka* до 3.8');
@@ -97,8 +96,7 @@ test('the card at the side: a click opens it, its subtree edited right there goe
 test('↩ on the chosen card opens it at the side; ⌘↩ in a new card\'s field makes it and opens it', async ({ page }) => {
   await open(page);
   await card(page, 'Миграция логов в ClickHouse').click();
-  await page.keyboard.press('Escape');
-  await expect(board(page).getByRole('dialog', { name: 'Карточка' })).toHaveCount(0);
+  await expect(board(page).getByRole('dialog', { name: 'Карточка' })).toHaveCount(0); // a click only chooses
   await page.keyboard.press('Enter');
   await expect(board(page).getByRole('dialog', { name: 'Карточка' }).locator('.kb-pt')).toHaveText('Миграция логов в ClickHouse');
   await page.keyboard.press('Escape');
