@@ -661,4 +661,28 @@ mod tests {
         assert_eq!(r.head.as_deref(), Some("main"));
         assert!(git(&["ls-remote", "--", "https://github.com/YuryBogdanov/no-such-repo-xyz.git"]).unwrap_err().starts_with("Репозиторий не найден или нет доступа"));
     }
+
+    /// The system's git on a local repository: its refs, a shallow clone of a tag with the built files in `dist/`.
+    #[test]
+    fn git_on_a_local_repository() {
+        let root = std::env::temp_dir().join(format!("panopticon-git-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let repo = root.join("okr");
+        fs::create_dir_all(repo.join("dist")).unwrap();
+        fs::write(repo.join("dist/manifest.json"), r#"{"id":"okr","version":"2.0.1"}"#).unwrap();
+        fs::write(repo.join("dist/main.js"), "export default {}").unwrap();
+        let r = repo.to_string_lossy().to_string();
+        for a in [vec!["init", "-q", "-b", "main", &r], vec!["-C", &r, "add", "."], vec!["-C", &r, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "1"], vec!["-C", &r, "tag", "v2.0.1"]] {
+            git(&a).unwrap();
+        }
+        let url = format!("file://{r}");
+        let refs = parse_ls_remote(&git(&["ls-remote", "--symref", "--", &url]).unwrap());
+        assert_eq!(refs.head.as_deref(), Some("main"));
+        assert_eq!(refs.tags.iter().map(|t| t.0.as_str()).collect::<Vec<_>>(), vec!["v2.0.1"]);
+        let to = root.join("clone").to_string_lossy().to_string();
+        git(&["-c", "advice.detachedHead=false", "clone", "--quiet", "--depth", "1", "--single-branch", "--branch", "v2.0.1", "--", &url, &to]).unwrap();
+        assert!(Path::new(&to).join("dist/main.js").is_file());
+        assert_eq!(check_manifest(&Path::new(&to).join("dist"), None).unwrap()["id"], "okr");
+        let _ = fs::remove_dir_all(&root);
+    }
 }

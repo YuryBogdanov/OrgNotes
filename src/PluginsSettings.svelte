@@ -9,6 +9,7 @@
   import Catalog from './Catalog.svelte';
   import CatalogItem from './CatalogItem.svelte';
   import InstallSheet from './InstallSheet.svelte';
+  import UrlSheet from './UrlSheet.svelte';
   import type { Manifest } from './api/manifest';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import { onMount } from 'svelte';
@@ -40,6 +41,7 @@
     store.settingsCrumb = page === 'list' ? null : page === 'catalog' ? 'Каталог' : `Каталог › ${page.name}`;
   });
   let installing = $state<{ e: CatalogEntry; m: Manifest } | null>(null);
+  let linking = $state(false);
   /** The button of a plugin in the catalog: install (rights first), or update (other rights asked first). */
   async function act(e: CatalogEntry, st: CatState) {
     const m = await catalog.manifestOf(e);
@@ -135,7 +137,7 @@
   {#if page !== 'list'}
   <section class="general" aria-label={page === 'catalog' ? 'Каталог плагинов' : page.name}>
     {#if page === 'catalog'}
-      <Catalog back={() => (page = 'list')} open={(e) => (page = e)} {act} />
+      <Catalog back={() => (page = 'list')} open={(e) => (page = e)} {act} link={() => (linking = true)} />
     {:else}
       {#key page.id}<CatalogItem e={page} back={() => (page = 'catalog')} {act} />{/key}
     {/if}
@@ -172,6 +174,7 @@
   </section>
   {/if}
 </div>
+{#if linking}<UrlSheet onclose={() => (linking = false)} />{/if}
 {#if installing}<InstallSheet e={installing.e} m={installing.m} onclose={() => (installing = null)} />{/if}
 {#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
 {#if removing}
