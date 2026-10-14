@@ -78,6 +78,48 @@ class Calendar {
   openEntry(e: { path: string; line: number }, neighbour = false) {
     void this.ctx.commands.run('file.open', { path: e.path, line: e.line, neighbour });
   }
+  // ---- the entry chosen (ТЗ 34): a chip, a row of «… ещё N», a card of the day, a task without a date ------------
+  /** A click chooses an entry, a double click or ↩ opens it; the core's menu, keys and palette act on it. */
+  picked = $state<{ path: string; line: number; layer: Layer | 'undated'; day: string | null } | null>(null);
+  isPicked(e: { path: string; line: number; layer?: Layer | 'undated' }) {
+    const p = this.picked;
+    return !!p && p.path === e.path && p.line === e.line && p.layer === (e.layer ?? 'undated');
+  }
+  pick(e: { path: string; line: number; layer?: Layer | 'undated'; day?: string }) {
+    this.picked = { path: e.path, line: e.line, layer: e.layer ?? 'undated', day: e.day ?? null };
+  }
+  /** The heading of the entry chosen, as the file has it now. */
+  pickedRef(): HeadingRef | null {
+    const p = this.picked;
+    const h = p && this.fileOf(p.path)?.headings.find((x) => x.line === p.line);
+    return p && h ? { path: p.path, line: h.line, title: h.title } : null;
+  }
+  /** The core's list of the calendar tab (`ui.taskList`): its menu at a point. */
+  tasks: { menu(at: { x: number; y: number }): void; dispose(): void } | null = null;
+  /** Right click (⌃-click) on an entry: chosen, then the core's menu of the task. */
+  menuOf(ev: MouseEvent, e: { path: string; line: number; layer?: Layer | 'undated'; day?: string }) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.pick(e);
+    this.tasks?.menu({ x: ev.clientX, y: ev.clientY });
+  }
+  /** «Выполнено» of the day panel: the first final status of the task's set. */
+  async done(e: { path: string; line: number }) {
+    const f = this.fileOf(e.path);
+    const h = f?.headings.find((x) => x.line === e.line);
+    if (!f || !h) return;
+    const to = sequenceFor(f.wf, h.keyword).states.find((x) => x.done)?.name;
+    if (to && to !== h.keyword) await this.ctx.edit!.transaction(`Выполнено: ${h.title}`, (tx) => tx.setStatus({ path: f.path, line: h.line, title: h.title }, to));
+  }
+  /** «Перенести…» of the day panel: the calendar of three months, then the entry's date, as a drag does. */
+  async reschedule(e: { path: string; line: number; layer: Layer | 'undated'; day: string | null }) {
+    const f = this.fileOf(e.path);
+    const d = await this.ctx.ui.pickDate({
+      kind: e.layer === 'deadline' ? 'DEADLINE' : 'SCHEDULED', names: f ? weekdayNames(f.text) : undefined,
+      current: e.day ? new Date(+e.day.slice(0, 4), +e.day.slice(5, 7) - 1, +e.day.slice(8, 10)) : null,
+    });
+    if (d) await this.move(e, d);
+  }
   /** «Изменить в настройках». */
   settings() {
     void this.ctx.commands.run('settings.open', { section: 'Календарь' });

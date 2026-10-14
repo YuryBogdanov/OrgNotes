@@ -17,6 +17,16 @@
       .sort((a, b) => a.day.localeCompare(b.day))
       .slice(0, 3);
   });
+  // the entry chosen in the calendar (ТЗ 34): its task here, «Выполнено» and «Перенести…» do what the menu does
+  const picked = $derived(calendar.picked);
+  const pf = $derived(picked ? calendar.fileOf(picked.path) : undefined);
+  const ph = $derived(picked && pf ? pf.headings.find((h) => h.line === picked.line) : undefined);
+  const pDone = $derived(!!ph?.keyword && !!pf?.wf.done.includes(ph.keyword));
+  const clean = (t: string) => t.replace(/\s*\[\d*(?:\/\d*|%)\]/g, '').trim();
+  function choose(ev: MouseEvent, e: CalEntry) {
+    if (ev.metaKey) return calendar.openEntry(e, true);
+    calendar.pick(e);
+  }
   const wfOf = (e: CalEntry) => calendar.files.find((f) => f.path === e.path)?.wf;
   const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
   const WD = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
@@ -35,12 +45,25 @@
 </script>
 
 <section class="day" aria-label="Выбранный день">
+  {#if picked && ph && pf}
+    <div class="task" aria-label="Выбранная задача">
+      <div class="cap">ЗАДАЧА</div>
+      <div class="pt">{#if ph.keyword}<span class="kw tone-chip" style={toneVars(ph.keyword, pf.wf)}>{ph.keyword}</span>{' '}{/if}{clean(ph.title)}</div>
+      <div class="pw">{pf.name.replace(/\.org$/, '').split('/').join(' › ')}</div>
+      <div class="pbtns">
+        {#if ph.keyword && !pDone}<button class="pri" onclick={() => void calendar.done(picked)}>Выполнено</button>{/if}
+        {#if picked.layer !== 'done'}<button onclick={() => void calendar.reschedule(picked)}>Перенести…</button>{/if}
+      </div>
+      <button class="open" onclick={() => calendar.openEntry(picked)}>Открыть в заметках</button>
+    </div>
+    <div class="sep"></div>
+  {/if}
   <div class="cap">ВЫБРАННЫЙ ДЕНЬ</div>
   <div class="dt">{dayTitle(day)}</div>
   <div class="rel">{relWords(day)}</div>
   <div class="cards">
     {#each list as e (e.path + e.line + e.layer + (e.time ?? ''))}
-      <button class="card" class:done={e.layer === 'done'} onclick={(ev) => calendar.openEntry(e, ev.metaKey)}>
+      <button class="card" class:done={e.layer === 'done'} class:picked={calendar.isPicked(e)} onclick={(ev) => choose(ev, e)} ondblclick={() => calendar.openEntry(e)} oncontextmenu={(ev) => calendar.menuOf(ev, e)}>
         {#if e.layer === 'event'}
           <span class="tm">{e.time ?? 'весь день'}</span>
         {:else if e.layer === 'deadline'}
@@ -78,6 +101,15 @@
 </section>
 
 <style>
+  .task { display: flex; flex-direction: column; gap: 6px; }
+  .pt { font-size: 14px; font-weight: 600; line-height: 1.3; }
+  .pt .kw { font-size: 10px; vertical-align: 1px; }
+  .pw { font-size: 12px; color: var(--fg2); }
+  .pbtns { display: flex; gap: 8px; margin-top: 4px; }
+  .pbtns button { flex: 1; height: 28px; border: 0; border-radius: 6px; background: var(--field); color: var(--fg); font: inherit; font-size: 12.5px; }
+  .pbtns button.pri { background: var(--acc); color: var(--onacc); font-weight: 600; }
+  .open { height: 28px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--acc); font: inherit; font-size: 12.5px; }
+  .card.picked { box-shadow: inset 0 0 0 1.5px var(--acc); }
   .day { display: flex; flex-direction: column; gap: 6px; padding: 14px; overflow: auto; }
   .cap { font-size: 11px; font-weight: 600; color: var(--fg2); letter-spacing: 0.02em; }
   .dt { font-size: 16px; font-weight: 700; }

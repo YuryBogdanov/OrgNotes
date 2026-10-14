@@ -62,14 +62,15 @@
   <div class="dh"><b>{dayShort(fromIso(day))}</b><span>{entriesWord(entries.length)}</span></div>
   <div role="listbox" aria-label="Записи">
     {#each entries as e, i (e.path + e.line + e.layer + (e.time ?? ''))}
-      <button role="option" aria-selected={i === sel} class:on={i === sel} class:mine={mark?.(e)} onmousemove={() => (sel = i)} onclick={(ev) => open(e, ev.metaKey)}>
+      <button role="option" aria-selected={i === sel} class:on={i === sel} class:picked={!mark && calendar.isPicked(e)} class:mine={mark?.(e)} onmousemove={() => (sel = i)}
+        onclick={(ev) => (mark || ev.metaKey ? open(e, ev.metaKey) : calendar.pick(e))} ondblclick={() => open(e, false)} oncontextmenu={(ev) => !mark && calendar.menuOf(ev, e)}>
         <span class="k tone-chip" class:ev={e.layer === 'event' || e.layer === 'deadline'} style={tone(e)}>{label(e)}</span>
         <span class="tt"><span class="t" class:done={e.layer === 'done'}>{e.priority ? `[#${e.priority}] ` : ''}{e.title}{mark?.(e) ? ' — эта задача' : ''}</span><span class="w">{e.where}</span></span>
         <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="var(--fg2)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-label="Открыть в новой вкладке"><path d="M8 4H4v12h12v-4M11 3h6v6M17 3l-8 8" /></svg>
       </button>
     {/each}
   </div>
-  <div class="foot">Клик — открыть в новой вкладке · ⌘-клик — в соседней панели</div>
+  <div class="foot">{mark ? 'Клик — открыть в новой вкладке · ⌘-клик — в соседней панели' : 'Клик — выбрать · двойной клик или ↩ — открыть · ⌘-клик — в соседней панели'}</div>
 </div>
 
 <style>
@@ -78,6 +79,7 @@
   .dh span { font-size: 11.5px; color: var(--fg2); }
   button { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 4px 8px; border: 0; border-radius: 7px; background: transparent; color: var(--fg); text-align: left; }
   button.on { background: var(--sel); }
+  button.picked { box-shadow: inset 0 0 0 1.5px var(--acc); }
   .k { flex: 0 0 auto; min-width: 42px; height: 18px; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; border-radius: 4px; font-size: 10px; font-weight: 700; box-sizing: border-box; }
   .tt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
