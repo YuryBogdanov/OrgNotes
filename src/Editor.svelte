@@ -1,3 +1,9 @@
+<script module lang="ts">
+  /** The reveals applied, by the editor's key: an editor made again for a tab shown again (another tab was in
+   *  front) must not apply its old reveal again — the caret would be centred, the scroll lost. */
+  const revealed = new Map<string, number>();
+</script>
+
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Compartment, EditorState, MapMode, RangeSetBuilder, StateEffect, StateField, Transaction, type Range } from '@codemirror/state';
@@ -17,7 +23,7 @@
   import { clipTarget, linkHooks, linkPaste } from './linkEdit';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
 
-  let { text, fileKey, path = '', wf, reveal, initial, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
+  let { text, fileKey, path = '', wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
     path?: string; // the file's name in the folder: what a plugin's link at the end of a line is run with (ТЗ 33)
     levels?: LevelView; // «Структурный вид»: one star per level, text moved by level
     drawers?: boolean; // drawers folded when a file opens and when the app adds one (:PROPERTIES:, :LOGBOOK:)
@@ -38,6 +44,10 @@
     text: string; fileKey: string; wf: Workflow;
     reveal: { line: number; n: number; focus?: boolean; col?: number } | null | undefined;
     initial?: { line: number; col: number }; // where the caret of this tab was (restored when the tab is shown)
+    initialTop?: number; // the first line that was in view (the scroll comes back with the tab)
+    ontop?: (line: number) => void; // the first line in view, after a scroll
+    initialFolds?: number[]; // the headings folded when the tab was last shown (their lines)
+    onfolds?: (lines: number[]) => void; // the headings folded now, after a fold or an unfold
     onchange: (t: string) => void;
     oncursor: (line: number, col: number) => void;
     onfollow: (link: OrgLink) => void;
@@ -166,7 +176,8 @@
   });
   /** Fold these heading lines (a card of goals: «Отметки», shown on the right). */
   function foldLines(v: EditorView, lines: number[]) {
-    const effects = lines.flatMap((l) => {
+    // in order: CodeMirror takes ranges sorted (nested folds come after their parent's in `foldedRanges`)
+    const effects = [...new Set(lines)].sort((a, b) => a - b).flatMap((l) => {
       if (l + 1 > v.state.doc.lines) return [];
       const ln = v.state.doc.line(l + 1);
       const r = foldable(v.state, ln.from, ln.to);
@@ -680,6 +691,12 @@
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         linkTip,
+        // the tab keeps its folded headings (S-Tab, ⇥): shown again, it comes back folded as it was
+        EditorView.updateListener.of((u) => {
+          // a fold changed, or an edit moved the lines of the folds
+          if (!onfolds || (!u.docChanged && foldedRanges(u.state) === foldedRanges(u.startState))) return;
+          onfolds(foldedHeadings(u.state));
+        }),
         EditorView.domEventHandlers({
           contextmenu(e, v) {
             e.preventDefault();
@@ -736,7 +753,31 @@
     const doc = view.state.doc;
     const ln = doc.line(Math.min(initial.line + 1, doc.lines));
     const pos = Math.min(ln.from + Math.max(0, initial.col - 1), ln.to);
-    view.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: 'center' }) });
+    // the scroll as it was (the caret may be out of view); without one, the caret in the middle
+    const top = initialTop !== undefined && initialTop > 0 ? doc.line(Math.min(initialTop + 1, doc.lines)).from : -1;
+    view.dispatch({ selection: { anchor: pos }, effects: top >= 0 ? EditorView.scrollIntoView(top, { y: 'start' }) : EditorView.scrollIntoView(pos, { y: 'center' }) });
+  }
+  /** The headings folded now (a heading's fold starts on its line; drawers are left out: they fold by themselves). */
+  function foldedHeadings(st: EditorState): number[] {
+    const heads = headingSet(st.doc);
+    const out: number[] = [];
+    foldedRanges(st).between(0, st.doc.length, (from) => {
+      const l = st.doc.lineAt(from).number - 1;
+      if (heads.has(l)) out.push(l);
+    });
+    return out.sort((a, b) => a - b);
+  }
+  /** The first line in view, told after a scroll (once a frame). */
+  let topFrame = 0;
+  function scrolled() {
+    if (!ontop || topFrame) return;
+    topFrame = requestAnimationFrame(() => {
+      topFrame = 0;
+      const v = view;
+      if (!v) return;
+      const b = v.lineBlockAtHeight(v.scrollDOM.scrollTop - v.documentPadding.top + 1);
+      ontop?.(v.state.doc.lineAt(b.from).number - 1);
+    });
   }
 
   onMount(() => {
@@ -746,7 +787,9 @@
     lastKey = fileKey;
     lastLevels = viewKey();
     lastReset = resetOn;
+    if (initialFolds?.length) foldLines(view, initialFolds);
     restoreCaret(); // a pending reveal, if any, is applied right after by its own effect
+    view.scrollDOM.addEventListener('scroll', scrolled, { passive: true });
     onapi?.({
       selection: () => {
         const v = view;
@@ -759,6 +802,8 @@
     const unregister = registerEditor(v.dom, { run: (id) => commands[id]?.(v) ?? false, onHeading: () => onHeading(v) });
     return () => {
       unregister();
+      cancelAnimationFrame(topFrame);
+      v.scrollDOM.removeEventListener('scroll', scrolled);
       v.destroy();
     };
   });
@@ -771,6 +816,7 @@
       lastReset = r;
       view.setState(makeState(t, w));
       foldAllDrawers(view);
+      if (initialFolds?.length) foldLines(view, initialFolds);
       restoreCaret();
     } else if (r !== lastReset) {
       // reloaded from disk (no edits here): the caret keeps its line and column, the scroll stays, and ⌘Z
@@ -879,8 +925,9 @@
 
   $effect(() => {
     const r = reveal;
-    if (!view || !r || r.n === lastReveal) return;
+    if (!view || !r || r.n === lastReveal || revealed.get(fileKey) === r.n) return;
     lastReveal = r.n;
+    revealed.set(fileKey, r.n);
     const ln = Math.min(r.line + 1, view.state.doc.lines);
     const line = view.state.doc.line(ln);
     const pos = line.from + Math.min(r.col ?? 0, line.length); // a new task puts the caret after its keyword
