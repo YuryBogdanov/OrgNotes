@@ -10,6 +10,7 @@
   import { toneOf, toneStyle, colorName } from './colors';
   import ColorPicker from './ColorPicker.svelte';
   import Picker from './Picker.svelte';
+  import RemovePlugin from './RemovePlugin.svelte';
   import {
     MAX_KEYWORD, addState, checkKey, normalizeKey, addWorkflow, canRemoveState, canRemoveWorkflow, checkKeyword, displayName, dropState, dropWorkflow,
     effectiveKeys, fromConfig, initialOf, moveState, normalizeKeyword, orgLine, pendingState, removeState, removeWorkflow,
@@ -757,7 +758,7 @@
       </div>
     {/if}
 </div>
-
+<RemovePlugin />
 <style>
   /* a sheet over the main window, as the agenda builder: clicks on the dimmed window do nothing */
   .scrim { position: fixed; inset: 0; z-index: 70; background: rgba(0, 0, 0, 0.42); }

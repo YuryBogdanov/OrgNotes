@@ -1,5 +1,7 @@
 <script lang="ts">
   import PluginHead from './PluginHead.svelte';
+  import { plugins } from './api/host.svelte';
+  import { pluginUpdates as up } from './pluginUpdates.svelte';
   import Picker from './Picker.svelte';
   import FormField from './FormField.svelte';
   import { WHERE_NOTE, WIDE, hintOf, optOf, optValue, optionsOf, whereOfGroup, type Field, type Schema } from './settingsSchema';
@@ -93,7 +95,13 @@
   {@render groups()}
 {:else}
   <div class="body">
-    <section class="general" aria-label={schema.label}>{#if plugin}<PluginHead id={plugin} />{/if}{@render groups()}</section>
+    <section class="general" aria-label={schema.label}>
+      {#if plugin}<PluginHead id={plugin} />{/if}{@render groups()}
+      <!-- an installed plugin's page ends with its removal (fix of ТЗ 37) -->
+      {#if plugin && plugins.entry(plugin) && !plugins.entry(plugin)!.builtin}
+        <button class="rm" onclick={() => (up.removing = plugins.entry(plugin!) ?? null)}>Удалить плагин…</button>
+      {/if}
+    </section>
   </div>
 {/if}
 {#each picking ? [picking] : [] as f (f.key)}
@@ -101,6 +109,8 @@
 {/each}
 
 <style>
+  .rm { align-self: flex-start; margin-top: 6px; padding: 0; border: 0; background: none; color: var(--todo); font-size: 12.5px; }
+  .rm:hover { text-decoration: underline; }
   section > :global(*) { flex-shrink: 0; }
   section { flex: 1; min-width: 0; overflow: auto; padding: 18px 22px 24px; display: flex; flex-direction: column; gap: 14px; }
   .body { flex: 1; min-height: 0; display: flex; }

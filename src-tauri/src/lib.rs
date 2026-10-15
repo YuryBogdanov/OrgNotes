@@ -1683,6 +1683,8 @@ pub fn run() {
             plugin_sources::plugin_install_release,
             plugin_sources::plugin_cancel,
             plugin_sources::plugin_remove,
+            plugin_sources::plugin_restore,
+            plugin_sources::plugin_reveal,
             plugin_sources::git_refs,
             plugin_sources::git_probe,
             plugin_sources::plugin_install_git,

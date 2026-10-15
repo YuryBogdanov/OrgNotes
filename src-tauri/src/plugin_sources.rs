@@ -332,7 +332,7 @@ pub async fn plugin_install_release(app: AppHandle, id: String, repo: String, ve
 
 /// «Удалить…»: the plugin's folder to the Trash.
 #[tauri::command]
-pub fn plugin_remove(app: AppHandle, id: String) -> Result<(), String> {
+pub fn plugin_remove(app: AppHandle, id: String) -> Result<String, String> {
     if !plugin_dir_ok(&id) {
         return Err("bad plugin".into());
     }
@@ -340,7 +340,55 @@ pub fn plugin_remove(app: AppHandle, id: String) -> Result<(), String> {
     if !dir.is_dir() {
         return Err(format!("нет плагина «{id}»"));
     }
-    trash::delete(&dir).map_err(|e| e.to_string())
+    // into the user's Trash by our own move, so «Вернуть» knows where it went (the system's trash does not tell);
+    // another volume: the system's trash, and no way back but the catalog
+    if let Some(trash) = std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".Trash")).filter(|t| t.is_dir()) {
+        let to = free_name(&trash, &format!("{id} (плагин Panopticon)"));
+        if std::fs::rename(&dir, &to).is_ok() {
+            return Ok(to.to_string_lossy().to_string());
+        }
+    }
+    trash::delete(&dir).map_err(|e| e.to_string())?;
+    Ok(String::new())
+}
+
+/// «name», else «name 2», «name 3»… — a name not taken in `dir`.
+fn free_name(dir: &std::path::Path, name: &str) -> std::path::PathBuf {
+    let mut p = dir.join(name);
+    let mut n = 2;
+    while p.exists() {
+        p = dir.join(format!("{name} {n}"));
+        n += 1;
+    }
+    p
+}
+
+/// «Вернуть»: the plugin's folder back from where `plugin_remove` put it.
+#[tauri::command]
+pub fn plugin_restore(app: AppHandle, id: String, from: String) -> Result<(), String> {
+    if !plugin_dir_ok(&id) {
+        return Err("bad plugin".into());
+    }
+    let src = std::path::PathBuf::from(&from);
+    let trash = std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".Trash")).ok_or("no home")?;
+    if from.is_empty() || !src.starts_with(&trash) || !src.is_dir() {
+        return Err("Корзину уже очистили".into());
+    }
+    let to = plugins_dir(&app)?.join(&id);
+    if to.exists() {
+        return Err(format!("плагин «{id}» уже установлен снова"));
+    }
+    std::fs::rename(&src, &to).map_err(|e| e.to_string())
+}
+
+/// «Показать в Finder»: the plugin's folder chosen in a Finder window.
+#[tauri::command]
+pub fn plugin_reveal(app: AppHandle, id: String) -> Result<(), String> {
+    if !plugin_dir_ok(&id) {
+        return Err("bad plugin".into());
+    }
+    let dir = plugins_dir(&app)?.join(&id);
+    std::process::Command::new("open").arg("-R").arg(dir).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
 // ---- git ----------------------------------------------------------------------------------------------------------
@@ -635,6 +683,15 @@ mod tests {
         assert_eq!(names, vec!["v2.0.10-beta", "2.0.2", "v2.0.1", "v1.9.0"]);
         assert_eq!(r.tags.iter().find(|t| t.0 == "v2.0.1").unwrap().1, "5555"); // the commit of an annotated tag
         assert!(version_of("v2.0.10") > version_of("v2.0.10-beta"));
+    }
+
+    #[test]
+    fn a_free_name_in_the_trash() {
+        let d = std::env::temp_dir().join(format!("pl-trash-{}", std::process::id()));
+        std::fs::create_dir_all(d.join("week (плагин Panopticon)")).unwrap();
+        assert_eq!(free_name(&d, "week (плагин Panopticon)"), d.join("week (плагин Panopticon) 2"));
+        assert_eq!(free_name(&d, "canvas"), d.join("canvas"));
+        std::fs::remove_dir_all(&d).unwrap();
     }
 
     #[test]

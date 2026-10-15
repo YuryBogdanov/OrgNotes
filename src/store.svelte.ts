@@ -112,6 +112,14 @@ function fromDisk(l: Listed, cfg: ProjectConfig): NoteFile {
   return build(l.name, l.path, text, text, l.text, eol, cfg);
 }
 
+/** A removed plugin's settings kept for «Вернуть». */
+export interface PluginData {
+  id: string;
+  folder: unknown;
+  local: string | null;
+  keys: Record<string, string[]>;
+}
+
 class Store {
   files = $state.raw<NoteFile[]>([]);
   folders = $state.raw<string[]>([]); // relative paths of all sub-folders, including empty ones
@@ -576,6 +584,38 @@ class Store {
   setLocalData(id: string, value: unknown) {
     lsSet('feature:' + id, JSON.stringify(value));
     this.localTick++;
+  }
+
+  /** A plugin removed with its settings (fix of ТЗ 37): its data in the folder and on this Mac and the shortcuts given
+   *  to its commands forgotten; what they were, for «Вернуть». */
+  forgetPluginData(id: string): PluginData {
+    const keys = Object.fromEntries(Object.entries(this.keyState.overrides).filter(([k]) => k.startsWith(id + '.')));
+    const backup: PluginData = { id, folder: id in this.featureFiles ? this.featureFiles[id] : undefined, local: lsGet('feature:' + id), keys };
+    if (backup.folder !== undefined) void this.setFolderData(id, {});
+    try {
+      localStorage.removeItem('feature:' + id);
+    } catch {
+      /* none */
+    }
+    this.localTick++;
+    if (Object.keys(keys).length) {
+      const overrides = { ...this.keyState.overrides };
+      for (const k of Object.keys(keys)) delete overrides[k];
+      this.keyState = { ...this.keyState, overrides };
+      this.saveKeys();
+    }
+    return backup;
+  }
+  async restorePluginData(b: PluginData) {
+    if (b.folder !== undefined) await this.setFolderData(b.id, b.folder);
+    if (b.local !== null) {
+      lsSet('feature:' + b.id, b.local);
+      this.localTick++;
+    }
+    if (Object.keys(b.keys).length) {
+      this.keyState = { ...this.keyState, overrides: { ...this.keyState.overrides, ...b.keys } };
+      this.saveKeys();
+    }
   }
 
   /** Re-parse every note with the current project config (unsaved edits stay). */

@@ -2,9 +2,9 @@
   import { plugins } from './api/host.svelte';
   import { API_VERSION } from './api/index';
   import { APP_VERSION, type Entry } from './api/declare';
-  import { codeUrl, sourceLabel } from './api/sources';
+  import { sourceLabel } from './api/sources';
   import { pluginUpdates as up } from './pluginUpdates.svelte';
-  import { openExternal, store } from './store.svelte';
+  import { store } from './store.svelte';
   import { catalog, type CatalogEntry, type CatState } from './pluginCatalog.svelte';
   import Catalog from './Catalog.svelte';
   import CatalogItem from './CatalogItem.svelte';
@@ -53,22 +53,33 @@
       void catalog.install(e, !!have?.enabled);
     }
   }
-  // «…» of an installed plugin; «Удалить…» asks first
-  let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
-  let removing = $state<Entry | null>(null);
+  // «⋯» of an installed plugin (fix of ТЗ 37 §1): its settings, a check, its page in the catalog, its folder, «Удалить
+  // плагин…» (asks first)
+  let menu = $state<{ x: number; y: number; items: MenuItem[]; dir: string } | null>(null);
   function more(ev: MouseEvent, e: Entry) {
     const id = idOf(e);
-    const code = codeUrl(e.source);
+    const m = e.manifest;
+    const sec = e.enabled ? m?.contributes.settings.find((x) => x.section)?.section : undefined;
     const r = (ev.currentTarget as HTMLElement).getBoundingClientRect();
     menu = {
-      x: r.right - 320, // the sheet clips what goes past its edge
+      dir: e.dir,
+      x: r.right - 250,
       y: r.bottom + 4,
       items: [
-        ...(code ? [{ label: 'Исходный код ↗', detail: code.replace(/^https:\/\//, ''), action: () => void openExternal(code) }] : []),
-        ...(e.source && (e.source.kind === 'catalog' || e.source.checkUpdates) ? [{ label: 'Проверить обновления', action: () => void up.checkPlugin(id) }] : []),
-        { label: 'Удалить…', danger: true, action: () => (removing = e) },
+        ...(sec ? [{ label: 'Настройки плагина', action: () => store.showSection(sec) }] : []),
+        ...(e.source && (e.source.kind === 'catalog' || e.source.kind === 'git') ? [{ label: 'Проверить обновления', action: () => void up.checkPlugin(id) }] : []),
+        ...(e.source?.kind === 'catalog' ? [{ label: 'Страница в каталоге', action: () => void openInCatalog(id) }] : []),
+        { label: 'Показать в Finder', action: () => void up.reveal(e) },
+        'sep' as const,
+        { label: 'Удалить плагин…', danger: true, action: () => (up.removing = e) },
       ],
     };
+  }
+  /** «Страница в каталоге»: the catalog read first if it is not yet. */
+  async function openInCatalog(id: string) {
+    if (!catalog.list.length) await catalog.load();
+    const c = catalog.list.find((x) => x.id === id);
+    page = c ?? 'catalog';
   }
   let open = $state<string | null>(null); // «Подробнее» of a failed one
   let busy = $state(false);
@@ -115,7 +126,7 @@
         </button>
       {/if}
       {#if !e.builtin}
-        <button class="dots" aria-label="Ещё: {m?.name ?? e.dir}" disabled={!!busy} onclick={(ev) => more(ev, e)}>{busy === 'check' ? '…' : '•••'}</button>
+        <button class="dots" class:on={menu?.dir === e.dir} title="Ещё" aria-label="Ещё: {m?.name ?? e.dir}" aria-haspopup="menu" disabled={!!busy} onclick={(ev) => more(ev, e)}>{busy === 'check' ? '…' : '⋯'}</button>
       {/if}
       <button class="switch" role="switch" aria-checked={e.enabled} aria-label="Плагин {m?.name ?? e.dir}" disabled={!m || (!e.enabled && e.problems.length > 0)}
         onclick={() => void plugins.setEnabled(id, !e.enabled)}><span></span></button>
@@ -182,24 +193,8 @@
 </div>
 {#if linking}<UrlSheet onclose={() => (linking = false)} />{/if}
 {#if installing}<InstallSheet e={installing.e} m={installing.m} onclose={() => (installing = null)} />{/if}
-{#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
-{#if removing}
-  {@const m = removing.manifest}
-  <div class="layer" use:portal>
-  <div class="scrim" aria-hidden="true"></div>
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Удаление плагина" tabindex="-1"
-    onkeydown={(ev) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); removing = null; } }}>
-    <b>Удалить «{m?.name ?? removing.dir}»?</b>
-    <p>Папка плагина уйдёт в Корзину. Его данные в заметках и настройки останутся — после новой установки он их найдёт.</p>
-    <div class="row">
-      <button class="change" onclick={() => (removing = null)}>Отмена</button>
-      <!-- svelte-ignore a11y_autofocus -->
-      <button class="change danger" autofocus onclick={() => { const id = idOf(removing!); removing = null; void up.remove(id); }}>Удалить</button>
-    </div>
-  </div>
-  </div>
-{/if}
+<!-- to <body>: the sheet (a transform) would clip the menu at its edge and shift it -->
+{#if menu}<div use:portal><ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} /></div>{/if}
 
 <style>
   .body { flex: 1; min-height: 0; display: flex; }
@@ -234,15 +229,9 @@
   .ic { flex: 0 0 auto; align-self: center; color: var(--fg2); }
   .src { font-size: 11.5px; color: var(--fg3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .upd { height: 24px; padding: 0 10px; border: 1px solid var(--acc); border-radius: 6px; background: transparent; color: var(--acc); font-size: 12px; white-space: nowrap; }
-  .dots { height: 24px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); font-size: 10px; letter-spacing: 1px; }
-  .dots:hover, .gear:hover { background: var(--field); }
+  .dots { flex: 0 0 28px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); font-size: 16px; letter-spacing: 1px; line-height: 1; }
+  .dots:hover, .dots.on, .gear:hover { background: var(--field); }
   .gear { height: 24px; width: 26px; padding: 0; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); }
-  .layer { color: var(--fg); }
-  .scrim { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, 0.3); }
-  .dlg { position: fixed; z-index: 91; left: 50%; top: 30%; transform: translateX(-50%); width: min(400px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 8px; padding: 18px 20px 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35); font-size: 13px; outline: none; }
-  .dlg p { margin: 0; color: var(--fg2); line-height: 1.45; }
-  .dlg .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
-  .danger { background: var(--todo); border-color: var(--todo); color: #fff; }
   .ver2 { margin-left: auto; font: 11.5px var(--mono); color: var(--fg3); }
   code { font-family: var(--mono); }
   .switch { flex: 0 0 auto; position: relative; width: 32px; height: 18px; padding: 0; border: 0; border-radius: 9px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); transition: background 0.15s; }
