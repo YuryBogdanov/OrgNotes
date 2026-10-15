@@ -486,7 +486,7 @@
     overflow: visible; /* the path bar's menus hang below it */
   }
   .path > span { padding: 0 4px; } /* plain text in the pill (agenda, a new note) lines up with the segments */
-  .pfirst, .last { color: var(--fg); }
+  .last { color: var(--fg); }
   .sep { color: var(--fg3); }
   .right { justify-self: end; display: flex; align-items: center; gap: 12px; }
   /* "Открыть в панели": three icon buttons in a grey capsule, the pressed one on a light plate */

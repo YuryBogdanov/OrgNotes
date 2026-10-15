@@ -114,7 +114,7 @@ describe('toolbar buttons', () => {
   it('pressing the pressed "Второй редактор" closes the second pane and keeps its tabs at the end of the first', () => {
     const L = one();
     toggleSecond(L, 'agenda', copy(L));
-    openFile(L, 1, 'b.org');
+    openFile(L, 1, 'b.org', 0);
     newUntitled(L, 1);
     expect(secondKind(L)).toBe('file'); // an untitled tab lights it too
     toggleSecond(L, 'file', copy(L));

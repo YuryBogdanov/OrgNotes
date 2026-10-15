@@ -49,12 +49,15 @@ text, it never re-serialises a tree. The UI is in Russian; code comments are in 
 
 ```bash
 npm run tauri dev                     # the app (dev). The runner wraps the binary in Panopticon-dev.app (§6)
-npx vitest run                        # unit tests (~209)
-E2E_PORT=1431 npx playwright test     # e2e, WebKit, Tauri mocked (~288, ~1.2 min)
-(cd src-tauri && cargo test)          # Rust: safe save, config, menu accelerators
-npx svelte-check                      # 4 errors are pre-existing (png imports, JumpBar :148, Settings InputEvent cast)
+npm run check                         # types: svelte-check (--tsgo; must be 0 errors) + tsc of the tests and e2e (tsconfig.tests.json)
+npm test                              # unit tests, vitest (~435)
+E2E_PORT=1431 npm run e2e             # e2e, WebKit, Tauri mocked (~625, ~4 min)
+npm run test:rust                     # Rust: safe save, config, plugins, menu accelerators
+E2E_PORT=1431 npm run verify          # all of the above in turn
 scripts/release-mac.sh                # build + verify the signature + zip → dist-release/
 ```
+
+TypeScript: `typescript` is 6 and `@typescript/native` is 7 (an npm alias): svelte-check 4 needs both to check with TS 7 (`--tsgo`); Vite does not use tsc.
 
 PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, so arm64 only).
 

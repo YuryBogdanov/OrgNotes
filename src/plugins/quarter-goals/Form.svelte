@@ -241,7 +241,6 @@
   .sel { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 6px 0 8px; }
   .sel select { flex: 1; min-width: 0; height: 30px; border: 0; background: transparent; color: var(--fg); font: inherit; outline: none; }
   .av { flex: 0 0 20px; width: 20px; height: 20px; border-radius: 10px; color: #ffffff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-  .calbox { border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
   .where { padding: 8px 10px; border-radius: 7px; background: var(--side); font-size: 12px; color: var(--fg2); line-height: 1.45; }
   .where b { color: var(--fg); }
   code { font-family: var(--mono); }
