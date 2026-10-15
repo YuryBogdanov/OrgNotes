@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { budget } from './helpers';
 import { WORK } from './levelsFixture';
 
 // ТЗ «Отображение уровней заголовков (одна звёздочка, отступы)».
@@ -271,13 +272,13 @@ test('a file of 50 000 lines opens and takes typing without delay, as without th
   const t0 = Date.now();
   await page.goto('/');
   await expect(page.locator('.cm-org-marker').first()).toBeVisible();
-  expect(Date.now() - t0).toBeLessThan(3000); // was ~18 s: links were found by parsing the whole file
+  expect(Date.now() - t0).toBeLessThan(budget(3000)); // was ~18 s: links were found by parsing the whole file
   await line(page, 'Заголовок 0').click();
   await page.keyboard.press('End');
   const t1 = Date.now();
   await page.keyboard.type('xyz');
   await expect(line(page, 'Заголовок 0xyz')).toBeVisible();
-  expect(Date.now() - t1).toBeLessThan(1000);
+  expect(Date.now() - t1).toBeLessThan(budget(1000));
   await expect(page.locator('.cm-link').first()).toHaveText('ссылка'); // links are still found
 });
 

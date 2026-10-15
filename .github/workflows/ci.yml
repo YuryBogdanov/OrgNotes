@@ -10,9 +10,14 @@ concurrency:
   cancel-in-progress: true
 jobs:
   web:
-    name: Types, unit, e2e
+    name: Types, unit, e2e (${{ matrix.shard }}/2)
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        # the e2e in two halves at once: a macOS runner is several times slower than a desk Mac
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,18 +26,20 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+        if: matrix.shard == 1
       - run: npm test
+        if: matrix.shard == 1
       - name: WebKit for Playwright
         run: npx playwright install webkit
       - name: e2e
-        run: npm run e2e
+        run: npm run e2e -- --shard=${{ matrix.shard }}/2
         env:
           E2E_PORT: 1431
       - name: The traces of what failed
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-traces
+          name: playwright-traces-${{ matrix.shard }}
           path: test-results/
           retention-days: 7
   rust:

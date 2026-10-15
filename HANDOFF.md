@@ -57,7 +57,7 @@ E2E_PORT=1431 npm run verify          # all of the above in turn
 scripts/release-mac.sh                # build + verify the signature + zip → dist-release/
 ```
 
-CI (`.github/workflows/ci.yml`, macOS): on every PR and on main — `npm run check`, vitest, Playwright (WebKit; one retry, a test passed only on it is reported flaky; traces uploaded on failure) and `cargo test` (after `npm run build`: the crate embeds `dist`). The repository is public since tech sprint 6.1.
+CI (`.github/workflows/ci.yml`, macOS): on every PR and on main — `npm run check`, vitest, Playwright (WebKit in two shards; one retry, a test passed only on it is reported flaky; the waits twice as long and `budget()` of speed tests ×4 — the runners are slower; traces uploaded on failure) and `cargo test` (after `npm run build`: the crate embeds `dist`). The repository is public since tech sprint 6.1.
 
 TypeScript: `typescript` is 6 and `@typescript/native` is 7 (an npm alias): svelte-check 4 needs both to check with TS 7 (`--tsgo`); Vite does not use tsc.
 
