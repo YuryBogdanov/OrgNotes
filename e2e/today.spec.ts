@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
-import { FILES, iso, shift, stamp } from './todayFixture';
+import { FILES, iso, shift, stamp, NOW } from './todayFixture';
 
 // ТЗ 32 (part A): «Сегодня» — the pinned tab first in the left pane, opened by itself at the start of the day; the
 // note and the choice from the journal, the agenda of the day, the tasks, the overdue ones; «Настройки → Сегодня».
@@ -13,6 +13,7 @@ async function open(page: Page, o: { auto?: boolean; ls?: Record<string, string>
   await page.setViewportSize({ width: 1440, height: 960 });
   await installTauriMock(page, FILES(), { today: o.auto ?? true });
   if (o.ls) await page.addInitScript((ls) => Object.entries(ls).forEach(([k, v]) => localStorage.setItem(k, v)), o.ls);
+  await page.clock.setFixedTime(NOW);
   await page.goto('/');
   await expect(page.locator('.pane').first()).toBeVisible();
 }
@@ -113,6 +114,7 @@ test('«Просрочено»: «Завтра» and «Сегодня» move the
   await expect(late.locator('.count')).toHaveText('2');
   await late.locator('.orow', { hasText: 'Ревью перформанса Олега' }).getByRole('button', { name: 'Сегодня' }).click();
   await expect.poll(() => disk(page, '/mock/work.org')).toContain(`DEADLINE: <${iso(shift(0))}`);
+  await expect(late.locator('.count')).toHaveText('1'); // the list drawn again before ⌘Z
   await page.keyboard.press('Meta+z');
   await expect.poll(() => disk(page, '/mock/work.org')).toContain(`DEADLINE: <${stamp(-3)}>`);
 });

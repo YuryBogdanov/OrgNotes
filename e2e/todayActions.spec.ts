@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
-import { FILES, iso, shift } from './todayFixture';
+import { FILES, iso, shift, NOW } from './todayFixture';
 
 // ТЗ 34, part B: the rows of «Сегодня» are one list of tasks — a click chooses, a double click or ↩ opens, ↑ ↓ go
 // from block to block; the menu and the keys act on the chosen task; a changed row stays until ⌘R.
@@ -14,6 +14,7 @@ const sel = (page: Page) => screen(page).locator('[data-k].sel');
 async function open(page: Page) {
   await page.setViewportSize({ width: 1440, height: 960 });
   await installTauriMock(page, FILES(), { today: true });
+  await page.clock.setFixedTime(NOW);
   await page.goto('/');
   await expect(screen(page)).toBeVisible();
 }

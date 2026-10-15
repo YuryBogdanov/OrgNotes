@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
 
 // ТЗ «Первый запуск и рабочая папка».
 const FILES = () => ({
@@ -161,7 +161,11 @@ test.describe('changing the folder', () => {
 
   test('panel → the unsaved question → «Папка найдена» → «Открыть»; a cancel at any step changes nothing', async ({ page }) => {
     await open(page);
+    // the folder read and the window laid out: a key pressed before that would be undone by the load
+    await expect(page.locator('.cm-content')).toBeVisible();
+    await pluginsReady(page);
     await page.keyboard.press('Meta+t');
+    await expect(page.locator('section.pane.active .tab.on')).toContainText('Без названия');
     await page.keyboard.type('черновик');
     // a cancelled panel
     await picks(page, null, '/other', '/other');

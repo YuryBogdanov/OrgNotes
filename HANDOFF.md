@@ -51,7 +51,7 @@ text, it never re-serialises a tree. The UI is in Russian; code comments are in 
 npm run tauri dev                     # the app (dev). The runner wraps the binary in Panopticon-dev.app (§6)
 npm run check                         # types: svelte-check (--tsgo; must be 0 errors) + tsc of the tests and e2e (tsconfig.tests.json)
 npm test                              # unit tests, vitest (~435)
-E2E_PORT=1431 npm run e2e             # e2e, WebKit, Tauri mocked (~625, ~4 min)
+E2E_PORT=1431 npm run e2e             # e2e, WebKit, Tauri mocked (~626, ~4 min; three runs in a row with no flaky test since tech 0.2)
 npm run test:rust                     # Rust: safe save, config, plugins, menu accelerators
 E2E_PORT=1431 npm run verify          # all of the above in turn
 scripts/release-mac.sh                # build + verify the signature + zip → dist-release/

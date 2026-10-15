@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
 import { FILES, INBOX, WORK } from './reviewFixture';
 
 // ТЗ «Разбор Inbox по карточкам».
@@ -18,6 +18,7 @@ async function open(page: Page, files: Record<string, string> = FILES()) {
   await installTauriMock(page, files);
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
+  await pluginsReady(page); // the Inbox is a plugin: its section and its keys
   await page.getByRole('tablist', { name: 'Режимы навигатора' }).getByRole('tab', { name: 'Inbox' }).click();
 }
 async function start(page: Page, files?: Record<string, string>) {
@@ -48,11 +49,13 @@ test.describe('starting', () => {
     await expect(panel(page).locator('.prog')).toContainText('Разобрано 0 из 5');
   });
 
-  test('nothing to go through: the button is off and says why; ⇧⌘R and the palette start it too', async ({ page }) => {
+  test('nothing to go through: the button is off and says why', async ({ page }) => {
     await open(page, { ...FILES(), [IB]: '* TODO Отложенная\nSCHEDULED: <2099-01-01 Thu>\n' });
     await expect(panel(page).getByRole('button', { name: 'Разобрать' })).toBeDisabled();
     await expect(panel(page).getByRole('button', { name: 'Разобрать' })).toHaveAttribute('title', 'Нечего разбирать');
-    await page.goto('/'); // a fresh window with tasks
+  });
+
+  test('⇧⌘R and the palette start it too; closing its tab ends it', async ({ page }) => {
     await open(page);
     await page.keyboard.press('Shift+Meta+r');
     await expect(card(page)).toBeVisible();

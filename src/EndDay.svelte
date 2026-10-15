@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { moved } from './pointer';
   import { onMount, tick } from 'svelte';
   import Editor from './Editor.svelte';
   import { store } from './store.svelte';
@@ -202,7 +203,7 @@
             <div class="drop" role="listbox" aria-label="Задачи">
               {#each candidates as t, i (t.key)}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <div class="opt" class:on={i === sel} role="option" aria-selected={i === sel} tabindex="-1" onmousemove={() => (sel = i)} onclick={() => add(t)}>
+                <div class="opt" class:on={i === sel} role="option" aria-selected={i === sel} tabindex="-1" onmousemove={(e) => moved(e) && (sel = i)} onclick={() => add(t)}>
                   <span class="kw tone" style={tone(t.kw, t.path)}>{t.kw}</span><span class="t">{t.title}</span><span class="file">{base(t.file)}</span>
                 </div>
               {/each}

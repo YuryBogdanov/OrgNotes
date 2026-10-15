@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { moved } from './pointer';
   import { tick, untrack } from 'svelte';
   import { store } from './store.svelte';
   import { displayName, displayPath } from './names';
@@ -227,7 +228,7 @@
       {#if j && it.kind === 'file' && list[j - 1].kind === 'folder'}<div class="line" role="separator"></div>{/if}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="item" class:on={j === l.sel} role="menuitem" tabindex="-1" aria-current={it.current ? 'true' : undefined} data-rel={it.rel}
-        onmousemove={(e) => { e.stopPropagation(); hover(depth, j); }} onclick={(e) => { e.stopPropagation(); pick(it, e.altKey); }}>
+        onmousemove={(e) => { e.stopPropagation(); if (moved(e)) hover(depth, j); }} onclick={(e) => { e.stopPropagation(); pick(it, e.altKey); }}>
         <span class="chk" aria-hidden="true">{it.current ? '✓' : ''}</span>
         <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           {#if it.kind === 'folder'}<path d="M3 6a1.5 1.5 0 0 1 1.5-1.5H8l1.5 2h6A1.5 1.5 0 0 1 17 8v6.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5z" />{:else}<path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" />{/if}

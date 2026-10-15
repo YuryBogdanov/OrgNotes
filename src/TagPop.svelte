@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { moved } from './pointer';
   import { onMount } from 'svelte';
   import { tagsState as ts } from './tagsState.svelte';
   import { bareTag, tagOk } from './tags';
@@ -80,7 +81,7 @@
     <div class="list" role="listbox" aria-label="Теги папки">
       {#each rows as r, i (r.tag + r.create)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="row" role="option" aria-selected={i === cur} class:on={i === cur} onmousedown={(e) => e.preventDefault()} onclick={() => add(r.tag)} onmousemove={() => (cur = i)}>
+        <div class="row" role="option" aria-selected={i === cur} class:on={i === cur} onmousedown={(e) => e.preventDefault()} onclick={() => add(r.tag)} onmousemove={(e) => moved(e) && (cur = i)}>
           {#if r.create}
             <span class="new">Создать тег <code>:{r.tag}:</code></span>
           {:else}

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
-import { DAY, FILES, iso, stamp } from './todayFixture';
+import { DAY, FILES, iso, stamp, NOW } from './todayFixture';
 
 // ТЗ 32 (part B): «Завершить день» — done, left, the three for tomorrow, a note; all written into the journal's
 // datetree at once (one ⌘Z), tasks get an :ID:, a second time replaces; [[id:…]] links open from the editor.
@@ -19,6 +19,7 @@ async function open(page: Page, files: Record<string, string> = FILES(), rich = 
   await page.setViewportSize({ width: 1440, height: 960 });
   await installTauriMock(page, files, { today: true });
   if (rich) await page.addInitScript(() => localStorage.setItem('editor:rich', '1'));
+  await page.clock.setFixedTime(NOW);
   await page.goto('/');
   await expect(page.getByRole('region', { name: 'Сегодня', exact: true })).toBeVisible();
 }
