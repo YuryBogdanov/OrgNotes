@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ConfirmDialog from './ConfirmDialog.svelte';
   import { portal } from './portal';
   import { tick } from 'svelte';
   import { store } from './store.svelte';
@@ -160,16 +161,9 @@
 {#if confirmDel}
   {@const t = confirmDel}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="modal" use:portal onmousedown={() => (confirmDel = null)}>
-    <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Удаление темы" tabindex="-1" onmousedown={(e) => e.stopPropagation()}>
-      <h2>Удалить тему «{t.name}»?</h2>
-      <p>Файл темы удаляется из папки тем. {store.themeFor(t.appearance).name === t.name ? `Редактор вернётся к теме «${t.appearance === 'dark' ? 'Panopticon тёмная' : 'Panopticon светлая'}».` : ''}</p>
-      <div class="btns">
-        <button onclick={() => (confirmDel = null)}>Отмена</button>
-        <button class="danger-b" onclick={() => { const x = t; confirmDel = null; void store.deleteTheme(x); }}>Удалить</button>
-      </div>
-    </div>
-  </div>
+  <ConfirmDialog label="Удаление темы" title="Удалить тему «{t.name}»?" onclose={() => (confirmDel = null)} actions={[{ label: 'Удалить', kind: 'danger', run: () => void store.deleteTheme(t) }]}>
+    Файл темы удаляется из папки тем. {store.themeFor(t.appearance).name === t.name ? `Редактор вернётся к теме «${t.appearance === 'dark' ? 'Panopticon тёмная' : 'Panopticon светлая'}».` : ''}
+  </ConfirmDialog>
 {/if}
 
 <style>
@@ -202,13 +196,6 @@
   .ghost { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
   .ghost.plain { border: 0; background: transparent; color: var(--fg2); }
   .hint { font-size: 11.5px; color: var(--fg3); }
-  .modal { position: fixed; inset: 0; z-index: 110; background: rgba(0, 0, 0, 0.28); display: flex; align-items: flex-start; justify-content: center; padding-top: 14vh; }
-  .dlg { width: 420px; max-width: calc(100% - 32px); padding: 18px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); outline: none; }
-  .dlg h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
-  .dlg p { margin: 0 0 14px; color: var(--fg2); line-height: 1.45; font-size: 12.5px; }
-  .btns { display: flex; justify-content: flex-end; gap: 8px; }
-  .btns button { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--field); color: var(--fg); }
-  .btns .danger-b { background: var(--danger); color: var(--on-danger); font-weight: 600; }
   .pv { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 9px 10px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 9px; font: 10px/14px var(--mono); white-space: nowrap; overflow: hidden; }
   .card.on .pv { border: 2px solid var(--acc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 22%, transparent); padding: 8px 9px; }
   .card:focus-visible { outline: none; }

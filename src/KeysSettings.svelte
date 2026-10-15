@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ConfirmDialog from './ConfirmDialog.svelte';
   import { store, DEFAULT_CAPTURE_KEY } from './store.svelte';
   import {
     FIXED_KEYS, GROUPS, KEY_COMMANDS, chordNote, commandById, conflictsOf, defaultsOf, isChord, isModified, matchesQuery, modifiedCount,
@@ -248,16 +249,9 @@
 
 {#if confirmReset}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="modal" onmousedown={() => (confirmReset = false)}>
-    <div class="dlg" role="alertdialog" tabindex="-1" aria-modal="true" aria-label="Сбросить сочетания" onmousedown={(e) => e.stopPropagation()}>
-      <h2>Вернуть все сочетания по умолчанию для набора «{presetName}»?</h2>
-      <p>Изменено: {changed}.</p>
-      <div class="btns">
-        <button onclick={() => (confirmReset = false)}>Отмена</button>
-        <button class="pri" onclick={() => { confirmReset = false; void store.resetKeys(); }}>Сбросить</button>
-      </div>
-    </div>
-  </div>
+  <ConfirmDialog label="Сбросить сочетания" title="Вернуть все сочетания по умолчанию для набора «{presetName}»?" onclose={() => (confirmReset = false)} actions={[{ label: 'Сбросить', kind: 'primary', run: () => void store.resetKeys() }]}>
+    Изменено: {changed}.
+  </ConfirmDialog>
 {/if}
 
 <style>
@@ -312,11 +306,4 @@
   .frow { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 6px 14px 6px 32px; font-size: 13px; }
   .frow + .frow { border-top: 1px solid var(--line); }
   .fk { font-family: var(--mono); font-size: 12px; color: var(--fg2); white-space: nowrap; }
-  .modal { position: absolute; inset: 0; z-index: 110; background: rgba(0, 0, 0, 0.28); display: flex; align-items: flex-start; justify-content: center; padding-top: 14vh; }
-  .dlg { width: 420px; max-width: calc(100% - 32px); padding: 18px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); }
-  .dlg h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
-  .dlg p { margin: 0 0 14px; color: var(--fg2); line-height: 1.45; }
-  .btns { display: flex; justify-content: flex-end; gap: 8px; }
-  .btns button { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--field); }
-  .btns .pri { background: var(--acc); color: var(--onacc); }
 </style>

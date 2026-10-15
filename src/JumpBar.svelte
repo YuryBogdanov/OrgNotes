@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clickOutside } from './clickOutside';
   import { moved } from './pointer';
   import { tick, untrack } from 'svelte';
   import { store } from './store.svelte';
@@ -201,11 +202,6 @@
     const it = shown(l)[j];
     if (it?.kind === 'folder') sub(it); // a submenu opens on hover, as in macOS menus
   }
-  function outside(e: MouseEvent) {
-    if (openIdx === null && focusIdx === null) return;
-    if (bar?.contains(e.target as Node)) return;
-    leave();
-  }
   const runs = (label: string, filter: string) => {
     if (!filter) return [{ s: label, hit: false }];
     const i = norm(label).indexOf(norm(filter));
@@ -214,7 +210,6 @@
   };
 </script>
 
-<svelte:window onmousedowncapture={outside} />
 
 {#snippet menu(depth: number)}
   {@const l = levels[depth]}
@@ -244,7 +239,7 @@
 {/snippet}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="jb" bind:this={bar} role="navigation" aria-label="Путь к файлу" onkeydown={key}>
+<div class="jb" bind:this={bar} use:clickOutside={{ onoutside: () => (openIdx !== null || focusIdx !== null) && leave(), capture: true }} role="navigation" aria-label="Путь к файлу" onkeydown={key}>
   {#each segs as s, i (s.rel)}
     {#if i}<span class="sep" aria-hidden="true">›</span>{/if}
     <span class="wrap">

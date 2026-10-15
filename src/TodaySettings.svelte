@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Switch from './Switch.svelte';
   import SchemaSettings from './SchemaSettings.svelte';
   import Picker from './Picker.svelte';
   import { store } from './store.svelte';
@@ -82,7 +83,7 @@
       </div>
       <div class="opt">
         <span class="olab"><span>Просроченные из всех файлов</span><small>SCHEDULED и DEADLINE раньше сегодняшнего дня</small></span>
-        <button class="switch" role="switch" aria-checked={cfg.overdueAll} aria-label="Просроченные из всех файлов" onclick={() => void today.setFolder({ overdueAll: !cfg.overdueAll })}><span></span></button>
+        <Switch checked={cfg.overdueAll} label="Просроченные из всех файлов" onchange={() => void today.setFolder({ overdueAll: !cfg.overdueAll })} />
       </div>
     </div>
     <p class="help">Хранится в папке заметок.</p>
@@ -102,7 +103,7 @@
             <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><circle cx="3" cy="3" r="1.2" /><circle cx="7" cy="3" r="1.2" /><circle cx="3" cy="7" r="1.2" /><circle cx="7" cy="7" r="1.2" /><circle cx="3" cy="11" r="1.2" /><circle cx="7" cy="11" r="1.2" /></svg>
           </span>
           <span class="olab grow"><span>{b.title}</span>{#if b.hint}<small>{b.hint}</small>{/if}</span>
-          <button class="switch" role="switch" aria-checked={r.on} aria-label={b.title} onclick={() => toggle(r.id)}><span></span></button>
+          <Switch checked={r.on} label={b.title} onchange={() => toggle(r.id)} />
         </div>
       {/each}
     </div>

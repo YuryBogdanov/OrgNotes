@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clickOutside } from './clickOutside';
   import { portal } from './portal';
   import { onMount } from 'svelte';
   import { fromHsv, parseHex, toHsv } from './colors';
@@ -64,10 +65,6 @@
     return { left: Math.max(8, Math.min(r.left + 30, window.innerWidth - W - 8)), top: below ? r.bottom + 4 : Math.max(8, r.top - hgt - 4) };
   });
   onMount(() => el?.querySelector<HTMLInputElement>('input')?.focus());
-  function outside(e: MouseEvent) {
-    const t = e.target as Node;
-    if (!el?.contains(t) && !anchor.contains(t)) onclose();
-  }
   function key(e: KeyboardEvent) {
     if (e.key !== 'Escape') return;
     e.preventDefault();
@@ -77,9 +74,9 @@
   }
 </script>
 
-<svelte:window onmousedown={outside} onkeydowncapture={key} />
+<svelte:window onkeydowncapture={key} />
 
-<div class="cpop" role="dialog" aria-label="Цвет" use:portal bind:this={el} style="left:{pos.left}px;top:{pos.top}px;width:{W}px">
+<div class="cpop" role="dialog" aria-label="Цвет" use:portal bind:this={el} use:clickOutside={{ onoutside: onclose, also: () => [anchor] }} style="left:{pos.left}px;top:{pos.top}px;width:{W}px">
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="sv" style="background:linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, {hueHex})" onpointerdown={(e) => drag(e, (x, y) => { sat = x; val = 1 - y; })}>
     <span class="knob" style="left:{sat * 100}%;top:{(1 - val) * 100}%;background:{solid}"></span>
