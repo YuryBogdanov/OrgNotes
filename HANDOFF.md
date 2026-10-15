@@ -86,7 +86,8 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 
 | File | What |
 |---|---|
-| `store.svelte.ts` (1.6k) | The single `Store` class (`$state` fields). Files, reload/watch, autosave (500 ms) and `save()` with conflict detection, layout, config, agendas, Inbox, quick entry, toasts, history. Most features hook in here. |
+| `store.svelte.ts` (2.6k) | The single `Store` class (`$state` fields). Files, reload/watch, autosave (500 ms) and `save()` with conflict detection, layout, config, agendas, Inbox, quick entry, history. Most features hook in here. |
+| `notify.svelte.ts`, `prefs.svelte.ts`, `themes.svelte.ts`, `storage.ts` | Split out of the store (tech sprint 2.1): the toast and the lines at the bottom (`notify`); the view preferences of this Mac — panels, widths, levels, rich text, links, drawers, find options (`prefs`); the appearance and the themes (`themes`); `lsGet`/`lsSet`/`lsDel`/`lsGetJson` (never throw). The store forwards every moved member (`store.toast`, `store.setRich`, `store.theme`…), so callers did not change; new code may import the module directly. |
 | `org.ts` | Org parsing (`parseHeadings`, `headingLines` skips #+BEGIN blocks), workflows/sequences, `setKeyword` (CLOSED/LOGBOOK), dates, colours. |
 | `edits.ts` | Text patches: planning dates, tags, refile, appendTask. |
 | `outline.ts` | Editor structure commands (promote/move subtree, cycle fold, status/priority cycling). |

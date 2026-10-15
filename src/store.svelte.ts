@@ -9,11 +9,12 @@ import { appendTask, setPlanning, setTags, weekdayNames } from './edits';
 import { bareTitle, caretAfter, keyOf, moveTo, moveWithin } from './refile';
 import type { CalSpec, Plate } from './commands';
 import { searchFile, type Hit, type Scope } from './search';
-import { DEFAULT_LEVELS, type LevelView } from './orgIndent';
+import { lsDel, lsGet, lsGetJson, lsSet } from './storage';
+import { notify } from './notify.svelte';
+import { prefs } from './prefs.svelte';
+import { themes } from './themes.svelte';
 import { DEFAULT_INBOX, append, entry, prepend, readInbox, withInbox, type InboxConfig } from './inbox';
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
-import { cachedTheme, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
-import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
 import { allFileViews, fileViewOf, navOf, viewOf } from './views';
 import { mini as miniSettings } from './miniOptions.svelte';
 import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
@@ -51,13 +52,6 @@ interface MiniSnapshot {
   note: MiniNote | null;
   files: { name: string; path: string; text: string; disk: string; diskRaw: string; eol: string }[];
 }
-function lsGetJson<T>(k: string): T | null {
-  try {
-    return JSON.parse(localStorage.getItem(k) ?? 'null');
-  } catch {
-    return null;
-  }
-}
 
 function build(name: string, path: string, text: string, disk: string, diskRaw: string, eol: Eol, cfg: ProjectConfig): NoteFile {
   const wf = resolveWorkflow(text, name, cfg);
@@ -73,23 +67,6 @@ function build(name: string, path: string, text: string, disk: string, diskRaw: 
 
 /** Where the palette opens: a step of a command at once (the card's buttons in «Разбор Inbox» use the heading ones). */
 export type PaletteStart = 'newFile' | 'newFolder' | 'goto' | 'status' | 'priority' | 'schedule' | 'deadline' | 'tags' | 'calendar' | 'step';
-const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
-const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
-function readLevels(): LevelView {
-  try {
-    const v = JSON.parse(lsGet('editor:levels') ?? 'null');
-    if (v && typeof v === 'object') {
-      return {
-        oneStar: typeof v.oneStar === 'boolean' ? v.oneStar : DEFAULT_LEVELS.oneStar,
-        indent: typeof v.indent === 'boolean' ? v.indent : DEFAULT_LEVELS.indent,
-        step: Number.isInteger(v.step) && v.step >= 1 && v.step <= 4 ? v.step : DEFAULT_LEVELS.step,
-      };
-    }
-  } catch {
-    /* unreadable: the defaults */
-  }
-  return { ...DEFAULT_LEVELS };
-}
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core');
@@ -121,6 +98,186 @@ export interface PluginData {
 }
 
 class Store {
+  // ---- forwarded (tech sprint 2.1): the notes at the bottom, the view preferences, the themes ---------------
+  get toast() {
+    return notify.toast;
+  }
+  set toast(v) {
+    notify.toast = v;
+  }
+  get notice() {
+    return notify.notice;
+  }
+  set notice(v) {
+    notify.notice = v;
+  }
+  get draftNotice() {
+    return notify.draftNotice;
+  }
+  set draftNotice(v) {
+    notify.draftNotice = v;
+  }
+  readonly note = notify.note.bind(notify);
+  readonly say = notify.say.bind(notify);
+  readonly sayDraft = notify.sayDraft.bind(notify);
+  get showNav() {
+    return prefs.showNav;
+  }
+  set showNav(v) {
+    prefs.showNav = v;
+  }
+  get showInspector() {
+    return prefs.showInspector;
+  }
+  set showInspector(v) {
+    prefs.showInspector = v;
+  }
+  get navW() {
+    return prefs.navW;
+  }
+  set navW(v) {
+    prefs.navW = v;
+  }
+  get inspW() {
+    return prefs.inspW;
+  }
+  set inspW(v) {
+    prefs.inspW = v;
+  }
+  get navHeadings() {
+    return prefs.navHeadings;
+  }
+  set navHeadings(v) {
+    prefs.navHeadings = v;
+  }
+  get levels() {
+    return prefs.levels;
+  }
+  set levels(v) {
+    prefs.levels = v;
+  }
+  get rich() {
+    return prefs.rich;
+  }
+  set rich(v) {
+    prefs.rich = v;
+  }
+  get richNumbers() {
+    return prefs.richNumbers;
+  }
+  set richNumbers(v) {
+    prefs.richNumbers = v;
+  }
+  get linkFormat() {
+    return prefs.linkFormat;
+  }
+  set linkFormat(v) {
+    prefs.linkFormat = v;
+  }
+  get foldDrawers() {
+    return prefs.foldDrawers;
+  }
+  set foldDrawers(v) {
+    prefs.foldDrawers = v;
+  }
+  get inspectorTab() {
+    return prefs.inspectorTab;
+  }
+  set inspectorTab(v) {
+    prefs.inspectorTab = v;
+  }
+  get findCase() {
+    return prefs.findCase;
+  }
+  set findCase(v) {
+    prefs.findCase = v;
+  }
+  get findWord() {
+    return prefs.findWord;
+  }
+  set findWord(v) {
+    prefs.findWord = v;
+  }
+  readonly setNavHeadings = prefs.setNavHeadings.bind(prefs);
+  readonly setRich = prefs.setRich.bind(prefs);
+  readonly setRichNumbers = prefs.setRichNumbers.bind(prefs);
+  readonly setLinkFormat = prefs.setLinkFormat.bind(prefs);
+  readonly setFoldDrawers = prefs.setFoldDrawers.bind(prefs);
+  readonly setLevels = prefs.setLevels.bind(prefs);
+  readonly toggleStructure = prefs.toggleStructure.bind(prefs);
+  readonly setInspectorTab = prefs.setInspectorTab.bind(prefs);
+  readonly setFindOpts = prefs.setFindOpts.bind(prefs);
+  get appearanceChoice() {
+    return themes.appearanceChoice;
+  }
+  set appearanceChoice(v) {
+    themes.appearanceChoice = v;
+  }
+  get systemDark() {
+    return themes.systemDark;
+  }
+  set systemDark(v) {
+    themes.systemDark = v;
+  }
+  get themeNames() {
+    return themes.themeNames;
+  }
+  set themeNames(v) {
+    themes.themeNames = v;
+  }
+  get ownThemes() {
+    return themes.ownThemes;
+  }
+  set ownThemes(v) {
+    themes.ownThemes = v;
+  }
+  get pluginThemes() {
+    return themes.pluginThemes;
+  }
+  set pluginThemes(v) {
+    themes.pluginThemes = v;
+  }
+  get pluginsReady() {
+    return themes.pluginsReady;
+  }
+  set pluginsReady(v) {
+    themes.pluginsReady = v;
+  }
+  get themesRead() {
+    return themes.themesRead;
+  }
+  set themesRead(v) {
+    themes.themesRead = v;
+  }
+  get themeEditing() {
+    return themes.themeEditing;
+  }
+  set themeEditing(v) {
+    themes.themeEditing = v;
+  }
+  get themes() {
+    return themes.themes;
+  }
+  get appearance() {
+    return themes.appearance;
+  }
+  get theme() {
+    return themes.theme;
+  }
+  readonly addThemes = themes.addThemes.bind(themes);
+  readonly resetMissingThemes = themes.resetMissingThemes.bind(themes);
+  readonly loadThemes = themes.loadThemes.bind(themes);
+  readonly copyTheme = themes.copyTheme.bind(themes);
+  readonly renameTheme = themes.renameTheme.bind(themes);
+  readonly editTheme = themes.editTheme.bind(themes);
+  readonly setThemeColors = themes.setThemeColors.bind(themes);
+  readonly resetTheme = themes.resetTheme.bind(themes);
+  readonly deleteTheme = themes.deleteTheme.bind(themes);
+  readonly exportTheme = themes.exportTheme.bind(themes);
+  readonly importTheme = themes.importTheme.bind(themes);
+  readonly themeFor = themes.themeFor.bind(themes);
+  readonly setAppearance = themes.setAppearance.bind(themes);
+  readonly setThemeName = themes.setThemeName.bind(themes);
   files = $state.raw<NoteFile[]>([]);
   folders = $state.raw<string[]>([]); // relative paths of all sub-folders, including empty ones
   config = $state.raw<ProjectConfig>(EMPTY_CONFIG); // <notes>/.orgnotes/config.json
@@ -153,18 +310,6 @@ class Store {
   diskGen = $state.raw<Record<string, number>>({});
   /** The sheet about a changed or deleted file. */
   diskReq = $state<{ kind: 'changed' | 'deleted'; path: string; resolve: (a: DiskAnswer) => void } | null>(null);
-  /** «work» обновлён с диска — a status line at the bottom of the editor for 4 s. */
-  toast = $state<{ text: string; n: number; actions?: { label: string; run: () => void }[]; icon?: string } | null>(null);
-  /** A short note at the bottom (with buttons, e.g. «Открыть», «Отменить»); it goes after a few seconds. `icon`: an SVG
-   *  path (viewBox 0 0 20 20) instead of the arrows of «обновлён с диска». */
-  note(text: string, actions?: { label: string; run: () => void }[], ms = 4000, icon?: string) {
-    this.toastNames = [];
-    this.toast = { text, n: Date.now(), actions, icon };
-    clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => (this.toast = null), ms);
-  }
-  private toastNames: string[] = [];
-  private toastTimer: ReturnType<typeof setTimeout> | undefined;
   /** The window is in front: disk questions wait for it. */
   appActive = $state(typeof document === 'undefined' || document.hasFocus());
 
@@ -204,33 +349,6 @@ class Store {
   }
   /** "Показать в навигаторе": expand to this file and mark it for a moment. */
   navReveal = $state<{ path: string; n: number } | null>(null);
-  showNav = $state(true);
-  showInspector = $state(true);
-  /** "Показывать заголовки в навигаторе" (Настройки → Основные): a view preference of this Mac, off by default. */
-  navHeadings = $state(lsGet('nav:headings') === '1');
-  setNavHeadings(on: boolean) {
-    this.navHeadings = on;
-    lsSet('nav:headings', on ? '1' : '0'); // the main window hears it through the storage event
-  }
-  /** «Уровни заголовков» (Настройки → Основные, a view preference of this Mac): one star per level, text by level. */
-  levels = $state<LevelView>(readLevels());
-  /** «Оформленный текст»: the editor draws the file like org-modern; with it, its line numbers (this Mac). */
-  rich = $state(lsGet('editor:rich') === '1');
-  richNumbers = $state(lsGet('editor:richNumbers') === '1');
-  setRich(on: boolean) {
-    this.rich = on;
-    lsSet('editor:rich', on ? '1' : '0'); // the other window hears it through the storage event
-  }
-  setRichNumbers(on: boolean) {
-    this.richNumbers = on;
-    lsSet('editor:richNumbers', on ? '1' : '0');
-  }
-  /** «Ссылки на заголовки» (ТЗ 35): by :ID: (added to the heading) or by the title (the file does not change). */
-  linkFormat = $state<'id' | 'title'>(lsGet('editor:links') === 'title' ? 'title' : 'id');
-  setLinkFormat(f: 'id' | 'title') {
-    this.linkFormat = f;
-    lsSet('editor:links', f);
-  }
   /**
    * The link to the heading at `line` of a file (the one the line is in; above the first heading — the file), in the
    * format set; an :ID: the heading lacks is added (one step of ⌘Z). Null: no such file, or the :ID: not written.
@@ -276,27 +394,6 @@ class Store {
     } catch {
       return '';
     }
-  }
-  /** Drawers folded when a file opens and when the app adds one (a preference of this Mac). */
-  foldDrawers = $state(lsGet('editor:drawers') !== '0');
-  setFoldDrawers(on: boolean) {
-    this.foldDrawers = on;
-    lsSet('editor:drawers', on ? '1' : '0'); // the other window hears it through the storage event
-  }
-  setLevels(l: Partial<LevelView>) {
-    this.levels = { ...this.levels, ...l, step: Math.max(1, Math.min(4, Math.round(l.step ?? this.levels.step))) };
-    lsSet('editor:levels', JSON.stringify(this.levels)); // the other window hears it through the storage event
-  }
-  /** «Вид › Структурный вид»: both switches on or off at once, to see the file as it is without the settings. */
-  toggleStructure() {
-    const on = !(this.levels.oneStar || this.levels.indent);
-    this.setLevels({ oneStar: on, indent: on });
-  }
-  /** The inspector's tab, remembered for the window. */
-  inspectorTab = $state<'task' | 'outline'>(lsGet('inspector:tab') === 'outline' ? 'outline' : 'task');
-  setInspectorTab(t: 'task' | 'outline') {
-    this.inspectorTab = t;
-    lsSet('inspector:tab', t);
   }
   /** Where the caret was last in each file (any tab): a file opened from the path bar goes back there. */
   private lastCursor: Record<string, { line: number; col: number }> = {};
@@ -348,11 +445,8 @@ class Store {
   }
   /** Full screen: the traffic lights are hidden until the pointer goes to the top of the screen (Rust watches them). */
   titlebar = $state({ fullscreen: false, lights: true, menu: 0 });
-  navW = $state(248);
-  inspW = $state(272);
   saveState = $state<'saved' | 'saving' | 'memory'>(isTauri ? 'saved' : 'memory');
   dir = $state<string | null>(null);
-  needFolder = $state(false);
   /**
    * A start screen over the whole window (ТЗ «Первый запуск и рабочая папка»): «welcome» (no folder yet), «found»
    * (a folder picked, before «Открыть»; `scan` null while counting), «missing» (the remembered folder cannot be
@@ -364,11 +458,9 @@ class Store {
   hasSample = $state(false);
   loaded = $state(false);
   history = $state.raw<{ path: string; line: number }[]>([]);
-  notice = $state('');
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
   private saving = 0; // saves in flight
   private writes = 0; // bumped after every successful write: a snapshot of the disk taken across a bump may be stale
-  private noticeTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** The tab with the keyboard: the active tab of the active pane. */
   get tab(): Tab | undefined {
@@ -402,19 +494,6 @@ class Store {
     return t?.kind === 'file' ? (this.files.find((f) => f.path === t.path) ?? this.orphans[t.path ?? '']) : undefined;
   }
 
-  /** A failed "Сохранить как…", shown in the bar of the new notes (other messages are about files). */
-  draftNotice = $state('');
-  private draftTimer: ReturnType<typeof setTimeout> | undefined;
-  sayDraft(msg: string) {
-    this.draftNotice = msg;
-    clearTimeout(this.draftTimer);
-    this.draftTimer = setTimeout(() => (this.draftNotice = ''), 6000);
-  }
-  say(msg: string) {
-    this.notice = msg;
-    clearTimeout(this.noticeTimer);
-    this.noticeTimer = setTimeout(() => (this.notice = ''), 6000);
-  }
 
   private async listFiles(): Promise<Listed[]> {
     if (isTauri) return invoke<Listed[]>('list_org_files');
@@ -592,11 +671,7 @@ class Store {
     const keys = Object.fromEntries(Object.entries(this.keyState.overrides).filter(([k]) => k.startsWith(id + '.')));
     const backup: PluginData = { id, folder: id in this.featureFiles ? this.featureFiles[id] : undefined, local: lsGet('feature:' + id), keys };
     if (backup.folder !== undefined) void this.setFolderData(id, {});
-    try {
-      localStorage.removeItem('feature:' + id);
-    } catch {
-      /* none */
-    }
+    lsDel('feature:' + id);
     this.localTick++;
     if (Object.keys(keys).length) {
       const overrides = { ...this.keyState.overrides };
@@ -1070,7 +1145,6 @@ class Store {
       const st = await invoke<{ dir: string | null; missing: string | null }>('notes_dir_status');
       this.dir = st.dir;
       this.hasSample = !!(await invoke<string | null>('sample_notes_dir'));
-      this.needFolder = !this.dir;
       if (!this.dir) {
         this.start = st.missing ? { kind: 'missing', path: st.missing } : { kind: 'welcome' };
         this.files = [];
@@ -1196,7 +1270,7 @@ class Store {
     this.diskGen = gen;
     if (Object.keys(moves).length) mapPaths(this.layout, (p) => moves[p] ?? p);
     for (const p of this.orphanAsked) if (!orphans[p]) this.orphanAsked.delete(p);
-    if (reloaded.length) this.showReloaded(reloaded);
+    if (reloaded.length) notify.reloaded(reloaded);
   }
   /** The files just taken from disk (their names): the plugins' «file.changed» says «disk» for them, then forgets. */
   diskTaken = new Set<string>();
@@ -1207,15 +1281,6 @@ class Store {
   }
   private isOpen(path: string) {
     return this.layout.panes.some((p) => p.tabs.some((t) => t.kind === 'file' && t.path === path));
-  }
-  private showReloaded(names: string[]) {
-    this.toastNames = [...new Set([...(this.toast ? this.toastNames : []), ...names])];
-    const n = this.toastNames.length;
-    const files = n % 10 === 1 && n % 100 !== 11 ? 'файл' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'файла' : 'файлов';
-    const text = n === 1 ? `«${displayName(this.toastNames[0])}» обновлён с диска: файл изменила другая программа` : `Обновлено с диска: ${n} ${files}`;
-    this.toast = { text, n: Date.now() };
-    clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => (this.toast = null), 4000);
   }
 
   /**
@@ -1679,13 +1744,6 @@ class Store {
     return 'ok';
   }
   // ---- search: ⌘F in a pane, ⇧⌘F in every file ------------------------------------------------------------
-  /** «Aa» and «Слово», shared by both searches (this Mac). */
-  findCase = $state(lsGet('find:cs') === '1');
-  findWord = $state(lsGet('find:word') === '1');
-  setFindOpts(o: { cs?: boolean; word?: boolean }) {
-    if (o.cs !== undefined) lsSet('find:cs', (this.findCase = o.cs) ? '1' : '0');
-    if (o.word !== undefined) lsSet('find:word', (this.findWord = o.word) ? '1' : '0');
-  }
   /** What a pane's find bar is asked (the menu, the keys, a jump from the search in every file). */
   findReq = $state<{ kind: 'open' | 'next' | 'prev' | 'useSel' | 'jump'; pane: number; n: number; q?: string; at?: { path: string; line: number; col: number } } | null>(null);
   askFind(kind: 'open' | 'next' | 'prev' | 'useSel') {
@@ -1700,19 +1758,16 @@ class Store {
     if (selection && !selection.includes('\n')) this.search.q = selection;
     this.search.focusN++;
   }
-  private recentKey2() {
-    return 'search:recent';
-  }
   searchRecent(): { q: string; t: number }[] {
     try {
-      const v = JSON.parse(lsGet(this.recentKey2()) ?? '[]');
+      const v = JSON.parse(lsGet(SEARCH_RECENT) ?? '[]');
       return Array.isArray(v) ? v.filter((x) => x && typeof x.q === 'string') : [];
     } catch {
       return [];
     }
   }
   clearSearchRecent() {
-    lsSet(this.recentKey2(), '[]');
+    lsSet(SEARCH_RECENT, '[]');
     this.search.focusN++;
   }
   /** ↩: every .org file of the folder (the open ones with their unsaved edits), a portion at a time; a new run stops
@@ -1721,7 +1776,7 @@ class Store {
     const q = this.search.q.trim();
     if (!q) return;
     const run = ++this.searchRun;
-    lsSet(this.recentKey2(), JSON.stringify([{ q, t: Date.now() }, ...this.searchRecent().filter((x) => x.q !== q)].slice(0, 8)));
+    lsSet(SEARCH_RECENT, JSON.stringify([{ q, t: Date.now() }, ...this.searchRecent().filter((x) => x.q !== q)].slice(0, 8)));
     const opts = { cs: this.findCase, word: this.findWord };
     const scope = this.search.scope;
     const open = new Set(this.layout.panes.flatMap((p) => p.tabs.flatMap((t) => (t.kind === 'file' && t.path ? [t.path] : []))));
@@ -1920,167 +1975,6 @@ class Store {
   /** ⌘2: the agenda in the active pane; ⌘1: back to the last file tab of that pane. */
   showAgendaHere() {
     openAgenda(this.layout, this.layout.active);
-  }
-  // ---- «Настройки → Оформление» (ТЗ 25): the appearance of the app and the editor theme of each, on this Mac ------
-  appearanceChoice = $state<AppearanceChoice>(readChoice());
-  /** macOS is dark (for «Системное»); followed while the app runs. */
-  systemDark = $state(isSystemDark());
-  themeNames = $state<Record<Appearance, string>>(readThemeNames());
-  /** Own themes: `themes/*.json` in the app's config folder (ТЗ 25 §4). */
-  ownThemes = $state.raw<Theme[]>([]);
-  /** Every theme to choose from: the built-in ones, then the own ones by name. */
-  get themes(): Theme[] {
-    return [...BUILTIN, ...this.pluginThemes, ...this.ownThemes];
-  }
-  /** The plugins' themes (roadmap 1.4: the Emacs ones are the plugin «theme-pack»), in the order they came. */
-  pluginThemes = $state.raw<Theme[]>([]);
-  /** The plugins have been started: till then a chosen plugin's theme is the one cached at the last run. */
-  pluginsReady = $state(false);
-  addThemes(plugin: string, list: Theme[]) {
-    const names = new Set([...BUILTIN, ...this.pluginThemes].map((t) => t.name));
-    const mine = list.filter((t) => !names.has(t.name) && !!names.add(t.name)).map((t) => ({ ...t, builtin: true, plugin }));
-    this.pluginThemes = [...this.pluginThemes, ...mine];
-    this.ownThemes = this.ownThemes.filter((t) => !mine.some((m) => m.name === t.name));
-    return () => void (this.pluginThemes = this.pluginThemes.filter((t) => t.plugin !== plugin));
-  }
-  /** A chosen theme that is gone (its plugin turned off) gives way to Panopticon of its appearance. */
-  resetMissingThemes() {
-    if (!this.themesRead) return;
-    for (const a of ['light', 'dark'] as const) if (!this.themes.some((t) => t.name === this.themeNames[a] && t.appearance === a)) this.setThemeName(a, DEFAULT_THEME[a]);
-  }
-  /** The own themes have been read (till then a chosen own theme is the one cached at the last run). */
-  themesRead = $state(false);
-  async loadThemes() {
-    if (!isTauri) return void (this.themesRead = true);
-    const texts = await invoke<string[]>('list_themes').catch(() => [] as string[]);
-    const seen = new Set<string>();
-    this.ownThemes = texts
-      .map(parseTheme)
-      .filter((t): t is Theme => !!t && ![...BUILTIN, ...this.pluginThemes].some((b) => b.name === t.name) && !seen.has(t.name) && !!seen.add(t.name))
-      .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-    this.themesRead = true;
-  }
-  private async saveTheme(t: Theme): Promise<boolean> {
-    try {
-      if (isTauri) await invoke('write_theme', { file: themeFile(t.name), text: themeJson(t) });
-      return true;
-    } catch (e) {
-      this.say('Не удалось сохранить тему: ' + e);
-      return false;
-    }
-  }
-  private putTheme(t: Theme, replace?: string) {
-    this.ownThemes = [...this.ownThemes.filter((x) => x.name !== t.name && x.name !== replace), t].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-  }
-  /** «+ Новая тема», «Дублировать», editing a built-in one: an own copy, saved and chosen for its appearance. */
-  async copyTheme(t: Theme): Promise<Theme | null> {
-    const c = copyOf(t, this.themes.map((x) => x.name));
-    if (!(await this.saveTheme(c))) return null;
-    this.putTheme(c);
-    this.setThemeName(c.appearance, c.name);
-    return c;
-  }
-  /** «Переименовать»: the file follows the name; a taken name gets «(2)». Null: nothing to do. */
-  async renameTheme(t: Theme, to: string): Promise<string | null> {
-    const name = to.trim().slice(0, 80);
-    if (t.builtin || !name || name === t.name) return null;
-    const n = uniqueName(name, this.themes.filter((x) => x.name !== t.name).map((x) => x.name));
-    const next = { ...t, name: n };
-    if (!(await this.saveTheme(next))) return null;
-    if (themeFile(n) !== themeFile(t.name) && isTauri) await invoke('delete_theme', { file: themeFile(t.name) }).catch(() => {});
-    this.putTheme(next, t.name);
-    for (const a of ['light', 'dark'] as const) if (this.themeNames[a] === t.name) this.setThemeName(a, n);
-    if (this.themeEditing === t.name) this.themeEditing = n;
-    return n;
-  }
-  /** The theme open in the theme editor (ТЗ 25 §2), inside «Настройки → Оформление»; null: the section itself. */
-  themeEditing = $state<string | null>(null);
-  /** «Редактировать»: a built-in theme gets an own copy («<тема> — моя») first; the theme is chosen and opened. */
-  async editTheme(t: Theme) {
-    const own = t.builtin ? await this.copyTheme(t) : t;
-    if (!own) return;
-    this.setThemeName(own.appearance, own.name);
-    this.themeEditing = own.name;
-  }
-  private themeTimer: ReturnType<typeof setTimeout> | undefined;
-  /** A colour changed in the editor: shown at once everywhere, written to its file a moment later. */
-  setThemeColors(name: string, colors: Theme['colors']) {
-    const t = this.ownThemes.find((x) => x.name === name);
-    if (!t) return;
-    const next = { ...t, colors };
-    this.putTheme(next);
-    clearTimeout(this.themeTimer);
-    this.themeTimer = setTimeout(() => void this.saveTheme(next), 300);
-  }
-  /** «Сбросить»: the colours of the theme it is based on (else of Panopticon of its appearance). */
-  resetTheme(name: string) {
-    const t = this.ownThemes.find((x) => x.name === name);
-    if (!t) return;
-    const base = this.themes.find((x) => x.name === t.basedOn && x.appearance === t.appearance && x.name !== t.name) ?? builtinFor(t.appearance);
-    this.setThemeColors(name, { ...base.colors, palette: { ...base.colors.palette } });
-  }
-  /** «Удалить» (own themes only): a chosen one gives way to the built-in Panopticon theme of its appearance. */
-  async deleteTheme(t: Theme) {
-    if (t.builtin) return;
-    try {
-      if (isTauri) await invoke('delete_theme', { file: themeFile(t.name) });
-    } catch (e) {
-      return this.say('Не удалось удалить тему: ' + e);
-    }
-    this.ownThemes = this.ownThemes.filter((x) => x.name !== t.name);
-    for (const a of ['light', 'dark'] as const) if (this.themeNames[a] === t.name) this.setThemeName(a, DEFAULT_THEME[a]);
-    if (this.themeEditing === t.name) this.themeEditing = null;
-  }
-  /** «Экспорт…»: the theme's file where the system save panel says. */
-  async exportTheme(t: Theme) {
-    if (!isTauri) return;
-    const { save } = await import('@tauri-apps/plugin-dialog');
-    const path = await save({ title: 'Экспорт темы', defaultPath: themeFile(t.name), filters: [{ name: 'Тема Panopticon', extensions: ['json'] }] });
-    if (!path) return;
-    try {
-      await invoke('export_text', { path, text: themeJson({ ...t, builtin: false }) });
-      this.note(`Тема «${t.name}» сохранена`);
-    } catch (e) {
-      this.say('Не удалось сохранить тему: ' + e);
-    }
-  }
-  /** «Импорт…»: a theme file of this format becomes an own theme (a taken name gets «(2)»). */
-  async importTheme() {
-    if (!isTauri) return;
-    const { open } = await import('@tauri-apps/plugin-dialog');
-    const path = await open({ title: 'Импорт темы', multiple: false, directory: false, filters: [{ name: 'Тема Panopticon', extensions: ['json'] }] });
-    if (typeof path !== 'string') return;
-    let t: Theme | null = null;
-    try {
-      t = parseTheme(await invoke<string>('import_text', { path }));
-    } catch (e) {
-      return this.say('Не удалось прочитать файл: ' + e);
-    }
-    if (!t) return this.say('Это не тема Panopticon: нужен файл .json с "format": "panopticon-theme"');
-    const it = { ...t, name: uniqueName(t.name, this.themes.map((x) => x.name)) };
-    if (!(await this.saveTheme(it))) return;
-    this.putTheme(it);
-    this.note(`Тема «${it.name}» добавлена — ${it.appearance === 'dark' ? 'для тёмного оформления' : 'для светлого оформления'}`);
-  }
-  get appearance(): Appearance {
-    return effective(this.appearanceChoice, this.systemDark);
-  }
-  themeFor(a: Appearance): Theme {
-    const name = this.themeNames[a];
-    if ((!this.themesRead || !this.pluginsReady) && !this.themes.some((t) => t.name === name)) return cachedTheme(a, name) ?? themeNamed(name, a);
-    return themeNamed(name, a, this.themes);
-  }
-  /** The editor theme in effect now. */
-  get theme(): Theme {
-    return this.themeFor(this.appearance);
-  }
-  setAppearance(c: AppearanceChoice) {
-    this.appearanceChoice = c;
-    saveChoice(c);
-  }
-  setThemeName(a: Appearance, name: string) {
-    this.themeNames = { ...this.themeNames, [a]: name };
-    saveThemeName(a, name);
   }
   showNotesHere() {
     const p = this.layout.panes[this.layout.active];
@@ -2621,6 +2515,7 @@ export type SettingsSection = string;
 export type NavMode = string;
 /** The search in every file: up to this many matches are listed. */
 export const SEARCH_CAP = 1000;
+const SEARCH_RECENT = 'search:recent';
 export interface SearchGroup {
   path: string;
   name: string; // relative
