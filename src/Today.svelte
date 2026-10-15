@@ -11,13 +11,14 @@
   import { weekdayNames } from './edits';
   import { today } from './todayState.svelte';
   import { allTodayBlocks, arrange, todayBlockOf } from './todayBlocks';
-  import { newMeeting, oneOnOnes, type OneOnOne } from './oneOnOne';
-  import { plugins } from './api/host.svelte';
+  import { oneOnOnes } from './oneOnOne';
   import { untrack } from 'svelte';
   import { lists, type DateKind, type ListTask } from './taskLists.svelte';
   import ListToast from './ListToast.svelte';
+  import TodayNote from './TodayNote.svelte';
+  import TodayMeetings from './TodayMeetings.svelte';
   import {
-    agendaRows, dateTitle, doneStatus, focusRows, journalDays, kicker, lastDay, noteLines, noteWhen, overdue, overdueWords, taskGroups, whenChosen,
+    agendaRows, dateTitle, doneStatus, focusRows, journalDays, kicker, lastDay, overdue, overdueWords, taskGroups, whenChosen,
     type OverdueRow, type TaskRow,
   } from './today';
 
@@ -200,36 +201,8 @@
     );
   });
 
-  // ---- 1-1: the meetings of the day; what the plugins add to a card (the goals' line, «Разбор целей») ----
+  // ---- 1-1: the meetings of the day (their cards: TodayMeetings.svelte) ----
   const meetings = $derived(oneOnOnes(files, day, cfg.tag));
-  const extras = $state<Record<string, { line: string | null; action: { label: string; run: () => void } | null }[]>>({});
-  $effect(() => {
-    const specs = [...plugins.oneOnOnes.entries()];
-    for (const m of meetings) {
-      const file = m.file;
-      void Promise.all(
-        specs.map(async ([pid, s]) => ({
-          line: s.line ? await Promise.resolve(plugins.guard(pid, () => s.line!(file), null)).catch(() => null) : null,
-          action: s.action && (await Promise.resolve(plugins.guard(pid, () => s.action!.available?.(file) ?? true, false)).catch(() => false))
-            ? { label: s.action.label, run: () => plugins.guard(pid, () => s.action!.run(file), undefined) } : null,
-        })),
-      ).then((r) => (extras[m.key] = r));
-    }
-  });
-  async function meeting(m: OneOnOne) {
-    if (m.today !== null) return open(m.path, m.today + 1);
-    let at = -1;
-    const step = await store.transaction('Новая встреча', (tx) =>
-      tx.update(m.path, (text) => {
-        const f = files.find((x) => x.path === m.path);
-        const r = f ? newMeeting(text, f.headings, m.line, day) : null;
-        if (r) at = r.line;
-        return r?.text ?? null;
-      }),
-    );
-    if (step && at >= 0) open(m.path, at);
-  }
-  const lastWords = (d: Date) => `${d.getDate()} ${['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'][d.getMonth()]}`;
 
   const EMPTY: Record<string, () => boolean> = { overdue: () => !late.length, oneOnOne: () => !meetings.length };
   const shown = (id: string) => {
@@ -324,55 +297,17 @@
 {#snippet block(id: string)}
   {@const b = todayBlockOf(id)}
   {#if b?.component}
-    <section class="card" aria-label={b.title}><b.component id={b.id} /></section>
+    <section class="tcard" aria-label={b.title}><b.component id={b.id} /></section>
   {:else if id === 'oneOnOne'}
-    {#each meetings as m (m.key)}
-      {@const ex = extras[m.key] ?? []}
-      <section class="card one" aria-label="1-1 сегодня: {m.name}">
-        <div class="head"><span class="name">1-1 сегодня</span>{#if m.time}<span class="sub">{m.time}</span>{/if}</div>
-        <div class="who">
-          <span class="av" style:background={m.color} aria-hidden="true">{m.initials}</span>
-          <div class="wl"><div class="wn">{m.name}</div><div class="ws">{[m.file, m.every, m.last ? `прошлая — ${lastWords(m.last)}` : ''].filter(Boolean).join(' · ')}</div></div>
-        </div>
-        {#if ex.some((e) => e.line) || m.open}
-          <div class="facts">
-            {#each ex.filter((e) => e.line) as e, i (i)}<div class="fact"><span class="fdot wait"></span><span>{e.line}</span></div>{/each}
-            {#if m.open}<div class="fact"><span class="fdot red"></span><span>Открытые договорённости с прошлой 1-1: {m.open}</span></div>{/if}
-          </div>
-        {/if}
-        <div class="mbtns">
-          <button class="mb primary" onclick={() => void meeting(m)}>{m.today !== null ? 'Открыть встречу' : 'Новая встреча'}</button>
-          <button class="mb" onclick={() => open(m.path, m.line)}>Открыть файл</button>
-          {#each ex.filter((e) => e.action) as e, i (i)}<button class="mb" onclick={() => e.action!.run()}>{e.action!.label}</button>{/each}
-        </div>
-      </section>
-    {/each}
+    <TodayMeetings {meetings} {day} onopen={open} />
   {:else if id === 'note'}
-    <section class="card note" aria-label="Записка со вчера">
-      <div class="head">
-        <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--noteAcc)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h9l3 3v11H4zM7 8h6M7 11h6M7 14h3" /></svg>
-        <span class="name">Записка со вчера</span>
-        {#if jd?.note}
-          <span class="sub">{noteWhen(jd.date, jd.note.time)}</span>
-          <button class="link" onclick={() => journal && open(journal.path, jd!.note!.line)}>{base(cfg.journal)} ›</button>
-        {/if}
-      </div>
-      {#if jd?.note}
-        <div class="ntext">
-          {#each noteLines(jd.note.text) as l, i (i)}
-            <div class="nl" style:padding-left="{l.depth * 16}px">{#if l.item}<span class="mk">–</span>{/if}<span>{@html l.html}</span></div>
-          {/each}
-        </div>
-      {:else}
-        <div class="none">Вчера записки не было. Вечером — «Завершить день…»</div>
-      {/if}
-    </section>
+    <TodayNote {jd} {journal} name={base(cfg.journal)} onopen={open} />
   {:else if id === 'focus'}
-    <section class="card focus" aria-label="Главное на сегодня">
-      <div class="head">
+    <section class="tcard focus" aria-label="Главное на сегодня">
+      <div class="tcard-head">
         <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="7" /><circle cx="10" cy="10" r="3.5" /></svg>
-        <span class="name">Главное на сегодня</span>
-        {#if jd && focus.length}<span class="sub">выбрано {whenChosen(jd.date, day)}</span>{/if}
+        <span class="tcard-name">Главное на сегодня</span>
+        {#if jd && focus.length}<span class="tcard-sub">выбрано {whenChosen(jd.date, day)}</span>{/if}
       </div>
       {#each focusRows2 as f (f.id)}
         {#if f.task}
@@ -389,14 +324,14 @@
           <div class="frow lost"><span class="box off"></span><span class="t">Задача не найдена</span><span class="meta">{f.title}</span></div>
         {/if}
       {:else}
-        <div class="none">Главное не выбрано. Вечером — «Завершить день…»</div>
+        <div class="tcard-none">Главное не выбрано. Вечером — «Завершить день…»</div>
       {/each}
     </section>
   {:else if id === 'agenda'}
-    <section class="card" aria-label="Агенда на сегодня">
-      <div class="head">
-        <span class="name">Агенда на сегодня</span><span class="sub">{agenda.length}</span>
-        <button class="link" onclick={openAgenda}>Открыть агенду ›</button>
+    <section class="tcard" aria-label="Агенда на сегодня">
+      <div class="tcard-head">
+        <span class="tcard-name">Агенда на сегодня</span><span class="tcard-sub">{agenda.length}</span>
+        <button class="tcard-link" onclick={openAgenda}>Открыть агенду ›</button>
       </div>
       {#each agenda as a (a.key)}
         <button class="arow" class:past={a.past} class:sel={selKey === a.slot} class:stale={a.stale} class:gone={a.gone} data-k={a.slot}
@@ -407,16 +342,16 @@
           {#if a.meeting}<span class="badge">1-1</span>{/if}
         </button>
       {:else}
-        <div class="none">На сегодня ничего нет</div>
+        <div class="tcard-none">На сегодня ничего нет</div>
       {/each}
     </section>
   {:else if id === 'tasks'}
-    <section class="card" aria-label="Задачи">
-      <div class="head"><span class="name">Задачи</span><span class="sub">{cfg.statuses.join(', ')} · {tasksTotal}</span></div>
+    <section class="tcard" aria-label="Задачи">
+      <div class="tcard-head"><span class="tcard-name">Задачи</span><span class="tcard-sub">{cfg.statuses.join(', ')} · {tasksTotal}</span></div>
       {#each groups as g (g.file)}
         <div class="grp">
           <span>{g.file.toUpperCase()}</span><span class="n">{g.total || ''}</span>
-          {#if isInbox(g.file) && review && !g.missing}<button class="link" onclick={() => review?.()}>Разобрать ›</button>{/if}
+          {#if isInbox(g.file) && review && !g.missing}<button class="tcard-link" onclick={() => review?.()}>Разобрать ›</button>{/if}
         </div>
         {#if g.missing}
           <div class="trow none">Файл не найден</div>
@@ -436,8 +371,8 @@
       {/each}
     </section>
   {:else if id === 'overdue'}
-    <section class="card" aria-label="Просрочено">
-      <div class="head"><span class="name">Просрочено</span><span class="count">{late.length}</span></div>
+    <section class="tcard" aria-label="Просрочено">
+      <div class="tcard-head"><span class="tcard-name">Просрочено</span><span class="count">{late.length}</span></div>
       {#each late.slice(0, LATE_CAP) as r (r.key)}
         <div class="orow" class:stale={r.stale} class:gone={r.gone} transition:slide={{ duration: 180 }}>
           <button class="rowbtn" class:sel={selKey === r.slot} data-k={r.slot} onclick={() => choose(r.slot)} ondblclick={() => open(r.path, r.line)} oncontextmenu={(e) => menu(e, r.slot)}>
@@ -475,19 +410,12 @@
   .ico:hover { color: var(--fg); }
   .row { display: flex; gap: 16px; flex-wrap: wrap; }
   .row.cols { align-items: flex-start; }
-  .row.full > :global(.card) { flex: 1 1 100%; }
-  .row:not(.cols) > :global(.card:first-child) { flex: 1.25 1 420px; }
-  .row:not(.cols) > :global(.card) { flex: 1 1 360px; }
+  .row.full > :global(.tcard) { flex: 1 1 100%; }
+  .row:not(.cols) > :global(.tcard:first-child) { flex: 1.25 1 420px; }
+  .row:not(.cols) > :global(.tcard) { flex: 1 1 360px; }
   .col { flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
-  .card { min-width: 0; box-sizing: border-box; padding: 12px 16px 8px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
-  .note { padding: 14px 18px 12px; background: var(--note); border-color: var(--noteLine); }
   .focus { padding: 14px 18px 10px; }
-  .head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-  .name { font-weight: 700; }
-  .sub { color: var(--fg2); font-size: 12px; }
-  .link { margin-left: auto; border: 0; background: none; padding: 0; font: inherit; font-size: 12px; color: var(--acc); cursor: default; }
-  .link:hover { text-decoration: underline; }
-  .none { color: var(--fg2); padding: 8px 0 6px; }
+  .none { color: var(--fg2); padding: 8px 0 6px; } /* a row of «нет задач» (.trow.none); a card's own: .tcard-none */
   .count { font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: color-mix(in srgb, var(--todo) 12%, transparent); color: var(--todo); }
   /* a status as a capsule (ТЗ 32, the design's update): as the marks of statuses in the navigator and the agenda */
   .kw { flex: 0 0 auto; padding: 1px 5px; border-radius: 4px; font-size: 10.5px; font-weight: 700; line-height: 15px; letter-spacing: 0.02em; color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); }
@@ -508,11 +436,6 @@
   .stale { opacity: 0.55; }
   .gone .t { text-decoration: line-through; }
 
-  .ntext { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; font-size: 14px; line-height: 1.45; }
-  .nl { display: flex; gap: 8px; }
-  .mk { color: var(--fg3); }
-  .ntext :global(.lnk) { color: var(--link); }
-  .ntext :global(code) { font: 12.5px var(--mono); }
 
   .frow { display: flex; align-items: center; gap: 10px; min-height: 34px; }
   .frow + .frow { border-top: 1px solid var(--line); }
@@ -534,7 +457,7 @@
 
   .grp { display: flex; align-items: center; gap: 6px; height: 28px; margin-top: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--fg3); }
   .grp .n { font-weight: 400; }
-  .grp .link { letter-spacing: 0; font-weight: 500; }
+  .grp .tcard-link { letter-spacing: 0; font-weight: 500; }
   .trow { min-height: 30px; border-top: 1px solid var(--line) !important; }
   .trow.none { display: flex; align-items: center; padding: 0; }
   .trow.more { color: var(--acc); font-size: 12px; }
@@ -546,19 +469,4 @@
   .chip:hover { background: var(--sel); }
 
   /* «1-1 сегодня» */
-  .one { padding: 12px 16px; }
-  .who { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-  .av { flex: 0 0 30px; width: 30px; height: 30px; border-radius: 15px; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-  .wl { flex: 1; min-width: 0; }
-  .wn { font-weight: 600; }
-  .ws { font-size: 12px; color: var(--fg2); }
-  .facts { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; }
-  .fact { display: flex; gap: 8px; }
-  .fdot { flex: 0 0 8px; width: 8px; height: 8px; margin-top: 5px; border-radius: 4px; }
-  .fdot.wait { background: var(--wait); }
-  .fdot.red { background: var(--todo); }
-  .mbtns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .mb { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 12px; }
-  .mb:hover { background: var(--field); }
-  .mb.primary { border: 0; background: var(--acc); color: var(--onacc); font-weight: 600; }
 </style>

@@ -208,3 +208,13 @@ button { cursor: default; }
 .spage .ibfile .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spage .opt { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; background: var(--side); border: 1px solid var(--line); border-radius: 8px; }
 .spage .opt label { font-size: 13px; }
+
+/* A card of «Сегодня» (tech sprint 4.2: one copy for Today.svelte and its blocks): the box, its head line with the
+   name, a note and a link at the right, the line of «nothing here». */
+.tcard { min-width: 0; box-sizing: border-box; padding: 12px 16px 8px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
+.tcard-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.tcard-name { font-weight: 700; }
+.tcard-sub { color: var(--fg2); font-size: 12px; }
+.tcard-link { margin-left: auto; border: 0; background: none; padding: 0; font: inherit; font-size: 12px; color: var(--acc); cursor: default; }
+.tcard-link:hover { text-decoration: underline; }
+.tcard-none { color: var(--fg2); padding: 8px 0 6px; }
