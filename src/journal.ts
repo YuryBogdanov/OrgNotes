@@ -2,6 +2,7 @@
 // on headings found by reference — and a step of one journal, so one ⌘Z takes back the last of them wherever it was
 // made (the Inbox list, a review card, the calendar, goals). Pure: the store reads the files and writes the result.
 
+import { addNote } from './logbook';
 import { parseHeadings, setKeyword, type Heading, type Workflow } from './org';
 import { setPlanning, setTags } from './edits';
 import { remove } from './inbox';
@@ -152,6 +153,11 @@ export class Tx {
       this.error = what;
       return null;
     }
+  }
+  /** A note on top of the heading's :LOGBOOK:, as Org's `C-c C-z` writes it (ТЗ 40 §3). */
+  addNote(ref: HeadingRef, text: string) {
+    if (!String(text).trim()) this.error = 'пустая заметка';
+    else this.on(ref, (t, h) => addNote(t, h, String(text)));
   }
   setProperty(ref: HeadingRef, key: string, value: string | null) {
     if (!/^[A-Za-z0-9_-]+$/.test(key)) this.error = 'имя свойства — латиница, цифры, _ и -';

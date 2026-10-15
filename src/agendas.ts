@@ -6,7 +6,7 @@ import { dayDiff, sequenceFor, toJs, type Heading, type OrgDate, type Workflow }
 import { asNamed } from './themes';
 import { displayName } from './names';
 
-export type Field = 'status' | 'scheduled' | 'deadline' | 'tag' | 'priority' | 'path' | 'title' | 'done';
+export type Field = 'status' | 'scheduled' | 'deadline' | 'tag' | 'priority' | 'path' | 'title' | 'done' | 'touched';
 /** A date value of a condition. Relative ones are counted from the day the agenda is shown. */
 export type DateVal =
   | { kind: 'before' } // раньше сегодня
@@ -24,6 +24,8 @@ export interface Cond {
   date?: DateVal;
   prio?: string;
   text?: string;
+  /** touched: a number of days */
+  days?: number;
 }
 export type Group = 'none' | 'day' | 'file' | 'status' | 'tag';
 export type Sort = 'prio' | 'scheduled' | 'deadline' | 'age' | 'alpha';
@@ -55,6 +57,7 @@ export const FIELDS: { id: Field; label: string }[] = [
   { id: 'path', label: 'Файл или папка' },
   { id: 'title', label: 'Заголовок содержит' },
   { id: 'done', label: 'Выполнено' },
+  { id: 'touched', label: 'Касание' },
 ];
 export const OPS: Record<Field, { id: string; label: string }[]> = {
   status: [{ id: 'in', label: 'одно из' }, { id: 'notin', label: 'не одно из' }],
@@ -65,6 +68,9 @@ export const OPS: Record<Field, { id: string; label: string }[]> = {
   path: [{ id: 'in', label: 'находится в' }, { id: 'notin', label: 'не находится в' }],
   title: [{ id: 'has', label: 'содержит' }, { id: 'hasnot', label: 'не содержит' }],
   done: [{ id: 'yes', label: 'да' }, { id: 'no', label: 'нет' }],
+  // ТЗ 40: the last change of the task's subtree — «давнее чем 30 дней»: 30 days or more ago; «за последние 7 дней»:
+  // today and the 6 days before
+  touched: [{ id: 'older', label: 'давнее чем' }, { id: 'within', label: 'за последние' }],
 };
 export const GROUPS: { id: Group; label: string }[] = [
   { id: 'none', label: 'без группировки' },
@@ -119,6 +125,8 @@ export function incomplete(c: Cond): boolean {
       return !c.prio;
     case 'title':
       return !c.text?.trim();
+    case 'touched':
+      return !(Number.isInteger(c.days) && c.days! >= 1);
   }
   return false;
 }
@@ -163,6 +171,7 @@ function readCond(v: any): Cond | null {
   if (field === 'scheduled' || field === 'deadline') c.date = readDate(v.date);
   if (field === 'priority' && PRIORITIES.includes(v.value)) c.prio = v.value;
   if (field === 'title') c.text = str(v.value);
+  if (field === 'touched' && Number.isInteger(v.value) && v.value >= 1) c.days = v.value;
   return c;
 }
 
@@ -198,6 +207,7 @@ function writeCond(c: Cond): Record<string, unknown> {
   if (c.date) o.date = c.date;
   if (c.field === 'priority') o.value = c.prio;
   if (c.field === 'title') o.value = c.text ?? '';
+  if (c.field === 'touched') o.value = c.days;
   return o;
 }
 export const writeAgenda = (a: Agenda) => ({
@@ -250,6 +260,8 @@ export interface Task {
   scheduled?: OrgDate;
   deadline?: OrgDate;
   closed?: OrgDate;
+  /** The last touch of its subtree, ms (ТЗ 40); none while the index is not read. */
+  touched?: number;
   tags: string[]; // own, inherited and the file's
   src: string; // "work › Q4 2026"
   path: string; // relative path of the file
@@ -264,6 +276,10 @@ export interface BlockResult {
 
 const norm = (s: string) => s.toLocaleLowerCase('ru').replace(/ё/g, 'е');
 const inPath = (name: string, p: string) => name === p || name.startsWith(p.replace(/\/$/, '') + '/');
+
+/** Where the agenda learns the touches of headings (ТЗ 40): set by the index (touchIndex.svelte.ts). */
+let touchOf: (file: string, line: number) => number | undefined = () => undefined;
+export const setTouchSource = (fn: (file: string, line: number) => number | undefined) => void (touchOf = fn);
 
 /** The files an agenda reads: all when it names none; a missing source just adds nothing. */
 export const inSources = (name: string, sources: string[]) => !sources.length || sources.some((s) => inPath(name, s));
@@ -281,7 +297,7 @@ export function tasksOf(files: Source[], sources: string[]): Task[] {
       for (let p = h.parent; p >= 0; p = f.headings[p].parent) for (const t of f.headings[p].tags) tags.add(t);
       out.push({
         file: fi, line: h.line, kw: h.keyword, set: sequenceFor(f.wf, h.keyword).name, done: f.wf.done.includes(h.keyword),
-        title: h.title, prio: h.priority, scheduled: h.scheduled, deadline: h.deadline, closed: h.closed,
+        title: h.title, prio: h.priority, scheduled: h.scheduled, deadline: h.deadline, closed: h.closed, touched: touchOf(f.name, h.line),
         tags: [...tags], src: [displayName(f.name), ...h.path].join(' › '), path: f.name, order,
       });
     });
@@ -348,6 +364,11 @@ export function matches(t: Task, c: Cond, today: Date): boolean {
     }
     case 'done':
       return c.op === 'yes' ? t.done : !t.done;
+    case 'touched': {
+      if (t.touched === undefined || !c.days) return false; // not known yet: in neither
+      const age = dayDiff(today, new Date(t.touched));
+      return c.op === 'within' ? age < c.days : age >= c.days;
+    }
   }
 }
 
@@ -465,6 +486,8 @@ export function valueWords(c: Cond): string[] {
       return c.prio ? [c.prio] : [];
     case 'title':
       return c.text?.trim() ? [c.text.trim()] : [];
+    case 'touched':
+      return c.days ? [`${c.days} ${plural(c.days, 'день', 'дня', 'дней')}`] : [];
   }
   return [];
 }
@@ -536,6 +559,9 @@ export function query(b: Block): string {
         break;
       case 'title':
         parts.push(`${c.op === 'hasnot' ? 'not ' : ''}title:${JSON.stringify(c.text!.trim())}`);
+        break;
+      case 'touched':
+        parts.push(`touched:${c.op === 'within' ? '<' : '>='}${c.days}d`);
         break;
       case 'done':
         parts.push(c.op === 'yes' ? 'done' : 'not done');

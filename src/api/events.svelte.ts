@@ -5,6 +5,7 @@ import { store } from '../store.svelte';
 import type { Dispose, EventName, HeadingRef } from './index';
 import type { Change } from './refs';
 import { clone, watch } from './watch.svelte';
+import { touches } from '../touchIndex.svelte';
 
 const headingListeners = new Set<(p: unknown) => void>();
 /** After a plugin's transaction: what it changed in which heading. */
@@ -28,6 +29,15 @@ export function listen(e: EventName, send: (p: unknown) => void, ownsView: (kind
         last = next;
       });
     }
+    case 'heading.touched':
+      // a batch at most once a second: each heading with its place now and when
+      return touches.onTouched((list) => {
+        for (const t of list) {
+          const f = store.files.find((x) => x.name === t.file);
+          const h = f?.headings.find((x) => x.line === t.line);
+          if (h) send({ ref: { path: t.file, line: t.line, title: h.title }, at: new Date(t.at) });
+        }
+      });
     case 'heading.changed':
       headingListeners.add(send);
       return () => void headingListeners.delete(send);

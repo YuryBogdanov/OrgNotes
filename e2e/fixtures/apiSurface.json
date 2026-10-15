@@ -29,9 +29,12 @@
       "folder": "function",
       "heading": "function",
       "inbox": "function",
+      "lastNote": "function",
+      "markReviewed": "function",
       "outline": "function",
       "query": "function",
       "statusTone": "function",
+      "touched": "function",
       "workflow": "function"
     },
     "net": {

@@ -9,8 +9,10 @@ import { bodyOf } from '../orgOps';
 import type { Tx as CoreTx } from '../journal';
 import { invoke } from '../tauri';
 import { hostAllowed, hostOf, type Manifest } from './manifest';
-import type { Ctx, Named } from './index';
-import { apiTx, fileOf, findHeading, infoOf, type Changed } from './refs';
+import type { Ctx, HeadingRef, Named } from './index';
+import { apiTx, fileOf, findHeading, infoOf, touchedOf, type Changed } from './refs';
+import { lastNote } from '../logbook';
+import { touches } from '../touchIndex.svelte';
 import { query } from './query';
 import { headingChanged } from './events.svelte';
 
@@ -31,18 +33,22 @@ export function netApi(m: Manifest): NonNullable<Ctx['net']> {
     },
   };
 }
-export function indexApi(): NonNullable<Ctx['index']> {
+/** `canTouch`: the plugin has `index.touch` («Осмотрено»). */
+export function indexApi(canTouch: boolean): NonNullable<Ctx['index']> {
+  const find = (ref: HeadingRef) => {
+    const f = fileOf(ref.path);
+    const h = f && findHeading(f.headings, ref);
+    return f && h ? { f, h } : null;
+  };
   return {
     query: async (q) => query(q),
     heading: async (ref) => {
-      const f = fileOf(ref.path);
-      const h = f && findHeading(f.headings, ref);
-      return f && h ? infoOf(f, h) : null;
+      const x = find(ref);
+      return x ? infoOf(x.f, x.h) : null;
     },
     body: async (ref) => {
-      const f = fileOf(ref.path);
-      const h = f && findHeading(f.headings, ref);
-      return f && h ? bodyOf(f.text, h) : null;
+      const x = find(ref);
+      return x ? bodyOf(x.f.text, x.h) : null;
     },
     byId: async (id) => {
       const want = String(id).trim();
@@ -61,6 +67,20 @@ export function indexApi(): NonNullable<Ctx['index']> {
     },
     inbox: async () => ({ path: store.inboxFile?.name ?? null, chosen: store.inboxCfg.file, add: store.inboxCfg.add }),
     folder: async () => store.dir ?? null,
+    touched: async (ref) => {
+      const x = find(ref);
+      return (x && touchedOf(x.f.name, x.h.line).touched) ?? null;
+    },
+    lastNote: async (ref) => {
+      const x = find(ref);
+      return x ? lastNote(x.f.text.split('\n'), x.h) : null;
+    },
+    markReviewed: async (ref) => {
+      if (!canTouch) throw new Error('нужно право index.touch');
+      const x = find(ref);
+      if (!x) throw new Error('заголовок не найден');
+      touches.review(x.f.name, x.h.line);
+    },
     workflow: async (path) => {
       const f = fileOf(path);
       const seqs = f?.wf.sequences ?? store.config.workflows;
@@ -91,7 +111,7 @@ export function editApi(guard: (fn: () => void) => void): NonNullable<Ctx['edit'
       const step = await store.transaction(label, (tx) => {
         t = tx;
         build(apiTx(tx, ev));
-      }, onUndo);
+      }, onUndo, { touch: o.touch !== false });
       const tx = t as CoreTx | null;
       if (step) {
         for (const [r, w] of ev) headingChanged(r, w);

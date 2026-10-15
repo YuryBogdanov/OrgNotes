@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   incomplete, nameProblem, newAgenda, newBlock, newCond, query, readAgendas, runAgenda, summary, sameAgenda, cloneAgenda,
-  statusKey, withAgendas, tasksCount, type Agenda, type Block, type Cond, type Source,
+  setTouchSource, statusKey, withAgendas, tasksCount, type Agenda, type Block, type Cond, type Source,
 } from './agendas';
 import { DEFAULT_WORKFLOW, fromSequences, parseHeadings, type Workflow } from './org';
 
@@ -167,5 +167,26 @@ describe('saving', () => {
     c.blocks[0].name = 'x';
     expect(a.blocks[0].name).toBe('Без названия');
     expect(sameAgenda(a, c)).toBe(false);
+  });
+});
+
+describe('the condition «Касание» (ТЗ 40)', () => {
+  // the touches of three tasks: 45 days ago, 30 days ago, today; the others not known
+  const ago = (d: number) => new Date(2026, 9, 11 - d, 15, 0).getTime();
+  const AT: Record<string, number> = { 'work.org:1': ago(45), 'work.org:3': ago(30), 'inbox.org:0': ago(0) };
+  beforeAll(() => setTouchSource((f, l) => AT[f + ':' + l]));
+  afterAll(() => setTouchSource(() => undefined));
+  it('«давнее чем 30 дней»: 30 days or more; «за последние 7 дней»: today and the 6 days before; unknown in neither', () => {
+    expect(titles(one({ field: 'touched', op: 'older', days: 30 }))).toEqual([['Подготовить бюджет 2027', 'Свести расходы']]);
+    expect(titles(one({ field: 'touched', op: 'within', days: 7 }))).toEqual([['Разобрать входящие']]);
+  });
+  it('needs its days; written to config.json and read back; in words and in the query', () => {
+    expect(incomplete({ ...newCond('touched') })).toBe(true);
+    const a = one({ field: 'touched', op: 'older', days: 30 });
+    const back = readAgendas(JSON.parse(withAgendas(null, [a])).agendas)[0];
+    expect(back.blocks[0].conds[0]).toMatchObject({ field: 'touched', op: 'older', days: 30 });
+    expect(summary(a.blocks[0])).toBe('касание: 30 дней');
+    expect(summary(one({ field: 'touched', op: 'within', days: 2 }).blocks[0])).toBe('касание: за последние 2 дня');
+    expect(query(a.blocks[0])).toBe('touched:>=30d');
   });
 });

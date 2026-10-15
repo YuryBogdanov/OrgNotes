@@ -11,7 +11,7 @@
   import { MULTI, allTagsOf, dateOfForm, folderTree, isChecked, optionsFor, statusSets, valueKind, type Kind, type Opt } from './builderOptions';
   import { isoDay } from './calIndex';
   import {
-    GROUPS, SORTS, fieldLabel, incomplete, nameProblem, newBlock, newCond, noValue, opLabel, query, summary, valueWords, type Block, type Cond,
+    GROUPS, SORTS, fieldLabel, incomplete, plural, nameProblem, newBlock, newCond, noValue, opLabel, query, summary, valueWords, type Block, type Cond,
     type DateVal, type Field,
   } from './agendas';
 
@@ -173,7 +173,7 @@
     await tick();
     const el = document.querySelector<HTMLElement>(`[data-val="${c.id}"]`);
     if (!el) return;
-    if (c.field === 'title') el.focus();
+    if (c.field === 'title' || c.field === 'touched') el.focus();
     else await openPop(valueKind(c.field), block, el, c);
   }
 
@@ -412,6 +412,9 @@
                       <button class="slot o" aria-haspopup="listbox" aria-label="Оператор: {opLabel(c.field, c.op)}" onclick={(e) => openPop('op', b, e.currentTarget, c)}><span>{opLabel(c.field, c.op)}</span>{@render chevron()}</button>
                       {#if c.field === 'title'}
                         <input class="val text" class:bad={showErrors && incomplete(c)} data-val={c.id} aria-label="Текст в заголовке" placeholder="текст" bind:value={c.text} spellcheck="false" autocomplete="off" />
+                      {:else if c.field === 'touched'}
+                        <span class="days"><input class="val num" class:bad={showErrors && incomplete(c)} data-val={c.id} type="number" min="1" step="1" aria-label="Дней" placeholder="30"
+                          value={c.days ?? ''} oninput={(e) => (c.days = e.currentTarget.value ? Math.max(1, Math.floor(+e.currentTarget.value)) : undefined)} /><span class="dl">{c.days ? plural(c.days, 'день', 'дня', 'дней') : 'дней'}</span></span>
                       {:else if noValue(c)}
                         <span class="val none"></span>
                       {:else}
@@ -645,6 +648,11 @@
   .slot > span { min-width: 0; overflow-wrap: anywhere; }
   .val { flex: 1 1 140px; min-width: 0; min-height: 28px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 3px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font-size: 12.5px; text-align: left; color: var(--fg); }
   .val.text { height: 28px; -webkit-user-select: text; user-select: text; }
+  /* «Касание»: the number of days and its word */
+  .days { flex: 1 1 140px; min-width: 0; display: flex; align-items: center; gap: 8px; }
+  .val.num { flex: 0 0 72px; height: 28px; -webkit-user-select: text; user-select: text; }
+  .val.num:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 25%, transparent); }
+  .dl { font-size: 12.5px; color: var(--fg2); }
   .val.none { border-color: transparent; background: transparent; }
   .val.bad { border-color: var(--todo); box-shadow: 0 0 0 3px color-mix(in srgb, var(--todo) 18%, transparent); }
   .ph { color: var(--fg3); }

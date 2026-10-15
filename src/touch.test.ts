@@ -20,7 +20,7 @@ const MIDTERM = [
 ].join('\n');
 
 /** The records of a text read at T0 (no history), then of another version at T1. */
-function twice(a: string, b: string, file = 'Midterm.org', mode: 'change' | 'open' = 'change') {
+function twice(a: string, b: string, file = 'Midterm.org', mode: 'change' | 'open' | 'quiet' = 'change') {
   const r0 = read(a);
   const first = reconcileFile(file, r0.lines, r0.hs, {}, {}, T0, 'open').records;
   const r1 = read(b);
@@ -38,6 +38,10 @@ describe('what is a touch', () => {
   it('spaces at the ends of lines and blank lines are not a touch', () => {
     const { next } = twice(MIDTERM, MIDTERM.replace('Описание', 'Описание   \n\n'));
     expect(atOf(next.records, '› Миграция биллинга').approx).toBe(true);
+  });
+  it('a mass edit (a tag renamed in every file) keeps the dates; the records follow the text', () => {
+    const { next } = twice(MIDTERM, MIDTERM.replace('* Найм в команду', '* Найм в команду :hr:'), 'Midterm.org', 'quiet');
+    expect(atOf(next.records, '› Найм в команду')).toMatchObject({ approx: true });
   });
   it('the order of siblings is not a touch of either', () => {
     const [a, b] = [MIDTERM.slice(0, MIDTERM.indexOf('* Найм')), MIDTERM.slice(MIDTERM.indexOf('* Найм'))];
