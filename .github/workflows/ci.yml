@@ -1,0 +1,55 @@
+# The checks of every pull request and of main (tech sprint 6.1): what `npm run verify` runs by hand.
+# macOS, because the app is: WebKit for the e2e (the app runs in WKWebView) and Swift for the Rust side.
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  web:
+    name: Types, unit, e2e
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - name: WebKit for Playwright
+        run: npx playwright install webkit
+      - name: e2e
+        run: npm run e2e
+        env:
+          E2E_PORT: 1431
+      - name: The traces of what failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
+  rust:
+    name: Rust
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      # the app's crate embeds the built front end (../dist) at compile time
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: cargo test
+        run: cargo test --manifest-path src-tauri/Cargo.toml
