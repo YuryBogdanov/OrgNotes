@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Reorder } from './reorder.svelte';
   import { moved } from './pointer';
   import { onMount, tick } from 'svelte';
   import Editor from './Editor.svelte';
@@ -88,18 +89,15 @@
       q = '';
     }
   }
-  let dragKey = $state<string | null>(null);
-  let overKey = $state<string | null>(null);
-  function drop(target: string) {
-    if (dragKey && dragKey !== target) {
-      const list = [...focus];
-      const from = list.findIndex((x) => x.key === dragKey);
-      const [it] = list.splice(from, 1);
-      list.splice(list.findIndex((x) => x.key === target) + (from <= list.findIndex((x) => x.key === target) ? 1 : 0), 0, it);
-      focus = list;
-    }
-    dragKey = overKey = null;
-  }
+  // a row dragged onto another: it goes there (after it when dragged down)
+  const drag = new Reorder((key, target) => {
+    if (key === target) return;
+    const list = [...focus];
+    const from = list.findIndex((x) => x.key === key);
+    const [it] = list.splice(from, 1);
+    list.splice(list.findIndex((x) => x.key === target) + (from <= list.findIndex((x) => x.key === target) ? 1 : 0), 0, it);
+    focus = list;
+  });
   function stepKey(e: KeyboardEvent, i: number) {
     if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
     e.preventDefault();
@@ -184,9 +182,8 @@
       <div class="cap">ГЛАВНОЕ НА ЗАВТРА<span>до трёх задач</span></div>
       <div class="focus" role="list">
         {#each focus as f, i (f.key)}
-          <div class="frow" class:over={overKey === f.key && dragKey !== f.key} role="listitem" draggable="true" tabindex="0" aria-label="{i + 1}. {f.title}"
-            ondragstart={(e) => { dragKey = f.key; e.dataTransfer?.setData('text/plain', f.key); }} ondragend={() => (dragKey = overKey = null)}
-            ondragover={(e) => { if (dragKey) { e.preventDefault(); overKey = f.key; } }} ondrop={(e) => { e.preventDefault(); drop(f.key); }}
+          <div class="frow" class:over={drag.overId === f.key && drag.dragId !== f.key} role="listitem" tabindex="0" aria-label="{i + 1}. {f.title}"
+            use:drag.handle={{ id: f.key }} use:drag.zone={f.key}
             onkeydown={(e) => stepKey(e, i)}>
             <span class="n">{i + 1}</span>
             <span class="kw tone" style={tone(f.kw, f.path)}>{f.kw}</span>
