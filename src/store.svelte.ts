@@ -17,6 +17,7 @@ import { PluginStore } from './pluginData.svelte';
 import { searchAll } from './searchAll.svelte';
 import { invoke, isTauri } from './tauri';
 import { MiniSync, type MiniNote } from './mirror.svelte';
+import { touches } from './touchIndex.svelte';
 import { AgendaStore } from './agendaStore.svelte';
 import { InboxStore } from './inboxStore.svelte';
 import { RefileStore } from './refileStore.svelte';
@@ -1007,6 +1008,9 @@ class Store {
     this.layout = saved ?? emptyLayout(pick ? newTab('file', pick.path) : undefined);
     this.files = files;
     this.loaded = true;
+    // the touches of headings (ТЗ 40): what changed while the app was closed gets the file's modification time
+    const mtimes = new Map(list.map((l) => [l.name, l.mtime ?? Date.now()]));
+    if (!this.mirror) void touches.open(files, (name) => mtimes.get(name) ?? Date.now());
   }
 
   private async readFolders(files: { name: string }[]): Promise<string[]> {
@@ -1055,11 +1059,12 @@ class Store {
     // open orphans count as known files: one that comes back is compared like any other
     const old = new Map([...Object.values(this.orphans), ...this.files].map((f) => [f.path, f]));
     const reloaded: string[] = [];
+    const taken: { name: string; at: number }[] = []; // read from disk changed: their headings' touches (ТЗ 40)
     const conflicts = { ...this.conflicts };
     const gen = { ...this.diskGen };
     const files = list.map((n) => {
       const o = old.get(n.path);
-      if (!o) return (this.diskTaken.add(n.name), fromDisk(n, this.config));
+      if (!o) return (this.diskTaken.add(n.name), taken.push({ name: n.name, at: n.mtime ?? Date.now() }), fromDisk(n, this.config));
       if (n.text === o.diskRaw) return o; // nothing new on disk: untouched, «touched», or the echo of our own save
       const { text, eol } = splitEol(n.text);
       if (text === o.text) {
@@ -1075,6 +1080,7 @@ class Store {
       }
       // no edits: take the disk version silently
       this.diskTaken.add(o.name);
+      taken.push({ name: n.name, at: n.mtime ?? Date.now() });
       if (this.isVisible(n.path)) reloaded.push(o.name);
       gen[n.path] = (gen[n.path] ?? 0) + 1;
       return fromDisk(n, this.config);
@@ -1098,9 +1104,15 @@ class Store {
       } else orphans[o.path] = o;
       delete conflicts[o.path];
     }
+    const goneNames = [...old.values()].filter((o) => !known.has(o.path) && this.files.some((f) => f.path === o.path)).map((o) => o.name);
     this.files = files;
     this.folders = folders;
     this.orphans = orphans;
+    for (const name of goneNames) touches.removeFile(name);
+    for (const t of taken) {
+      const f = files.find((x) => x.name === t.name);
+      if (f) touches.change(f, t.at);
+    }
     this.conflicts = conflicts;
     this.diskGen = gen;
     if (Object.keys(moves).length) mapPaths(this.layout, (p) => moves[p] ?? p);
@@ -1153,6 +1165,8 @@ class Store {
         // the disk text comes in as an ordinary edit, so ⌘Z brings mine back
         this.files = this.files.map((x) => (x.path === path ? build(x.name, x.path, c.disk, c.disk, c.diskRaw, c.eol, this.config) : x));
         this.conflicts = rest;
+        const now = this.files.find((x) => x.path === path);
+        if (now) touches.change(now, c.mtime);
       } else if (a === 'mine') {
         // the disk version is the accepted base now: the next write replaces it without asking again
         this.files = this.files.map((x) => (x.path === path ? { ...x, disk: c.disk, diskRaw: c.diskRaw } : x));
@@ -2049,6 +2063,8 @@ class Store {
       await invoke('save_org_file', { path, text: out, base: f.diskRaw });
       this.writes++;
       this.files = this.files.map((x) => (x.path === path ? { ...x, disk: text, diskRaw: out } : x));
+      const written = this.files.find((x) => x.path === path);
+      if (written) touches.change(written, Date.now());
     } catch (e) {
       failure = e;
     } finally {

@@ -173,6 +173,8 @@ pub fn run() {
             files::list_folders,
             config::read_project_config,
             config::write_project_config,
+            config::read_touch_file,
+            config::write_touch_file,
             files::create_entry,
             files::save_new_file,
             quit_app,

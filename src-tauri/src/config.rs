@@ -49,6 +49,23 @@ pub(crate) fn write_project_config(state: State<AppState>, text: String) -> Res<
     write_config_in(&root_of(&state)?, &text)
 }
 
+// ---- the touches of headings (ТЗ 40 §2.5): `.orgnotes/touch.json`, read and written whole by the page -----------
+
+const TOUCH_FILE: &str = "touch.json";
+
+/// The index of touches as last written; none when the folder has none yet (or it cannot be read: built anew).
+#[tauri::command]
+pub(crate) fn read_touch_file(state: State<AppState>) -> Option<String> {
+    let root = lock(&state.dir).clone()?;
+    fs::read_to_string(root.join(CONFIG_DIR).join(TOUCH_FILE)).ok()
+}
+
+#[tauri::command]
+pub(crate) fn write_touch_file(state: State<AppState>, text: String) -> Res<()> {
+    let dir = root_of(&state)?.join(CONFIG_DIR);
+    fs::create_dir_all(&dir)?;
+    atomic_write(&dir.join(format!("{TOUCH_FILE}.tmp")), &dir.join(TOUCH_FILE), text.as_bytes())
+}
 
 // ---- a feature's own settings in the notes folder (roadmap 0.6): `.orgnotes/plugins/<id>.json` ------------------
 
