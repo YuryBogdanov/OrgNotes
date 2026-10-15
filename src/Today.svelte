@@ -5,7 +5,7 @@
   import { actionOf } from './views';
   import { entriesIn } from './calIndex';
   import { runAgenda } from './agendas';
-  import { firstOpen, sequenceFor } from './org';
+  import { firstOpen, sequenceFor, titleIndex } from './org';
   import { toneFor } from './org';
   import { toneStyle } from './colors';
   import { weekdayNames } from './edits';
@@ -39,13 +39,7 @@
   // ---- the rows as one list of tasks (ТЗ 34) ----
   /** Which of the headings with its title in its file a row's task is: its name whatever its line. */
   function nOf(path: string, line: number, title: string) {
-    const f = files.find((x) => x.path === path);
-    let n = 0;
-    for (const h of f?.headings ?? []) {
-      if (h.line === line) return n;
-      if (h.title === title) n++;
-    }
-    return 0;
+    return titleIndex(files.find((x) => x.path === path)?.headings ?? [], line, title);
   }
   type Row = { path: string; line: number; title: string; kw: string | null; slot: string; n: number; stale?: boolean; gone?: boolean };
   /** Rows changed from the list stay as they were until a refresh (`frozen`): drawn with the task's values now. */
@@ -105,8 +99,7 @@
   $effect(() => {
     const fz = frozen;
     if (!fz) return;
-    const all = store.files;
-    if (all.length !== fz.texts.size || all.some((f) => { const was = fz.texts.get(f.path); return was === undefined || (f.text !== was && lists.own.get(f.path) !== f.text); })) untrack(refresh);
+    if (lists.changedOutside(store.files, fz.texts)) untrack(refresh);
   });
   $effect(() => {
     void day.getTime();

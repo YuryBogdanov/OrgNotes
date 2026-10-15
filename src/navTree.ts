@@ -16,7 +16,8 @@ export interface TreeNode {
   kids: boolean; // it can be opened
 }
 
-const parentOf = (rel: string) => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
+/** The folder of a relative path ('' for the root). */
+export const parentOf = (rel: string) => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
 export const folderKey = (rel: string) => rel + '/';
 
 /** «path#Цели › Q4 › Бюджет»: the titles from the top of the file down to heading `i`. */

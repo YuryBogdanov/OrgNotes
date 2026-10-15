@@ -436,3 +436,23 @@ export function restore(raw: string | null, exists: (path: string) => boolean): 
     return null;
   }
 }
+
+/**
+ * Room for two panes (tech sprint 4.1, from App.svelte): with a window `width` too narrow, the inspector is hidden
+ * first, then the navigator; still too narrow, the panes merge. Nothing changes with one pane or before the width is
+ * known (0).
+ */
+export function fitPanels(width: number, o: { navW: number; inspW: number; nav: boolean; insp: boolean; two: boolean }): { nav: boolean; insp: boolean; merge: boolean } {
+  let { nav, insp } = o;
+  if (!width || !o.two) return { nav, insp, merge: false };
+  const room = () => width - (nav ? o.navW + 1 : 0) - (insp ? o.inspW + 1 : 0);
+  const need = 2 * MIN_PANE + 1;
+  if (insp && room() < need) insp = false;
+  if (nav && room() < need) nav = false;
+  return { nav, insp, merge: room() < need };
+}
+/** The divider dragged to `x` over panes at `left` of `width`: the left pane's share, neither narrower than MIN_PANE. */
+export function dividerRatio(x: number, left: number, width: number): number {
+  const min = Math.min(0.45, MIN_PANE / width);
+  return Math.max(min, Math.min(1 - min, (x - left) / width));
+}

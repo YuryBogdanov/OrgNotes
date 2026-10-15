@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fitStatus, fitUntitledBar, UNTITLED_HINT } from './statusFit';
   import { store } from './store.svelte';
   import { headingAt } from './org';
   import Editor from './Editor.svelte';
@@ -252,39 +253,13 @@
     cv.font = font;
     return Math.ceil(cv.measureText(str).width);
   };
-  const GAP = 16; // .status gap
   let sw = $state(0); // the status bar's width
   const cursorText = $derived(tab ? `Стр. ${tab.cursor.line + 1}, кол. ${tab.cursor.col}` : '');
   const savedText = $derived(store.notice || (tab && gone(tab) ? 'Файла нет на диске' : store.saveState === 'saving' ? 'Сохранение…' : store.saveState === 'saved' ? 'Сохранено' : 'Только в памяти (браузер)'));
-  const status = $derived.by(() => {
-    const parts = file ? displayPath(file.name) : [];
-    const name = parts[parts.length - 1] ?? '';
-    const fixed = 28 + tw(cursorText) + tw(savedText) + 2 * GAP; // padding, cursor, saved, the gaps around the path
-    const room = (org: boolean, utf: boolean) => sw - fixed - (org ? tw('Org') + GAP : 0) - (utf ? tw('UTF-8') + GAP : 0);
-    // first the folders of the path go, from the start; then UTF-8, then Org
-    const org = !font || tw(name) <= room(true, false);
-    const utf = !font || tw(name) <= room(true, true);
-    const r = room(org, utf);
-    let path = name;
-    for (let k = 0; k < parts.length - 1; k++) {
-      const tail = parts.slice(k).join('/');
-      const t = k ? '…/' + tail : tail;
-      if (!font || tw(t) <= r) {
-        path = t;
-        break;
-      }
-    }
-    return { org, utf, path };
-  });
+  const status = $derived(fitStatus(file ? displayPath(file.name) : [], sw, cursorText, savedText, font ? tw : null));
   let uw = $state(0); // the untitled bar's width
   let btnW = $state(0);
-  const HINT = 'Файл появится на диске после «Сохранить как…»';
-  const bar = $derived.by(() => {
-    // dot 7 + gap + "Не сохранено" + gap + the button, inside 12 px padding; the hint goes first, then ⌘S
-    const fixed = 24 + 7 + 10 + tw('Не сохранено') + 10 + btnW;
-    const keys = tw(store.keyHint('save')) + 8;
-    return { keys: !font || fixed + keys <= uw, hint: !font || fixed + keys + 10 + tw(HINT) + 10 <= uw };
-  });
+  const bar = $derived(fitUntitledBar(uw, btnW, store.keyHint('save'), font ? tw : null));
   let bottom: HTMLElement | undefined = $state();
   $effect(() => {
     if (bottom && !font) font = getComputedStyle(bottom).font;
@@ -408,7 +383,7 @@
     <div class="unsaved" bind:clientWidth={uw} bind:this={bottom}>
       <span class="odot" aria-hidden="true"></span>
       <span class="us">Не сохранено</span>
-      {#if store.draftNotice}<span class="hint err">{store.draftNotice}</span>{:else if bar.hint}<span class="hint">{HINT}</span>{/if}
+      {#if store.draftNotice}<span class="hint err">{store.draftNotice}</span>{:else if bar.hint}<span class="hint">{UNTITLED_HINT}</span>{/if}
       <span class="usr">{#if bar.keys && store.keyHint('save')}<span>{store.keyHint('save')}</span>{/if}<button bind:offsetWidth={btnW} onclick={() => store.saveAs(tab)}>Сохранить как…</button></span>
     </div>
   {:else}

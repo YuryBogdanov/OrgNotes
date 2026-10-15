@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { parentOf } from './navTree';
   import './features'; // the built-in features register their tabs, sections and keys (roadmap 0.3)
   import './linkPicker'; // «Ссылка на» for the editors (ТЗ 35)
   import { onMount, untrack } from 'svelte';
@@ -14,7 +15,7 @@
   import EmptyFolder from './EmptyFolder.svelte';
   import JumpBar from './JumpBar.svelte';
   import { installMenu, type AppMenu } from './menu';
-  import { MIN_PANE, secondKind } from './layout';
+  import { dividerRatio, fitPanels, secondKind } from './layout';
   import { displayPath } from './names';
   import Splitter from './Splitter.svelte';
   import Dialogs from './Dialogs.svelte';
@@ -72,17 +73,7 @@
 
   // ---- room for two panes: hide the inspector first, then the navigator, then merge the panes ----------
   let bodyW = $state(0);
-  const room = (nav: boolean, insp: boolean) => bodyW - (nav ? store.navW + 1 : 0) - (insp ? store.inspW + 1 : 0);
-  const fit = $derived.by(() => {
-    let nav = store.showNav;
-    let insp = store.showInspector;
-    const two = store.layout.panes.length > 1;
-    if (!bodyW || !two) return { nav, insp, merge: false };
-    const need = 2 * MIN_PANE + 1;
-    if (insp && room(nav, insp) < need) insp = false;
-    if (nav && room(nav, insp) < need) nav = false;
-    return { nav, insp, merge: room(nav, insp) < need };
-  });
+  const fit = $derived(fitPanels(bodyW, { navW: store.navW, inspW: store.inspW, nav: store.showNav, insp: store.showInspector, two: store.layout.panes.length > 1 }));
   $effect(() => {
     if (fit.merge) store.mergePanes();
   });
@@ -103,8 +94,7 @@
     const move = (m: PointerEvent) => {
       if (!panesEl) return;
       const r = panesEl.getBoundingClientRect();
-      const min = Math.min(0.45, MIN_PANE / r.width);
-      store.layout.ratio = Math.max(min, Math.min(1 - min, (m.clientX - r.left) / r.width));
+      store.layout.ratio = dividerRatio(m.clientX, r.left, r.width);
     };
     const up = () => {
       el.removeEventListener('pointermove', move);
@@ -143,7 +133,7 @@
     navExpand: () => store.navTree('expand'),
     newFile: () => {
       if (!store.canManageFiles) return;
-      const dir = store.file && store.file.name.includes('/') ? store.file.name.slice(0, store.file.name.lastIndexOf('/')) : '';
+      const dir = store.file ? parentOf(store.file.name) : '';
       store.showNav = true;
       store.creating = { dir, kind: 'file' };
     },
