@@ -138,6 +138,24 @@
       b?.scrollIntoView({ block: 'nearest' });
     });
   }
+  // The chosen row had the focus and was drawn anew (a block came or went with the folder read, a plugin's block came):
+  // the focus left with the old button — it goes to the new one, so the list's keys keep working.
+  let rowFocus = false;
+  $effect(() => {
+    const node = el;
+    if (!node) return;
+    const into = (e: FocusEvent) => (rowFocus = !!(e.target as HTMLElement).closest?.('[data-k]') && node.contains(e.target as Node));
+    document.addEventListener('focusin', into);
+    const watch = new MutationObserver(() => {
+      if (!rowFocus || !selKey || (document.activeElement && document.activeElement !== document.body)) return;
+      rowsOnScreen().find((x) => x.dataset.k === selKey)?.focus({ preventScroll: true });
+    });
+    watch.observe(node, { childList: true, subtree: true });
+    return () => {
+      document.removeEventListener('focusin', into);
+      watch.disconnect();
+    };
+  });
   function keydown(e: KeyboardEvent) {
     if ((e.key !== 'ArrowDown' && e.key !== 'ArrowUp') || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) {
       if (e.code === 'KeyZ' && e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && lists.canUndo) {

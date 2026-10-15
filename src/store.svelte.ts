@@ -8,11 +8,17 @@ import { displayName, isArchive, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags, weekdayNames } from './edits';
 import { bareTitle, caretAfter, keyOf, moveTo, moveWithin } from './refile';
 import type { CalSpec, Plate } from './commands';
-import { searchFile, type Hit, type Scope } from './search';
-import { lsDel, lsGet, lsGetJson, lsSet } from './storage';
+import { lsGet, lsGetJson, lsSet } from './storage';
 import { notify } from './notify.svelte';
 import { prefs } from './prefs.svelte';
 import { themes } from './themes.svelte';
+import { shortcuts } from './shortcuts.svelte';
+import { PluginStore } from './pluginData.svelte';
+import { searchAll } from './searchAll.svelte';
+import { invoke, isTauri } from './tauri';
+export { DEFAULT_CAPTURE_KEY, type ScopeKeys } from './shortcuts.svelte';
+export type { PluginData, StorageSpec } from './pluginData.svelte';
+export { SEARCH_CAP, type SearchGroup, type SearchState } from './searchAll.svelte';
 import { DEFAULT_INBOX, append, entry, prepend, readInbox, withInbox, type InboxConfig } from './inbox';
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
 import { allFileViews, fileViewOf, navOf, viewOf } from './views';
@@ -21,7 +27,6 @@ import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
 import { fileLink, headingLink, labelOf, linkHooks } from './linkEdit';
 import { newId } from './endDay';
 import { fileTypeOf, fileTypes, isOrgName, watchFileTypes, withExt } from './fileTypes.svelte';
-import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow, type WorkflowDef } from './org';
 
 export interface NoteFile {
@@ -36,7 +41,6 @@ export interface NoteFile {
   filetags: string[];
 }
 
-const isTauri = '__TAURI_INTERNALS__' in window;
 /** A link (ТЗ 35): the icon of its toasts. */
 const LINK_ICON = 'M8.5 11.5a3.5 3.5 0 0 0 5 0l2.5-2.5a3.5 3.5 0 0 0-5-5l-1 1M11.5 8.5a3.5 3.5 0 0 0-5 0L4 11a3.5 3.5 0 0 0 5 5l1-1';
 /** The note of the mini window (ТЗ 31): a heading of a file (by its title near its line), or the file whole. */
@@ -68,11 +72,6 @@ function build(name: string, path: string, text: string, disk: string, diskRaw: 
 /** Where the palette opens: a step of a command at once (the card's buttons in «Разбор Inbox» use the heading ones). */
 export type PaletteStart = 'newFile' | 'newFolder' | 'goto' | 'status' | 'priority' | 'schedule' | 'deadline' | 'tags' | 'calendar' | 'step';
 
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<T>(cmd, args);
-}
-
 export async function openExternal(url: string) {
   if (isTauri) {
     const { openUrl } = await import('@tauri-apps/plugin-opener');
@@ -89,15 +88,71 @@ function fromDisk(l: Listed, cfg: ProjectConfig): NoteFile {
   return build(l.name, l.path, text, text, l.text, eol, cfg);
 }
 
-/** A removed plugin's settings kept for «Вернуть». */
-export interface PluginData {
-  id: string;
-  folder: unknown;
-  local: string | null;
-  keys: Record<string, string[]>;
-}
 
 class Store {
+  // ---- forwarded (tech sprint 2.2): the shortcuts, what features keep, the search in every file -------------
+  get keyState() {
+    return shortcuts.keyState;
+  }
+  set keyState(v) {
+    shortcuts.keyState = v;
+  }
+  get keysVersion() {
+    return shortcuts.keysVersion;
+  }
+  set keysVersion(v) {
+    shortcuts.keysVersion = v;
+  }
+  get keyRecording() {
+    return shortcuts.keyRecording;
+  }
+  set keyRecording(v) {
+    shortcuts.keyRecording = v;
+  }
+  get captureKey() {
+    return shortcuts.captureKey;
+  }
+  set captureKey(v) {
+    shortcuts.captureKey = v;
+  }
+  get captureGlobal() {
+    return shortcuts.captureGlobal;
+  }
+  set captureGlobal(v) {
+    shortcuts.captureGlobal = v;
+  }
+  get bindings() {
+    return shortcuts.bindings;
+  }
+  get scopeKeys() {
+    return shortcuts.scopeKeys;
+  }
+  readonly keyHint = shortcuts.keyHint.bind(shortcuts);
+  readonly titled = shortcuts.titled.bind(shortcuts);
+  readonly setKeys = shortcuts.setKeys.bind(shortcuts);
+  readonly setPreset = shortcuts.setPreset.bind(shortcuts);
+  readonly resetKeys = shortcuts.resetKeys.bind(shortcuts);
+  readonly setScopeKeys = shortcuts.setScopeKeys.bind(shortcuts);
+  readonly applyCaptureKey = shortcuts.applyCaptureKey.bind(shortcuts);
+  readonly applyMiniKey = shortcuts.applyMiniKey.bind(shortcuts);
+  readonly toggleMini = shortcuts.toggleMini.bind(shortcuts);
+  readonly setCaptureKey = shortcuts.setCaptureKey.bind(shortcuts);
+  private data = new PluginStore({ config: () => this.parsedConfig, updateConfig: (make) => this.updateConfig(make), refresh: () => this.refreshStatusSets() });
+  readonly registerStorage = this.data.registerStorage.bind(this.data);
+  readonly hasStorage = this.data.hasStorage.bind(this.data);
+  readonly hasLegacy = this.data.hasLegacy.bind(this.data);
+  readonly folderData = this.data.folderData.bind(this.data);
+  readonly setFolderData = this.data.setFolderData.bind(this.data);
+  readonly readFeatureFile = this.data.readFeatureFile.bind(this.data);
+  readonly localData = this.data.localData.bind(this.data);
+  readonly setLocalData = this.data.setLocalData.bind(this.data);
+  readonly forgetPluginData = this.data.forgetPluginData.bind(this.data);
+  readonly restorePluginData = this.data.restorePluginData.bind(this.data);
+  get search() {
+    return searchAll.state;
+  }
+  readonly searchRecent = searchAll.recent.bind(searchAll);
+  readonly clearSearchRecent = searchAll.clearRecent.bind(searchAll);
   // ---- forwarded (tech sprint 2.1): the notes at the bottom, the view preferences, the themes ---------------
   get toast() {
     return notify.toast;
@@ -572,126 +627,6 @@ class Store {
     return { ...c, workflows: [...(c.workflows.length ? c.workflows : [DEFAULT_SEQUENCE]), ...add] };
   }
 
-  /**
-   * A feature's own settings (roadmap 0.6): what describes the files and the team's ways (the goals' sources, the
-   * calendar's files) in the notes folder, `.orgnotes/plugins/<id>.json`, going along with the files; what is
-   * personal on this Mac. Before 0.6 they were keys of config.json: read from there until written anew.
-   */
-  private storages = new Map<string, StorageSpec>();
-  /** The folder's files of the features, as read (undefined: there is none yet). */
-  private featureFiles = $state<Record<string, unknown>>({});
-  registerStorage(id: string, o: StorageSpec = {}) {
-    this.storages.set(id, o);
-  }
-  hasStorage(id: string) {
-    return this.storages.has(id);
-  }
-  /** config.json still has the feature's old keys (its file is not written yet). */
-  hasLegacy(id: string) {
-    return (this.storages.get(id)?.legacyKeys ?? []).some((k) => hasPath(this.parsedConfig, k));
-  }
-  /** The feature's settings in the notes folder (its file, else what config.json had before 0.6). */
-  folderData(id: string): unknown {
-    const s = this.storages.get(id);
-    if (!(id in this.featureFiles)) return s?.legacy?.(this.parsedConfig);
-    const v = this.featureFiles[id];
-    return s?.upgrade ? s.upgrade(v, 'folder') : v;
-  }
-  async setFolderData(id: string, value: unknown): Promise<boolean> {
-    const text = JSON.stringify(value, null, 2) + '\n';
-    try {
-      if (isTauri) await invoke('write_feature_file', { id, text });
-    } catch (e) {
-      this.say('Не удалось сохранить настройки: ' + e);
-      return false;
-    }
-    this.featureFiles = { ...this.featureFiles, [id]: value };
-    this.refreshStatusSets();
-    // moved: the old keys leave config.json (the file is the place now)
-    const keys = (this.storages.get(id)?.legacyKeys ?? []).filter((k) => hasPath(this.parsedConfig, k));
-    if (keys.length)
-      await this.updateConfig((raw) => {
-        try {
-          const p = raw ? JSON.parse(raw) : {};
-          for (const k of keys) dropPath(p, k);
-          return JSON.stringify(p, null, 2) + '\n';
-        } catch {
-          return raw ?? '';
-        }
-      });
-    return true;
-  }
-  /** One feature's file read now (a plugin turned on after the folder was read). */
-  async readFeatureFile(id: string) {
-    if (!isTauri || id in this.featureFiles) return;
-    try {
-      const t = await invoke<string | null>('read_feature_file', { id });
-      if (t !== null) this.featureFiles = { ...this.featureFiles, [id]: JSON.parse(t) };
-    } catch {
-      /* unreadable: as if there were none */
-    }
-  }
-  private async readFeatureFiles() {
-    const out: Record<string, unknown> = {};
-    if (isTauri)
-      for (const id of this.storages.keys()) {
-        try {
-          const t = await invoke<string | null>('read_feature_file', { id });
-          if (t !== null) out[id] = JSON.parse(t);
-        } catch {
-          /* unreadable: as if there were none */
-        }
-      }
-    this.featureFiles = out;
-  }
-  /** The feature's personal settings on this Mac (else what `legacy` gives: config.json before 0.6). */
-  localData(id: string): unknown {
-    void this.localTick;
-    const raw = lsGet('feature:' + id);
-    const s = this.storages.get(id);
-    if (raw !== null) {
-      try {
-        const v = JSON.parse(raw);
-        return s?.upgrade ? s.upgrade(v, 'local') : v;
-      } catch {
-        /* the default */
-      }
-    }
-    return s?.localLegacy?.(this.parsedConfig);
-  }
-  private localTick = $state(0);
-  setLocalData(id: string, value: unknown) {
-    lsSet('feature:' + id, JSON.stringify(value));
-    this.localTick++;
-  }
-
-  /** A plugin removed with its settings (fix of ТЗ 37): its data in the folder and on this Mac and the shortcuts given
-   *  to its commands forgotten; what they were, for «Вернуть». */
-  forgetPluginData(id: string): PluginData {
-    const keys = Object.fromEntries(Object.entries(this.keyState.overrides).filter(([k]) => k.startsWith(id + '.')));
-    const backup: PluginData = { id, folder: id in this.featureFiles ? this.featureFiles[id] : undefined, local: lsGet('feature:' + id), keys };
-    if (backup.folder !== undefined) void this.setFolderData(id, {});
-    lsDel('feature:' + id);
-    this.localTick++;
-    if (Object.keys(keys).length) {
-      const overrides = { ...this.keyState.overrides };
-      for (const k of Object.keys(keys)) delete overrides[k];
-      this.keyState = { ...this.keyState, overrides };
-      this.saveKeys();
-    }
-    return backup;
-  }
-  async restorePluginData(b: PluginData) {
-    if (b.folder !== undefined) await this.setFolderData(b.id, b.folder);
-    if (b.local !== null) {
-      lsSet('feature:' + b.id, b.local);
-      this.localTick++;
-    }
-    if (Object.keys(b.keys).length) {
-      this.keyState = { ...this.keyState, overrides: { ...this.keyState.overrides, ...b.keys } };
-      this.saveKeys();
-    }
-  }
 
   /** Re-parse every note with the current project config (unsaved edits stay). */
   private rebuildAll() {
@@ -755,61 +690,12 @@ class Store {
     lsSet('settings:section', section);
   }
 
-  // ---- keyboard shortcuts (ТЗ «раздел „Клавиши“»): a set of defaults and the changes on top, on this Mac ----------
-  keyState = $state<KeyState>(parseState(lsGet('keys')));
-  /** Every command's shortcuts now; the quick entry's is its own setting (it is registered with the system). */
-  /** The registry of commands changed (a plugin turned on or off): the shortcuts again. */
-  keysVersion = $state(0);
-  bindings = $derived.by(() => {
-    void this.keysVersion;
-    const b = bindingsOf(this.keyState);
-    b.set('capture', this.captureKey ? [fromAccelerator(this.captureKey)] : []);
-    return b;
-  });
-  /** A shortcut is being recorded in the settings: the window's keys wait. */
-  keyRecording = $state(false);
   /** «Навигатор: свернуть / развернуть всё» from the palette or a key: the tree of «Файлы» does it. */
   navTreeReq = $state<{ kind: 'collapse' | 'expand'; n: number } | null>(null);
   navTree(kind: 'collapse' | 'expand') {
     this.showNav = true;
     this.setNavMode('files');
     this.navTreeReq = { kind, n: Date.now() };
-  }
-  /** The first shortcut of a command, for tooltips and hints («⇧⌘O»); '' if it has none. */
-  keyHint(id: string) {
-    return this.bindings.get(id)?.[0] ?? '';
-  }
-  /** «Найти далее (⌘G)», or the title alone. */
-  titled(title: string, id: string) {
-    const k = this.keyHint(id);
-    return k ? `${title} (${k})` : title;
-  }
-  /** Give a command these shortcuts; the quick entry's goes to the system (an error says why it could not). */
-  async setKeys(id: string, keys: string[]): Promise<string | null> {
-    if (id === 'capture') return this.setCaptureKey(keys[0] ? (toAccelerator(keys[0]) ?? '') : '', this.captureGlobal);
-    this.keyState = withKeys(this.keyState, id, keys);
-    this.saveKeys();
-    return null;
-  }
-  setPreset(preset: Preset) {
-    this.keyState = { ...this.keyState, preset };
-    this.saveKeys();
-  }
-  /** «Сбросить все»: the defaults of the set, the quick entry's ⇧⌘I too. */
-  async resetKeys() {
-    this.keyState = { ...DEFAULT_STATE, preset: this.keyState.preset };
-    this.saveKeys();
-    if (this.captureKey !== DEFAULT_CAPTURE_KEY) await this.setCaptureKey(DEFAULT_CAPTURE_KEY, this.captureGlobal);
-  }
-  private saveKeys() {
-    lsSet('keys', JSON.stringify(this.keyState));
-  }
-  /** A feature's scope of keys (keys.ts `registerScope`) runs its commands while its tab is shown (⌘1…⌘5 of a
-   *  review win over the window's): set by the tab, taken away when it goes. */
-  scopeKeys = new Map<string, ScopeKeys>();
-  setScopeKeys(scope: string, keys: ScopeKeys | null) {
-    if (keys) this.scopeKeys.set(scope, keys);
-    else this.scopeKeys.delete(scope);
   }
 
   /** Persist the project config (Settings) and apply it right away. */
@@ -1018,46 +904,6 @@ class Store {
     const add = this.inboxCfg.add === 'end' ? append : prepend;
     return (await this.transaction('Новая задача в Inbox', (tx) => tx.update(f.path, (t) => add(t, task)))) ? 'ok' : 'error';
   }
-  /** The quick entry's shortcut and whether it works from any program (a preference of this Mac). */
-  captureKey = $state(lsGet('capture:key') || DEFAULT_CAPTURE_KEY);
-  captureGlobal = $state(lsGet('capture:global') !== '0');
-  /** Register the shortcut with the system; null, or why it could not be (taken by another program, say). */
-  async applyCaptureKey(): Promise<string | null> {
-    if (!isTauri) return null;
-    try {
-      await invoke('set_capture_shortcut', { accelerator: this.captureKey, global: this.captureGlobal });
-      return null;
-    } catch (e) {
-      return String(e);
-    }
-  }
-  /** The mini window's system-wide shortcut (ТЗ 31; ⌃⌥⌘M: ⌃⌥Space switches the input source on macOS), as set in
-   *  «Клавиши»: registered again when it changes; one taken by another program is said. */
-  private miniKeyNow: string | null = null;
-  async applyMiniKey(): Promise<string | null> {
-    if (!isTauri) return null;
-    const accelerator = toAccelerator(this.bindings.get('miniShow')?.[0] ?? '') ?? '';
-    if (accelerator === this.miniKeyNow) return null;
-    this.miniKeyNow = accelerator;
-    try {
-      await invoke('set_mini_shortcut', { accelerator });
-      return null;
-    } catch (e) {
-      this.say('Сочетание мини-окна занято другой программой: ' + e);
-      return String(e);
-    }
-  }
-  /** «Мини-окно: показать»: shown with the keys in it (or the keys back to the program before). */
-  toggleMini() {
-    if (isTauri) void invoke('mini_toggle').catch(() => {});
-  }
-  async setCaptureKey(key: string, global: boolean): Promise<string | null> {
-    this.captureKey = key;
-    this.captureGlobal = global;
-    lsSet('capture:key', key);
-    lsSet('capture:global', global ? '1' : '0');
-    return this.applyCaptureKey();
-  }
   /** The quick entry inside the window (⇧⌘I with the window in front, «+» in the Inbox panel). */
   capture = $state<{ n: number } | null>(null);
   /** «Выбрать файл…» for the Inbox: the palette of files. */
@@ -1157,7 +1003,7 @@ class Store {
     // and anything the user does after that must not be overwritten by the tail of this function
     const list = this.sorted(await this.listFiles());
     this.configRaw = null;
-    await this.readFeatureFiles(); // first: a feature's set of statuses may depend on them
+    await this.data.readAll(); // first: a feature's set of statuses may depend on them
     this.takeConfig(await this.readConfig());
     const cfg = this.config;
     const files = list.map((l) => fromDisk(l, cfg));
@@ -1749,68 +1595,17 @@ class Store {
   askFind(kind: 'open' | 'next' | 'prev' | 'useSel') {
     this.findReq = { kind, pane: this.layout.active, n: Date.now() + Math.random() };
   }
-  /** The search in every file: its query, where, the results (kept until the app quits). */
-  search = $state<SearchState>({ q: '', ran: '', scope: 'all', running: false, groups: [], total: 0, capped: false, scanned: 0, sel: null, focusN: 0 });
-  private searchRun = 0;
   /** ⇧⌘F: the section «Поиск», the field in focus (the editor's one-line selection in it, not searched yet). */
   openSearch(selection = '') {
     this.setNavMode('search');
     if (selection && !selection.includes('\n')) this.search.q = selection;
     this.search.focusN++;
   }
-  searchRecent(): { q: string; t: number }[] {
-    try {
-      const v = JSON.parse(lsGet(SEARCH_RECENT) ?? '[]');
-      return Array.isArray(v) ? v.filter((x) => x && typeof x.q === 'string') : [];
-    } catch {
-      return [];
-    }
-  }
-  clearSearchRecent() {
-    lsSet(SEARCH_RECENT, '[]');
-    this.search.focusN++;
-  }
-  /** ↩: every .org file of the folder (the open ones with their unsaved edits), a portion at a time; a new run stops
-   *  the old one. */
-  async runSearch() {
-    const q = this.search.q.trim();
-    if (!q) return;
-    const run = ++this.searchRun;
-    lsSet(SEARCH_RECENT, JSON.stringify([{ q, t: Date.now() }, ...this.searchRecent().filter((x) => x.q !== q)].slice(0, 8)));
-    const opts = { cs: this.findCase, word: this.findWord };
-    const scope = this.search.scope;
+  /** ↩: every .org file of the folder (the open ones with their unsaved edits) — the open ones first. */
+  runSearch() {
     const open = new Set(this.layout.panes.flatMap((p) => p.tabs.flatMap((t) => (t.kind === 'file' && t.path ? [t.path] : []))));
-    const files = this.files.filter((f) => isOrgName(f.name)); // not a plugin's file (a canvas's JSON)
-    const groups: SearchGroup[] = [];
-    let total = 0;
-    let capped = false;
-    Object.assign(this.search, { ran: q, running: true, groups: [], total: 0, capped: false, scanned: 0, sel: null });
-    const order = (a: SearchGroup, b: SearchGroup) =>
-      Number(open.has(b.path)) - Number(open.has(a.path)) || b.hits.length - a.hits.length || a.name.localeCompare(b.name, 'ru');
-    const show = () => {
-      const g = [...groups].sort(order);
-      g.forEach((x, i) => (x.open = i < 5));
-      Object.assign(this.search, { groups: g, total, capped });
-    };
-    for (let i = 0; i < files.length; i++) {
-      if (run !== this.searchRun) return;
-      const f = files[i];
-      const hits = searchFile(f.text, f.headings, q, opts, scope, SEARCH_CAP - total);
-      if (hits.length) groups.push({ path: f.path, name: f.name, hits, open: false, all: false, stamp: f.text });
-      total += hits.length;
-      if (total >= SEARCH_CAP) {
-        capped = true;
-        break;
-      }
-      if (i % 40 === 39) {
-        this.search.scanned = i + 1;
-        show();
-        await new Promise((r) => setTimeout(r, 0)); // the window stays alive on a big folder
-      }
-    }
-    if (run !== this.searchRun) return;
-    show();
-    this.search.running = false;
+    // not a plugin's file (a canvas's JSON)
+    return searchAll.run(this.files.filter((f) => isOrgName(f.name)), open, { cs: this.findCase, word: this.findWord });
   }
   /** A result: its file in the active pane at the match; the pane's find bar with the same query. */
   openHit(g: number, i: number) {
@@ -2459,38 +2254,6 @@ class Store {
   }
 }
 
-export const DEFAULT_CAPTURE_KEY = 'Shift+CmdOrCtrl+KeyI';
-/** A key of config.json («goals») or a key in one («inbox.order»). */
-function hasPath(o: any, path: string): boolean {
-  const [a, b] = path.split('.');
-  return !!o && typeof o === 'object' && a in o && (b === undefined || (!!o[a] && typeof o[a] === 'object' && b in o[a]));
-}
-function dropPath(o: any, path: string) {
-  const [a, b] = path.split('.');
-  if (b === undefined) return void delete o[a];
-  if (!o[a] || typeof o[a] !== 'object') return;
-  delete o[a][b];
-  if (!Object.keys(o[a]).length) delete o[a];
-}
-/** What a feature does around a move it asked for. */
-/** Where a feature keeps its settings and where they were before roadmap 0.6 (config.json). */
-export interface StorageSpec {
-  /** Its folder's settings as config.json had them. */
-  legacy?: (parsed: any) => unknown;
-  /** The keys of config.json dropped once the feature's file is written («goals», or «inbox.order» inside a key: the
-   *  key goes when nothing is left in it). */
-  legacyKeys?: string[];
-  /** Its settings of this Mac as config.json had them. */
-  localLegacy?: (parsed: any) => unknown;
-  /** Its file or its settings of this Mac as written before, read in their new shape (the calendar became a plugin:
-   *  its flat settings → `{ settings, data }`); the next write keeps the new one. */
-  upgrade?: (v: unknown, where: 'folder' | 'local') => unknown;
-}
-/** What a feature's tab does with the keys of its scope. */
-export interface ScopeKeys {
-  active: () => boolean;
-  run: (id: string) => boolean;
-}
 /** What a feature does around a move it asked for. */
 export interface RefileHooks {
   /** Just before the write: a fade of the row going away, say. */
@@ -2513,29 +2276,6 @@ export interface RefileReq {
 export type SettingsSection = string;
 /** The navigator's mode: the core's (files, agendas, search) or a feature's section (views.ts). */
 export type NavMode = string;
-/** The search in every file: up to this many matches are listed. */
-export const SEARCH_CAP = 1000;
-const SEARCH_RECENT = 'search:recent';
-export interface SearchGroup {
-  path: string;
-  name: string; // relative
-  hits: Hit[];
-  open: boolean; // its results shown
-  all: boolean; // «Ещё N» opened: every result, not the first 4
-  stamp: string; // the text searched: the file changed since when it differs
-}
-export interface SearchState {
-  q: string; // the field
-  ran: string; // the query of the results shown
-  scope: Scope;
-  running: boolean;
-  groups: SearchGroup[];
-  total: number;
-  capped: boolean; // more than SEARCH_CAP: only the first shown
-  scanned: number; // files looked at so far
-  sel: { g: number; i: number } | null;
-  focusN: number; // bumped: the field takes the focus
-}
 export type Scan = { name: string; path: string; shown: string; org: number; folders: number; other: number; capped: boolean; big: boolean };
 export type StartScreen = { kind: 'welcome' } | { kind: 'found'; path: string; scan: Scan | null; change: boolean } | { kind: 'missing'; path: string } | null;
 export type Unsaved = { tab: Tab; kind: 'file' | 'note'; name: string };

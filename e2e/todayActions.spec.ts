@@ -69,7 +69,11 @@ test('the menu and the keys on the chosen task; the row stays dimmed until ⌘R;
 test('«Просрочено»: ⌥⇧→ moves the date the row tells; its chips still work with one click', async ({ page }) => {
   await open(page);
   const late = block(page, 'Просрочено');
-  await late.getByText('Ревью перформанса Олега').click();
+  // chosen before the key (a click while the rows are still drawn anew after the folder is read may be lost)
+  await expect(async () => {
+    await late.getByText('Ревью перформанса Олега').click();
+    await expect(sel(page)).toContainText('Ревью перформанса Олега', { timeout: 1000 });
+  }).toPass();
   await page.keyboard.press('Alt+Shift+ArrowRight');
   await expect.poll(() => disk(page, '/mock/work.org')).toContain(`DEADLINE: <${iso(shift(-2))}`);
   await expect(late.locator('.orow', { hasText: 'Ревью перформанса Олега' })).toBeVisible(); // still overdue, stays
