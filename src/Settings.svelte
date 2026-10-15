@@ -13,6 +13,9 @@
   import ColorPicker from './ColorPicker.svelte';
   import Picker from './Picker.svelte';
   import RemovePlugin from './RemovePlugin.svelte';
+  import SettingsGeneral from './SettingsGeneral.svelte';
+  import SettingsInbox from './SettingsInbox.svelte';
+  import SettingsAgendas from './SettingsAgendas.svelte';
   import {
     MAX_KEYWORD, addState, checkKey, normalizeKey, addWorkflow, canRemoveState, canRemoveWorkflow, checkKeyword, displayName, dropState, dropWorkflow,
     effectiveKeys, fromConfig, initialOf, moveState, normalizeKeyword, orgLine, pendingState, removeState, removeWorkflow,
@@ -333,23 +336,9 @@
     if (contentEl) contentEl.scrollTop = 0;
   });
 
-  // ---- Inbox ---------------------------------------------------------------------------------------------------
-  let pickFile = $state(false); // «Выбрать…»: the palette of files, the same as in the Inbox stub
-  const inboxPath = $derived(
-    !store.inboxCfg.file ? 'Не выбран' : store.inboxCfg.file.split('/').join(' / ') + (store.inboxFile ? '' : ' — не найден'),
-  );
-  const inboxStates = $derived.by(() => {
-    const seqs = store.inboxFile?.wf.sequences ?? store.config.workflows;
-    return [...new Set(seqs.flatMap((sq) => sq.states.filter((x) => !x.done).map((x) => x.name)))];
-  });
-  // ---- Календарь ------------------------------------------------------------------------------------------------
+  let pickFile = $state(false); // Inbox's «Выбрать…»: the palette of files, the same as in the Inbox stub
   // ---- Агенды: «Мои агенды» -----------------------------------------------------------------------------
   let confirmAgenda = $state<{ id: string; name: string } | null>(null);
-  /** «Новая агенда»: the settings close and the builder opens (one sheet at a time); ⌘, brings them back. */
-  function newAgenda() {
-    store.closeSettings();
-    store.newAgendaInBuilder();
-  }
   const bannerCount = $derived(problems.length + Object.keys(errors).length);
 </script>
 
@@ -385,164 +374,16 @@
     {:else if tab === 'Оформление'}
       <div class="page"><AppearanceSettings /></div>
     {:else if tab === 'Inbox'}
-      <div class="body">
-        <section class="general" aria-label="Inbox">
-          <div class="cap">ФАЙЛ</div>
-          <div class="opts">
-            <div class="opt">
-              <span id="ib-file">Файл Inbox</span>
-              <span class="ibfile">
-                <span class="val" aria-labelledby="ib-file" data-testid="ib-file">{inboxPath}</span>
-                <button class="btn" aria-label="Выбрать файл Inbox" onclick={() => (pickFile = true)}>Выбрать…</button>
-              </span>
-            </div>
-            <div class="opt">
-              <label for="ib-add">Куда добавлять</label>
-              <select id="ib-add" class="sel" value={store.inboxCfg.add} onchange={(e) => store.setInbox({ add: e.currentTarget.value === 'end' ? 'end' : 'top' })}>
-                <option value="top">В начало файла</option>
-                <option value="end">В конец файла</option>
-              </select>
-            </div>
-          </div>
-          <p class="help">Сюда попадают новые задачи; задачи, записанные в файл вручную, тоже появляются в списке. Новые задачи записываются сразу на диск, между задачами — пустая строка. В начало — после строк вроде #+TITLE, перед первой задачей. Файл свой у каждой рабочей папки.</p>
-
-          <div class="cap">БЫСТРЫЙ ВВОД</div>
-          <div class="opts">
-            <div class="opt">
-              <span>{store.keyHint('capture') || 'Без сочетания'} — изменить в разделе «Клавиши»</span>
-              <button class="btn" onclick={() => store.showSection('Клавиши')}>Открыть…</button>
-            </div>
-            <div class="opt">
-              <label for="ib-global">Работает из любой программы</label>
-              <Switch id="ib-global" checked={store.captureGlobal} label="Работает из любой программы" onchange={() => void store.setCaptureKey(store.captureKey, !store.captureGlobal)} />
-            </div>
-            <div class="opt">
-              <label for="ib-confirm">Показывать подтверждение «Добавлено в Inbox»</label>
-              <Switch id="ib-confirm" checked={store.inboxCfg.confirm} label="Показывать подтверждение" onchange={() => store.setInbox({ confirm: !store.inboxCfg.confirm })} />
-            </div>
-            <div class="opt">
-              <label for="ib-status">Статус новой задачи</label>
-              <select id="ib-status" class="sel" value={store.inboxCfg.status ?? ''} onchange={(e) => store.setInbox({ status: e.currentTarget.value || null })}>
-                <option value="">Начальный статус набора</option>
-                {#each inboxStates as st (st)}<option value={st}>{st}</option>{/each}
-              </select>
-            </div>
-            <div class="opt">
-              <label for="ib-created">Записывать дату создания (:CREATED:)</label>
-              <Switch id="ib-created" checked={store.inboxCfg.created} label="Записывать дату создания" onchange={() => store.setInbox({ created: !store.inboxCfg.created })} />
-            </div>
-          </div>
-          <p class="help">Из любой программы: приложение должно быть запущено (окно можно закрыть, оно остаётся в Dock). Сочетание хранится на этом Mac.</p>
-
-          {#each blocksOf('Inbox') as b (b.schema.id)}<SchemaSettings schema={b.schema} embedded />{/each}
-        </section>
-      </div>
+      <div class="body"><SettingsInbox onpick={() => (pickFile = true)} /></div>
     {:else if tab === 'Теги'}
       <TagsSettings />
     {:else if settingsOf(tab)}
       {@const spec = settingsOf(tab)!}
       {#if spec.schema}<SchemaSettings schema={spec.schema} plugin={spec.plugin} />{:else if spec.component}<spec.component />{/if}
     {:else if tab === 'Агенды'}
-      <div class="body">
-        <section class="general" aria-label="Агенды">
-          <div class="cap">МОИ АГЕНДЫ</div>
-          {#if store.agendas.length}
-            <div class="alist" role="list" aria-label="Мои агенды">
-              {#each store.agendas as a (a.id)}
-                <div class="arow" role="listitem">
-                  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 6h12M4 10h8M4 14h5" /></svg>
-                  <span class="an">{a.name}</span>
-                  <span class="ab">{a.blocks.length} {a.blocks.length % 10 === 1 && a.blocks.length % 100 !== 11 ? 'блок' : a.blocks.length % 10 >= 2 && a.blocks.length % 10 <= 4 && (a.blocks.length % 100 < 12 || a.blocks.length % 100 > 14) ? 'блока' : 'блоков'}</span>
-                  <button class="x" aria-label="Удалить агенду {a.name}" title="Удалить агенду" onclick={() => (confirmAgenda = { id: a.id, name: a.name })}>×</button>
-                </div>
-              {/each}
-            </div>
-          {:else}
-            <p class="help">Своих агенд пока нет. Агенда — это набор блоков, каждый выбирает задачи по условиям.</p>
-          {/if}
-          <div><button class="primary-b" onclick={newAgenda}>Новая агенда в конструкторе…</button></div>
-          <p class="help">Изменить агенду можно в навигаторе в режиме «Агенда» (⌃⌘2): правый клик по названию → «Редактировать…».</p>
-          {#each blocksOf('Агенды') as b (b.schema.id)}<SchemaSettings schema={b.schema} embedded />{/each}
-        </section>
-      </div>
+      <div class="body"><SettingsAgendas onremove={(a) => (confirmAgenda = a)} /></div>
     {:else if tab === 'Основные'}
-      <div class="body">
-        <section class="general" aria-label="Основные">
-          <div class="cap">РАБОЧАЯ ПАПКА</div>
-          <div class="opt">
-            <div class="folder">
-              <span class="fname">{store.dir ? store.dir.split('/').pop() : 'Не выбрана'}</span>
-              {#if store.dir}<span class="fpath" title={store.dir}>{store.dir.replace(/^\/Users\/[^/]+/, '~')}</span>{/if}
-            </div>
-            <!-- the settings close: what they show belongs to the folder being left -->
-            <button class="btn" onclick={() => { store.closeSettings(); void store.changeFolder(); }}>Изменить…</button>
-          </div>
-          <p class="help">Приложение работает с одной папкой: все org-файлы в ней и её подпапках. Сменить её можно и в меню «Файл → Открыть другую папку…».</p>
-          <div class="cap">НАВИГАТОР</div>
-          <div class="opt">
-            <label for="nav-headings">Показывать заголовки в навигаторе</label>
-            <Switch id="nav-headings" checked={store.navHeadings} label="Показывать заголовки в навигаторе" onchange={() => store.setNavHeadings(!store.navHeadings)} />
-          </div>
-          <p class="help">Структура файла всегда есть в инспекторе, на вкладке «Структура», и в командной палитре по «#». Настройка хранится на этом Mac.</p>
-          <div class="cap">УРОВНИ ЗАГОЛОВКОВ</div>
-          <div class="opts">
-            <div class="opt">
-              <label for="one-star">Одна звёздочка на уровень</label>
-              <Switch id="one-star" checked={store.levels.oneStar} label="Одна звёздочка на уровень" onchange={() => store.setLevels({ oneStar: !store.levels.oneStar })} />
-            </div>
-            <div class="opt">
-              <label for="indent-text">Сдвигать текст по уровню</label>
-              <Switch id="indent-text" checked={store.levels.indent} label="Сдвигать текст по уровню" onchange={() => store.setLevels({ indent: !store.levels.indent })} />
-            </div>
-            <div class="opt">
-              <span id="step-l">Шаг отступа</span>
-              <div class="stepper" role="group" aria-labelledby="step-l">
-                <button aria-label="Меньше" disabled={store.levels.step <= 1} onclick={() => store.setLevels({ step: store.levels.step - 1 })}>−</button>
-                <span class="sv" aria-live="polite">{store.levels.step} симв.</span>
-                <button aria-label="Больше" disabled={store.levels.step >= 4} onclick={() => store.setLevels({ step: store.levels.step + 1 })}>+</button>
-              </div>
-            </div>
-          </div>
-          <p class="help">Только вид в редакторе: звёздочки и пробелы в файлах не меняются. «Вид › Структурный вид» включает и выключает обе настройки сразу. Настройки хранятся на этом Mac.</p>
-          <div class="cap">ОФОРМЛЕННЫЙ ТЕКСТ</div>
-          <div class="opts">
-            <div class="opt">
-              <label for="rich-on">Оформленный текст</label>
-              <Switch id="rich-on" checked={store.rich} label="Оформленный текст" onchange={() => store.setRich(!store.rich)} />
-            </div>
-            <div class="opt">
-              <label for="rich-nums">Номера строк в оформленном виде</label>
-              <Switch id="rich-nums" checked={store.richNumbers} label="Номера строк в оформленном виде" onchange={() => store.setRichNumbers(!store.richNumbers)} />
-            </div>
-          </div>
-          <p class="help">Статусы, приоритеты и теги — капсулами, даты — плашками, заголовки крупнее, разметка без служебных символов. Строка под курсором показывается как есть. Текст файла не меняется. То же — «Вид › Оформленный текст» и переключатель «Текст / Оформление» над редактором. Настройки хранятся на этом Mac.</p>
-          <div class="cap">DRAWERS</div>
-          <div class="opts">
-            <div class="opt">
-              <label for="fold-drawers">Сворачивать drawers при открытии файла</label>
-              <Switch id="fold-drawers" checked={store.foldDrawers} label="Сворачивать drawers при открытии файла" onchange={() => store.setFoldDrawers(!store.foldDrawers)} />
-            </div>
-          </div>
-          <p class="help">Блоки :PROPERTIES:, :LOGBOOK: и другие показываются одной строкой с «…», в том числе новые — от Inbox и смены статуса. Tab на этой строке или клик по «…» разворачивает. Только вид: файл не меняется. Настройка хранится на этом Mac.</p>
-          <div class="cap">ССЫЛКИ</div>
-          <div class="opt">
-            <span id="links-l">Ссылки на заголовки</span>
-            <div class="lseg" role="radiogroup" aria-labelledby="links-l">
-              <button role="radio" aria-checked={store.linkFormat === 'id'} class:on={store.linkFormat === 'id'} onclick={() => store.setLinkFormat('id')}>По ID</button>
-              <button role="radio" aria-checked={store.linkFormat === 'title'} class:on={store.linkFormat === 'title'} onclick={() => store.setLinkFormat('title')}>По названию</button>
-            </div>
-          </div>
-          <p class="help">{store.linkFormat === 'id' ? 'Ссылка не ломается при переименовании и переносе. К заголовку добавляется свойство :ID:.' : 'Файл не меняется, но ссылка ломается, если заголовок переименовать.'} «Копировать ссылку на заголовок» — ⌃C L; выделите текст и нажмите ⌘V, чтобы сделать его ссылкой. Настройка хранится на этом Mac.</p>
-          <div class="cap">КЛАВИШИ</div>
-          <div class="opt">
-            <div class="folder">
-              <span>Сочетания клавиш перенесены в раздел «Клавиши»</span>
-              <span class="fpath">Набор «Как в Emacs / Как в macOS» и все команды</span>
-            </div>
-            <button class="btn" onclick={() => store.showSection('Клавиши')}>Открыть…</button>
-          </div>
-        </section>
-      </div>
+      <div class="body"><SettingsGeneral /></div>
     {:else}
     <div class="body">
       <aside>
@@ -784,29 +625,6 @@
   .chip { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
   .add { width: 100%; margin-top: 4px; height: 30px; border: 1px dashed var(--line); background: transparent; border-radius: 7px; color: var(--acc); }
   .help { font-size: 12px; line-height: 1.5; color: var(--fg2); padding: 10px 6px; }
-  .general { max-width: 760px; }
-  .opts { display: flex; flex-direction: column; gap: 6px; }
-  .sel { height: 26px; max-width: 260px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 0 6px; font-size: 12.5px; }
-  .val { font-size: 12.5px; color: var(--fg2); }
-  .ibfile { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .ibfile .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .stepper { display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 7px; background: var(--field); }
-  .stepper button { width: 24px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; font-size: 14px; }
-  .stepper button:hover:not(:disabled) { background: var(--bg); }
-  .stepper button:disabled { opacity: 0.35; }
-  .stepper button:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
-  .sv { min-width: 56px; text-align: center; font-size: 12.5px; font-variant-numeric: tabular-nums; }
-  .alist { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-  .arow { display: flex; align-items: center; gap: 9px; height: 36px; padding: 0 8px 0 12px; background: var(--side); }
-  .arow + .arow { border-top: 1px solid var(--line); }
-  .an { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ab { font-size: 12px; color: var(--fg2); }
-  .primary-b { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--acc); color: var(--onacc); font-size: 12.5px; font-weight: 600; }
-  .folder { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
-  .fname { font-size: 13px; font-weight: 600; }
-  .fpath { font-size: 12px; color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .opt { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; background: var(--side); border: 1px solid var(--line); border-radius: 8px; }
-  .opt label { font-size: 13px; }
   /* a macOS switch */
 
   section { flex: 1; min-width: 0; overflow: auto; padding: 18px 22px 24px; display: flex; flex-direction: column; gap: 14px; }
@@ -874,9 +692,6 @@
   .err.banner { padding: 8px 12px; border-radius: 6px; background: color-mix(in srgb, var(--todo) 12%, transparent); }
 
   /* «По ID / По названию» (ТЗ 35) */
-  .lseg { display: flex; padding: 2px; gap: 2px; border-radius: 7px; background: var(--field); }
-  .lseg button { height: 22px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 12px; }
-  .lseg button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); font-weight: 500; }
   .updot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--acc); }
   .shead { padding: 14px 10px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--fg3); }
 </style>
