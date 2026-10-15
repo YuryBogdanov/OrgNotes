@@ -6,12 +6,11 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { mount, unmount, untrack, type Component } from 'svelte';
 import { store } from '../store.svelte';
-import { newTab, openFile, openFromAgenda, openScoped, openView } from '../layout';
+import { newTab, openFile, openScoped, openView } from '../layout';
 import { headingActions } from '../headingActions.svelte';
-import { newId } from '../endDay';
 import { registerFileType } from '../fileTypes.svelte';
 import { register as registerPalette } from '../commands';
-import { registerAction, registerFileView, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf, viewOf } from '../views';
+import { registerAction, registerFileView, registerNav, registerSettings, registerSettingsBlock, registerView, actionOf } from '../views';
 import { setLineLink } from '../lineLinks';
 import PluginFileView from '../PluginFileView.svelte';
 import PluginEditor from '../PluginEditor.svelte';
@@ -19,8 +18,7 @@ import type { MenuItem as CoreMenuItem } from '../ContextMenu.svelte';
 import { registerTodayBlock } from '../todayBlocks';
 import PluginTodayBlock from '../PluginTodayBlock.svelte';
 import { fuzzy } from '../fuzzy';
-import { runAgenda, statusKey, type Agenda, type Cond as CoreCond } from '../agendas';
-import { DEFAULT_SEQUENCE, DEFAULT_WORKFLOW, headingAt, namedFor, type Heading, type OrgDate, type WorkflowDef } from '../org';
+import { DEFAULT_WORKFLOW, headingAt, namedFor, type WorkflowDef } from '../org';
 import { parseTheme, type Theme } from '../themes';
 import { displayName, isArchive } from '../names';
 import type { Tx as CoreTx } from '../journal';
@@ -28,17 +26,21 @@ import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSc
 import { builtinEntries, declareKeys, entries, viewScope, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, type Entry, type Listed } from './declare';
 import PluginsSettings from '../PluginsSettings.svelte';
 import { hostAllowed, hostOf, iconOf, type Manifest, type ManifestSettings } from './manifest';
-import type { MenuItem as ApiMenuItem, Ctx, Dispose, Named, SheetSpec, EventName, FormSpec, HeadingInfo, HeadingRef, Place, Plugin, Query, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
+import type { MenuItem as ApiMenuItem, Ctx, Dispose, Named, SheetSpec, EventName, FormSpec, HeadingRef, Place, Plugin, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
 import PluginInspector from '../PluginInspector.svelte';
 import PluginNav from '../PluginNav.svelte';
 import PluginReview from '../PluginReview.svelte';
 import { mountWidget } from './widgets.svelte';
 import { lists } from '../taskLists.svelte';
-import { bodyOf, propertiesOf, reschedulesOf } from '../orgOps';
+import { bodyOf } from '../orgOps';
+import { RIGHTS, rightsText, trust, trusted } from './trust';
+import { apiRef, apiTx, coreRef, fileOf, findHeading, infoOf, type Change, type Changed } from './refs';
+import { query } from './query';
+import { coreCommand } from './coreCommands';
+import { invoke, isTauri } from '../tauri';
+export { RIGHTS, rightsText };
 
-const isTauri = '__TAURI_INTERNALS__' in window;
-const invoke = async <T,>(cmd: string, args?: Record<string, unknown>) => (await import('@tauri-apps/api/core')).invoke<T>(cmd, args);
 /** The data files of the built-in plugins (their themes), as text. */
 const DATA = import.meta.glob('../plugins/*/**/*.json', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>;
 const MAINS = import.meta.glob('../plugins/*/main.ts') as Record<string, () => Promise<{ default: Plugin }>>;
@@ -1295,39 +1297,12 @@ class Host {
   }
   private headingListeners = new Set<(p: unknown) => void>();
   /** After a plugin's transaction: what it changed in which heading. */
-  headingChanged(ref: HeadingRef, what: 'status' | 'planning' | 'tags' | 'title' | 'property' | 'body' | 'moved' | 'removed') {
+  headingChanged(ref: HeadingRef, what: Change) {
     for (const l of this.headingListeners) l({ ref, what });
   }
 }
 
 export const plugins = new Host();
-
-// ---- the plugins the user has let in (on this Mac): with the rights they had then -------------------------------
-const TRUST_KEY = 'plugins:trusted';
-const rightsOf = (m: Manifest) => JSON.stringify([[...m.permissions].sort(), [...m.net].sort()]);
-function trustedMap(): Record<string, string> {
-  try {
-    const v = JSON.parse(localStorage.getItem(TRUST_KEY) ?? '{}');
-    return v && typeof v === 'object' ? v : {};
-  } catch {
-    return {};
-  }
-}
-const trusted = (m: Manifest) => trustedMap()[m.id] === rightsOf(m);
-function trust(m: Manifest) {
-  try {
-    localStorage.setItem(TRUST_KEY, JSON.stringify({ ...trustedMap(), [m.id]: rightsOf(m) }));
-  } catch {
-    /* asked again next time */
-  }
-}
-/** The rights in words, for the sheet and the list. */
-export const RIGHTS: Record<string, string> = {
-  'index.read': 'чтение заметок', 'files.read': 'чтение файлов заметок', 'files.edit': 'правка заметок',
-  clipboard: 'запись в буфер обмена', net: 'сеть', process: 'запуск процессов',
-};
-export const rightsText = (m: Manifest) =>
-  m.permissions.map((p) => (p === 'net' && m.net.length ? `${RIGHTS.net} (${m.net.join(', ')})` : (RIGHTS[p] ?? p))).join(', ');
 
 // ---- helpers --------------------------------------------------------------------------------------------------
 
@@ -1351,195 +1326,6 @@ function watch<T>(read: () => T, fn: (v: T) => void): Dispose {
       untrack(() => fn(v));
     });
   });
-}
-const fileOf = (path: string) => store.files.find((f) => f.name === path);
-function findHeading(hs: Heading[], ref: HeadingRef) {
-  return hs.find((h) => h.line === ref.line && h.title === ref.title) ?? hs.filter((h) => h.title === ref.title).sort((a, b) => Math.abs(a.line - ref.line) - Math.abs(b.line - ref.line))[0];
-}
-/** A heading's own parts the plugins read since 1.7: its event, its properties. */
-// an event: the stamp under the heading (the core's), else one in its title (the calendar writes them there)
-const STAMP = /<(\d{4})-(\d{2})-(\d{2})(?:\s+[^\s\d>]+)?(?:\s+(\d{2}:\d{2}))?[^>]*>/;
-function eventOf(h: Heading): OrgDate | undefined {
-  if (h.event) return { ...h.event };
-  const m = STAMP.exec(h.title);
-  return m ? { y: +m[1], m: +m[2], d: +m[3], ...(m[4] ? { time: m[4] } : {}) } : undefined;
-}
-// the lines of the text read last: a file's headings ask for them one after another
-let seen: { text: string; lines: string[] } = { text: '', lines: [''] };
-const linesOf = (text: string) => (seen.text === text ? seen.lines : (seen = { text, lines: text.split('\n') }).lines);
-const extraOf = (text: string, h: Heading) => {
-  const event = eventOf(h);
-  const lines = linesOf(text);
-  const moved = reschedulesOf(lines, h);
-  return { ...(event ? { event } : {}), properties: propertiesOf(lines, h), ...(moved.length ? { reschedules: moved } : {}) };
-};
-function infoOf(f: (typeof store.files)[number], h: Heading): HeadingInfo {
-  const inherited = new Set<string>(f.filetags);
-  for (let p = h.parent; p >= 0; p = f.headings[p].parent) for (const t of f.headings[p].tags) inherited.add(t);
-  return {
-    ref: { path: f.name, line: h.line, title: h.title }, level: h.level, keyword: h.keyword, done: !!h.keyword && f.wf.done.includes(h.keyword),
-    priority: h.priority, title: h.title, tags: [...new Set([...h.tags, ...inherited])],
-    ...(h.scheduled ? { scheduled: { ...h.scheduled } } : {}), ...(h.deadline ? { deadline: { ...h.deadline } } : {}), ...(h.closed ? { closed: { ...h.closed } } : {}),
-    ...extraOf(f.text, h),
-  } as HeadingInfo;
-}
-/** The agenda's engine on a query: a keyword without its set means it in every set. */
-function query(q: Query): HeadingInfo[] {
-  const sets = new Set<string>();
-  for (const f of store.files) for (const s of f.wf.sequences ?? [DEFAULT_SEQUENCE]) sets.add(s.name);
-  const conds: CoreCond[] = q.conds.map((c, i) => ({
-    ...(c as CoreCond), id: 'q' + i,
-    values: c.field === 'status' ? (c.values ?? []).flatMap((v) => (v.includes('\u001f') ? [v] : [...sets].map((s) => statusKey(s, v)))) : c.values,
-  }));
-  const a: Agenda = { id: 'q', name: 'q', sources: q.sources ?? [], blocks: [{ id: 'b', name: 'q', color: 'blue', conds, group: 'none', sort: q.sort ?? 'prio', limit: null }] };
-  const [r] = runAgenda(a, store.agendaFiles, new Date(new Date().setHours(0, 0, 0, 0)));
-  if (!r) throw new Error('условие запроса не закончено');
-  return r.groups.flatMap((g) => g.tasks).flatMap((t) => {
-    const f = fileOf(t.path);
-    const h = f?.headings.find((x) => x.line === t.line);
-    return f && h ? [infoOf(f, h)] : [];
-  });
-}
-/** The core's commands a plugin may run (ТЗ 26: a minimum, grows with our plugins). */
-function coreCommand(cmd: string, arg: unknown) {
-  const a = (arg ?? {}) as { path?: string; ref?: HeadingRef };
-  switch (cmd) {
-    case 'file.open': {
-      const i = store.files.findIndex((f) => f.name === a.path);
-      if (i < 0) throw new Error(`нет файла «${a.path}»`);
-      const o = (arg ?? {}) as { line?: number; beside?: boolean; focus?: boolean; neighbour?: boolean };
-      const line = Math.max(0, Number(o.line) || 0);
-      if (o.neighbour) {
-        // as from an agenda: the other pane (made on the left when there is none), the focus stays here
-        const t = openFromAgenda(store.layout, store.layout.active, store.files[i].path, line, '', 'neighbor');
-        t.fromAgenda = null;
-        return;
-      }
-      if (!o.beside) return store.open(i, line, o.focus !== false);
-      // in the other editor (a new tab when there is one), what is shown here stays in front
-      const L = store.layout;
-      const here = L.active;
-      const keep = L.panes[here].tabs[L.panes[here].active];
-      openFile(L, L.panes.length > 1 ? 1 - here : here, store.files[i].path, line, { replace: false, focus: false });
-      L.active = here;
-      L.panes[here].active = Math.max(0, L.panes[here].tabs.indexOf(keep));
-      return;
-    }
-    case 'heading.reveal': {
-      const i = a.ref ? store.files.findIndex((f) => f.name === a.ref!.path) : -1;
-      const h = i >= 0 && a.ref ? findHeading(store.files[i].headings, a.ref) : undefined;
-      if (!h) throw new Error('заголовок не найден');
-      return store.open(i, h.line);
-    }
-    case 'file.reveal': {
-      if (!store.files.some((f) => f.name === a.path)) throw new Error(`нет файла «${a.path}»`);
-      return store.revealEntry(String(a.path));
-    }
-    case 'agenda.open':
-      return store.showAgendaHere();
-    case 'settings.open':
-      return store.openSettings(typeof (arg as { section?: unknown })?.section === 'string' ? ((arg as { section: string }).section as never) : undefined);
-    case 'capture.open':
-      return store.openCapture();
-    case 'inbox.pickFile':
-      return void (store.pickInbox = Date.now());
-    case 'inbox.createFile':
-      return store.createInboxFile();
-    case 'heading.status':
-    case 'heading.schedule':
-    case 'heading.deadline':
-    case 'heading.tags':
-    case 'heading.priority': {
-      // the palette's step for the heading: the caret goes to it in the tab shown (its file must be the tab's)
-      const f = a.ref ? fileOf(a.ref.path) : undefined;
-      const h = f && a.ref ? findHeading(f.headings, a.ref) : undefined;
-      const t = store.tab;
-      if (!f || !h || !t) throw new Error('заголовок не найден');
-      const shown = t.kind === 'file' ? t.path : viewOf(t.kind)?.fileOf?.(t);
-      if (shown !== f.path) throw new Error('файл заголовка не показан во вкладке');
-      store.setTabCursor(t, h.line, 0);
-      return store.openPalette(cmd.slice('heading.'.length) as 'status');
-    }
-  }
-  throw new Error(`нет команды «${cmd}»`);
-}
-type Changed = [HeadingRef, Parameters<Host['headingChanged']>[1]];
-/** A reference of the API (a path in the notes folder) as the core's (the file's full path). */
-const coreRef = (h: HeadingRef): HeadingRef => ({ ...h, path: fileOf(h.path)?.path ?? h.path });
-const corePath = (rel: string) => fileOf(rel)?.path ?? rel;
-/** A reference of the core's (an absolute path) as the plugins have it (the path in the notes folder). */
-const apiRef = (h: HeadingRef | null): HeadingRef | null => (h ? { ...h, path: store.files.find((f) => f.path === h.path)?.name ?? h.path } : null);
-/** A heading of a transaction (its text now) as the plugins see it. */
-function txInfo(tx: CoreTx, ref: HeadingRef, h: Heading): HeadingInfo {
-  const f = store.files.find((x) => x.path === ref.path);
-  const hs = tx.headings(ref.path) ?? [];
-  const inherited = new Set<string>(f?.filetags ?? []);
-  for (let p = h.parent; p >= 0; p = hs[p].parent) for (const t of hs[p].tags) inherited.add(t);
-  const done = !!h.keyword && !!f?.wf.done.includes(h.keyword);
-  return {
-    ref: { path: f?.name ?? ref.path, line: h.line, title: h.title }, level: h.level, keyword: h.keyword, done, priority: h.priority, title: h.title,
-    tags: [...new Set([...h.tags, ...inherited])],
-    ...(h.scheduled ? { scheduled: { ...h.scheduled } } : {}), ...(h.deadline ? { deadline: { ...h.deadline } } : {}), ...(h.closed ? { closed: { ...h.closed } } : {}),
-    ...extraOf(tx.text(ref.path) ?? '', h),
-  } as HeadingInfo;
-}
-/** The plugin's Tx over the core's (§5.4): the same operations; what changed in which heading, for the events. */
-function apiTx(tx: CoreTx, ev: Changed[]) {
-  return {
-    setStatus: (h: HeadingRef, kw: string | null) => (tx.setStatus(coreRef(h), kw), ev.push([h, 'status'])),
-    setPlanning: (h: HeadingRef, k: 'SCHEDULED' | 'DEADLINE', d: Date | null) => (tx.setPlanning(coreRef(h), k, d), ev.push([h, 'planning'])),
-    setTags: (h: HeadingRef, tags: string[]) => (tx.setTags(coreRef(h), tags), ev.push([h, 'tags'])),
-    setTitle: (h: HeadingRef, title: string) => (tx.setTitle(coreRef(h), String(title)), ev.push([h, 'title'])),
-    setProperty: (h: HeadingRef, k: string, v: string | null) => (tx.setProperty(coreRef(h), k, v), ev.push([h, 'property'])),
-    insertHeading: (at: { under: HeadingRef; position: 'first' | 'last' } | { under: HeadingRef; before: HeadingRef } | { file: string; position: 'top' | 'end' } | { after: HeadingRef }, org: string) =>
-      apiRef(
-        tx.insertHeading(
-          'after' in at
-            ? { after: coreRef(at.after) }
-            : 'under' in at ? ('before' in at ? { under: coreRef(at.under), before: coreRef(at.before) } : { under: coreRef(at.under), position: at.position }) : { file: corePath(at.file), position: at.position },
-          org,
-        ),
-      ),
-    ensureChild: (under: HeadingRef, title: string, at: { before?: HeadingRef } = {}) =>
-      apiRef(tx.ensureChild(coreRef(under), String(title), at.before ? { before: coreRef(at.before) } : {})),
-    heading: (h: HeadingRef) => {
-      const r = coreRef(h);
-      const x = tx.heading(r);
-      return x ? txInfo(tx, r, x) : null;
-    },
-    children: (h: HeadingRef) => {
-      const r = coreRef(h);
-      return tx.children(r).map((x) => txInfo(tx, r, x));
-    },
-    body: (h: HeadingRef) => tx.body(coreRef(h)),
-    replaceBody: (h: HeadingRef, org: string) => (tx.replaceBody(coreRef(h), org), ev.push([h, 'body'])),
-    move: (h: HeadingRef, to: { under: HeadingRef } | { file: string } | { before: HeadingRef } | { after: HeadingRef }) => (
-      tx.move(coreRef(h), 'under' in to ? { under: coreRef(to.under) } : 'before' in to ? { before: coreRef(to.before) } : 'after' in to ? { after: coreRef(to.after) } : { file: corePath(to.file) }),
-      ev.push([h, 'moved'])
-    ),
-    remove: (h: HeadingRef) => (tx.remove(coreRef(h)), ev.push([h, 'removed'])),
-    ensureId: (h: HeadingRef) => {
-      const r = coreRef(h);
-      const x = tx.heading(r);
-      if (!x) return null;
-      const have = txInfo(tx, r, x).properties.ID;
-      if (have) return have;
-      const id = newId();
-      tx.setProperty(r, 'ID', id);
-      ev.push([h, 'property']);
-      return id;
-    },
-    update: (path: string, fn: (text: string) => string | null) =>
-      tx.update(corePath(path), (t) => {
-        try {
-          const r = fn(t);
-          return typeof r === 'string' ? r : null;
-        } catch (err) {
-          tx.error = err instanceof Error ? err.message : String(err);
-          return null;
-        }
-      }),
-  };
 }
 
 plugins.declare();

@@ -1,0 +1,166 @@
+{
+  "all": {
+    "clipboard": {
+      "write": "function"
+    },
+    "commands": {
+      "keyOf": "function",
+      "on": "function",
+      "run": "function",
+      "setAvailable": "function"
+    },
+    "edit": {
+      "ensureFile": "function",
+      "transaction": "function",
+      "undo": "function"
+    },
+    "events": {
+      "on": "function"
+    },
+    "exports": "function",
+    "files": {
+      "read": "function"
+    },
+    "id": "string",
+    "index": {
+      "body": "function",
+      "byId": "function",
+      "files": "function",
+      "folder": "function",
+      "heading": "function",
+      "inbox": "function",
+      "outline": "function",
+      "query": "function",
+      "statusTone": "function",
+      "workflow": "function"
+    },
+    "net": {
+      "fetch": "function"
+    },
+    "plugins": {
+      "call": "function"
+    },
+    "settings": {
+      "dynamic": "function",
+      "onChange": "function",
+      "values": "function"
+    },
+    "statusSets": {
+      "set": "function"
+    },
+    "storage": {
+      "folder": {
+        "get": "function",
+        "onChange": "function",
+        "set": "function"
+      },
+      "local": {
+        "get": "function",
+        "onChange": "function",
+        "set": "function"
+      }
+    },
+    "ui": {
+      "choose": "function",
+      "close": "function",
+      "currentHeading": "function",
+      "currentReview": "function",
+      "drawSlot": "function",
+      "editor": "function",
+      "editorLink": "function",
+      "fileView": "function",
+      "form": "function",
+      "headingAction": "function",
+      "menu": "function",
+      "navSection": "function",
+      "notify": "function",
+      "oneOnOne": "function",
+      "open": "function",
+      "openFileView": "function",
+      "pickDate": "function",
+      "pickPlace": "function",
+      "refile": "function",
+      "review": "function",
+      "saveFile": "function",
+      "setBadge": "function",
+      "setMonthFilter": "function",
+      "sheet": "function",
+      "showAs": "function",
+      "slot": "function",
+      "taskAction": "function",
+      "taskList": "function",
+      "todayBlock": "function",
+      "view": "function",
+      "widget": "function"
+    }
+  },
+  "none": {
+    "commands": {
+      "keyOf": "function",
+      "on": "function",
+      "run": "function",
+      "setAvailable": "function"
+    },
+    "events": {
+      "on": "function"
+    },
+    "exports": "function",
+    "id": "string",
+    "plugins": {
+      "call": "function"
+    },
+    "settings": {
+      "dynamic": "function",
+      "onChange": "function",
+      "values": "function"
+    },
+    "statusSets": {
+      "set": "function"
+    },
+    "storage": {
+      "folder": {
+        "get": "function",
+        "onChange": "function",
+        "set": "function"
+      },
+      "local": {
+        "get": "function",
+        "onChange": "function",
+        "set": "function"
+      }
+    },
+    "ui": {
+      "choose": "function",
+      "close": "function",
+      "currentHeading": "function",
+      "currentReview": "function",
+      "drawSlot": "function",
+      "editor": "function",
+      "editorLink": "function",
+      "fileView": "function",
+      "form": "function",
+      "headingAction": "function",
+      "menu": "function",
+      "navSection": "function",
+      "notify": "function",
+      "oneOnOne": "function",
+      "open": "function",
+      "openFileView": "function",
+      "pickDate": "function",
+      "pickPlace": "function",
+      "refile": "function",
+      "review": "function",
+      "saveFile": "function",
+      "setBadge": "function",
+      "setMonthFilter": "function",
+      "sheet": "function",
+      "showAs": "function",
+      "slot": "function",
+      "taskAction": "function",
+      "taskList": "function",
+      "todayBlock": "function",
+      "view": "function",
+      "widget": "function"
+    }
+  }
+}
