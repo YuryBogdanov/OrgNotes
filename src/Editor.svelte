@@ -5,6 +5,7 @@
 </script>
 
 <script lang="ts">
+  import { portal } from './portal';
   import { onMount } from 'svelte';
   import { Compartment, EditorState, MapMode, RangeSetBuilder, StateEffect, StateField, Transaction, type Range } from '@codemirror/state';
   import { Decoration, EditorView, ViewPlugin, WidgetType, hoverTooltip, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
@@ -637,10 +638,6 @@
       if (more.length) items.push('sep', ...more.map((a): MenuItem => ({ label: a.label, action: () => a.run(path, hl.number - 1) })));
     }
     menu = { x: e.clientX, y: e.clientY, items };
-  }
-  function portal(node: HTMLElement) {
-    document.body.appendChild(node);
-    return { destroy: () => node.remove() };
   }
 
   const headLine = (t: string) => /^\*+\s/.test(t);

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { portal } from './portal';
   import { onMount } from 'svelte';
   import { fromHsv, parseHex, toHsv } from './colors';
 
@@ -62,10 +63,6 @@
     const below = window.innerHeight - r.bottom > hgt + 12;
     return { left: Math.max(8, Math.min(r.left + 30, window.innerWidth - W - 8)), top: below ? r.bottom + 4 : Math.max(8, r.top - hgt - 4) };
   });
-  function portal(node: HTMLElement) {
-    document.body.appendChild(node);
-    return { destroy: () => node.remove() };
-  }
   onMount(() => el?.querySelector<HTMLInputElement>('input')?.focus());
   function outside(e: MouseEvent) {
     const t = e.target as Node;

@@ -391,7 +391,7 @@
               <span id="ib-file">Файл Inbox</span>
               <span class="ibfile">
                 <span class="val" aria-labelledby="ib-file" data-testid="ib-file">{inboxPath}</span>
-                <button class="change" aria-label="Выбрать файл Inbox" onclick={() => (pickFile = true)}>Выбрать…</button>
+                <button class="btn" aria-label="Выбрать файл Inbox" onclick={() => (pickFile = true)}>Выбрать…</button>
               </span>
             </div>
             <div class="opt">
@@ -408,7 +408,7 @@
           <div class="opts">
             <div class="opt">
               <span>{store.keyHint('capture') || 'Без сочетания'} — изменить в разделе «Клавиши»</span>
-              <button class="change" onclick={() => store.showSection('Клавиши')}>Открыть…</button>
+              <button class="btn" onclick={() => store.showSection('Клавиши')}>Открыть…</button>
             </div>
             <div class="opt">
               <label for="ib-global">Работает из любой программы</label>
@@ -476,7 +476,7 @@
               {#if store.dir}<span class="fpath" title={store.dir}>{store.dir.replace(/^\/Users\/[^/]+/, '~')}</span>{/if}
             </div>
             <!-- the settings close: what they show belongs to the folder being left -->
-            <button class="change" onclick={() => { store.closeSettings(); void store.changeFolder(); }}>Изменить…</button>
+            <button class="btn" onclick={() => { store.closeSettings(); void store.changeFolder(); }}>Изменить…</button>
           </div>
           <p class="help">Приложение работает с одной папкой: все org-файлы в ней и её подпапках. Сменить её можно и в меню «Файл → Открыть другую папку…».</p>
           <div class="cap">НАВИГАТОР</div>
@@ -546,7 +546,7 @@
               <span>Сочетания клавиш перенесены в раздел «Клавиши»</span>
               <span class="fpath">Набор «Как в Emacs / Как в macOS» и все команды</span>
             </div>
-            <button class="change" onclick={() => store.showSection('Клавиши')}>Открыть…</button>
+            <button class="btn" onclick={() => store.showSection('Клавиши')}>Открыть…</button>
           </div>
         </section>
       </div>
@@ -834,16 +834,9 @@
   .folder { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
   .fname { font-size: 13px; font-weight: 600; }
   .fpath { font-size: 12px; color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .change { flex: 0 0 auto; height: 24px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
   .opt { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; background: var(--side); border: 1px solid var(--line); border-radius: 8px; }
   .opt label { font-size: 13px; }
   /* a macOS switch */
-  .switch { flex: 0 0 auto; position: relative; width: 32px; height: 18px; padding: 0; border: 0; border-radius: 9px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); transition: background 0.15s; }
-  .switch span { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: var(--onpacc); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s; }
-  .switch[aria-checked='true'] { background: var(--acc); box-shadow: none; }
-  .switch[aria-checked='true'] span { transform: translateX(14px); }
-  .switch:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
-  @media (prefers-reduced-motion: reduce) { .switch, .switch span { transition: none; } }
 
   section { flex: 1; min-width: 0; overflow: auto; padding: 18px 22px 24px; display: flex; flex-direction: column; gap: 14px; }
   .head { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
@@ -916,7 +909,7 @@
   .btns { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
   .btns button { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--field); }
   .btns .primary { background: var(--acc); color: var(--onacc); font-weight: 600; }
-  .btns .danger-b { background: var(--todo); color: var(--onacc); font-weight: 600; }
+  .btns .danger-b { background: var(--danger); color: var(--on-danger); font-weight: 600; }
   /* «По ID / По названию» (ТЗ 35) */
   .lseg { display: flex; padding: 2px; gap: 2px; border-radius: 7px; background: var(--field); }
   .lseg button { height: 22px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 12px; }

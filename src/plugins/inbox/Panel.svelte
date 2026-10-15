@@ -317,5 +317,5 @@
   .dlg p { margin: 0 0 14px; color: var(--fg2); line-height: 1.45; font-size: 12.5px; }
   .btns { display: flex; justify-content: flex-end; gap: 8px; }
   .btns button { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--field); }
-  .btns .danger-b { background: var(--todo); color: var(--onacc); font-weight: 600; }
+  .btns .danger-b { background: var(--danger); color: var(--on-danger); font-weight: 600; }
 </style>

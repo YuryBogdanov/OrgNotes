@@ -95,7 +95,7 @@
   .menu button:hover:not(:disabled) { background: var(--acc); color: var(--onacc); }
   .menu button:disabled { opacity: 0.4; }
   .menu button.danger { color: var(--todo); }
-  .menu button.danger:hover:not(:disabled) { background: var(--todo); color: var(--onacc); }
+  .menu button.danger:hover:not(:disabled) { background: var(--danger); color: var(--on-danger); }
   .menu { max-width: min(420px, calc(100vw - 8px)); }
   .lb { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lb.it { font-style: italic; }

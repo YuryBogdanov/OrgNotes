@@ -43,8 +43,8 @@
             <span id={id(f)}>{f.label}</span>
             <span class="ibfile">
               <span class="val" aria-labelledby={id(f)} data-testid={id(f)}>{f.show((v[f.key] as string | null) ?? null)}</span>
-              {#if v[f.key] && f.clear}<button class="change" aria-label="{f.label}: {f.clear}" title={f.clear[0].toUpperCase() + f.clear.slice(1)} onclick={() => set(f.key, null)}>×</button>{/if}
-              <button class="change" aria-label="Выбрать {f.label.toLowerCase()}" onclick={() => (picking = f)}>Выбрать…</button>
+              {#if v[f.key] && f.clear}<button class="btn" aria-label="{f.label}: {f.clear}" title={f.clear[0].toUpperCase() + f.clear.slice(1)} onclick={() => set(f.key, null)}>×</button>{/if}
+              <button class="btn" aria-label="Выбрать {f.label.toLowerCase()}" onclick={() => (picking = f)}>Выбрать…</button>
             </span>
           {:else}
             <span class="olab">
@@ -130,11 +130,5 @@
   .segs button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); font-weight: 500; }
   .ibfile { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .ibfile .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .change { flex: 0 0 auto; height: 24px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
   .hrs { display: flex; align-items: center; gap: 6px; color: var(--fg2); }
-  .switch { flex: 0 0 auto; position: relative; width: 32px; height: 18px; padding: 0; border: 0; border-radius: 9px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); transition: background 0.15s; }
-  .switch span { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: var(--onpacc); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s; }
-  .switch[aria-checked='true'] { background: var(--acc); box-shadow: none; }
-  .switch[aria-checked='true'] span { transform: translateX(14px); }
-  .switch:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 </style>

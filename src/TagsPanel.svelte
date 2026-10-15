@@ -146,6 +146,6 @@
   .dlg p { margin: 0; color: var(--fg2); line-height: 1.45; }
   .dlg .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
   .b { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); font-size: 13px; }
-  .b.danger { border: 0; background: var(--todo); color: #fff; font-weight: 600; }
+  .b.danger { border: 0; background: var(--danger); color: var(--on-danger); font-weight: 600; }
   .hint { margin: 0; padding: 8px 12px 10px; font-size: 11px; line-height: 1.45; color: var(--fg3); border-top: 1px solid var(--line); }
 </style>

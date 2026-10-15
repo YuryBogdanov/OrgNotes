@@ -8,6 +8,8 @@
   --segon: #ffffff; --shadow: 0 1px 2px rgba(0,0,0,0.18);
   /* popovers (the command palette): their ground, the dim behind, the selected row (white text ≥ 4.5:1) */
   --pop: #ffffff; --scrim: rgba(0,0,0,0.20); --pacc: #0a64d6; --onpacc: #ffffff;
+  /* tech sprint 1.1: a destructive button, the dim behind a dialog and its shadow, a switch's knob */
+  --danger: #c4262e; --on-danger: #ffffff; --dlg-scrim: rgba(0,0,0,0.30); --dlg-shadow: 0 24px 70px rgba(0,0,0,0.35); --knob: #ffffff;
   --stage: #e9e9ee; /* behind the cards of «Разбор Inbox» */
   --note: #fff8e1; --noteLine: #f0dc9c; --noteAcc: #935300; /* «Записка со вчера» (ТЗ 32) */
   /* the editor's own: see-through, so the selection (drawn under the text) shows through the current line */
@@ -25,6 +27,7 @@
   --ts: #f58ad4; --tagbg: #3d3d46; --tagfg: #c9c9d2; --tagdot: #55555e; --link: #6cb4ff;
   --segon: #55555e; --shadow: none;
   --pop: #2c2c32; --scrim: rgba(0,0,0,0.45); --pacc: #1f6fd6; --onpacc: #ffffff;
+  --danger: #d0343c; --on-danger: #ffffff; --dlg-scrim: rgba(0,0,0,0.45); --dlg-shadow: 0 24px 70px rgba(0,0,0,0.5); --knob: #ffffff;
   --stage: #18181b;
   --note: #2f2a1c; --noteLine: #4d4228; --noteAcc: #f0b04d;
   --cur-line: rgba(108,180,255,0.07); --sel-text: rgba(10,132,255,0.45); --sel-text-blur: rgba(255,255,255,0.14);
@@ -176,3 +179,18 @@ button { cursor: default; }
 .cm-tooltip.cm-tooltip-autocomplete .cm-completionLabel::after { content: ':'; color: var(--fg3); }
 .cm-tooltip.cm-tooltip-autocomplete .cm-completionMatchedText { text-decoration: none; font-weight: 700; color: var(--acc); }
 .cm-tooltip.cm-tooltip-autocomplete .cm-completionDetail { margin-left: auto; font: 11.5px var(--ui, system-ui); font-style: normal; color: var(--fg3); }
+
+/* A switch (role="switch", aria-checked): the settings', the plugins' (tech sprint 1.1: one rule instead of five copies) */
+.switch { flex: 0 0 auto; position: relative; width: 32px; height: 18px; padding: 0; border: 0; border-radius: 9px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); transition: background 0.15s; }
+.switch span { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: var(--knob); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s; }
+.switch[aria-checked='true'] { background: var(--acc); box-shadow: none; }
+.switch[aria-checked='true'] span { transform: translateX(14px); }
+.switch:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.switch:disabled { opacity: 0.45; }
+@media (prefers-reduced-motion: reduce) { .switch, .switch span { transition: none; } }
+
+/* A button of the settings and sheets (tech sprint 1.1): plain, primary (.pri), destructive (.danger) */
+.btn { flex: 0 0 auto; height: 24px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
+.btn:disabled { opacity: 0.5; }
+.btn.pri { border: 0; background: var(--acc); color: var(--onacc); font-weight: 600; }
+.btn.danger { border: 0; background: var(--danger); color: var(--on-danger); font-weight: 600; }

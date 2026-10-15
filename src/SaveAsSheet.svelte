@@ -157,7 +157,7 @@
   .btns button { height: 26px; padding: 0 12px; border: 1px solid var(--line); background: var(--bg); border-radius: 6px; font-size: 13px; }
   .btns .primary { border: 0; background: var(--acc); color: var(--onacc); font-weight: 600; padding: 0 16px; }
   .btns .primary:disabled { opacity: 0.5; }
-  .btns .danger { border: 0; background: var(--todo); color: var(--onacc); font-weight: 600; }
+  .btns .danger { border: 0; background: var(--danger); color: var(--on-danger); font-weight: 600; }
   .ask { position: absolute; top: 40px; width: 380px; padding: 18px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); }
   .ask h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
   .ask p { margin: 0 0 14px; color: var(--fg2); line-height: 1.45; }
