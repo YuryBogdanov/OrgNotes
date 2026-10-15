@@ -56,7 +56,7 @@ export function decorate(v: EditorView, words: Workflow): { all: DecorationSet; 
           if (/^\s*\|[-+]+\|?\s*$/.test(t)) mark(line.from, line.to, 'cm-tablesep');
         }
       }
-      for (const m of t.matchAll(/[<\[]\d{4}-\d{2}-\d{2}[^>\]\n]*[>\]]/g)) mark(line.from + m.index!, line.from + m.index! + m[0].length, 'cm-ts');
+      for (const m of t.matchAll(/[<[]\d{4}-\d{2}-\d{2}[^>\]\n]*[>\]]/g)) mark(line.from + m.index!, line.from + m.index! + m[0].length, 'cm-ts');
       if (line.to + 1 > to) break;
       pos = line.to + 1;
     }

@@ -29,7 +29,7 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="m-scrim" use:portal onmousedown={onclose}>
   <div class="m-dlg" bind:this={box} {role} aria-modal="true" aria-label={label} tabindex="-1" style:width="{width}px" onmousedown={(e) => e.stopPropagation()} onkeydown={keys}>
     {@render children()}

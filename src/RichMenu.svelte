@@ -62,9 +62,8 @@
   const title = $derived(pick.kind === 'status' ? 'Статус' : 'Приоритет');
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="scrim" onmousedown={onclose}></div>
-<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="menu" role="menu" aria-label={title} tabindex="0" bind:this={box} onkeydown={key} style:left="{x}px" style:top="{y}px">
   {#each items as it, i (it.id)}
     {#if it.sep}<div class="sep" role="separator"></div>{/if}

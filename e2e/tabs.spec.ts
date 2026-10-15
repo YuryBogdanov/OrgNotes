@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, expandTree } from './tauriMock';
-import { diskAll as disk, log } from './helpers';
+import { diskAll as disk } from './helpers';
 
 const FILES = () => ({
   '/mock/work.org': '#+TITLE: Work\n\n* Q4 2026\n** TODO Бюджет\nтекст\n',

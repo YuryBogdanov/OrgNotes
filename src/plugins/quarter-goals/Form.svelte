@@ -28,7 +28,6 @@
   let dateTouched = false;
   let bad = $state(false);
   let cal = $state(false); // the calendar is open under the deadline
-  let view = $state<Date>(date!);
   let qMenu = $state(false);
   let busy = $state(false);
 
@@ -52,7 +51,6 @@
 
   function setDate(d: Date) {
     date = d;
-    view = d;
     dateText = '';
     bad = false;
     dateTouched = true;
@@ -62,7 +60,6 @@
     qMenu = false;
     if (!dateTouched) {
       date = qEnd(q);
-      view = date;
     }
   }
   function typedDate() {
@@ -76,7 +73,6 @@
     bad = !d;
     if (d) {
       date = d;
-      view = d;
     }
   }
   /** ⇧ ← → a day, ⇧ ↑ ↓ a week; with ⌥ a month, a year; ↩ takes the day and closes the calendar. */
@@ -158,7 +154,6 @@
   void tick().then(() => titleEl?.focus());
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="gform" role="dialog" aria-modal="true" aria-label="Новая цель" tabindex="-1" bind:this={sheet} onkeydown={key}>
   <header>
     <b>Новая цель</b>

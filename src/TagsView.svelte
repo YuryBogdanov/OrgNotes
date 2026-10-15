@@ -257,7 +257,6 @@
         {/if}
       </div>
     </div>
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
     <div class="list" role="listbox" aria-label="Заголовки с тегом" tabindex="0" bind:this={list} onkeydown={keydown}
       onclick={(e) => !(e.target as HTMLElement).closest('.row') && clear()}>
       {#each groups as g (g.path)}

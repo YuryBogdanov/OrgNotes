@@ -67,7 +67,6 @@
   </button>
   {#if session.defer}
     {@const d = session.defer}
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div class="defer" role="dialog" aria-label="Отложить до" tabindex="0" bind:this={deferEl} onkeydown={deferKey}>
       <span class="dh"><b>Отложить до…</b><span>ставит SCHEDULED</span></span>
       <div class="opts" role="listbox" aria-label="Когда">
@@ -95,11 +94,11 @@
 </button>
 
 {#if session.defer}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="dscrim" onmousedown={() => (session.defer = null)}></div>
 {/if}
 {#if session.confirmDel && item}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="ib-modal" onmousedown={() => (session.confirmDel = false)}>
     <div class="ib-dlg" role="alertdialog" aria-modal="true" aria-label="Удаление задачи" onmousedown={(e) => e.stopPropagation()}>
       <h2>Удалить задачу «{item.title}» вместе с деталями?</h2>

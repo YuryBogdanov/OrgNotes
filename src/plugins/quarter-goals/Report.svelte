@@ -34,7 +34,6 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="rep" role="dialog" aria-modal="true" aria-label="Отчёт за квартал" tabindex="-1" onkeydown={key}>
   <header>
     <b>Отчёт за квартал · {quarterLabel(q)}</b>

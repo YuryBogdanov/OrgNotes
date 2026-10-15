@@ -62,7 +62,7 @@ class TagsState {
 
   private async save(change: (t: { colors: Record<string, string>; noInherit: string[] }) => void) {
     await store.updateConfig((raw) => {
-      let o: any = {};
+      let o: any;
       try {
         o = raw ? JSON.parse(raw) : {};
       } catch {
@@ -122,7 +122,7 @@ class TagsState {
     if (!step && p.n) return false;
     const color = this.colorOf(from);
     await store.updateConfig((raw) => {
-      let o: any = {};
+      let o: any;
       try {
         o = raw ? JSON.parse(raw) : {};
       } catch {

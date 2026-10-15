@@ -295,7 +295,7 @@
   {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
   {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
   {#if store.capture}
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="capscrim" onmousedown={(e) => { if (e.target === e.currentTarget) store.capture = null; }}>
       {#key store.capture.n}
         <Capture file={store.inboxFile ? nameOf(store.inboxFile.name) + '.org' : null}
@@ -328,7 +328,6 @@
         <div class="panes" bind:this={panesEl}>
           {#each store.layout.panes as p, i (p.id)}
             {#if i === 1}
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div class="divider" role="separator" aria-orientation="vertical" aria-label="Граница панелей"
                 onpointerdown={dragDivider} ondblclick={() => (store.layout.ratio = 0.5)}></div>
             {/if}

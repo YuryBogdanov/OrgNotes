@@ -109,12 +109,10 @@
   });
 
   // ---- keys ------------------------------------------------------------------------------------------------------
-  const top = $derived(levels[levels.length - 1]);
   function move(d: number) {
     const l = levels[levels.length - 1];
     const n = shown(l).length;
     if (n) l.sel = Math.max(0, Math.min(n - 1, l.sel + d)); // no going round at the ends
-    mouseOwns = false;
   }
   function key(e: KeyboardEvent) {
     if (focusIdx === null && openIdx === null) return;
@@ -185,14 +183,12 @@
   }
 
   // ---- mouse -------------------------------------------------------------------------------------------------------
-  let mouseOwns = $state(true); // a key press takes the highlight until the pointer moves
   function clickSeg(i: number) {
     if (openIdx === i) return leave();
     focusIdx = i;
     open(i);
   }
   function hover(depth: number, j: number) {
-    mouseOwns = true;
     const l = levels[depth];
     if (!l) return;
     const it0 = shown(l)[j];
@@ -238,7 +234,6 @@
   </div>
 {/snippet}
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="jb" bind:this={bar} use:clickOutside={{ onoutside: () => (openIdx !== null || focusIdx !== null) && leave(), capture: true }} role="navigation" aria-label="Путь к файлу" onkeydown={key}>
   {#each segs as s, i (s.rel)}
     {#if i}<span class="sep" aria-hidden="true">›</span>{/if}

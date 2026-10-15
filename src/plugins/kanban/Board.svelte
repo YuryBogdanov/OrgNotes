@@ -384,10 +384,10 @@
                   <div class="kb-ph" style:height="{drag?.h ?? 58}px" aria-hidden="true"></div>
                 {:else}
                 {@const k = c.cards[row.i]}
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <div class="kb-card" class:done={k.done} class:sel={selected === k.key} class:ghost={drag?.key === k.key} role="button" tabindex="-1" aria-label={k.title} data-line={k.line} data-key={k.key}
                   onpointerdown={(e) => down(e, k, c.keyword)} ondblclick={() => openPeek({ line: k.line, title: k.heading })}
                   oncontextmenu={(e) => { e.preventDefault(); select(k.key); root?.focus({ preventScroll: true }); tasks?.menu({ x: e.clientX, y: e.clientY }); }}>
+                  <!-- eslint-disable-next-line svelte/no-at-html-tags -- the title escaped by board.ts titleHtml -->
                   <div class="kb-t">{@html titleHtml(k.title)}</div>
                   {#if k.priority || k.date || k.progress || k.tags.length}
                     <div class="kb-meta">
@@ -420,7 +420,6 @@
     <div class="kb-stage"></div>
   {/if}
   {#if opened && peek}
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div class="kb-peek" role="dialog" aria-label="Карточка" tabindex="-1" onkeydown={peekKeys}>
       <div class="kb-ph2">
         {#if peekHeading?.keyword}<button class="kb-kw kb-pk" style:--c={kanban.tone(peekHeading.keyword, path)} title="Сменить статус" onclick={peekStatus}>{peekHeading.keyword} ▾</button>{/if}
@@ -445,6 +444,7 @@
     </div>
   </div>
   <div class="kb-drag" style:left="{drag.x - drag.ox}px" style:top="{drag.y - drag.oy}px" style:width="{drag.w}px" aria-hidden="true">
+    <!-- eslint-disable-next-line svelte/no-at-html-tags -- titleHtml of the card dragged -->
     <div class="kb-t">{@html drag.html}</div>
     {#if drag.tags}<div class="kb-meta"><span class="kb-tags">{drag.tags}</span></div>{/if}
   </div>

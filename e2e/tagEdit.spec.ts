@@ -1,6 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, pluginsReady } from './tauriMock';
-import { diskFile as disk } from './helpers';
 
 // ТЗ 38, PR C: the tags of a heading in the editor — ⌃C Q (and «Теги…» of the menu and the palette): a field with the
 // folder's tags, ↩ / ⌫ / ⎋, the changes in the line at once and one ⌘Z; the tags offered while typing; a click on a

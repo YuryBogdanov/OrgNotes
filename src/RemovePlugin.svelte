@@ -24,7 +24,6 @@
 {#if e}
   <div class="layer" use:portal>
     <div class="scrim" aria-hidden="true"></div>
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Удалить плагин" tabindex="-1"
       onkeydown={(ev) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); up.removing = null; } }}>
       <b>Удалить «{name}»?</b>

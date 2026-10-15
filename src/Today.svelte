@@ -44,7 +44,7 @@
   }
   type Row = { path: string; line: number; title: string; kw: string | null; slot: string; n: number; stale?: boolean; gone?: boolean };
   /** Rows changed from the list stay as they were until a refresh (`frozen`): drawn with the task's values now. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the rows of three kinds, as they were drawn
+  // the rows of three kinds, as they were drawn
   let frozen = $state.raw<{ agenda: any[]; groups: { file: string; rows: any[] }[]; late: any[]; texts: Map<string, string> } | null>(null);
   function shownRows<T extends { path: string; line: number; title: string; kw: string | null }>(block: string, live: T[], was: (T & Row)[] | undefined): (T & Row)[] {
     const rows = live.map((r) => {
@@ -251,7 +251,6 @@
 </script>
 
 <div class="host">
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div class="today" role="region" aria-label="Сегодня" tabindex="-1" bind:this={el} onkeydown={keydown} onclick={clickEmpty}>
   <div class="wrap">
     <header>

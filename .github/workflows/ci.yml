@@ -27,6 +27,8 @@ jobs:
       - run: npm ci
       - run: npm run check
         if: matrix.shard == 1
+      - run: npm run lint
+        if: matrix.shard == 1
       - run: npm test
         if: matrix.shard == 1
       - name: WebKit for Playwright

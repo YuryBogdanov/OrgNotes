@@ -5,7 +5,7 @@ import {
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { displayName, isArchive, noteName, withOrg } from './names';
-import { appendTask, setPlanning, setTags, weekdayNames } from './edits';
+import { appendTask, setPlanning, setTags } from './edits';
 import { caretAfter } from './refile';
 import type { CalSpec, Plate } from './commands';
 import { lsGet, lsSet } from './storage';
@@ -29,11 +29,11 @@ import { readInbox } from './inbox';
 import { readAgendas, type Agenda } from './agendas';
 import { allFileViews, fileViewOf, navOf, viewOf } from './views';
 import { mini as miniSettings } from './miniOptions.svelte';
-import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
+import { Journal, Tx, canUndo, type Step } from './journal';
 import { fileLink, headingLink, labelOf, linkHooks } from './linkEdit';
 import { newId } from './endDay';
 import { fileTypeOf, fileTypes, isOrgName, watchFileTypes, withExt } from './fileTypes.svelte';
-import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow, type WorkflowDef } from './org';
+import { DEFAULT_SEQUENCE, EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow, type WorkflowDef } from './org';
 
 export interface NoteFile {
   name: string; // relative path inside the notes folder

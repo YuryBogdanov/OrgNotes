@@ -180,7 +180,6 @@
     {#if pending.length}
       <div class="prog"><div class="pt"><span>{tasksWord(pending.length)}</span>{#if oldest}<span>самой старой {days(oldest)}</span>{/if}</div></div>
     {/if}
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div class="list" bind:this={list} role="listbox" tabindex="0" aria-label="Задачи Inbox" aria-activedescendant="ib-{sel}" onkeydown={key}>
       {#each items as it, i (it.line + ':' + it.title)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -214,7 +213,7 @@
 
 {#if datePop}
   {@const dp = datePop}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="scrim" onmousedown={() => (datePop = null)}></div>
   <div class="pop" role="dialog" aria-label="Дата задачи" style="left:{dp.x}px;top:{dp.y}px">
     <div class="seg" role="radiogroup" aria-label="Какая дата">
@@ -231,7 +230,7 @@
 
 {#if confirmDel}
   {@const it = confirmDel}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="modal" onmousedown={() => (confirmDel = null)}>
     <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Удаление задачи" onmousedown={(e) => e.stopPropagation()}>
       <h2>Удалить задачу «{it.title}» вместе с деталями?</h2>

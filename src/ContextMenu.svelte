@@ -42,7 +42,7 @@
 
 <svelte:window onkeydown={(e) => !nested && key(e)} onblur={() => !nested && onclose()} />
 {#if !nested}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="scrim" onmousedown={onclose} oncontextmenu={(e) => { e.preventDefault(); onclose(); }}></div>
 {/if}
 <div class="menu" class:tall role="menu" bind:this={el} style="left:{pos.left}px;top:{pos.top}px;min-width:{width}px">

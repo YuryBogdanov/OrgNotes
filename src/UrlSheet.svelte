@@ -89,7 +89,6 @@
 
 <div class="layer" use:portal>
   <div class="scrim" aria-hidden="true"></div>
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div class="dlg" role="dialog" aria-modal="true" aria-label="Установка по ссылке" tabindex="-1" onkeydown={key}>
     <b class="t">Установить плагин по ссылке</b>
     <label class="fld">

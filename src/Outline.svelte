@@ -50,10 +50,7 @@
   });
 
   const current = $derived(store.selected); // the heading the caret is in
-  let cursor = $state(-1); // the row ↑/↓ are on (a heading index)
-  $effect(() => {
-    cursor = current;
-  });
+  let cursor = $derived(current); // the row ↑/↓ are on (a heading index): the caret's heading until moved
 
   let list: HTMLDivElement | undefined = $state();
   // the current heading stays in view as the caret moves
@@ -109,7 +106,6 @@
     {:else if !rows.length}
       <div class="empty">Ничего не найдено</div>
     {:else}
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div class="tree" role="tree" aria-label="Структура файла" tabindex="0" bind:this={list} onkeydown={key}
         aria-activedescendant={cursor >= 0 ? 'ol-' + cursor : undefined}>
         {#each rows as r (r.i)}

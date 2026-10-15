@@ -281,7 +281,6 @@
             use:focusSelect onkeydown={(e) => keyNew(e, r)} onblur={() => (store.creating = null)} />
         </div>
       {:else}
-        <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
         <div class="row" class:sel={r.selected} class:flash={r.kind === 'file' && flash === r.key} class:dim={r.done} data-key={r.key} class:drop={r.kind === 'folder' && dropOn === r.rel}
           style="padding-left:{6 + r.depth * 14}px" role="treeitem" aria-selected={r.selected} aria-expanded={r.hasKids ? r.open : undefined}
           tabindex={r.key === focusKey ? 0 : -1}

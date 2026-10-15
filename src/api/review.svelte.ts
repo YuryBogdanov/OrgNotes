@@ -50,7 +50,7 @@ export class ReviewController {
     const a = r?.spec.actions.find((x) => x.id === actionId);
     if (!r || !c || !a || this.host.failed(r.plugin)) return;
     if (a.disabled && this.host.guard(r.plugin, () => a.disabled!(c.info), false)) return;
-    let res: 'next' | 'stay' = 'stay';
+    let res: 'next' | 'stay';
     try {
       res = await a.run(c.info);
     } catch (err) {

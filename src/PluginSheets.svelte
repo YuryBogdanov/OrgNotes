@@ -145,7 +145,6 @@
 {#if plugins.form && schema}
   {@const r = plugins.form}
   <div class="scrim" aria-hidden="true"></div>
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div class="pform" class:wide={r.spec.groups.some((g) => g.fields.some((f) => WIDE.has(f.type)))} role="dialog" aria-modal="true" aria-label={r.spec.title} tabindex="-1" bind:this={sheet} onkeydown={key}>
     <header><b>{r.spec.title}</b>{#if r.spec.headerExtra}<span class="hx" bind:this={extra}></span>{/if}<span class="who">{plugins.name(r.plugin)}</span></header>
     <div class="body"><SchemaSettings {schema} embedded where={false} /></div>
@@ -162,7 +161,6 @@
     <!-- the plugin draws the whole sheet (its dialog, header, footer, keys) -->
     <div class="bare" bind:this={sheetBody}></div>
   {:else}
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div class="pform psheet" role="dialog" aria-modal="true" aria-label={r.spec.title} tabindex="-1">
     <header><b>{r.spec.title}</b><span class="who">{plugins.name(r.plugin)}</span></header>
     <div class="body" bind:this={sheetBody}></div>
@@ -181,7 +179,6 @@
 {#each plugins.trustReq ? [plugins.trustReq] : [] as t (t)}
   {@const m = t.entry.manifest!}
   <div class="scrim" aria-hidden="true"></div>
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div class="pform trust" role="alertdialog" aria-modal="true" aria-label={t.update ? `Обновить плагин «${m.name}»` : `Включить плагин «${m.name}»`} tabindex="-1"
     onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); t.resolve(false); } }}>
     <header><b>{t.update ? `Обновить «${m.name}» до ${t.update}?` : `Включить плагин «${m.name}»?`}</b></header>

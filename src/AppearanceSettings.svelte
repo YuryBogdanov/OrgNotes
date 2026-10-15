@@ -160,7 +160,6 @@
 {#if menu}<div use:portal><ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} /></div>{/if}
 {#if confirmDel}
   {@const t = confirmDel}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <ConfirmDialog label="Удаление темы" title="Удалить тему «{t.name}»?" onclose={() => (confirmDel = null)} actions={[{ label: 'Удалить', kind: 'danger', run: () => void store.deleteTheme(t) }]}>
     Файл темы удаляется из папки тем. {store.themeFor(t.appearance).name === t.name ? `Редактор вернётся к теме «${t.appearance === 'dark' ? 'Panopticon тёмная' : 'Panopticon светлая'}».` : ''}
   </ConfirmDialog>

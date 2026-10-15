@@ -81,7 +81,7 @@
 {/if}
 
 {#if req}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="scrim" onmousedown={() => done(false)}></div>
   <div class="tagpop" role="dialog" aria-label="Теги задачи" style="left:{pos.left}px;top:{pos.top}px">
     <div class="cap">ТЕГИ</div>
@@ -94,7 +94,6 @@
     {#if found.length}
       <div class="list" role="listbox" aria-label="Теги папки">
         {#each found as t, i (t)}
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div class="opt" class:on={i === hi} role="option" aria-selected={i === hi} onmousedown={(e) => { e.preventDefault(); add(t); }}>{t}</div>
         {/each}
       </div>

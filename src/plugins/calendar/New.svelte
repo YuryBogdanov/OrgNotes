@@ -52,7 +52,6 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="cap" role="dialog" aria-label={kind === 'task' ? 'Новая задача' : 'Новое событие'} tabindex="-1" onkeydown={key}>
   <div class="crumb"><span>{kind === 'task' ? 'Новая задача' : 'Новое событие'}</span><span aria-hidden="true">›</span><span>{valid ? dayShort(fromIso(day)) : 'дата?'}</span></div>
   <div class="trow" class:shake>

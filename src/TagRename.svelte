@@ -46,7 +46,6 @@
 
 <div class="layer" use:portal>
   <div class="scrim" aria-hidden="true"></div>
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div class="dlg" role="dialog" aria-modal="true" aria-label={merge ? 'Объединить тег' : 'Переименовать тег'} tabindex="-1" onkeydown={key}>
     <b class="t">{merge ? 'Объединить тег с другим' : 'Переименовать тег во всех файлах'}</b>
     <div class="ft">

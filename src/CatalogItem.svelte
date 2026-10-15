@@ -67,6 +67,7 @@
         <p class="lead">{e.description}</p>
         {#if readme}
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <!-- eslint-disable-next-line svelte/no-at-html-tags -- escaped by readme.ts: no HTML of the README gets through -->
           <div class="md" onclick={click}>{@html readme}</div>
         {:else if readmeErr}
           <p class="dim">README не загрузился: {readmeErr}</p>
@@ -79,6 +80,7 @@
             <div class="rh"><b>{r.tag}</b><span>{date(r.date)}{r.size ? ` · ${kb(r.size)}` : ''}</span></div>
             {#if r.notes.trim()}
               <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+              <!-- eslint-disable-next-line svelte/no-at-html-tags -- escaped by readme.ts -->
               <div class="md" onclick={click}>{@html renderReadme(r.notes, page)}</div>
             {/if}
           </div>
