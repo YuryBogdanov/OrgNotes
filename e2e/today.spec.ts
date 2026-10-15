@@ -137,6 +137,25 @@ test('«Настройки → Сегодня»: after «Основные»; a b
   await expect(screen(page).getByRole('region', { name: 'Задачи' })).toContainText('Ждём ответа');
 });
 
+test('«Настройки → Сегодня»: a block dragged by its grip onto another goes before it; the line shows where', async ({ page }) => {
+  await open(page);
+  await screen(page).getByRole('button', { name: 'Настроить экран' }).click();
+  const list = page.getByRole('dialog', { name: 'Настройки' }).getByRole('list', { name: 'Блоки' });
+  const names = () => list.getByRole('listitem').locator('.olab > span:first-child').allInnerTexts();
+  const before = await names();
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__dt = new DataTransfer();
+    const fire = (el: Element, type: string) => el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: w.__dt }));
+    fire(document.querySelectorAll('.blk [data-grip]')[2], 'dragstart');
+    fire(document.querySelectorAll('.blk')[0], 'dragover');
+  });
+  await expect(list.getByRole('listitem').first()).toHaveClass(/over/);
+  await page.evaluate(() => document.querySelectorAll('.blk')[0].dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: (window as any).__dt })));
+  await expect.poll(names).toEqual([before[2], before[0], before[1], ...before.slice(3)]);
+  await expect(list.locator('.over')).toHaveCount(0);
+});
+
 test('«Время напоминания»: 15:00–21:00 by a quarter of an hour, 17:30 by default; off while the reminder is off; statuses are capsules', async ({ page }) => {
   await open(page);
   await expect(screen(page).getByRole('region', { name: 'Задачи' }).locator('.kw').first()).toHaveCSS('border-radius', '4px');

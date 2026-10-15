@@ -2,6 +2,7 @@
   import Switch from './Switch.svelte';
   import SchemaSettings from './SchemaSettings.svelte';
   import Picker from './Picker.svelte';
+  import { Reorder } from './reorder.svelte';
   import { store } from './store.svelte';
   import { moreSchema, showSchema, today } from './todayState.svelte';
   import { todayBlockOf } from './todayBlocks';
@@ -21,8 +22,6 @@
 
   const all = $derived(today.blocks);
   const rows = $derived(all.filter((b) => todayBlockOf(b.id)));
-  let dragId = $state<string | null>(null);
-  let overId = $state<string | null>(null);
   function moveBlock(id: string, to: number) {
     const list = [...all];
     const from = list.findIndex((b) => b.id === id);
@@ -31,10 +30,7 @@
     list.splice(Math.max(0, Math.min(list.length, to)), 0, b);
     void today.setFolder({ blocks: list });
   }
-  const dropOn = (target: string) => {
-    if (dragId && dragId !== target) moveBlock(dragId, all.findIndex((b) => b.id === target));
-    dragId = overId = null;
-  };
+  const drag = new Reorder((id, target) => void (id !== target && moveBlock(id, all.findIndex((b) => b.id === target))));
   function step(e: KeyboardEvent, id: string) {
     if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
     e.preventDefault();
@@ -94,11 +90,8 @@
     <div class="opts" role="list" aria-label="Блоки">
       {#each rows as r (r.id)}
         {@const b = todayBlockOf(r.id)!}
-        <div class="opt blk" class:over={overId === r.id && dragId !== r.id} role="listitem"
-          ondragover={(e) => { if (dragId) { e.preventDefault(); overId = r.id; } }}
-          ondrop={(e) => { e.preventDefault(); dropOn(r.id); }}>
-          <span class="grip" role="button" tabindex="0" draggable="true" data-grip={r.id} aria-label="Перетащить блок «{b.title}». Option со стрелками вверх и вниз меняет порядок"
-            ondragstart={(e) => { dragId = r.id; e.dataTransfer?.setData('text/plain', r.id); }} ondragend={() => (dragId = overId = null)}
+        <div class="opt blk" class:over={drag.overId === r.id && drag.dragId !== r.id} role="listitem" use:drag.zone={r.id}>
+          <span class="grip" role="button" tabindex="0" use:drag.handle={{ id: r.id }} data-grip={r.id} aria-label="Перетащить блок «{b.title}». Option со стрелками вверх и вниз меняет порядок"
             onkeydown={(e) => step(e, r.id)}>
             <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><circle cx="3" cy="3" r="1.2" /><circle cx="7" cy="3" r="1.2" /><circle cx="3" cy="7" r="1.2" /><circle cx="7" cy="7" r="1.2" /><circle cx="3" cy="11" r="1.2" /><circle cx="7" cy="11" r="1.2" /></svg>
           </span>

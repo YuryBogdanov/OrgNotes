@@ -13,6 +13,7 @@
   import ColorPicker from './ColorPicker.svelte';
   import Picker from './Picker.svelte';
   import RemovePlugin from './RemovePlugin.svelte';
+  import { Reorder } from './reorder.svelte';
   import SettingsGeneral from './SettingsGeneral.svelte';
   import SettingsInbox from './SettingsInbox.svelte';
   import SettingsAgendas from './SettingsAgendas.svelte';
@@ -255,21 +256,10 @@
   }
 
   // ---- drag and drop ------------------------------------------------------------------------------------
-  let dragId = $state<string | null>(null);
-  let overId = $state<string | null>(null);
-  let dragWf = $state<string | null>(null);
-  let overWf = $state<string | null>(null);
-  function startRowDrag(e: DragEvent, s: DraftState) {
-    dragId = s.id;
-    e.dataTransfer?.setData('text/plain', s.id);
-    const row = (e.currentTarget as HTMLElement).closest('.srow');
-    if (row && e.dataTransfer) e.dataTransfer.setDragImage(row, 12, 20);
-  }
-  const dropRow = (e: DragEvent, before: string | 'separator' | null) => {
-    e.preventDefault();
-    if (dragId && wf) dropState(wf, dragId, before);
-    dragId = overId = null;
-  };
+  // a set by its grip onto another set (before it) or the end; a state by its grip onto a state, the line between the
+  // open and the done ones, or the end (the whole row is the drag image)
+  const wfDrag = new Reorder((id, target) => dropWorkflow(draft, id, target === 'end' ? null : target));
+  const rowDrag = new Reorder((id, target) => void (wf && dropState(wf, id, target === 'end' ? null : target)));
 
   // keyboard reordering of the focused row: ⌥↑ / ⌥↓
   function rowKey(e: KeyboardEvent, s: DraftState) {
@@ -389,13 +379,10 @@
       <aside>
         <div class="cap">НАБОРЫ СТАТУСОВ</div>
         {#each draft.workflows as w (w.id)}
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div class="wfrow" class:over={overWf === w.id}
-            ondragover={(e) => { if (dragWf) { e.preventDefault(); overWf = w.id; } }}
-            ondrop={(e) => { e.preventDefault(); if (dragWf) dropWorkflow(draft, dragWf, w.id); dragWf = overWf = null; }}>
+          <div class="wfrow" class:over={wfDrag.overId === w.id} use:wfDrag.zone={w.id}>
             <button class="wf" class:on={w.id === wf?.id} aria-pressed={w.id === wf?.id} onclick={() => (selectedId = w.id)}>
               <span class="wfh">
-                <span class="wfgrip" draggable="true" role="img" aria-label="Перетащить набор" ondragstart={(e) => { dragWf = w.id; e.dataTransfer?.setData('text/plain', w.id); }} ondragend={() => (dragWf = overWf = null)}>⋮⋮</span>
+                <span class="wfgrip" role="img" aria-label="Перетащить набор" use:wfDrag.handle={{ id: w.id }}>⋮⋮</span>
                 <span class="wfn">{w.name || '—'}</span>
               </span>
               <span class="chips">
@@ -404,9 +391,7 @@
             </button>
           </div>
         {/each}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="wfend" class:over={overWf === 'end'} ondragover={(e) => { if (dragWf) { e.preventDefault(); overWf = 'end'; } }}
-          ondrop={(e) => { e.preventDefault(); if (dragWf) dropWorkflow(draft, dragWf, null); dragWf = overWf = null; }}></div>
+        <div class="wfend" class:over={wfDrag.overId === 'end'} use:wfDrag.zone={'end'}></div>
         <button class="add" onclick={() => (selectedId = addWorkflow(draft).id)}>+ Новый набор</button>
         <p class="help">Набор — это цепочка состояний. Первый набор в списке используется по умолчанию. Порядок меняется перетаскиванием. Переключаться между наборами на заголовке можно клавишами ⌃⇧← и ⌃⇧→.</p>
       </aside>
@@ -448,8 +433,7 @@
 
             {#each [...open, 'sep', ...done] as item (typeof item === 'string' ? 'sep' : item.id)}
               {#if typeof item === 'string'}
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div class="sep" class:over={overId === 'separator'} ondragover={(e) => { e.preventDefault(); overId = 'separator'; }} ondrop={(e) => dropRow(e, 'separator')}>
+                <div class="sep" class:over={rowDrag.overId === 'separator'} use:rowDrag.zone={'separator'}>
                   <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>
                   Ниже — завершающие состояния: задача считается закрытой
                 </div>
@@ -457,11 +441,10 @@
                 {@const s = item}
                 {@const kw = valueOf(s)}
                 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-                <div class="grid srow" class:over={overId === s.id} class:isdone={s.done} class:bad={!!errors[s.id]} role="row" tabindex="0" data-row={s.id}
+                <div class="grid srow" class:over={rowDrag.overId === s.id} class:isdone={s.done} class:bad={!!errors[s.id]} role="row" tabindex="0" data-row={s.id}
                   aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" aria-label="{displayName(s.keyword) || 'Новое состояние'}. Option со стрелками вверх и вниз меняет порядок"
-                  onkeydown={(e) => rowKey(e, s)}
-                  ondragover={(e) => { if (dragId) { e.preventDefault(); overId = s.id; } }} ondrop={(e) => dropRow(e, s.id)}>
-                  <span class="grip" draggable="true" role="img" aria-label="Перетащить строку" ondragstart={(e) => startRowDrag(e, s)} ondragend={() => (dragId = overId = null)}>⋮⋮</span>
+                  onkeydown={(e) => rowKey(e, s)} use:rowDrag.zone={s.id}>
+                  <span class="grip" role="img" aria-label="Перетащить строку" use:rowDrag.handle={{ id: s.id, image: '.srow' }}>⋮⋮</span>
                   <span class="colorcell">
                     <button class="swatch" aria-label="Цвет: {s.color ? colorName(s.color) : 'авто'}. Изменить" aria-haspopup="dialog" aria-expanded={picker?.id === s.id}
                       onclick={(e) => togglePicker(e, s)}>
@@ -499,8 +482,7 @@
               {/if}
             {/each}
 
-            <!-- svelte-ignore a11y_no_static_element_interactions -->
-            <div class="addrow" class:over={overId === 'end'} ondragover={(e) => { if (dragId) { e.preventDefault(); overId = 'end'; } }} ondrop={(e) => dropRow(e, null)}>
+            <div class="addrow" class:over={rowDrag.overId === 'end'} use:rowDrag.zone={'end'}>
               <button onclick={() => plus(false)}>+ Состояние</button>
               <button onclick={() => plus(true)}>+ Завершающее</button>
             </div>

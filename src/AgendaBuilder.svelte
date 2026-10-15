@@ -7,6 +7,7 @@
   import { displayName } from './names';
   import ColorPicker from './ColorPicker.svelte';
   import AgendaPreview from './AgendaPreview.svelte';
+  import { Reorder } from './reorder.svelte';
   import { MULTI, allTagsOf, dateOfForm, folderTree, isChecked, optionsFor, statusSets, valueKind, type Kind, type Opt } from './builderOptions';
   import { isoDay } from './calIndex';
   import {
@@ -242,8 +243,8 @@
     const to = before ? draft.blocks.findIndex((x) => x.id === before) : draft.blocks.length;
     draft.blocks.splice(to < 0 ? draft.blocks.length : to, 0, b);
   }
-  let dragId = $state<string | null>(null);
-  let overId = $state<string | null>(null);
+  // dragging a block by its grip: onto a block (before it) or the end
+  const drag = new Reorder((id, target) => move(id, target === 'end' ? null : target), () => (open = ''));
   function gripKey(e: KeyboardEvent, b: Block) {
     if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
     e.preventDefault();
@@ -328,9 +329,8 @@
   <svg class="chev" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={chev} /></svg>
 {/snippet}
 {#snippet grip(b: Block)}
-  <span class="grip" role="button" tabindex="0" draggable="true" data-grip={b.id} aria-label="Перетащить блок «{b.name}». Option со стрелками вверх и вниз меняет порядок"
+  <span class="grip" role="button" tabindex="0" use:drag.handle={{ id: b.id }} data-grip={b.id} aria-label="Перетащить блок «{b.name}». Option со стрелками вверх и вниз меняет порядок"
     aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" onkeydown={(e) => gripKey(e, b)}
-    ondragstart={(e) => { dragId = b.id; open = ''; e.dataTransfer?.setData('text/plain', b.id); }} ondragend={() => (dragId = overId = null)}
     onclick={(e) => e.stopPropagation()}>
     <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 5h.01M13 5h.01M7 10h.01M13 10h.01M7 15h.01M13 15h.01" /></svg>
   </span>
@@ -376,10 +376,7 @@
       <div class="grp">
         <div class="cap">БЛОКИ — перетаскивайте, чтобы поменять порядок</div>
         {#each draft.blocks as b (b.id)}
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div class="bwrap" class:over={overId === b.id && dragId !== b.id}
-            ondragover={(e) => { if (dragId) { e.preventDefault(); overId = b.id; } }}
-            ondrop={(e) => { e.preventDefault(); if (dragId) move(dragId, b.id); dragId = overId = null; }}>
+          <div class="bwrap" class:over={drag.overId === b.id && drag.dragId !== b.id} use:drag.zone={b.id}>
             {#if open !== b.id}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <div class="block" data-block={b.id} role="button" tabindex="0" aria-expanded="false" aria-label="Блок «{b.name}»: {summary(b)}"
@@ -459,9 +456,7 @@
             {/if}
           </div>
         {/each}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="bend" class:over={overId === 'end'} ondragover={(e) => { if (dragId) { e.preventDefault(); overId = 'end'; } }}
-          ondrop={(e) => { e.preventDefault(); if (dragId) move(dragId, null); dragId = overId = null; }}></div>
+        <div class="bend" class:over={drag.overId === 'end'} use:drag.zone={'end'}></div>
         <button class="addb" onclick={addBlock}>+ Добавить блок</button>
       </div>
     </div>
