@@ -11,6 +11,9 @@ export const diskFile = (page: Page, p: string) => page.evaluate((x) => (window 
 /** What the mock was asked (commands that write, panels, windows): `[name, …args]`. */
 export const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 
+/** A time budget of a speed test: CI's runners are slower than a desk Mac (a check of «no delay», not of a number). */
+export const budget = (ms: number) => ms * (process.env.CI ? 4 : 1);
+
 export const settingsSheet = (page: Page) => page.getByRole('dialog', { name: 'Настройки' });
 export const palette = (page: Page) => page.getByRole('dialog', { name: 'Командная палитра' });
 export const toast = (page: Page) => page.locator('.toast');
