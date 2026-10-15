@@ -22,11 +22,11 @@ import { DEFAULT_WORKFLOW, headingAt, namedFor, type WorkflowDef } from '../org'
 import { parseTheme, type Theme } from '../themes';
 import { displayName, isArchive } from '../names';
 import type { Tx as CoreTx } from '../journal';
-import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSchema';
+import type { Values } from '../settingsSchema';
 import { builtinEntries, declareKeys, entries, viewScope, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, type Entry, type Listed } from './declare';
 import PluginsSettings from '../PluginsSettings.svelte';
-import { hostAllowed, hostOf, iconOf, type Manifest, type ManifestSettings } from './manifest';
-import type { MenuItem as ApiMenuItem, Ctx, Dispose, Named, SheetSpec, EventName, FormSpec, HeadingRef, Place, Plugin, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
+import { hostAllowed, hostOf, iconOf, type Manifest } from './manifest';
+import type { MenuItem as ApiMenuItem, Ctx, Dispose, Named, SheetSpec, FormSpec, HeadingRef, Place, Plugin, Render, Store, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
 import PluginInspector from '../PluginInspector.svelte';
 import PluginNav from '../PluginNav.svelte';
@@ -35,9 +35,14 @@ import { mountWidget } from './widgets.svelte';
 import { lists } from '../taskLists.svelte';
 import { bodyOf } from '../orgOps';
 import { RIGHTS, rightsText, trust, trusted } from './trust';
-import { apiRef, apiTx, coreRef, fileOf, findHeading, infoOf, type Change, type Changed } from './refs';
+import { apiRef, apiTx, coreRef, fileOf, findHeading, infoOf, type Changed } from './refs';
 import { query } from './query';
 import { coreCommand } from './coreCommands';
+import { REVIEW_KIND, ReviewController, type ReviewRun } from './review.svelte';
+export { REVIEW_KIND, type ReviewRun };
+import { headingChanged, listen } from './events.svelte';
+import { clone, watch } from './watch.svelte';
+import { put, schemaOf, settingsValues, whole, type Dynamic } from './pluginSettings';
 import { invoke, isTauri } from '../tauri';
 export { RIGHTS, rightsText };
 
@@ -47,7 +52,6 @@ const MAINS = import.meta.glob('../plugins/*/main.ts') as Record<string, () => P
 const PLUG = 'M8 2.5v4M12 2.5v4M5.5 6.5h9v3a4.5 4.5 0 0 1-9 0zM10 14v3.5';
 
 /** The kind of the tab of a plugin's review (one at a time). */
-export const REVIEW_KIND = 'plugin.review';
 export interface FormReq {
   plugin: string;
   spec: FormSpec;
@@ -59,20 +63,6 @@ export interface PlaceReq {
   title: string;
   levels?: number[];
   resolve: (p: Place | null) => void;
-}
-export interface ReviewRun {
-  plugin: string;
-  spec: ReviewSpec;
-  refs: HeadingRef[];
-  /** The card shown; -1: the summary. */
-  cur: number;
-  done: number;
-  /** The cards an action moved on from (a card gone back to counts once). */
-  doneAt: Set<number>;
-  /** The queue set anew by the plugin with another heading at the card shown: the card is drawn anew. */
-  gen: number;
-  resolved: boolean;
-  resolve: (r: ReviewResult) => void;
 }
 
 export interface ViewEntry {
@@ -118,10 +108,9 @@ class Host {
   /** The core's sheets a plugin asked for, and its review. */
   form = $state<FormReq | null>(null);
   place = $state<PlaceReq | null>(null);
-  review = $state<ReviewRun | null>(null);
   sheetReq = $state<{ plugin: string; spec: SheetSpec; resolve: (button: string | null) => void } | null>(null);
   menuReq = $state<{ plugin: string; x: number; y: number; items: CoreMenuItem[] } | null>(null);
-  private dynamic = new SvelteMap<string, { options?(v: Values): CoreOpt[] | [CoreOpt[], CoreOpt[]]; hint?(v: Values): string; show?(path: string | null): string; clean?(text: string): string }>();
+  private dynamic = new SvelteMap<string, Dynamic>();
   private disposers = new Map<string, Dispose[]>();
   private plugins = new Map<string, Plugin>();
   private started = false;
@@ -218,6 +207,33 @@ class Host {
     await this.start();
   }
 
+  // ---- the review (review.svelte.ts) -------------------------------------------------------------------------------
+  private reviews = new ReviewController({ guard: (id, fn, fb) => this.guard(id, fn, fb), fail: (id, err) => this.fail(id, err), failed: (id) => this.failed.has(id) });
+  get review() {
+    return this.reviews.run;
+  }
+  set review(r) {
+    this.reviews.run = r;
+  }
+  get reviewRedraw() {
+    return this.reviews.redraw;
+  }
+  set reviewRedraw(n) {
+    this.reviews.redraw = n;
+  }
+  get reviewBar() {
+    return this.reviews.bar;
+  }
+  set reviewBar(n) {
+    this.reviews.bar = n;
+  }
+  readonly reviewHeading = this.reviews.heading.bind(this.reviews);
+  readonly reviewAct = this.reviews.act.bind(this.reviews);
+  readonly reviewEdited = this.reviews.edited.bind(this.reviews);
+  readonly reviewStep = this.reviews.step.bind(this.reviews);
+  readonly reviewShow = this.reviews.show.bind(this.reviews);
+  readonly endReview = this.reviews.end.bind(this.reviews);
+
   // ---- what the manifests declare, before any code ---------------------------------------------------------------
   declare() {
     this.declareAll(true);
@@ -232,110 +248,6 @@ class Host {
     store.addSheet(() => !!(this.form || this.place || this.sheetReq));
   }
 
-  // ---- the review -------------------------------------------------------------------------------------------------
-  /** The card's heading now: found by its title near its line (an action may have moved it). */
-  reviewHeading() {
-    const r = this.review;
-    const ref = r && r.cur >= 0 ? r.refs[r.cur] : null;
-    const f = ref ? fileOf(ref.path) : undefined;
-    // by its title; else the heading at its line (its title edited in the card, ТЗ 28)
-    const h = f && ref ? (findHeading(f.headings, ref) ?? f.headings.find((x) => x.line === ref.line)) : undefined;
-    return f && h ? { file: f, heading: h, info: infoOf(f, h) } : null;
-  }
-  async reviewAct(actionId: string) {
-    const r = this.review;
-    const c = this.reviewHeading();
-    const a = r?.spec.actions.find((x) => x.id === actionId);
-    if (!r || !c || !a || this.failed.has(r.plugin)) return;
-    if (a.disabled && this.guard(r.plugin, () => a.disabled!(c.info), false)) return;
-    let res: 'next' | 'stay' = 'stay';
-    try {
-      res = await a.run(c.info);
-    } catch (err) {
-      this.fail(r.plugin, err);
-      return;
-    }
-    if (this.review !== r) return;
-    const now = this.reviewHeading();
-    if (now) r.refs[r.cur] = now.info.ref; // it may have moved: the card keeps it
-    if (res === 'next') {
-      r.doneAt.add(r.cur);
-      r.done = r.doneAt.size;
-      await this.reviewStep(1);
-    } else this.reviewRedraw++;
-  }
-  /** The card's heading was edited in it, by the user (its line moved, its title changed): the card keeps it (ТЗ 28).
-   *  A change from outside is not: the heading at its line may be another one then. */
-  reviewEdited(line: number) {
-    const r = this.review;
-    const ref = r && r.cur >= 0 ? r.refs[r.cur] : null;
-    const f = ref ? fileOf(ref.path) : undefined;
-    const h = f?.headings.find((x) => x.line === line);
-    // only the same heading: moved by an edit above it (its title) or retitled in place (its line); a rewrite of the
-    // file (a goal moved to another quarter) leaves the narrowed range pointing elsewhere — the title finds it then
-    if (r && ref && h && (h.title === ref.title || h.line === ref.line) && (ref.line !== h.line || ref.title !== h.title)) r.refs[r.cur] = { path: ref.path, line: h.line, title: h.title };
-  }
-  /** The card drawn again (the plugin's parts read the file anew). */
-  reviewRedraw = $state(0);
-  /** The bar read again (the actions' `disabled`). */
-  reviewBar = $state(0);
-  /** Another card; what the plugin is writing is saved first (`beforeStep`). */
-  async reviewStep(d: number) {
-    const r = this.review;
-    if (!r) return;
-    const c = this.reviewHeading();
-    if (c && r.spec.beforeStep) {
-      try {
-        await r.spec.beforeStep(c.info);
-      } catch (err) {
-        this.fail(r.plugin, err);
-        return;
-      }
-    }
-    if (this.review !== r) return;
-    if (r.spec.next) {
-      const n = this.guard(r.plugin, () => r.spec.next!(r.cur, d < 0 ? -1 : 1), r.cur);
-      if (this.review !== r || n === r.cur || n < -1 || n >= r.refs.length) return;
-      r.cur = n;
-      if (n < 0) this.endReview(true, false, true);
-      return;
-    }
-    if (r.cur < 0) {
-      if (d < 0) r.cur = r.refs.length - 1; // «Назад» from the summary
-      return;
-    }
-    const n = r.cur + d;
-    if (n < 0) return;
-    r.cur = n < r.refs.length ? n : -1;
-    if (r.cur < 0) this.endReview(true, false, true);
-  }
-  /** The plugin shows a card (-1: the summary): the review's tab in front. */
-  reviewShow(r: ReviewRun, i: number) {
-    if (this.review !== r || i < -1 || i >= r.refs.length) return;
-    for (const [pi, p] of store.layout.panes.entries()) {
-      const ti = p.tabs.findIndex((t) => t.kind === REVIEW_KIND);
-      if (ti >= 0 && (store.layout.active !== pi || p.active !== ti)) store.activateTab(pi, ti);
-    }
-    r.cur = i;
-    if (i < 0) this.endReview(true, false, true);
-  }
-  /** The review answers its plugin: through, or left; `keep`: its summary stays shown. */
-  endReview(finished: boolean, gone = false, keep = false) {
-    const r = this.review;
-    if (!r) return;
-    if (!r.resolved) {
-      r.resolved = true;
-      r.resolve({ total: r.refs.length, done: r.done, finished });
-    }
-    if (!keep) {
-      this.review = null;
-      if (r.spec.onClose) this.guard(r.plugin, () => r.spec.onClose!(), undefined);
-    }
-    if (!gone && !keep) for (const [pi, p] of store.layout.panes.entries()) {
-      const ti = p.tabs.findIndex((t) => t.kind === REVIEW_KIND);
-      if (ti >= 0) store.closeTab(pi, ti);
-    }
-  }
   /** A plugin's menu items as the core's menu draws them. */
   private coreMenu(id: string, items: (ApiMenuItem | 'sep')[]): CoreMenuItem[] {
     return items.flatMap((it): CoreMenuItem[] => (it === 'sep' ? ['sep'] : [
@@ -442,7 +354,7 @@ class Host {
       }));
     }
     m.contributes.settings.forEach((s, i) => {
-      const schema = this.schemaOf(m, s, i);
+      const schema = schemaOf(m, s, i, (pid, fn, fb) => this.guard(pid, fn, fb), (k) => this.dynamic.get(k));
       if (s.section) this.keep(id, registerSettings({ id: s.section, icon: s.icon ?? PLUG, order: 81 + i, schema, plugin: id })); // after the core's, before «Плагины»
       else if (s.block) this.keep(id, registerSettingsBlock({ section: s.block, order: 50 + i, schema }));
     });
@@ -593,28 +505,34 @@ class Host {
   untrusted = new SvelteMap<string, string>();
   /** Why it was turned off, in full (the list of plugins' «Подробнее»). */
   stack = new SvelteMap<string, string>();
-  /** Everything the plugin registered taken back; its code told to stop. */
+  /** What the plugin registered taken back (its disposers, its drawings); its code told to stop. */
+  private takeBack(id: string) {
+    for (const d of (this.disposers.get(id) ?? []).reverse()) {
+      try {
+        d();
+      } catch {
+        /* taken back as far as it goes */
+      }
+    }
+    this.disposers.delete(id);
+    for (const [k, v] of this.views) if (v.plugin === id) this.views.delete(k);
+    for (const [k, v] of this.navs) if (v.plugin === id) this.navs.delete(k);
+    for (const [k, v] of this.todayRenders) if (v.plugin === id) (this.todayRenders.delete(k), this.todayHidden.delete(k));
+    this.oneOnOnes.delete(id);
+    for (const [k, v] of this.fileViews) if (v.plugin === id) this.fileViews.delete(k);
+    setLineLink(id, null);
+    try {
+      void Promise.resolve(this.plugins.get(id)?.deactivate?.()).catch(() => {});
+    } catch {
+      /* off anyway */
+    }
+    this.plugins.delete(id);
+  }
   /** A plugin turned off while its `activate` ran: what it registered meanwhile is taken back, it is deactivated. */
   private dropLate(id: string) {
-    untrack(() => {
-      for (const d of (this.disposers.get(id) ?? []).reverse()) {
-        try {
-          d();
-        } catch {
-          /* taken back as far as it goes */
-        }
-      }
-      this.disposers.delete(id);
-      for (const [k, v] of this.views) if (v.plugin === id) this.views.delete(k);
-      for (const [k, v] of this.navs) if (v.plugin === id) this.navs.delete(k);
-      for (const [k, v] of this.todayRenders) if (v.plugin === id) (this.todayRenders.delete(k), this.todayHidden.delete(k));
-      this.oneOnOnes.delete(id);
-      for (const [k, v] of this.fileViews) if (v.plugin === id) this.fileViews.delete(k);
-      setLineLink(id, null);
-      void Promise.resolve(this.plugins.get(id)?.deactivate?.()).catch(() => {});
-      this.plugins.delete(id);
-    });
+    untrack(() => this.takeBack(id));
   }
+  /** The plugin turned off: everything it registered taken back, its sheets answered, its keys gone. */
   private teardown(id: string) {
     const m = this.manifest(id);
     this.declared.delete(id);
@@ -625,28 +543,9 @@ class Host {
       if (this.sheetReq?.plugin === id) this.sheetReq.resolve(null);
       if (this.menuReq?.plugin === id) this.menuReq = null;
       if (this.review?.plugin === id) this.endReview(false);
-      for (const d of (this.disposers.get(id) ?? []).reverse()) {
-        try {
-          d();
-        } catch {
-          /* taken back as far as it goes */
-        }
-      }
-      this.disposers.delete(id);
-      for (const [k, v] of this.views) if (v.plugin === id) this.views.delete(k);
-      for (const [k, v] of this.navs) if (v.plugin === id) this.navs.delete(k);
-      for (const [k, v] of this.todayRenders) if (v.plugin === id) (this.todayRenders.delete(k), this.todayHidden.delete(k));
-      this.oneOnOnes.delete(id);
-      for (const [k, v] of this.fileViews) if (v.plugin === id) this.fileViews.delete(k);
-      setLineLink(id, null);
+      this.takeBack(id);
       store.refreshStatusSets();
       if (this.manifest(id)?.contributes.navSections.some((n) => n.id === store.navMode)) store.setNavMode('files');
-      try {
-        void Promise.resolve(this.plugins.get(id)?.deactivate?.()).catch(() => {});
-      } catch {
-        /* off anyway */
-      }
-      this.plugins.delete(id);
       if (m) {
         undeclareKeys(m);
         store.keysVersion++;
@@ -1067,7 +966,7 @@ class Host {
         },
       },
       storage: { folder: this.storeOf(id, 'folder', 'data', keep), local: this.storeOf(id, 'local', 'data', keep) },
-      events: { on: (e, fn) => keep(this.listen(id, e, fn)) },
+      events: { on: (e, fn) => keep(listen(e, (p) => this.guard(id, () => fn(p), undefined), (kind) => !!m.contributes.views.some((v) => v.id === kind))) },
       statusSets: {
         set: (defs, o = {}) => {
           for (const d of sets) d();
@@ -1081,8 +980,8 @@ class Host {
         },
       },
       settings: {
-        values: () => this.settingsValues(m),
-        onChange: (fn) => keep(watch(() => this.settingsValues(m), (v) => this.guard(id, () => fn(v), undefined))),
+        values: () => settingsValues(m),
+        onChange: (fn) => keep(watch(() => settingsValues(m), (v) => this.guard(id, () => fn(v), undefined))),
         dynamic: (key, spec) => {
           const k = id + ':' + key;
           this.dynamic.set(k, spec);
@@ -1164,7 +1063,7 @@ class Host {
           }, onUndo);
           const tx = t as CoreTx | null;
           if (step) {
-            for (const [r, w] of ev) this.headingChanged(r, w);
+            for (const [r, w] of ev) headingChanged(r, w);
             return 'ok';
           }
           return tx?.conflict ? 'conflict' : tx && !tx.error && !tx.result().length ? 'ok' : 'error';
@@ -1175,131 +1074,15 @@ class Host {
     return ctx;
   }
 
-  /** The plugin's own place of a storage: `{ data, settings }` in its file (or on this Mac). */
-  private whole(id: string, where: 'folder' | 'local'): Record<string, unknown> {
-    const v = where === 'folder' ? store.folderData(id) : store.localData(id);
-    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
-  }
-  private async put(id: string, where: 'folder' | 'local', part: 'data' | 'settings', value: unknown) {
-    const next = { ...this.whole(id, where), [part]: value };
-    if (where === 'folder') await store.setFolderData(id, next);
-    else store.setLocalData(id, next);
-  }
   private storeOf(id: string, where: 'folder' | 'local', part: 'data', keep: (d: Dispose) => Dispose): Store {
     return {
-      get: <T>() => clone(this.whole(id, where)[part]) as T | undefined,
-      set: (v) => this.put(id, where, part, clone(v)),
-      onChange: (fn) => keep(watch(() => JSON.stringify(this.whole(id, where)[part] ?? null), () => this.guard(id, () => fn(), undefined))),
+      get: <T>() => clone(whole(id, where)[part]) as T | undefined,
+      set: (v) => put(id, where, part, clone(v)),
+      onChange: (fn) => keep(watch(() => JSON.stringify(whole(id, where)[part] ?? null), () => this.guard(id, () => fn(), undefined))),
     };
   }
 
-  // ---- settings by the manifest's schema --------------------------------------------------------------------------
-  private fields(m: Manifest): Field[] {
-    return m.contributes.settings.flatMap((s) => s.groups.flatMap((g) => g.fields));
-  }
-  settingsValues(m: Manifest): Values {
-    const out: Values = {};
-    const folder = (this.whole(m.id, 'folder').settings ?? {}) as Values;
-    const local = (this.whole(m.id, 'local').settings ?? {}) as Values;
-    for (const f of this.fields(m))
-      for (const k of f.type === 'pair' ? [f.key, f.key2] : [f.key]) {
-        const own = f.where === 'folder' ? folder : local;
-        const d = (f as { default?: unknown; default2?: unknown })[k === f.key ? 'default' : 'default2'];
-        out[k] = k in own ? own[k] : (d ?? null);
-      }
-    return out;
-  }
-  private async setSettings(m: Manifest, patch: Values) {
-    const by = { folder: {} as Values, local: {} as Values };
-    for (const f of this.fields(m)) for (const k of f.type === 'pair' ? [f.key, f.key2] : [f.key]) if (k in patch) by[f.where][k] = patch[k];
-    for (const where of ['folder', 'local'] as const)
-      if (Object.keys(by[where]).length) await this.put(m.id, where, 'settings', { ...((this.whole(m.id, where).settings ?? {}) as Values), ...by[where] });
-    // the first change moves what config.json still has (a feature's settings of before) to the plugin's file
-    if (store.hasLegacy(m.id)) await store.setFolderData(m.id, this.whole(m.id, 'folder'));
-  }
-  private schemaOf(m: Manifest, s: ManifestSettings, i: number): Schema {
-    const dyn = (key: string) => this.dynamic.get(m.id + ':' + key);
-    const field = (f: Field): Field => {
-      const hint = (v: Values) => this.guard(m.id, () => dyn(f.key)?.hint?.(v), undefined) ?? (typeof f.hint === 'string' ? f.hint : '');
-      if (f.type === 'choice') return { ...f, hint, options: (v) => (this.guard(m.id, () => dyn(f.key)?.options?.(v), undefined) as CoreOpt[] | undefined) ?? (Array.isArray(f.options) ? f.options : []) };
-      if (f.type === 'file') return { ...f, hint, show: (rel) => this.guard(m.id, () => dyn(f.key)?.show?.(rel), undefined) ?? rel ?? 'Не выбран' };
-      if (f.type === 'text') return { ...f, hint, clean: (t) => this.guard(m.id, () => dyn(f.key)?.clean?.(t), undefined) ?? t };
-      if (f.type === 'pair') {
-        const both = (f as unknown as { options?: [CoreOpt[], CoreOpt[]] }).options;
-        return { ...f, hint, options: (v) => (this.guard(m.id, () => dyn(f.key)?.options?.(v), undefined) as [CoreOpt[], CoreOpt[]] | undefined) ?? (Array.isArray(both) ? both : [[], []]) };
-      }
-      return { ...f, hint };
-    };
-    return {
-      id: `${m.id}-${i}`,
-      label: s.section ?? s.block ?? m.name,
-      groups: s.groups.map((g): Group => ({ ...g, fields: g.fields.map(field) })),
-      values: () => this.settingsValues(m),
-      set: (patch) => this.setSettings(m, patch),
-    };
-  }
 
-  // ---- events -------------------------------------------------------------------------------------------------
-  private listen(id: string, e: EventName, fn: (p: unknown) => void): Dispose {
-    const send = (p: unknown) => this.guard(id, () => fn(p), undefined);
-    switch (e) {
-      case 'file.changed': {
-        let last = new Map(store.files.map((f) => [f.name, f.text]));
-        return watch(() => store.files, (files) => {
-          const next = new Map(files.map((f) => [f.name, f.text]));
-          for (const [name, text] of next)
-            if (last.get(name) !== text) {
-              const by = store.diskTaken.has(name) ? 'disk' : 'edit';
-              store.diskTaken.delete(name);
-              send({ path: name, by });
-            }
-          last = next;
-        });
-      }
-      case 'heading.changed':
-        this.headingListeners.add(send);
-        return () => this.headingListeners.delete(send);
-      case 'tab.active':
-        const now = () => {
-          const t = store.tab;
-          const own = !!t && !!this.manifest(id)?.contributes.views.some((v) => v.id === t.kind);
-          send({ kind: t?.kind ?? null, path: t?.kind === 'file' ? (store.file?.name ?? null) : null, state: own ? clone(t!.data) : undefined, view: t?.kind === 'file' ? store.viewOf(t) || null : null });
-        };
-        queueMicrotask(now); // the tab shown now, then each change
-        return watch(() => [store.tab?.id, store.tab?.data, store.viewOf(store.tab)], now);
-      case 'inbox.changed':
-        return watch(() => store.inboxFile?.name ?? null, (p) => send({ path: p }));
-      case 'folder.changed':
-        return watch(() => store.dir, (d) => send({ folder: d }));
-      case 'theme.changed': {
-        const o = new MutationObserver(() => send({ appearance: document.documentElement.dataset.appearance ?? null }));
-        o.observe(document.documentElement, { attributes: true, attributeFilter: ['data-appearance', 'style'] });
-        return () => o.disconnect();
-      }
-      case 'day.changed': {
-        let day = new Date().toDateString();
-        const tick = () => {
-          const d = new Date().toDateString();
-          if (d !== day) {
-            day = d;
-            send({ date: new Date() });
-          }
-        };
-        const t = setInterval(tick, 60_000);
-        document.addEventListener('visibilitychange', tick); // the Mac woke up
-        return () => {
-          clearInterval(t);
-          document.removeEventListener('visibilitychange', tick);
-        };
-      }
-    }
-    throw new Error(`нет события «${e}»`);
-  }
-  private headingListeners = new Set<(p: unknown) => void>();
-  /** After a plugin's transaction: what it changed in which heading. */
-  headingChanged(ref: HeadingRef, what: Change) {
-    for (const l of this.headingListeners) l({ ref, what });
-  }
 }
 
 export const plugins = new Host();
@@ -1312,20 +1095,5 @@ interface SlotPiece {
 }
 /** Where the built-in plugins' sections of the navigator stand (views.ts: Файлы 0 … Поиск 70). */
 const BUILTIN_NAV: Record<string, number> = { inbox: 10, 'quarter-goals': 40, calendar: 50 };
-const clone = <T>(v: T): T => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
-/** An effect outside any component: `fn` with the new value when it changes (not at first). */
-function watch<T>(read: () => T, fn: (v: T) => void): Dispose {
-  let first = true;
-  return $effect.root(() => {
-    $effect(() => {
-      const v = read();
-      if (first) {
-        first = false;
-        return;
-      }
-      untrack(() => fn(v));
-    });
-  });
-}
 
 plugins.declare();
