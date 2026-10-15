@@ -26,7 +26,8 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           const id = listeners['notes-changed'];
           if (id) cbs[id]({ event: 'notes-changed', id: 1, payload: null });
         }, eventDelay);
-      const mtime: Record<string, number> = {};
+      // the files' modification times: set before the start by a test (`__mtimeInit`), else 0; a write sets now
+      const mtime: Record<string, number> = { ...(w.__mtimeInit ?? {}) };
       // another program: writes, deletes and moves files, and the watcher tells the app
       w.__setDisk = (path: string, text: string) => {
         disk[path] = text;
@@ -228,6 +229,11 @@ export async function installTauriMock(page: Page, files: Record<string, string>
         write_project_config: (a) => {
           disk['/mock/.orgnotes/config.json'] = a.text;
           emit();
+        },
+        // the touches of headings (ТЗ 40): written whole, no event (the folder's watcher does not see .orgnotes)
+        read_touch_file: () => disk[(root() ?? '/mock') + '/.orgnotes/touch.json'] ?? null,
+        write_touch_file: (a) => {
+          disk[(root() ?? '/mock') + '/.orgnotes/touch.json'] = a.text;
         },
         read_feature_file: (a) => disk[(root() ?? '/mock') + '/.orgnotes/plugins/' + a.id + '.json'] ?? null,
         write_feature_file: (a) => {
