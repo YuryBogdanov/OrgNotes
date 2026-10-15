@@ -182,7 +182,7 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           // where plugins come from (ТЗ 37): a test's fixtures in window.__sources —
           //   catalog: { plugins, stats }, raw: { 'repo/file': text }, releases: { 'repo@version': { file: text } },
           //   git: { url: { refs, refsFor?: { ref: files } } } — files of a ref: { 'manifest.json': text, … }
-          if (['catalog_fetch', 'catalog_raw', 'catalog_releases', 'plugin_install_release', 'plugin_cancel', 'plugin_remove', 'git_refs', 'git_probe', 'plugin_install_git'].includes(cmd)) {
+          if (['catalog_fetch', 'catalog_raw', 'catalog_releases', 'plugin_install_release', 'plugin_cancel', 'plugin_remove', 'git_refs', 'git_probe', 'plugin_install_git', 'plugin_restore', 'plugin_reveal'].includes(cmd)) {
             const src = w.__sources ?? {};
             w.__log.push([cmd, args]);
             const put = (id: string, files: Record<string, string>, source: object) => {
@@ -215,11 +215,25 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             }
             if (cmd === 'plugin_cancel') return null;
             if (cmd === 'plugin_remove') {
+              // to the Trash: kept under /Trash/<id>/ so «Вернуть» can bring it back (a test empties it by hand)
               const ks = Object.keys(disk).filter((k) => k.startsWith(`/config/plugins/${args.id}/`));
               if (!ks.length) throw `нет плагина «${args.id}»`;
-              for (const k of ks) delete disk[k];
+              for (const k of ks) {
+                disk[`/Trash/${args.id}/` + k.slice(`/config/plugins/${args.id}/`.length)] = disk[k];
+                delete disk[k];
+              }
+              return `/Trash/${args.id}`;
+            }
+            if (cmd === 'plugin_restore') {
+              const ks = Object.keys(disk).filter((k) => k.startsWith(args.from + '/'));
+              if (!args.from || !ks.length) throw 'Корзину уже очистили';
+              for (const k of ks) {
+                disk[`/config/plugins/${args.id}/` + k.slice(args.from.length + 1)] = disk[k];
+                delete disk[k];
+              }
               return null;
             }
+            if (cmd === 'plugin_reveal') return null;
             if (cmd === 'git_refs') {
               if (!src.git?.[args.url]) throw 'Репозиторий не найден или нет доступа: проверьте ссылку, ключ SSH или вход в git на этом Mac';
               return src.git[args.url].refs;

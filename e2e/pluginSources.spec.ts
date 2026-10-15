@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
 
 // ТЗ 37, PR A: where an installed plugin came from (the catalog, a git link), its update — the plugin restarted
-// alone, other rights asked first — and «Удалить…». The network and git are the mock's fixtures (window.__sources).
+// alone, other rights asked first — and «Удалить…» (its menu and «Вернуть»: the fix of ТЗ 37). The network and git are the mock's fixtures (window.__sources).
 
 const manifest = (id: string, version: string, o: object = {}) => JSON.stringify({
   id, name: id === 'pomo' ? 'Помидор' : 'OKR команды', version, api: '^1.8', author: 'Олег Р.', description: 'Таймер фокуса',
@@ -104,15 +104,93 @@ test('by a git link: the link shown, a newer tag to update to; «Удалить�
   await sheet(page).getByLabel('Найти плагин').fill('okr');
   await expect(sheet(page).locator('.pl')).toHaveCount(1);
   await sheet(page).getByLabel('Найти плагин').fill('');
-  // «…» → «Удалить…»
+  // «⋯» → «Удалить плагин…» (fix of ТЗ 37)
   await okr.getByRole('button', { name: 'Ещё: OKR команды' }).click();
-  await expect(page.getByRole('menuitem', { name: /Исходный код/ })).toContainText('git.company.local/team/panopticon-okr');
-  await page.getByRole('menuitem', { name: 'Удалить…' }).click();
-  const ask = page.getByRole('alertdialog', { name: 'Удаление плагина' });
+  await expect(page.getByRole('menuitem')).toHaveText(['Проверить обновления', 'Показать в Finder', 'Удалить плагин…']); // by a link: no catalog page
+  await page.getByRole('menuitem', { name: 'Удалить плагин…' }).click();
+  const ask = page.getByRole('alertdialog', { name: 'Удалить плагин' });
   await expect(ask).toContainText('Удалить «OKR команды»?');
   await ask.getByRole('button', { name: 'Удалить' }).click();
   await expect(okr).toHaveCount(0);
   await expect(row(page, 'Помидор')).toBeVisible();
   expect(await disk(page, '/config/plugins/okr/main.js')).toBeUndefined();
-  await expect(page.locator('.toast').last()).toContainText('«OKR команды» удалён — папка в Корзине');
+  await expect(page.locator('.toast').last()).toContainText('«OKR команды» удалён · плагин в Корзине');
+});
+
+// ---- the fix of ТЗ 37: the menu of a plugin, its removal, «Вернуть» ----
+const POMO_SETTINGS = { contributes: { commands: [{ id: 'pomo.ping', title: 'pomo: версия', keys: ['⌃⌘P'] }], settings: [{ section: 'Помидор', groups: [{ fields: [{ key: 'minutes', type: 'text', where: 'local', label: 'Минут' }] }] }] } };
+async function withPomo(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('feature:pomo', JSON.stringify({ settings: { minutes: '50' } }));
+    localStorage.setItem('keys', JSON.stringify({ preset: 'emacs', overrides: { 'pomo.ping': ['⌃⌘O'] } }));
+  });
+  await open(page, plugin('pomo', '0.3.0', { kind: 'catalog', repo: 'oleg/pomo', version: '0.3.0' }, POMO_SETTINGS), { raw: { 'oleg/pomo/manifest.json': manifest('pomo', '0.3.0', POMO_SETTINGS) } }, { pomo: READ });
+  await openSettingsSheet(page, 'Плагины');
+}
+const local = (page: Page, k: string) => page.evaluate((x) => localStorage.getItem(x), k);
+
+test('«⋯»: only for the installed; its settings, a check, its catalog page, Finder, «Удалить плагин…»', async ({ page }) => {
+  await withPomo(page);
+  await expect(row(page, 'Цели квартала').getByRole('button', { name: /^Ещё/ })).toHaveCount(0); // built in: only off
+  const r = row(page, 'Помидор');
+  const dots = r.getByRole('button', { name: 'Ещё: Помидор' });
+  await expect(dots).toHaveAttribute('title', 'Ещё');
+  await dots.click();
+  await expect(page.getByRole('menuitem')).toHaveText(['Настройки плагина', 'Проверить обновления', 'Страница в каталоге', 'Показать в Finder', 'Удалить плагин…']);
+  await expect(dots).toHaveClass(/on/);
+  await page.getByRole('menuitem', { name: 'Показать в Finder' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).__log.some((l: any) => l[0] === 'plugin_reveal' && l[1].id === 'pomo'))).toBe(true);
+  // its settings page ends with «Удалить плагин…»
+  await dots.click();
+  await page.getByRole('menuitem', { name: 'Настройки плагина' }).click();
+  await sheet(page).getByRole('button', { name: 'Удалить плагин…' }).click();
+  await expect(page.getByRole('alertdialog', { name: 'Удалить плагин' })).toContainText('Удалить «Помидор»?');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+});
+
+test('removed without its settings: to the Trash, its command and shortcut gone, settings kept; «Вернуть» brings it back on', async ({ page }) => {
+  await withPomo(page);
+  await row(page, 'Помидор').getByRole('button', { name: 'Ещё: Помидор' }).click();
+  await page.getByRole('menuitem', { name: 'Удалить плагин…' }).click();
+  const ask = page.getByRole('alertdialog', { name: 'Удалить плагин' });
+  await expect(ask).toContainText('Плагин уйдёт в Корзину macOS, его команды и сочетания пропадут. Ваши org-файлы не изменятся — включая записи, созданные плагином.');
+  await expect(ask.getByRole('checkbox', { name: /Удалить и настройки плагина/ })).not.toBeChecked();
+  await ask.getByRole('button', { name: 'Удалить' }).click();
+  await expect(row(page, 'Помидор')).toHaveCount(0);
+  expect(await disk(page, '/Trash/pomo/main.js')).toBeTruthy();
+  const toast = page.locator('.toast', { hasText: '«Помидор» удалён · плагин в Корзине' });
+  await expect(toast).toBeVisible();
+  expect(await local(page, 'feature:pomo')).toContain('50'); // kept
+  expect(await local(page, 'keys')).toContain('⌃⌘O');
+  expect(await disk(page, '/mock/work.org')).toBe('* TODO A\n'); // the notes as they were
+  await toast.getByRole('button', { name: 'Вернуть' }).click();
+  await expect(row(page, 'Помидор')).toBeVisible();
+  await expect(row(page, 'Помидор').getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+  expect(await disk(page, '/config/plugins/pomo/main.js')).toBeTruthy();
+  await expect(page.locator('.toast').last()).toContainText('«Помидор» снова установлен');
+});
+
+test('removed with its settings: they go (and the shortcuts given to it); «Вернуть» brings them back too; an emptied Trash says so', async ({ page }) => {
+  await withPomo(page);
+  await row(page, 'Помидор').getByRole('button', { name: 'Ещё: Помидор' }).click();
+  await page.getByRole('menuitem', { name: 'Удалить плагин…' }).click();
+  const ask = page.getByRole('alertdialog', { name: 'Удалить плагин' });
+  await ask.getByRole('checkbox', { name: /Удалить и настройки плагина/ }).check();
+  await ask.getByRole('button', { name: 'Удалить' }).click();
+  await expect(row(page, 'Помидор')).toHaveCount(0);
+  expect(await local(page, 'feature:pomo')).toBeNull();
+  expect(await local(page, 'keys')).not.toContain('⌃⌘O');
+  await page.locator('.toast', { hasText: 'удалён' }).getByRole('button', { name: 'Вернуть' }).click();
+  await expect(row(page, 'Помидор')).toBeVisible();
+  expect(await local(page, 'feature:pomo')).toContain('50');
+  expect(await local(page, 'keys')).toContain('⌃⌘O');
+  // once more, and the Trash emptied before «Вернуть»
+  await row(page, 'Помидор').getByRole('button', { name: 'Ещё: Помидор' }).click();
+  await page.getByRole('menuitem', { name: 'Удалить плагин…' }).click();
+  await page.getByRole('alertdialog', { name: 'Удалить плагин' }).getByRole('button', { name: 'Удалить' }).click();
+  await page.evaluate(() => { const d = (window as any).__disk; for (const k of Object.keys(d)) if (k.startsWith('/Trash/')) delete d[k]; });
+  await page.locator('.toast', { hasText: 'удалён' }).getByRole('button', { name: 'Вернуть' }).click();
+  await expect(page.locator('.toast').last()).toContainText('Корзину уже очистили — «Помидор» можно снова поставить из каталога');
+  await expect(row(page, 'Помидор')).toHaveCount(0);
 });

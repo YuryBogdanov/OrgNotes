@@ -7,7 +7,7 @@ import { plugins } from './api/host.svelte';
 import { parseManifest, type Manifest } from './api/manifest';
 import { cmpVersion, newerTag } from './api/sources';
 import type { Entry } from './api/declare';
-import { store } from './store.svelte';
+import { store, type PluginData } from './store.svelte';
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core');
@@ -129,21 +129,49 @@ class PluginUpdates {
       this.busy.delete(id);
     }
   }
-  /** «Удалить…» (asked before): off, its folder to the Trash; its data stays. */
-  async remove(id: string) {
+  /** The plugin «Удалить плагин…» asks about now (its dialog is shown while it is set). */
+  removing = $state<Entry | null>(null);
+  /** «Удалить» (asked before): off, its folder to the Trash; its settings stay unless `dropSettings`. A toast with
+   *  «Вернуть» for 8 s. */
+  async remove(id: string, dropSettings = false) {
     const e = plugins.entry(id);
     if (!e || e.builtin) return;
+    const name = e.manifest?.name ?? id;
+    const wasOn = e.enabled;
     this.busy.set(id, 'remove');
     try {
       if (e.enabled) await plugins.setEnabled(id, false);
-      await invoke('plugin_remove', { id: e.dir });
+      const from = await invoke<string>('plugin_remove', { id: e.dir });
+      const backup = dropSettings ? store.forgetPluginData(id) : null;
       this.updates.delete(id);
       await plugins.refreshInstalled();
-      store.note(`«${e.manifest?.name ?? id}» удалён — папка в Корзине`);
+      store.note(`«${name}» удалён · плагин в Корзине`, [{ label: 'Вернуть', run: () => void this.restore({ id, dir: e.dir, from, wasOn, backup, name }) }], 8000);
     } catch (err) {
       store.note(`Не удалось удалить: ${err}`);
     } finally {
       this.busy.delete(id);
+    }
+  }
+  /** «Вернуть»: the folder back from the Trash, its settings if they were removed, on again if it was. */
+  async restore(r: { id: string; dir: string; from: string; wasOn: boolean; backup: PluginData | null; name: string }) {
+    try {
+      await invoke('plugin_restore', { id: r.dir, from: r.from });
+    } catch (err) {
+      const gone = !r.from || String(err).includes('очистили');
+      store.note(gone ? `Корзину уже очистили — «${r.name}» можно снова поставить из каталога` : `Не удалось вернуть «${r.name}»: ${err}`);
+      return;
+    }
+    if (r.backup) await store.restorePluginData(r.backup);
+    await plugins.refreshInstalled();
+    if (r.wasOn) await plugins.setEnabled(r.id, true);
+    store.note(`«${r.name}» снова установлен`);
+  }
+  /** «Показать в Finder». */
+  async reveal(e: Entry) {
+    try {
+      await invoke('plugin_reveal', { id: e.dir });
+    } catch (err) {
+      store.note(`Не удалось показать папку: ${err}`);
     }
   }
 }

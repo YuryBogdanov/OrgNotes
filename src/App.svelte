@@ -331,13 +331,6 @@
   {#if store.pickInbox}{#key store.pickInbox}<Picker onclose={() => (store.pickInbox = 0)} />{/key}{/if}
   {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
   <TaskListHost />
-  {#if store.toast}
-    <div class="toast" class:acts={!!store.toast.actions} role="status">
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={store.toast.icon ?? 'M16.5 10a6.5 6.5 0 1 1-2-4.7M16.5 3.5V6.5h-3'} /></svg>
-      <span>{store.toast.text}</span>
-      {#each store.toast.actions ?? [] as a}<button class="tbtn" onclick={() => { store.toast = null; a.run(); }}>{a.label}</button>{/each}
-    </div>
-  {/if}
   {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
   <!-- a start screen comes instead of the window (no toolbar, no navigator) -->
   {#if !store.start}
@@ -439,6 +432,14 @@
   </div>
   {/if}
 </div>
+<!-- the toast stays live while a sheet makes the window inert («Вернуть» of a plugin removed in the settings) -->
+{#if store.toast}
+  <div class="toast" class:acts={!!store.toast.actions} role="status">
+    <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={store.toast.icon ?? 'M16.5 10a6.5 6.5 0 1 1-2-4.7M16.5 3.5V6.5h-3'} /></svg>
+    <span>{store.toast.text}</span>
+    {#each store.toast.actions ?? [] as a}<button class="tbtn" onclick={() => { store.toast = null; a.run(); }}>{a.label}</button>{/each}
+  </div>
+{/if}
 {#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
 {#if store.settingsOpen && store.loaded}<Settings />{/if}
 {#if today.ending}<EndDay />{/if}

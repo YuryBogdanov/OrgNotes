@@ -7,11 +7,15 @@
   import { incompatible } from './api/manifest';
   import { renderReadme } from './readme';
   import { openExternal } from './store.svelte';
+  import { plugins } from './api/host.svelte';
+  import { pluginUpdates as up } from './pluginUpdates.svelte';
 
   // A plugin's page in the catalog (ТЗ 37 §6): its README, its releases; its rights and whether it fits this app.
   let { e, back, act }: { e: CatalogEntry; back: () => void; act: (e: CatalogEntry, s: CatState) => void } = $props();
   const m = $derived(catalog.manifests.get(e.id));
   const s = $derived(catalog.stateOf(e));
+  // installed from the folder of plugins: «Удалить плагин…» here too (fix of ТЗ 37)
+  const have = $derived(plugins.entries.find((x) => x.manifest?.id === e.id && !x.builtin) ?? null);
   const page = $derived(`https://github.com/${e.repo}`);
   let tab = $state<'about' | 'versions'>('about');
 
@@ -50,6 +54,7 @@
       <div class="sub">{[e.author, m ? `v${m.version}` : '', e.updated ? `обновлён ${date(e.updated)}` : '', e.downloads ? `⬇ ${count(e.downloads)}` : ''].filter(Boolean).join(' · ')}</div>
     </div>
     <button class="code" onclick={() => void openExternal(page)}>Исходный код ↗</button>
+    {#if have}<button class="code rm" onclick={() => (up.removing = have)}>Удалить плагин…</button>{/if}
     <CatalogButton {e} {s} big onact={() => act(e, s)} />
   </div>
   <div class="seg" role="tablist" aria-label="Страница плагина">
@@ -119,6 +124,7 @@
   .ttl { flex: 1; min-width: 0; }
   h2 { margin: 0; font-size: 19px; font-weight: 700; }
   .sub { font-size: 12px; color: var(--fg2); margin-top: 2px; }
+  .code.rm { color: var(--todo); }
   .code { height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); font-size: 12.5px; white-space: nowrap; }
   .seg { display: flex; padding: 2px; gap: 2px; background: var(--field); border-radius: 8px; align-self: flex-start; }
   .seg button { height: 24px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); font-size: 12.5px; }
