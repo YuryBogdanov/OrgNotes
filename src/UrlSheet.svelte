@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Segmented from './Segmented.svelte';
   import { plugins, RIGHTS } from './api/host.svelte';
   import { parseManifest, incompatible, type Manifest } from './api/manifest';
   import { API_VERSION } from './api/index';
@@ -106,10 +107,8 @@
       {#if latestTag || head}
         <div class="ver">
           <span class="lb">Версия</span>
-          <div class="seg" role="radiogroup" aria-label="Версия">
-            {#if latestTag}<button role="radio" aria-checked={probe.ref === latestTag} class:on={probe.ref === latestTag} disabled={probing} onclick={() => probe!.ref !== latestTag && void check(latestTag!)}>Последний тег · {latestTag}</button>{/if}
-            {#if head}<button role="radio" aria-checked={probe.ref === head} class:on={probe.ref === head} disabled={probing} onclick={() => probe!.ref !== head && void check(head!)}>Ветка {head}</button>{/if}
-          </div>
+          <Segmented label="Версия" size="large" disabled={probing} value={probe.ref} onchange={(r) => void check(r)}
+            options={[...(latestTag ? [{ value: latestTag, label: `Последний тег · ${latestTag}` }] : []), ...(head ? [{ value: head, label: `Ветка ${head}` }] : [])]} />
         </div>
       {/if}
       <div class="found" aria-label="Найденный плагин">
@@ -143,9 +142,6 @@
   .hint { font-size: 11.5px; color: var(--fg3); }
   .err { font-size: 12px; color: var(--todo); }
   .ver { display: flex; align-items: center; gap: 10px; }
-  .seg { display: flex; padding: 2px; gap: 2px; background: var(--field); border-radius: 8px; }
-  .seg button { height: 24px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); font-size: 12.5px; }
-  .seg button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); font-weight: 600; }
   .found { display: flex; gap: 12px; padding: 12px; border-radius: 10px; background: var(--side); border: 1px solid var(--line); }
   .ib { flex: 0 0 34px; width: 34px; height: 34px; box-sizing: border-box; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; }
   .fi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }

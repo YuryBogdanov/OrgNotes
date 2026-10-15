@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Switch from './Switch.svelte';
   import { plugins, RIGHTS } from './api/host.svelte';
   import { sourceLabel } from './api/sources';
   import { store } from './store.svelte';
@@ -20,7 +21,7 @@
         <div class="nm"><b>{m.name}</b><span>{[m.version, e.builtin ? 'Panopticon' : m.author || sourceLabel(e.source)].filter(Boolean).join(' · ')}</span></div>
         {#if m.description}<div class="ds">{m.description}</div>{/if}
       </div>
-      <button class="switch" role="switch" aria-checked={e.enabled} aria-label="Плагин {m.name}" disabled={!e.enabled && e.problems.length > 0} onclick={() => void plugins.setEnabled(id, !e.enabled)}><span></span></button>
+      <Switch checked={e.enabled} label="Плагин {m.name}" disabled={!e.enabled && e.problems.length > 0} onchange={() => void plugins.setEnabled(id, !e.enabled)} />
     </div>
     <div class="meta">
       <span>Права: {m.permissions.length ? m.permissions.map((p) => (p === 'net' && m.net.length ? `${RIGHTS.net}: ${m.net.join(', ')}` : (RIGHTS[p] ?? p))).join(', ') : 'только свои настройки'}</span>

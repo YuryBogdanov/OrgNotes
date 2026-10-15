@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clickOutside } from './clickOutside';
   import { moved } from './pointer';
   import { onMount, tick } from 'svelte';
   import { store } from './store.svelte';
@@ -328,12 +329,6 @@
     void filter;
     hi = 0;
   });
-  function outside(e: MouseEvent) {
-    if (!pop) return;
-    const t = e.target as Node;
-    if (popEl?.contains(t) || pop.anchor.contains(t)) return;
-    closePop(true, false); // a click elsewhere takes the choice
-  }
 
   // ---- blocks ---------------------------------------------------------------------------------------------------
   async function addBlock() {
@@ -438,7 +433,7 @@
   const chev = 'M2 4.5l4 4 4-4';
 </script>
 
-<svelte:window onkeydown={key} onmousedown={outside} />
+<svelte:window onkeydown={key} />
 
 {#snippet chevron()}
   <svg class="chev" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={chev} /></svg>
@@ -637,7 +632,8 @@
     {@const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8))}
     {@const below = window.innerHeight - r.bottom > 260 || r.top < window.innerHeight / 2}
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-    <div class="pop" bind:this={popEl} role={pop.kind === 'add' ? 'menu' : 'listbox'} tabindex="-1" aria-multiselectable={isMulti || undefined}
+    <!-- a click elsewhere takes the choice -->
+    <div class="pop" bind:this={popEl} use:clickOutside={{ onoutside: () => closePop(true, false), also: () => [pop?.anchor] }} role={pop.kind === 'add' ? 'menu' : 'listbox'} tabindex="-1" aria-multiselectable={isMulti || undefined}
       aria-label={pop.kind === 'add' ? 'Поле условия' : pop.kind === 'sources' ? 'Источники' : 'Значение'} onkeydown={popKey}
       style="left:{left}px;min-width:{w}px;{below ? `top:${r.bottom + 4}px;max-height:${window.innerHeight - r.bottom - 16}px` : `bottom:${window.innerHeight - r.top + 4}px;max-height:${r.top - 16}px`}">
       {#if pop.kind === 'add'}<div class="ph">ПОЛЕ УСЛОВИЯ</div>{/if}

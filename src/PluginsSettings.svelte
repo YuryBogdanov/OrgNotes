@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Switch from './Switch.svelte';
   import { plugins } from './api/host.svelte';
   import { API_VERSION } from './api/index';
   import { APP_VERSION, type Entry } from './api/declare';
@@ -128,8 +129,7 @@
       {#if !e.builtin}
         <button class="dots" class:on={menu?.dir === e.dir} title="Ещё" aria-label="Ещё: {m?.name ?? e.dir}" aria-haspopup="menu" disabled={!!busy} onclick={(ev) => more(ev, e)}>{busy === 'check' ? '…' : '⋯'}</button>
       {/if}
-      <button class="switch" role="switch" aria-checked={e.enabled} aria-label="Плагин {m?.name ?? e.dir}" disabled={!m || (!e.enabled && e.problems.length > 0)}
-        onclick={() => void plugins.setEnabled(id, !e.enabled)}><span></span></button>
+      <Switch checked={e.enabled} label="Плагин {m?.name ?? e.dir}" disabled={!m || (!e.enabled && e.problems.length > 0)} onchange={() => void plugins.setEnabled(id, !e.enabled)} />
     </div>
     {#if m?.description}<p class="desc">{m.description}</p>{/if}
     {#if m && (m.author || m.permissions.length)}

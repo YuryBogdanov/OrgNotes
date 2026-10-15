@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Segmented from './Segmented.svelte';
   import { tagsState as ts } from './tagsState.svelte';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import TagRename from './TagRename.svelte';
@@ -79,10 +80,7 @@
     </label>
     <div class="head">
       <span>ТЕГИ · {all.length}</span>
-      <div class="seg" role="radiogroup" aria-label="Порядок тегов">
-        <button role="radio" aria-checked={ts.sort === 'count'} class:on={ts.sort === 'count'} onclick={() => ts.setSort('count')}>по частоте</button>
-        <button role="radio" aria-checked={ts.sort === 'name'} class:on={ts.sort === 'name'} onclick={() => ts.setSort('name')}>А–Я</button>
-      </div>
+      <Segmented label="Порядок тегов" size="small" push value={ts.sort} onchange={(v) => ts.setSort(v)} options={[{ value: 'count' as const, label: 'по частоте' }, { value: 'name' as const, label: 'А–Я' }]} />
     </div>
   </div>
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -127,9 +125,6 @@
   .find input { flex: 1; min-width: 0; border: 0; outline: none; background: none; color: var(--fg); font-size: 12.5px; }
   .head { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
   .head > span { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--fg3); }
-  .seg { margin-left: auto; display: flex; padding: 1px; gap: 1px; background: var(--field); border-radius: 6px; }
-  .seg button { height: 20px; padding: 0 7px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 11px; }
-  .seg button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); }
   .list { flex: 1; min-height: 0; overflow: auto; padding: 2px 8px; outline: none; }
   .tag { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: 6px; cursor: default; }
   .tag:hover { background: var(--field); }

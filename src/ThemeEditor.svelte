@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Segmented from './Segmented.svelte';
   import { portal } from './portal';
   import { store } from './store.svelte';
   import Editor from './Editor.svelte';
@@ -158,10 +159,7 @@ ${deepLines ? '***** Уровень 5\n' : ''}`;
       <div class="pv">
         <div class="pvh">
           <b>Пример</b><span>обновляется сразу</span>
-          <div class="segs" role="radiogroup" aria-label="Вид примера">
-            <button role="radio" aria-checked={!rich} class:on={!rich} onclick={() => (rich = false)}>Текст</button>
-            <button role="radio" aria-checked={rich} class:on={rich} onclick={() => (rich = true)}>Оформление</button>
-          </div>
+          <Segmented label="Вид примера" size="small" push value={rich} onchange={(v) => (rich = v)} options={[{ value: false, label: 'Текст' }, { value: true, label: 'Оформление' }]} />
         </div>
         <div class="pvbody" style={themeVars(c)}>
           {#key rich}
@@ -209,9 +207,6 @@ ${deepLines ? '***** Уровень 5\n' : ''}`;
   .pv { flex: 1.3 1 420px; min-width: 0; display: flex; flex-direction: column; }
   .pvh { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
   .pvh span { color: var(--fg2); }
-  .segs { margin-left: auto; display: flex; padding: 2px; background: var(--field); border-radius: 7px; gap: 2px; }
-  .segs button { height: 20px; padding: 0 9px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 11.5px; }
-  .segs button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); }
   .pvbody { flex: 1 1 0; min-height: 420px; display: flex; flex-direction: column; background: var(--ed-bg); }
   .gone { padding: 20px 28px; color: var(--fg2); }
 </style>

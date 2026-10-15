@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Switch from './Switch.svelte';
+  import ConfirmDialog from './ConfirmDialog.svelte';
   import { store, type SettingsSection } from './store.svelte';
   import { allSettings, blocksOf, settingsOf } from './views';
   import SchemaSettings from './SchemaSettings.svelte';
@@ -412,13 +414,11 @@
             </div>
             <div class="opt">
               <label for="ib-global">Работает из любой программы</label>
-              <button id="ib-global" class="switch" role="switch" aria-checked={store.captureGlobal} aria-label="Работает из любой программы"
-                onclick={() => void store.setCaptureKey(store.captureKey, !store.captureGlobal)}><span></span></button>
+              <Switch id="ib-global" checked={store.captureGlobal} label="Работает из любой программы" onchange={() => void store.setCaptureKey(store.captureKey, !store.captureGlobal)} />
             </div>
             <div class="opt">
               <label for="ib-confirm">Показывать подтверждение «Добавлено в Inbox»</label>
-              <button id="ib-confirm" class="switch" role="switch" aria-checked={store.inboxCfg.confirm} aria-label="Показывать подтверждение"
-                onclick={() => store.setInbox({ confirm: !store.inboxCfg.confirm })}><span></span></button>
+              <Switch id="ib-confirm" checked={store.inboxCfg.confirm} label="Показывать подтверждение" onchange={() => store.setInbox({ confirm: !store.inboxCfg.confirm })} />
             </div>
             <div class="opt">
               <label for="ib-status">Статус новой задачи</label>
@@ -429,8 +429,7 @@
             </div>
             <div class="opt">
               <label for="ib-created">Записывать дату создания (:CREATED:)</label>
-              <button id="ib-created" class="switch" role="switch" aria-checked={store.inboxCfg.created} aria-label="Записывать дату создания"
-                onclick={() => store.setInbox({ created: !store.inboxCfg.created })}><span></span></button>
+              <Switch id="ib-created" checked={store.inboxCfg.created} label="Записывать дату создания" onchange={() => store.setInbox({ created: !store.inboxCfg.created })} />
             </div>
           </div>
           <p class="help">Из любой программы: приложение должно быть запущено (окно можно закрыть, оно остаётся в Dock). Сочетание хранится на этом Mac.</p>
@@ -482,21 +481,18 @@
           <div class="cap">НАВИГАТОР</div>
           <div class="opt">
             <label for="nav-headings">Показывать заголовки в навигаторе</label>
-            <button id="nav-headings" class="switch" role="switch" aria-checked={store.navHeadings} aria-label="Показывать заголовки в навигаторе"
-              onclick={() => store.setNavHeadings(!store.navHeadings)}><span></span></button>
+            <Switch id="nav-headings" checked={store.navHeadings} label="Показывать заголовки в навигаторе" onchange={() => store.setNavHeadings(!store.navHeadings)} />
           </div>
           <p class="help">Структура файла всегда есть в инспекторе, на вкладке «Структура», и в командной палитре по «#». Настройка хранится на этом Mac.</p>
           <div class="cap">УРОВНИ ЗАГОЛОВКОВ</div>
           <div class="opts">
             <div class="opt">
               <label for="one-star">Одна звёздочка на уровень</label>
-              <button id="one-star" class="switch" role="switch" aria-checked={store.levels.oneStar} aria-label="Одна звёздочка на уровень"
-                onclick={() => store.setLevels({ oneStar: !store.levels.oneStar })}><span></span></button>
+              <Switch id="one-star" checked={store.levels.oneStar} label="Одна звёздочка на уровень" onchange={() => store.setLevels({ oneStar: !store.levels.oneStar })} />
             </div>
             <div class="opt">
               <label for="indent-text">Сдвигать текст по уровню</label>
-              <button id="indent-text" class="switch" role="switch" aria-checked={store.levels.indent} aria-label="Сдвигать текст по уровню"
-                onclick={() => store.setLevels({ indent: !store.levels.indent })}><span></span></button>
+              <Switch id="indent-text" checked={store.levels.indent} label="Сдвигать текст по уровню" onchange={() => store.setLevels({ indent: !store.levels.indent })} />
             </div>
             <div class="opt">
               <span id="step-l">Шаг отступа</span>
@@ -512,13 +508,11 @@
           <div class="opts">
             <div class="opt">
               <label for="rich-on">Оформленный текст</label>
-              <button id="rich-on" class="switch" role="switch" aria-checked={store.rich} aria-label="Оформленный текст"
-                onclick={() => store.setRich(!store.rich)}><span></span></button>
+              <Switch id="rich-on" checked={store.rich} label="Оформленный текст" onchange={() => store.setRich(!store.rich)} />
             </div>
             <div class="opt">
               <label for="rich-nums">Номера строк в оформленном виде</label>
-              <button id="rich-nums" class="switch" role="switch" aria-checked={store.richNumbers} aria-label="Номера строк в оформленном виде"
-                onclick={() => store.setRichNumbers(!store.richNumbers)}><span></span></button>
+              <Switch id="rich-nums" checked={store.richNumbers} label="Номера строк в оформленном виде" onchange={() => store.setRichNumbers(!store.richNumbers)} />
             </div>
           </div>
           <p class="help">Статусы, приоритеты и теги — капсулами, даты — плашками, заголовки крупнее, разметка без служебных символов. Строка под курсором показывается как есть. Текст файла не меняется. То же — «Вид › Оформленный текст» и переключатель «Текст / Оформление» над редактором. Настройки хранятся на этом Mac.</p>
@@ -526,8 +520,7 @@
           <div class="opts">
             <div class="opt">
               <label for="fold-drawers">Сворачивать drawers при открытии файла</label>
-              <button id="fold-drawers" class="switch" role="switch" aria-checked={store.foldDrawers} aria-label="Сворачивать drawers при открытии файла"
-                onclick={() => store.setFoldDrawers(!store.foldDrawers)}><span></span></button>
+              <Switch id="fold-drawers" checked={store.foldDrawers} label="Сворачивать drawers при открытии файла" onchange={() => store.setFoldDrawers(!store.foldDrawers)} />
             </div>
           </div>
           <p class="help">Блоки :PROPERTIES:, :LOGBOOK: и другие показываются одной строкой с «…», в том числе новые — от Inbox и смены статуса. Tab на этой строке или клик по «…» разворачивает. Только вид: файл не меняется. Настройка хранится на этом Mac.</p>
@@ -716,46 +709,24 @@
     {#if pickFile}<Picker onclose={() => (pickFile = false)} />{/if}
 
     {#if confirmAgenda}
-      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-      <div class="modal" onmousedown={() => (confirmAgenda = null)}>
-        <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Удаление агенды" onmousedown={(e) => e.stopPropagation()}>
-          <h2>Удалить агенду «{confirmAgenda.name}»?</h2>
-          <p>Задачи и файлы не изменятся: удаляется только сама агенда.</p>
-          <div class="btns">
-            <button onclick={() => (confirmAgenda = null)}>Отмена</button>
-            <button class="danger-b" onclick={() => { const id = confirmAgenda!.id; confirmAgenda = null; void store.deleteAgenda(id); }}>Удалить</button>
-          </div>
-        </div>
-      </div>
+      {@const id = confirmAgenda.id}
+      <ConfirmDialog label="Удаление агенды" title="Удалить агенду «{confirmAgenda.name}»?" onclose={() => (confirmAgenda = null)} actions={[{ label: 'Удалить', kind: 'danger', run: () => void store.deleteAgenda(id) }]}>
+        Задачи и файлы не изменятся: удаляется только сама агенда.
+      </ConfirmDialog>
     {/if}
 
     {#if rename}
-      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-      <div class="modal" onmousedown={() => chooseRename('cancel')}>
-        <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Переименование статуса" onmousedown={(e) => e.stopPropagation()}>
-          <h2>Заменить {rename.from} на {rename.to} в {rename.count} заголовках?</h2>
-          <p>Если оставить слово в заметках как есть, эти заголовки перестанут считаться задачами со статусом.</p>
-          <div class="btns">
-            <button onclick={() => chooseRename('cancel')}>Отмена</button>
-            <button onclick={() => chooseRename('settings')}>Только в настройках</button>
-            <button class="primary" onclick={() => chooseRename('files')}>Заменить в файлах</button>
-          </div>
-        </div>
-      </div>
+      <!-- «Отмена» of the dialog is the rename's «cancel» too -->
+      <ConfirmDialog label="Переименование статуса" title="Заменить {rename.from} на {rename.to} в {rename.count} заголовках?" onclose={() => rename && chooseRename('cancel')}
+        actions={[{ label: 'Только в настройках', run: () => chooseRename('settings') }, { label: 'Заменить в файлах', kind: 'primary', run: () => chooseRename('files') }]}>
+        Если оставить слово в заметках как есть, эти заголовки перестанут считаться задачами со статусом.
+      </ConfirmDialog>
     {/if}
 
     {#if confirmDelete}
-      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-      <div class="modal" onmousedown={() => (confirmDelete = null)}>
-        <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Удаление статуса" onmousedown={(e) => e.stopPropagation()}>
-          <h2>{confirmDelete.s.keyword} используется в {confirmDelete.count} заголовках</h2>
-          <p>Файлы не изменятся: слово останется в тексте, но перестанет считаться статусом.</p>
-          <div class="btns">
-            <button onclick={() => (confirmDelete = null)}>Отмена</button>
-            <button class="danger-b" onclick={doDelete}>Удалить</button>
-          </div>
-        </div>
-      </div>
+      <ConfirmDialog label="Удаление статуса" title="{confirmDelete.s.keyword} используется в {confirmDelete.count} заголовках" onclose={() => (confirmDelete = null)} actions={[{ label: 'Удалить', kind: 'danger', run: doDelete }]}>
+        Файлы не изменятся: слово останется в тексте, но перестанет считаться статусом.
+      </ConfirmDialog>
     {/if}
 </div>
 <RemovePlugin />
@@ -902,14 +873,6 @@
   .err { color: var(--todo); font-size: 12px; }
   .err.banner { padding: 8px 12px; border-radius: 6px; background: color-mix(in srgb, var(--todo) 12%, transparent); }
 
-  .modal { position: absolute; inset: 0; z-index: 110; background: rgba(0, 0, 0, 0.28); display: flex; align-items: flex-start; justify-content: center; padding-top: 14vh; }
-  .dlg { width: 420px; max-width: calc(100% - 32px); padding: 18px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); }
-  .dlg h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
-  .dlg p { margin: 0 0 14px; color: var(--fg2); line-height: 1.45; }
-  .btns { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-  .btns button { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--field); }
-  .btns .primary { background: var(--acc); color: var(--onacc); font-weight: 600; }
-  .btns .danger-b { background: var(--danger); color: var(--on-danger); font-weight: 600; }
   /* «По ID / По названию» (ТЗ 35) */
   .lseg { display: flex; padding: 2px; gap: 2px; border-radius: 7px; background: var(--field); }
   .lseg button { height: 22px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 12px; }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clickOutside } from './clickOutside';
   import { onMount } from 'svelte';
   import { PALETTE, colorName, toneOf, toneStyle, type Tone } from './colors';
   import { asNamed } from './themes';
@@ -46,11 +47,6 @@
     queueMicrotask(() => el?.querySelectorAll<HTMLElement>('[data-sw]')[focused]?.focus());
   });
 
-  function outside(e: MouseEvent) {
-    const t = e.target as Node;
-    if (el?.contains(t) || anchor?.contains(t)) return; // a click on the swatch is handled by its own toggle
-    onclose();
-  }
   function key(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       e.stopPropagation();
@@ -68,9 +64,10 @@
   }
 </script>
 
-<svelte:window onmousedown={outside} onkeydown={key} />
+<svelte:window onkeydown={key} />
 
-<div class="pop" bind:this={el} role="dialog" aria-label="{title} {keyword}"
+<!-- a click on the swatch is handled by its own toggle -->
+<div class="pop" bind:this={el} use:clickOutside={{ onoutside: onclose, also: () => [anchor] }} role="dialog" aria-label="{title} {keyword}"
   style="left:{place.left}px;width:{WIDTH}px;{place.above ? `bottom:${place.bottom}px` : `top:${place.top}px`}">
   <span class="arrow" class:below={place.above} style="left:{place.arrow - 7}px"></span>
   <div class="hd"><b>{title}</b><span>{label}</span></div>

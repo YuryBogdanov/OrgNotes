@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Segmented from './Segmented.svelte';
+  import Switch from './Switch.svelte';
   import PluginHead from './PluginHead.svelte';
   import { plugins } from './api/host.svelte';
   import { pluginUpdates as up } from './pluginUpdates.svelte';
@@ -54,18 +56,14 @@
               {#if hint}<small>{hint}</small>{/if}
             </span>
             {#if f.type === 'switch'}
-              <button id={id(f)} class="switch" role="switch" aria-checked={!!v[f.key]} aria-label={f.label} onclick={() => set(f.key, !v[f.key])}><span></span></button>
+              <Switch id={id(f)} checked={!!v[f.key]} label={f.label} onchange={() => set(f.key, !v[f.key])} />
             {:else if f.type === 'text'}
               <input id={id(f)} class="sel txt" value={(v[f.key] as string) ?? ''} placeholder={f.placeholder} spellcheck="false"
                 onchange={(e) => set(f.key, f.clean ? f.clean(e.currentTarget.value) : e.currentTarget.value)} />
             {:else if f.type === 'choice'}
               {@const opts = optionsOf(f, v)}
               {#if f.look === 'segments'}
-                <div class="segs" role="radiogroup" aria-labelledby={id(f)}>
-                  {#each opts as o (o.value)}
-                    <button role="radio" aria-checked={v[f.key] === o.value} class:on={v[f.key] === o.value} disabled={o.disabled} onclick={() => set(f.key, o.value)}>{o.label}</button>
-                  {/each}
-                </div>
+                <Segmented labelledby={id(f)} value={v[f.key]} onchange={(x) => set(f.key, x)} options={opts.map((o) => ({ value: o.value as unknown, label: o.label, disabled: o.disabled }))} />
               {:else}
                 <select id={id(f)} class="sel" disabled={f.disabled?.(v) ?? false} value={optValue(v[f.key])} onchange={(e) => set(f.key, optOf(opts, e.currentTarget.value))}>
                   {#each opts as o, i (i)}<option value={optValue(o.value)} disabled={o.disabled}>{o.label}</option>{/each}
@@ -125,9 +123,6 @@
   .sel { height: 26px; max-width: 260px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 0 6px; font-size: 12.5px; }
   .sel.txt { width: 200px; padding: 0 8px; -webkit-user-select: text; user-select: text; }
   .val { font-size: 12.5px; color: var(--fg2); }
-  .segs { display: flex; padding: 2px; background: var(--field); border-radius: 7px; gap: 2px; }
-  .segs button { height: 22px; padding: 0 10px; white-space: nowrap; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 12px; }
-  .segs button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); font-weight: 500; }
   .ibfile { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .ibfile .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hrs { display: flex; align-items: center; gap: 6px; color: var(--fg2); }

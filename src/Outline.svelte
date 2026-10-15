@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Segmented from './Segmented.svelte';
   import { draggedHeading, setDragged } from './dragData';
   import { SvelteSet } from 'svelte/reactivity';
   import { store } from './store.svelte';
@@ -102,10 +103,7 @@
       <input bind:value={filter} placeholder="Фильтр заголовков" aria-label="Фильтр заголовков" spellcheck="false" autocomplete="off"
         onkeydown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); list?.focus(); key(e); } else if (e.key === 'Escape') filter = ''; }} />
     </label>
-    <div class="seg" role="radiogroup" aria-label="Что показывать">
-      <button role="radio" aria-checked={!tasksOnly} class:on={!tasksOnly} onclick={() => (tasksOnly = false)}>Все</button>
-      <button role="radio" aria-checked={tasksOnly} class:on={tasksOnly} onclick={() => (tasksOnly = true)}>Только задачи</button>
-    </div>
+    <Segmented label="Что показывать" fill value={tasksOnly} onchange={(v) => (tasksOnly = v)} options={[{ value: false, label: 'Все' }, { value: true, label: 'Только задачи' }]} />
     {#if !f.headings.length}
       <div class="empty">В файле нет заголовков</div>
     {:else if !rows.length}
@@ -140,9 +138,6 @@
   .filter input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--fg); font-size: 12px; padding: 0; -webkit-user-select: text; user-select: text; }
   .filter input::placeholder { color: var(--fg2); }
   .filter:focus-within { box-shadow: 0 0 0 2px var(--acc); }
-  .seg { display: flex; padding: 2px; background: var(--field); border-radius: 7px; gap: 2px; }
-  .seg button { flex: 1; height: 22px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 12px; }
-  .seg button.on { background: var(--segon); box-shadow: var(--shadow); color: var(--fg); font-weight: 600; }
   .tree { display: flex; flex-direction: column; gap: 1px; outline: none; overflow: auto; min-height: 0; }
   .row { display: flex; align-items: center; gap: 6px; flex: 0 0 26px; height: 26px; padding-right: 8px; border-radius: 6px; cursor: default; }
   .row.cur { background: var(--sel); }
