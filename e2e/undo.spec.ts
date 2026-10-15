@@ -99,3 +99,21 @@ test('goals: a mark of the 1-1 review is taken back by ⌘Z too, the counter wit
   await page.keyboard.press('Meta+z');
   await expect.poll(() => disk(page, PETROV)).toBe(before);
 });
+
+test('⌘Z pressed quickly again and again takes back as many steps, in order (no step taken twice)', async ({ page }) => {
+  await open(page);
+  for (let i = 0; i < 3; i++) {
+    const n = 4 - i;
+    await rows(page).first().getByRole('button', { name: /^Готово/ }).click();
+    await expect(rows(page)).toHaveCount(n - 1);
+  }
+  await blur(page);
+  await page.evaluate(() => ((window as any).__saveDelay = 200)); // a slow disk: the next ⌘Z comes while one is written
+  // three presses without waiting for the writes
+  await page.keyboard.press('Meta+z');
+  await page.keyboard.press('Meta+z');
+  await page.keyboard.press('Meta+z');
+  await expect.poll(() => disk(page)).toBe(INBOX());
+  await expect(rows(page)).toHaveCount(4);
+  await expect(page.locator('.toast', { hasText: 'Отменить нельзя' })).toHaveCount(0);
+});
