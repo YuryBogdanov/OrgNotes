@@ -7,16 +7,13 @@
 <script lang="ts">
   import { portal } from './portal';
   import { onMount } from 'svelte';
-  import { Compartment, EditorState, MapMode, RangeSetBuilder, StateEffect, StateField, Transaction, type Range } from '@codemirror/state';
-  import { Decoration, EditorView, ViewPlugin, WidgetType, hoverTooltip, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+  import { Compartment, EditorState, StateField, Transaction } from '@codemirror/state';
+  import { Decoration, EditorView, ViewPlugin, hoverTooltip, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
-  import { codeFolding, foldEffect, foldGutter, foldKeymap, foldService, foldable, foldedRanges, toggleFold, unfoldEffect } from '@codemirror/language';
-  import { drawerRanges, headingLines, toneFor, type DrawerRange, type Workflow } from './org';
-  import { toneStyle } from './colors';
-  import { extractLinks, type OrgLink } from './links';
-  import { changeStatusAt, cyclePriority, foldTargets, insertHeading, isHeadingLine, moveSubtree, newTaskState, nextCycleState, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree, insertItem, type Result } from './outline';
-  import type { Text } from '@codemirror/state';
-  import { lineLinks, onLineLinks } from './lineLinks';
+  import { codeFolding, foldGutter, foldKeymap, foldedRanges, toggleFold } from '@codemirror/language';
+  import type { Workflow } from './org';
+  import type { OrgLink } from './links';
+  import { changeStatusAt, cyclePriority, moveSubtree, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree } from './outline';
   import { DEFAULT_LEVELS, orgIndent, type LevelView } from './orgIndent';
   import { orgRich, type RichPick } from './orgRich';
   import { findExtension, findField, foundInfo, moveFind, setFind, type FindQuery } from './findView';
@@ -28,6 +25,13 @@
   import { tagsState } from './tagsState.svelte';
   import { lineTags, withTags } from './tags';
   import { autocompletion, type CompletionContext } from '@codemirror/autocomplete';
+  import { drawerMap, headingSet, linkAt, linksIn } from './cm/doc';
+  import { noteExt } from './cm/lineNote';
+  import { lineLinkExt } from './cm/lineLinks';
+  import { dropStaleFolds, foldAllDrawers, foldLines, foldNewDrawers, toggleDrawer } from './cm/drawers';
+  import { cycleState, cycleVisibility, newHeading, onHeading, orgFold, run, sel } from './cm/structure';
+  import { decorate } from './cm/decorate';
+  import { narrowRange, narrowing, setNarrow } from './cm/narrow';
 
   let { text, fileKey, path = '', wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
     path?: string; // the file's name in the folder: what a plugin's link at the end of a line is run with (ТЗ 33)
@@ -69,356 +73,19 @@
   let lastLevels = '';
   const numbers = new Compartment(); // line numbers: off while drawn, unless asked for
   const note = new Compartment();
-  class NoteWidget extends WidgetType {
-    text: string;
-    constructor(text: string) {
-      super();
-      this.text = text;
-    }
-    eq(o: NoteWidget) {
-      return o.text === this.text;
-    }
-    toDOM() {
-      const s = document.createElement('span');
-      s.className = 'cm-line-note';
-      s.textContent = this.text;
-      return s;
-    }
-  }
-  // ---- the plugins' links at the end of a line («Открыть доску ⌥⌘B», ТЗ 33) ----
-  class LinkWidget extends WidgetType {
-    label: string;
-    owner: number;
-    line: number;
-    constructor(label: string, owner: number, line: number) {
-      super();
-      this.label = label;
-      this.owner = owner;
-      this.line = line;
-    }
-    eq(o: LinkWidget) {
-      return o.label === this.label && o.owner === this.owner && o.line === this.line;
-    }
-    toDOM() {
-      const s = document.createElement('span');
-      s.className = 'cm-line-link';
-      s.textContent = this.label;
-      s.dataset.lineLink = this.owner + ':' + this.line;
-      return s;
-    }
-    ignoreEvent() {
-      return false;
-    }
-  }
-  const linksChanged = StateEffect.define<null>();
-  function lineLinkDecos(v: EditorView): DecorationSet {
-    const all = lineLinks();
-    if (!all.length) return Decoration.none;
-    const out: Range<Decoration>[] = [];
-    for (const r of v.visibleRanges)
-      for (let pos = r.from; pos <= r.to; ) {
-        const ln = v.state.doc.lineAt(pos);
-        all.forEach((l, i) => {
-          const label = l.label(ln.text, ln.number - 1);
-          if (label) out.push(Decoration.widget({ widget: new LinkWidget(label, i, ln.number - 1), side: 1 }).range(ln.to));
-        });
-        pos = ln.to + 1;
-      }
-    return Decoration.set(out, true);
-  }
-  const lineLinkExt = () => [
-    ViewPlugin.fromClass(
-      class {
-        decorations: DecorationSet;
-        stop: () => void;
-        constructor(v: EditorView) {
-          this.decorations = lineLinkDecos(v);
-          this.stop = onLineLinks(() => queueMicrotask(() => v.dispatch({ effects: linksChanged.of(null) })));
-        }
-        update(u: ViewUpdate) {
-          if (u.docChanged || u.viewportChanged || u.transactions.some((t) => t.effects.some((e) => e.is(linksChanged)))) this.decorations = lineLinkDecos(u.view);
-        }
-        destroy() {
-          this.stop();
-        }
-      },
-      { decorations: (p) => p.decorations },
-    ),
-    EditorView.domEventHandlers({
-      mousedown(e) {
-        const el = (e.target as HTMLElement).closest?.('[data-line-link]') as HTMLElement | null;
-        if (!el || e.button !== 0) return false;
-        e.preventDefault();
-        const [i, line] = el.dataset.lineLink!.split(':').map(Number);
-        lineLinks()[i]?.run(path, line);
-        return true;
-      },
-    }),
-  ];
-  const noteExt = (n: { line: number; text: string } | null) =>
-    n ? EditorView.decorations.compute([], (st) => (n.line + 1 > st.doc.lines ? Decoration.none : Decoration.set([Decoration.widget({ widget: new NoteWidget(n.text), side: 1 }).range(st.doc.line(n.line + 1).to)]))) : [];
 
-  const HEAD = /^(\*+)\s/;
-  // heading lines per document version; ignores `* x` inside #+BEGIN_…/#+END_… blocks
-  const cache = new WeakMap<Text, Set<number>>();
-  const headingSet = (doc: Text) => {
-    let s = cache.get(doc);
-    if (!s) cache.set(doc, (s = headingLines(doc.toString().split('\n'))));
-    return s;
-  };
-
-  // drawers per document version, by the line (0-based) they start on
-  const drawerCache = new WeakMap<Text, Map<number, DrawerRange>>();
-  const drawerMap = (doc: Text) => {
-    let m = drawerCache.get(doc);
-    if (!m) drawerCache.set(doc, (m = new Map(drawerRanges(doc.toString().split('\n')).map((d) => [d.start, d]))));
-    return m;
-  };
-  /** The folded range of a drawer: from the end of its first line to the end of its :END: line. */
-  const drawerFold = (doc: Text, d: DrawerRange) => ({ from: doc.line(d.start + 1).to, to: doc.line(d.end + 1).to });
   let drawersOn = true; // read by the editor's extensions, which outlive a render
   $effect.pre(() => {
     drawersOn = drawers;
   });
-  /** Fold these heading lines (a card of goals: «Отметки», shown on the right). */
-  function foldLines(v: EditorView, lines: number[]) {
-    // in order: CodeMirror takes ranges sorted (nested folds come after their parent's in `foldedRanges`)
-    const effects = [...new Set(lines)].sort((a, b) => a - b).flatMap((l) => {
-      if (l + 1 > v.state.doc.lines) return [];
-      const ln = v.state.doc.line(l + 1);
-      const r = foldable(v.state, ln.from, ln.to);
-      return r ? [foldEffect.of(r)] : [];
-    });
-    if (effects.length) v.dispatch({ effects });
-  }
   $effect(() => {
     const n = lineNote;
     view?.dispatch({ effects: note.reconfigure(noteExt(n)) });
   });
-  /** Fold every drawer of the document (a file just opened). */
-  function foldAllDrawers(v: EditorView) {
-    if (!drawersOn) return;
-    const effects = [...drawerMap(v.state.doc).values()].map((d) => foldEffect.of(drawerFold(v.state.doc, d)));
-    if (effects.length) v.dispatch({ effects });
-  }
-  // what the user types, pastes, deletes or undoes: a drawer made this way stays open
-  const BY_HAND = ['input.type', 'input.paste', 'input.drop', 'input.complete', 'delete', 'undo', 'redo'];
-  /** A drawer the app adds (Inbox, a status with LOGBOOK, a file changed on disk) comes folded. */
-  const foldNewDrawers = EditorState.transactionExtender.of((tr: Transaction) => {
-    if (!drawersOn || !tr.docChanged || BY_HAND.some((e) => tr.isUserEvent(e))) return null;
-    const before = new Set<number>();
-    for (const d of drawerMap(tr.startState.doc).values()) {
-      const at = tr.changes.mapPos(tr.startState.doc.line(d.start + 1).from, 1, MapMode.TrackDel);
-      if (at !== null) before.add(at);
-    }
-    const effects: StateEffect<unknown>[] = [];
-    for (const d of drawerMap(tr.newDoc).values())
-      if (!before.has(tr.newDoc.line(d.start + 1).from)) effects.push(foldEffect.of(drawerFold(tr.newDoc, d)));
-    return effects.length ? { effects } : null;
-  });
-  /** Tab on a drawer's first line: fold or open it; the caret goes to that line, so the next Tab finds it again. */
-  function toggleDrawer(v: EditorView, d: DrawerRange) {
-    const r = drawerFold(v.state.doc, d);
-    let folded = false;
-    foldedRanges(v.state).between(r.from, r.from, (a, b) => {
-      if (a === r.from && b === r.to) folded = true;
-    });
-    const head = v.state.selection.main.head;
-    v.dispatch({ effects: (folded ? unfoldEffect : foldEffect).of(r), selection: head > r.from ? { anchor: r.from } : undefined });
-    return true;
-  }
-  /** Folds on drawers that are not drawers any more (an :END: gone): taken away, the text shows. */
-  function dropStaleFolds(v: EditorView) {
-    const doc = v.state.doc;
-    const heads = headingSet(doc);
-    const drawersHere = drawerMap(doc);
-    const stale: { from: number; to: number }[] = [];
-    foldedRanges(v.state).between(0, doc.length, (from, to) => {
-      const line = doc.lineAt(from);
-      if (line.to !== from || heads.has(line.number - 1)) return;
-      const d = drawersHere.get(line.number - 1);
-      if (!d || drawerFold(doc, d).to !== to) stale.push({ from, to });
-    });
-    if (stale.length) queueMicrotask(() => v.dispatch({ effects: stale.map((r) => unfoldEffect.of(r)) }));
-  }
 
-  const linkCache = new WeakMap<Text, OrgLink[]>();
-  const linksIn = (doc: Text) => {
-    let l = linkCache.get(doc);
-    if (!l) linkCache.set(doc, (l = extractLinks(doc.toString())));
-    return l;
-  };
-  const linkAt = (doc: Text, pos: number) => linksIn(doc).find((l) => pos >= l.from && pos <= l.to);
 
   // ---- Org structure commands -------------------------------------------------------
-  const cycleState = new WeakMap<EditorView, number>(); // S-Tab position per editor, absent = everything open
 
-  const apply = (v: EditorView, r: Result) => {
-    v.dispatch({ changes: r.changes, selection: { anchor: r.caret }, scrollIntoView: true, userEvent: 'input' });
-    cycleState.delete(v);
-    return true;
-  };
-  const sel = (v: EditorView) => v.state.selection.main;
-  /** Apply a command result; a heading-line command that cannot move still consumes the key. */
-  const run = (v: EditorView, r: Result | null) => (r ? apply(v, r) : true);
-  const onHeading = (v: EditorView) => sel(v).empty && isHeadingLine(v.state.doc.toString(), sel(v).head);
-
-  const isFolded = (v: EditorView, lineTo: number) => {
-    let folded = false;
-    foldedRanges(v.state).between(lineTo, lineTo, (from) => {
-      if (from === lineTo) folded = true;
-    });
-    return folded;
-  };
-
-  /** M-RET / M-S-RET: new heading at the current level. */
-  const newHeading = (v: EditorView, todo: boolean, words: Workflow) => {
-    const head = sel(v).head;
-    // in a list: a new item (with a checkbox for ⌥⇧↩), as Org's M-RET / M-S-RET there
-    const item = insertItem(v.state.doc.toString(), head, { box: todo });
-    if (item) return apply(v, item);
-    const line = v.state.doc.lineAt(head);
-    return apply(v, insertHeading(v.state.doc.toString(), head, { todo: todo ? newTaskState(words) : undefined, folded: isFolded(v, line.to) }));
-  };
-
-  /** S-Tab: everything folded, then level 1 open, level 2 open, ... all open, then folded again. */
-  const cycleVisibility = (v: EditorView) => {
-    const text = v.state.doc.toString();
-    const { max } = foldTargets(text, 0);
-    if (max === 0) return false; // no headings
-    const state = nextCycleState(cycleState.get(v), max);
-    cycleState.set(v, state);
-    const targets = foldTargets(text, state).lines;
-    const effects = [] as ReturnType<typeof foldEffect.of>[];
-    const heads = headingSet(v.state.doc);
-    // only the headings' folds: drawers keep theirs (as org-cycle-hide-drawers)
-    foldedRanges(v.state).between(0, v.state.doc.length, (from, to) => {
-      if (heads.has(v.state.doc.lineAt(from).number - 1)) effects.push(unfoldEffect.of({ from, to }));
-    });
-    const fold: { from: number; to: number }[] = [];
-    for (const ln of targets) {
-      const l = v.state.doc.line(ln + 1);
-      const r = foldable(v.state, l.from, l.to);
-      if (r) {
-        effects.push(foldEffect.of(r));
-        fold.push(r);
-      }
-    }
-    // the caret must not end up inside hidden text: put it on the outermost folded heading
-    const head = sel(v).head;
-    const hiding = fold.filter((r) => head > r.from && head <= r.to).sort((a, b) => a.from - b.from)[0];
-    v.dispatch({ effects, selection: hiding ? { anchor: hiding.from } : undefined, scrollIntoView: true });
-    return true;
-  };
-
-  const orgFold = foldService.of((state, lineStart) => {
-    const line = state.doc.lineAt(lineStart);
-    const heads = headingSet(state.doc);
-    if (!heads.has(line.number - 1)) {
-      const d = drawerMap(state.doc).get(line.number - 1);
-      return d ? drawerFold(state.doc, d) : null;
-    }
-    const m = HEAD.exec(line.text)!;
-    let end = line.to;
-    let content = false; // a heading followed only by blank lines has nothing to fold
-    for (let n = line.number + 1; n <= state.doc.lines; n++) {
-      const l = state.doc.line(n);
-      const mm = heads.has(n - 1) ? HEAD.exec(l.text) : null;
-      if (mm && mm[1].length <= m[1].length) break;
-      if (l.text.trim() !== '') content = true;
-      end = l.to;
-    }
-    return content && end > line.to ? { from: line.to, to: end } : null;
-  });
-
-  function decorate(v: EditorView, words: Workflow): { all: DecorationSet; atomic: DecorationSet } {
-    const items: Range<Decoration>[] = [];
-    const hidden: Range<Decoration>[] = [];
-    const open = new Set(words.open);
-    const done = new Set(words.done);
-    const heads = headingSet(v.state.doc);
-    const mark = (from: number, to: number, cls: string) => items.push(Decoration.mark({ class: cls }).range(from, to));
-    for (const { from, to } of v.visibleRanges) {
-      let pos = from;
-      while (pos <= to) {
-        const line = v.state.doc.lineAt(pos);
-        const t = line.text;
-        const hm = heads.has(line.number - 1) ? HEAD.exec(t) : null;
-        if (hm) {
-          const lvl = Math.min(hm[1].length, 9); // deeper than 9: as 9
-          items.push(Decoration.line({ class: 'cm-h' + lvl }).range(line.from));
-          let i = hm[0].length;
-          const w = /^(\S+)/.exec(t.slice(i));
-          if (w && (open.has(w[1]) || done.has(w[1]))) {
-            items.push(
-              Decoration.mark({ class: 'cm-kw tone', attributes: { style: toneStyle(toneFor(w[1], words)) } }).range(line.from + i, line.from + i + w[1].length),
-            );
-            i += w[1].length;
-            if (done.has(w[1])) items.push(Decoration.line({ class: 'cm-doneline' }).range(line.from));
-          }
-          const pr = /^\s+(\[#[A-Z]\])/.exec(t.slice(i));
-          if (pr) mark(line.from + i + pr[0].length - pr[1].length, line.from + i + pr[0].length, 'cm-prio');
-          const ck = /\[\d+\/\d+\]|\[\d+%\]/.exec(t);
-          if (ck) mark(line.from + ck.index, line.from + ck.index + ck[0].length, 'cm-cookie');
-          const tg = /\s(:(?:[^\s:]+:)+)\s*$/.exec(t);
-          if (tg) mark(line.from + tg.index + 1, line.from + tg.index + 1 + tg[1].length, 'cm-tags');
-        } else {
-          const pl = /^\s*((?:SCHEDULED|DEADLINE|CLOSED):)/.exec(t);
-          if (pl) {
-            for (const m of t.matchAll(/(SCHEDULED|DEADLINE|CLOSED):/g)) mark(line.from + m.index!, line.from + m.index! + m[0].length, 'cm-plan');
-          }
-          if (/^\s*:[A-Za-z_]+:/.test(t)) {
-            const m = /:[A-Za-z_]+:/.exec(t)!;
-            mark(line.from + m.index, line.from + m.index + m[0].length, 'cm-drawer');
-          }
-          if (/^#\+/.test(t)) {
-            const m = /^#\+\w+:/.exec(t);
-            if (m) mark(line.from, line.from + m[0].length, 'cm-meta');
-          }
-          if (/^\s*\|/.test(t)) {
-            if (/^\s*\|[-+]+\|?\s*$/.test(t)) mark(line.from, line.to, 'cm-tablesep');
-          }
-        }
-        for (const m of t.matchAll(/[<\[]\d{4}-\d{2}-\d{2}[^>\]\n]*[>\]]/g)) mark(line.from + m.index!, line.from + m.index! + m[0].length, 'cm-ts');
-        if (line.to + 1 > to) break;
-        pos = line.to + 1;
-      }
-    }
-    // links: show only the description (like org-link-descriptive) unless the cursor is on the link
-    const sel = v.state.selection.main;
-    const hide = (a: number, b: number) => {
-      if (b <= a) return;
-      const r = Decoration.replace({}).range(a, b);
-      items.push(r);
-      hidden.push(r);
-    };
-    for (const l of linksIn(v.state.doc)) {
-      if (!v.visibleRanges.some((r) => l.to >= r.from && l.from <= r.to)) continue;
-      const oneLine = v.state.doc.lineAt(l.from).number === v.state.doc.lineAt(l.to).number;
-      if (l.format === 'bracket' && oneLine) {
-        const a = l.descFrom ?? l.from + 2;
-        const b = l.descTo ?? l.to - 2;
-        mark(a, b, 'cm-link');
-        if (sel.from <= l.to && sel.to >= l.from) {
-          mark(l.from, a, 'cm-linkmark');
-          mark(b, l.to, 'cm-linkmark');
-        } else {
-          hide(l.from, a);
-          hide(b, l.to);
-        }
-      } else {
-        mark(l.from, l.to, 'cm-link');
-      }
-    }
-    // builder needs ordering by position (line decorations first at equal position)
-    const build = (rs: Range<Decoration>[]) => {
-      rs.sort((a, b) => a.from - b.from || a.value.startSide - b.value.startSide);
-      const b = new RangeSetBuilder<Decoration>();
-      for (const r of rs) b.add(r.from, r.to, r.value);
-      return b.finish();
-    };
-    return { all: build(items), atomic: build(hidden) };
-  }
 
   // ---- the look: the structural view, or «Оформленный текст» (which includes it) ----------------------------
   const viewKey = () => JSON.stringify([levels, rich, richNumbers]);
@@ -434,52 +101,12 @@
   }
 
   // ---- narrowing to one subtree ----------------------------------------------------------------------
-  /** The shown part: from the start of the first line to the end of the last non-blank one — but never above `keep`
-   *  (the caret, the end shown already): blank lines typed here stay while the card is open (fix to ТЗ 18, Enter). */
-  function narrowRange(doc: Text, n: { line: number; end: number; keep?: number }) {
-    let last = Math.min(n.end, doc.lines) - 1;
-    const floor = n.keep !== undefined ? Math.min(last, doc.lineAt(Math.min(n.keep, doc.length)).number - 1) : n.line;
-    while (last > Math.max(n.line, floor) && doc.line(last + 1).text.trim() === '') last--;
-    return { from: doc.line(Math.min(n.line + 1, doc.lines)).from, to: doc.line(Math.max(last, n.line) + 1).to };
-  }
-  const hiddenOutside = (st: EditorState, r: { from: number; to: number } | null) => {
-    if (!r) return Decoration.none;
-    const out: Range<Decoration>[] = [];
-    if (r.from > 0) out.push(Decoration.replace({ block: true }).range(0, r.from - 1));
-    if (r.to < st.doc.length) out.push(Decoration.replace({ block: true }).range(r.to + 1, st.doc.length));
-    return Decoration.set(out);
-  };
-  /** The heading's lines again (it grew or moved by a change from elsewhere: the mini window, ТЗ 31). */
-  const setNarrow = StateEffect.define<{ line: number; end: number; keep?: number }>();
+
   let narrowField: StateField<{ from: number; to: number }> | null = null;
-  function narrowing(n: { line: number; end: number }) {
-    const field = StateField.define<{ from: number; to: number }>({
-      create: (st) => narrowRange(st.doc, n),
-      update: (r, tr) => {
-        const reset = tr.effects.find((e) => e.is(setNarrow));
-        if (reset) return narrowRange(tr.state.doc, reset.value as { line: number; end: number; keep?: number });
-        // typing at either edge stays inside
-        return tr.docChanged ? { from: tr.changes.mapPos(r.from, -1), to: tr.changes.mapPos(r.to, 1) } : r;
-      },
-    });
-    narrowField = field;
-    return [
-      field,
-      EditorView.decorations.compute([field], (st) => hiddenOutside(st, st.field(field))),
-      EditorView.atomicRanges.of((v) => hiddenOutside(v.state, v.state.field(field))),
-      // the user cannot change what is hidden (the app's own patches, from disk or other tabs, still go through)
-      EditorState.changeFilter.of((tr) => {
-        if (!tr.annotation(Transaction.userEvent)) return true;
-        const r = tr.startState.field(field);
-        const len = tr.startState.doc.length;
-        return [0, Math.max(0, r.from - 1), Math.min(len, r.to + 1), len];
-      }),
-      EditorView.updateListener.of((u) => {
-        if (!u.docChanged) return;
-        const r = u.state.field(field);
-        onnarrow?.(u.state.doc.lineAt(r.from).number - 1, u.state.doc.lineAt(r.to).number - 1, u.transactions.some((tr) => !!tr.annotation(Transaction.userEvent)));
-      }),
-    ];
+  function narrowExt(n: { line: number; end: number }) {
+    const nw = narrowing(n, (a, b, byUser) => onnarrow?.(a, b, byUser));
+    narrowField = nw.field;
+    return nw.ext;
   }
 
   /** `cm-has-selection` on the editor while something is selected: the current line is not marked then. Through
@@ -752,8 +379,8 @@
       doc,
       extensions: [
         numbers.of(numbersExt()), highlightActiveLine(), highlightActiveLineGutter(), drawSelection(),
-        ...(narrow ? narrowing(narrow) : [scrollPastEnd()]), // the last line can be scrolled up to the top, as in Xcode (room below, not lines in the file)
-        undo.of(history()), orgFold, foldNewDrawers, findExtension,
+        ...(narrow ? narrowExt(narrow) : [scrollPastEnd()]), // the last line can be scrolled up to the top, as in Xcode (room below, not lines in the file)
+        undo.of(history()), orgFold, foldNewDrawers(() => drawersOn), findExtension,
         codeFolding({
           placeholderDOM: (_v, onclick) => {
             const el = document.createElement('span');
@@ -765,7 +392,7 @@
             return el;
           },
         }),
-        ...(gutter ? [foldGutter()] : []), plugin, ...lineLinkExt(), selectionClass, note.of(noteExt(lineNote)), structure.of(structureExt(words)),
+        ...(gutter ? [foldGutter()] : []), plugin, ...lineLinkExt(() => path), selectionClass, note.of(noteExt(lineNote)), structure.of(structureExt(words)),
         ...(hint ? [cmPlaceholder(hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         linkTip,
@@ -871,7 +498,7 @@
 
   onMount(() => {
     view = new EditorView({ state: makeState(text, wf), parent: host });
-    foldAllDrawers(view);
+    foldAllDrawers(view, drawersOn);
     foldLines(view, folded);
     lastKey = fileKey;
     lastLevels = viewKey();
@@ -904,7 +531,7 @@
       lastKey = k;
       lastReset = r;
       view.setState(makeState(t, w));
-      foldAllDrawers(view);
+      foldAllDrawers(view, drawersOn);
       if (initialFolds?.length) foldLines(view, initialFolds);
       restoreCaret();
     } else if (r !== lastReset) {
