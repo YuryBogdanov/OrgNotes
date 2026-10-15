@@ -860,6 +860,15 @@ class Host {
           });
           L.active = pi;
         },
+        saveFile: async (o) => {
+          const { save } = await import('@tauri-apps/plugin-dialog');
+          const name = String(o?.name ?? 'export').replace(/[/\\:]/g, '-');
+          const path = await save({ title: o.title ?? 'Сохранить как', defaultPath: name, ...(o.filter ? { filters: [{ name: String(o.filter.name), extensions: o.filter.extensions.map(String) }] } : {}) });
+          if (!path) return null;
+          if (typeof o.base64 === 'string') await invoke('export_bytes', { path, data: o.base64 });
+          else await invoke('export_text', { path, text: String(o.text ?? '') });
+          return path;
+        },
         form: (spec) =>
           new Promise((resolve) => {
             this.form?.resolve(null);
@@ -1421,6 +1430,10 @@ function coreCommand(cmd: string, arg: unknown) {
       const h = i >= 0 && a.ref ? findHeading(store.files[i].headings, a.ref) : undefined;
       if (!h) throw new Error('заголовок не найден');
       return store.open(i, h.line);
+    }
+    case 'file.reveal': {
+      if (!store.files.some((f) => f.name === a.path)) throw new Error(`нет файла «${a.path}»`);
+      return store.revealEntry(String(a.path));
     }
     case 'agenda.open':
       return store.showAgendaHere();

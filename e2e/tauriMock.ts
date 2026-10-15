@@ -110,6 +110,10 @@ export async function installTauriMock(page: Page, files: Record<string, string>
             w.__log.push(['delete_theme', args.file]);
             return;
           }
+          if (cmd === 'export_bytes') {
+            disk[args.path] = 'base64:' + args.data;
+            return;
+          }
           if (cmd === 'export_text') {
             disk[args.path] = args.text;
             return;
