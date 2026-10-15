@@ -5,13 +5,8 @@
 import { cachedTheme, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
 import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
 import { notify } from './notify.svelte';
+import { invoke, isTauri } from './tauri';
 
-const isTauri = '__TAURI_INTERNALS__' in window;
-
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<T>(cmd, args);
-}
 
 class Themes {
   appearanceChoice = $state<AppearanceChoice>(readChoice());
