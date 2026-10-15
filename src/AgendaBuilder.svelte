@@ -3,13 +3,15 @@
   import { moved } from './pointer';
   import { onMount, tick } from 'svelte';
   import { store } from './store.svelte';
-  import { resolveWorkflow, toneFor, type Workflow } from './org';
   import { toneOf, toneStyle } from './colors';
   import { displayName } from './names';
   import ColorPicker from './ColorPicker.svelte';
+  import AgendaPreview from './AgendaPreview.svelte';
+  import { MULTI, allTagsOf, dateOfForm, folderTree, isChecked, optionsFor, statusSets, valueKind, type Kind, type Opt } from './builderOptions';
+  import { isoDay } from './calIndex';
   import {
-    FIELDS, GROUPS, OPS, PRIORITIES, SORTS, fieldLabel, incomplete, inSources, nameProblem, newBlock, newCond, noValue, opLabel, query,
-    runAgenda, shortDay, statusKey, statusName, summary, tasksCount, valueWords, type Block, type Cond, type DateVal, type Field,
+    GROUPS, SORTS, fieldLabel, incomplete, nameProblem, newBlock, newCond, noValue, opLabel, query, summary, valueWords, type Block, type Cond,
+    type DateVal, type Field,
   } from './agendas';
 
   // «Конструктор агенды»: the whole window — the agenda and its blocks on the left, a live preview on the right.
@@ -23,7 +25,6 @@
   const others = $derived(store.agendas.filter((a) => a.id !== draft.id).map((a) => a.name));
   const problem = $derived(nameProblem(draft.name, others));
   const today = $derived(new Date(store.today.getFullYear(), store.today.getMonth(), store.today.getDate()));
-  const preview = $derived(runAgenda(draft, store.files, today, 50));
   const dotStyle = (b: Block) => toneStyle(toneOf(b.color) ?? toneOf('blue')!);
 
   // the focus goes to the name (all of it selected for a new agenda); on closing the store puts it back
@@ -32,44 +33,13 @@
     if (isNew) nameEl?.select(); // «Новая агенда», ready to be typed over
   });
 
-  // ---- what the pickers offer --------------------------------------------------------------------------------
-  type StatusSet = { name: string; states: { name: string; tone: string }[] };
-  const sets = $derived.by<StatusSet[]>(() => {
-    const seen = new Map<string, StatusSet>();
-    const add = (wf: Workflow) => {
-      for (const s of wf.sequences ?? []) {
-        if (!seen.has(s.name)) seen.set(s.name, { name: s.name, states: s.states.map((x) => ({ name: x.name, tone: toneStyle(toneFor(x.name, wf)) })) });
-      }
-    };
-    for (const f of store.files) if (inSources(f.name, draft.sources)) add(f.wf);
-    if (!seen.size) add(resolveWorkflow('', '', store.config));
-    return [...seen.values()];
-  });
-  const allTags = $derived([...new Set(store.files.flatMap((f) => [...f.filetags, ...f.headings.flatMap((h) => h.tags)]))].sort((a, b) => a.localeCompare(b, 'ru')));
-  /** The notes folder as a tree: folders first, then files, each level by name. */
-  const tree = $derived.by(() => {
-    const dirs = new Set(store.folders);
-    const files = store.files.map((f) => f.name);
-    const out: { rel: string; dir: boolean; depth: number }[] = [];
-    const children = (parent: string) => {
-      const inside = (p: string) => (parent ? p.startsWith(parent + '/') && !p.slice(parent.length + 1).includes('/') : !p.includes('/'));
-      const ds = [...dirs].filter(inside).sort((a, b) => a.localeCompare(b, 'ru'));
-      const fs = files.filter(inside).sort((a, b) => a.localeCompare(b, 'ru'));
-      const depth = parent ? parent.split('/').length : 0;
-      for (const d of ds) {
-        out.push({ rel: d, dir: true, depth });
-        children(d);
-      }
-      for (const f of fs) out.push({ rel: f, dir: false, depth });
-    };
-    children('');
-    return out;
-  });
+  // ---- what the pickers offer (builderOptions.ts) --------------------------------------------------------------
+  const sets = $derived(statusSets(store.files, draft.sources, store.config));
+  const allTags = $derived(allTagsOf(store.files));
+  const tree = $derived(folderTree(store.folders, store.files.map((f) => f.name)));
   const exists = (rel: string) => store.folders.includes(rel) || store.files.some((f) => f.name === rel);
 
   // ---- popovers: one at a time, anchored under the control that opened it --------------------------------------
-  type Kind = 'add' | 'field' | 'op' | 'status' | 'date' | 'tag' | 'prio' | 'path' | 'sources' | 'group' | 'sort';
-  type Opt = { id: string; label: string; head?: boolean; count?: string; tone?: string; depth?: number; dir?: boolean; hint?: string };
   let pop = $state<{ kind: Kind; block: Block; cond?: Cond; anchor: HTMLElement } | null>(null);
   let popEl: HTMLDivElement | undefined = $state();
   let filter = $state('');
@@ -80,86 +50,12 @@
   let formFrom = $state('');
   let formTo = $state('');
 
-  const MULTI: Kind[] = ['status', 'tag', 'path', 'sources'];
-  const norm = (s: string) => s.toLocaleLowerCase('ru').replace(/ё/g, 'е');
-  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const DATE_OPTS: { id: DateVal['kind'] | 'none'; label: string }[] = [
-    { id: 'before', label: 'раньше сегодня' },
-    { id: 'today', label: 'сегодня' },
-    { id: 'tomorrow', label: 'завтра' },
-    { id: 'next', label: 'ближайшие N дней…' },
-    { id: 'range', label: 'в диапазоне…' },
-    { id: 'none', label: 'не задано' },
-  ];
 
-  const opts = $derived.by<Opt[]>(() => {
-    if (!pop) return [];
-    const q = norm(filter.trim());
-    const ok = (s: string) => !q || norm(s).includes(q);
-    switch (pop.kind) {
-      case 'add':
-      case 'field':
-        return FIELDS.map((f) => ({ id: f.id, label: f.label }));
-      case 'op':
-        return OPS[pop.cond!.field].map((o) => ({ id: o.id, label: o.label }));
-      case 'group':
-        return GROUPS.map((g) => ({ id: g.id, label: g.label }));
-      case 'sort':
-        return SORTS.map((s) => ({ id: s.id, label: s.label }));
-      case 'prio':
-        return PRIORITIES.map((p) => ({ id: p, label: p }));
-      case 'date':
-        return DATE_OPTS.map((d) => ({ id: d.id, label: d.label }));
-      case 'status': {
-        if (sets.length === 1) return sets[0].states.map((s) => ({ id: statusKey(sets[0].name, s.name), label: s.name, tone: s.tone }));
-        const out: Opt[] = [];
-        for (const set of sets) {
-          const states = set.states.filter((s) => ok(s.name));
-          if (!states.length) continue; // an empty group is hidden
-          const n = set.states.filter((s) => picked.includes(statusKey(set.name, s.name))).length;
-          out.push({ id: 'h:' + set.name, label: set.name.toLocaleUpperCase('ru'), head: true, count: `выбрано ${n} из ${set.states.length}` });
-          for (const s of states) out.push({ id: statusKey(set.name, s.name), label: s.name, tone: s.tone });
-        }
-        return out;
-      }
-      case 'tag': {
-        const out: Opt[] = [...new Set([...allTags, ...picked])].filter(ok).map((t) => ({ id: t, label: t }));
-        const typed = filter.trim().replace(/\s+/g, '_');
-        if (typed && !out.some((o) => o.id === typed) && !/[:\s]/.test(typed)) out.push({ id: typed, label: `Добавить тег «${typed}»` });
-        return out;
-      }
-      case 'path':
-      case 'sources':
-        return q
-          ? tree.filter((t) => ok(t.rel)).map((t) => ({ id: t.rel, label: displayName(t.rel), dir: t.dir, depth: 0, hint: t.rel.includes('/') ? t.rel.slice(0, t.rel.lastIndexOf('/')) : '' }))
-          : tree.map((t) => ({ id: t.rel, label: displayName(t.rel), dir: t.dir, depth: t.depth }));
-    }
-  });
+  const opts = $derived(pop ? optionsFor(pop.kind, pop.cond?.field, filter, picked, { sets, tags: allTags, tree }) : []);
   const items = $derived(opts.filter((o) => !o.head));
   const searchable = $derived(!!pop && (pop.kind === 'tag' || pop.kind === 'path' || pop.kind === 'sources' || (pop.kind === 'status' && sets.length > 1)));
   const isMulti = $derived(!!pop && MULTI.includes(pop.kind));
 
-  /** Is this option the current one (single choice) or picked (multiple)? */
-  function checked(o: Opt): boolean {
-    if (!pop) return false;
-    if (isMulti) return picked.includes(o.id);
-    const c = pop.cond;
-    switch (pop.kind) {
-      case 'field':
-        return c?.field === o.id;
-      case 'op':
-        return c?.op === o.id;
-      case 'group':
-        return pop.block.group === o.id;
-      case 'sort':
-        return pop.block.sort === o.id;
-      case 'prio':
-        return c?.prio === o.id;
-      case 'date':
-        return c?.op === 'none' ? o.id === 'none' : c?.date?.kind === o.id;
-    }
-    return false;
-  }
 
   async function openPop(kind: Kind, block: Block, anchor: HTMLElement, cond?: Cond) {
     if (pop?.anchor === anchor && pop.kind === kind) return closePop(true);
@@ -169,7 +65,7 @@
     picked = kind === 'sources' ? [...draft.sources] : MULTI.includes(kind) ? [...(cond?.values ?? [])] : [];
     pop = { kind, block, cond, anchor };
     await tick();
-    const i = items.findIndex((o) => checked(o));
+    const i = items.findIndex((o) => (pop ? isChecked(pop.kind, o.id, { multi: isMulti, picked, cond: pop.cond, block: pop.block }) : false));
     hi = Math.max(0, i);
     focusPop();
     scrollHi();
@@ -248,8 +144,8 @@
         } else if (o.id === 'next' || o.id === 'range') {
           form = o.id;
           formN = c.date?.kind === 'next' ? String(c.date.n) : '7';
-          formFrom = c.date?.kind === 'range' ? c.date.from : iso(today);
-          formTo = c.date?.kind === 'range' ? c.date.to : iso(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 6));
+          formFrom = c.date?.kind === 'range' ? c.date.from : isoDay(today);
+          formTo = c.date?.kind === 'range' ? c.date.to : isoDay(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 6));
           await tick();
           popEl?.querySelector<HTMLInputElement>('.form input')?.focus();
           return;
@@ -264,15 +160,9 @@
   function submitForm() {
     const c = pop?.cond;
     if (!c) return;
-    if (form === 'next') {
-      const n = parseInt(formN, 10);
-      if (!(n >= 1)) return;
-      c.date = { kind: 'next', n: Math.min(n, 3650) };
-    } else if (form === 'range') {
-      if (!formFrom || !formTo) return;
-      const [from, to] = formFrom <= formTo ? [formFrom, formTo] : [formTo, formFrom];
-      c.date = { kind: 'range', from, to };
-    }
+    const d = form && dateOfForm(form, formN, formFrom, formTo);
+    if (!d) return;
+    c.date = d;
     if (c.op === 'none') c.op = 'eq';
     closePop(false);
   }
@@ -285,7 +175,6 @@
     if (c.field === 'title') el.focus();
     else await openPop(valueKind(c.field), block, el, c);
   }
-  const valueKind = (f: Field): Kind => (f === 'scheduled' || f === 'deadline' ? 'date' : f === 'priority' ? 'prio' : (f as Kind));
 
   function popKey(e: KeyboardEvent) {
     if (!pop) return;
@@ -577,30 +466,7 @@
       </div>
     </div>
 
-    <div class="pv" aria-label="Предпросмотр">
-      <div class="pvh"><span class="cap">ПРЕДПРОСМОТР</span><span class="upd">обновляется при каждом изменении</span></div>
-      {#each preview as r (r.block.id)}
-        <div class="ph2" data-preview={r.block.name}>
-          <span class="dot tone-bg" style={dotStyle(r.block)}></span>
-          <span class="pt">{r.block.name || 'Без названия'}</span>
-          <span class="pc">{tasksCount(r.total)}</span>
-        </div>
-        {#if !r.total}<div class="pnone">нет задач</div>{/if}
-        {#each r.groups as g (g.key)}
-          {#if g.title}<div class="pg">{g.title}</div>{/if}
-          {#each g.tasks as t (t.file + ':' + t.line)}
-            {@const f = store.files[t.file]}
-            {@const d = t.scheduled ?? t.deadline}
-            <div class="prow">
-              <span class="kw tone-chip" style={toneStyle(toneFor(t.kw, f.wf))}>{t.kw}</span>
-              <div class="pm"><span class="ptt">{t.title}</span><span class="ps">{t.src}</span></div>
-              <span class="pd">{d ? shortDay(d) : ''}</span>
-            </div>
-          {/each}
-        {/each}
-        {#if r.more}<div class="pnone">и ещё {r.more}</div>{/if}
-      {/each}
-    </div>
+    <AgendaPreview {draft} {today} />
   </div>
 
   <div class="wfoot">
@@ -667,9 +533,9 @@
             {:else}
               {@const i = items.indexOf(o)}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <div class="opt" class:hi={i === hi} role={pop.kind === 'add' ? 'menuitem' : 'option'} aria-selected={checked(o)} data-opt={o.id}
+              <div class="opt" class:hi={i === hi} role={pop.kind === 'add' ? 'menuitem' : 'option'} aria-selected={(pop ? isChecked(pop.kind, o.id, { multi: isMulti, picked, cond: pop.cond, block: pop.block }) : false)} data-opt={o.id}
                 style="padding-left:{8 + (o.depth ?? 0) * 14}px" onmousemove={(e) => moved(e) && (hi = i)} onclick={() => choose(o)}>
-                <span class="ck">{checked(o) ? '✓' : ''}</span>
+                <span class="ck">{(pop ? isChecked(pop.kind, o.id, { multi: isMulti, picked, cond: pop.cond, block: pop.block }) : false) ? '✓' : ''}</span>
                 {#if o.tone}<span class="sdot tone-bg" style={o.tone}></span>{/if}
                 {#if pop.kind === 'path' || pop.kind === 'sources'}
                   <svg class="fi" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -728,11 +594,10 @@
 
   .cols { min-height: 0; display: flex; overflow: hidden; }
   .ed { flex: 1 1 560px; min-width: 0; background: var(--side); border-right: 1px solid var(--line); overflow: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 18px; }
-  .pv { flex: 1 1 440px; min-width: 0; overflow: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 6px; }
   /* an app window under 960 pt (the sheet: 888 minus its border): the preview goes under the editor, the content scrolls as one */
   @container (max-width: 885px) {
     .cols { flex-wrap: wrap; overflow: auto; }
-    .ed, .pv { flex-basis: 100%; overflow: visible; }
+    .ed { flex-basis: 100%; overflow: visible; }
     .ed { border-right: 0; border-bottom: 1px solid var(--line); }
   }
   .grp { display: flex; flex-direction: column; gap: 10px; }
@@ -806,19 +671,6 @@
   .qtext { padding: 8px 10px; background: var(--side); border-radius: 6px; font-size: 12px; font-family: var(--mono); color: var(--fg2); line-height: 1.5; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; cursor: text; }
   .addb { height: 36px; border: 1px dashed var(--line); background: transparent; color: var(--acc); border-radius: 9px; font-size: 13px; font-weight: 500; }
 
-  .pvh { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-  .upd { font-size: 12px; color: var(--fg3); }
-  .ph2 { display: flex; align-items: center; gap: 8px; padding: 14px 0 6px; }
-  .pt { font-weight: 700; }
-  .pc { font-size: 12px; color: var(--fg2); }
-  .pg { padding: 4px 0 2px 16px; font-size: 12px; font-weight: 600; color: var(--fg2); }
-  .pnone { padding: 2px 0 4px 16px; font-size: 12.5px; color: var(--fg2); }
-  .prow { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 4px 10px; margin-bottom: 4px; border-radius: 7px; background: var(--side); }
-  .kw { flex: 0 0 auto; min-width: 52px; box-sizing: border-box; text-align: center; padding: 1px 4px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; }
-  .pm { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .ptt { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ps { font-size: 11.5px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pd { flex: 0 0 auto; font-size: 11.5px; color: var(--fg2); }
 
   .pop { position: fixed; z-index: 100; max-width: min(360px, calc(100vw - 16px)); box-sizing: border-box; padding: 5px; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; gap: 1px; font-size: 13px; overflow: hidden; }
   .pop:focus { outline: none; }
