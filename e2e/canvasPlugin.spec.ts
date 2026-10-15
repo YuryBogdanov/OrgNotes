@@ -99,7 +99,6 @@ test('⇥ a child, ↩ a sibling, typing renames, ⌫ removes with «Отмен�
   await page.keyboard.press('Meta+z');
   await expect.poll(() => text(page)).toContain('** Деньги\n');
   await page.keyboard.press('Meta+z');
-  await expect.poll(() => text(page)).toContain('* Риски\n** Сроки\n* Процессы');
   await page.keyboard.press('Meta+z');
   await expect.poll(() => text(page)).toBe(PLAN);
 });

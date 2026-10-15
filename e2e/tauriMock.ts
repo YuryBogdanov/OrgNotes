@@ -165,7 +165,8 @@ export async function installTauriMock(page: Page, files: Record<string, string>
               w.__log.push(['conflict', args.path]);
               throw 'conflict';
             }
-            await new Promise((r) => setTimeout(r, 5));
+            // a slow disk when a test says so: window.__saveDelay = 150
+            await new Promise((r) => setTimeout(r, w.__saveDelay ?? 5));
             disk[args.path] = args.text;
             w.__log.push(['save', args.path]);
             emit();

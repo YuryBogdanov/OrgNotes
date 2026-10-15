@@ -864,7 +864,18 @@ class Store {
     return this.transaction(label, (tx) => texts.forEach((x) => tx.update(x.path, () => x.text)), onUndo);
   }
   /** Take a step back, if its files were not changed since (the toast's «Отменить»). */
-  async undo(step: Step): Promise<boolean> {
+  /** The undos one after another: a second ⌘Z pressed while the first is being written takes the step before it,
+   *  not the same one again. */
+  private undoQueue: Promise<unknown> = Promise.resolve();
+  private queued<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.undoQueue.then(fn);
+    this.undoQueue = run.catch(() => undefined);
+    return run;
+  }
+  undo(step: Step): Promise<boolean> {
+    return this.queued(() => this.undoNow(step));
+  }
+  private async undoNow(step: Step): Promise<boolean> {
     if (!this.journal.has(step)) return false;
     if (!canUndo(step, (p) => this.files.find((x) => x.path === p)?.text)) {
       this.say('Отменить нельзя: файл уже изменился');
@@ -876,9 +887,11 @@ class Store {
     return true;
   }
   /** ⌘Z outside a text editor: the last step, wherever it was made. False: there is none (or it cannot be). */
-  async undoLast(): Promise<boolean> {
-    const s = this.journal.last();
-    return s ? this.undo(s) : false;
+  undoLast(): Promise<boolean> {
+    return this.queued(async () => {
+      const s = this.journal.last();
+      return s ? this.undoNow(s) : false;
+    });
   }
   /** Quick entry: a task at the top or the end of the Inbox file (as set), on disk at once. */
   async addToInbox(title: string, details: string): Promise<'ok' | 'nofile' | 'empty' | 'error'> {
