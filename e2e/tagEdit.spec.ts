@@ -1,12 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, pluginsReady } from './tauriMock';
+import { diskFile as disk } from './helpers';
 
 // ТЗ 38, PR C: the tags of a heading in the editor — ⌃C Q (and «Теги…» of the menu and the palette): a field with the
 // folder's tags, ↩ / ⌫ / ⎋, the changes in the line at once and one ⌘Z; the tags offered while typing; a click on a
 // tag opens its tab.
 
 const WORK = ['* TODO Переезд в новый ДЦ    :infra:dc:', 'Текст.', '* Отчёт по SLA :sla:', '* Слайды :slides:', '* Без тегов', ''].join('\n');
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string | undefined, p);
 const line = (page: Page, n: number) => page.locator('.cm-line').nth(n);
 const pop = (page: Page) => page.getByRole('dialog', { name: 'Теги заголовка' });
 async function open(page: Page) {

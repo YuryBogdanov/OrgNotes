@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, pluginsReady } from './tauriMock';
+import { diskFile as disk } from './helpers';
 
 // ТЗ 38, PR B: the menu of a tag in the navigator — renamed or merged in every file (a preview first; one ⌘Z), its
 // colour, removed from every file. Its colour, «не наследовать» and the agendas follow a rename.
@@ -7,7 +8,6 @@ import { installTauriMock, pluginsReady } from './tauriMock';
 const PLATFORM = ['#+FILETAGS: :infra:', '* Инфраструктура   :infra:', '** TODO Kafka :infra:platform:', '** TODO Логи', '#+BEGIN_SRC org', '* пример :infra:', '#+END_SRC', ''].join('\n');
 const WORK = ['* NEXT Бюджет :infra:budget:', '* Другое :platform:', ''].join('\n');
 const CFG = JSON.stringify({ version: 1, tags: { colors: { infra: 'blue' }, noInherit: ['infra'] }, agendas: [{ id: 'a1', name: 'Инфра', sources: [], blocks: [{ id: 'b1', name: 'X', color: 'blue', conds: [{ field: 'tag', op: 'has', values: ['infra'] }], group: 'none', sort: 'prio', limit: null }] }] });
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string | undefined, p);
 const nav = (page: Page) => page.getByRole('listbox', { name: 'Теги' });
 async function open(page: Page) {
   await page.setViewportSize({ width: 1440, height: 900 });

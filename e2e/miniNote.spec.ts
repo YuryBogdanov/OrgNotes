@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { log } from './helpers';
 
 // ТЗ 31, PR B1: the note in the mini window — the same state of the files as the main window (it mirrors them: the
 // main window sends them, it sends its edits back), a heading narrowed or a file whole, ⌘P, ⌥↩ on the root, «Доступно
@@ -7,7 +8,6 @@ import { installTauriMock } from './tauriMock';
 
 const W = '/mock/Work.org';
 const TEXT = '* Созвон\n** Что показали\n- миграция биллинга\n* Другое\nтекст\n';
-const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 const edits = async (page: Page) => (await log(page)).filter((e) => e[0] === 'emit' && e[2] === 'mini-edit').map((e) => (e[3] as { text: string }).text);
 const send = (page: Page, event: string, payload: unknown) => page.evaluate(([e, p]) => (window as any).__emitEvent(e, p), [event, payload] as const);
 const snapshot = (text = TEXT, note: unknown = { path: 'Work.org', line: 0, title: 'Созвон' }) => ({

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
+import { diskFile as disk, settingsSheet as sheet } from './helpers';
 
 // ТЗ 37, PR A: where an installed plugin came from (the catalog, a git link), its update — the plugin restarted
 // alone, other rights asked first — and «Удалить…» (its menu and «Вернуть»: the fix of ТЗ 37). The network and git are the mock's fixtures (window.__sources).
@@ -17,9 +18,7 @@ const plugin = (id: string, version: string, source: object, o: object = {}) => 
 const files = (id: string, version: string, o: object = {}) => ({ 'manifest.json': manifest(id, version, o), 'main.js': main(id, version) });
 const OKR = 'git@git.company.local:team/panopticon-okr.git';
 
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Настройки' });
 const row = (page: Page, name: string) => sheet(page).getByRole('group', { name });
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string | undefined, p);
 async function open(page: Page, installed: Record<string, string>, sources: object, rights: Record<string, string>) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript(([s, r]) => {

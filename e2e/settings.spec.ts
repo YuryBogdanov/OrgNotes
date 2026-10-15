@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { diskAll as disk, log } from './helpers';
 
 const CONFIG = {
   version: 1,
@@ -20,8 +21,6 @@ const config = (page: Page) =>
     const raw = (window as any).__disk['/mock/.orgnotes/config.json'];
     return raw ? JSON.parse(raw) : null;
   });
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
-const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 
 /** The settings: a sheet over the main window (⌘,), at «Статусы». */
 const openSettings = async (page: Page, files: Record<string, string> = { '/mock/Work.org': NOTES, '/mock/.orgnotes/config.json': JSON.stringify(CONFIG) }) => {

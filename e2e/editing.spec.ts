@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { log } from './helpers';
 
 const WEEKLY = '/mock/Weekly.org';
 const LF = [
@@ -23,7 +24,6 @@ const cursor = async (page: Page) => {
   return { line: +m![1], col: +m![2] };
 };
 const disk = (page: Page, path = WEEKLY) => page.evaluate((p) => (window as any).__disk[p] as string, path);
-const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 const clickEndOf = async (page: Page, text: string) => {
   await page.locator('.cm-line', { hasText: text }).first().click();
   await page.keyboard.press('End');

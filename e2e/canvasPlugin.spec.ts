@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { installTauriMock, pluginsReady } from './tauriMock';
+import { diskFile as disk } from './helpers';
 
 // ТЗ 39, part A: the plugin «Холст» — an outside plugin (its own repository, panopticon-canvas next to this one),
 // installed from the app's folder of plugins as a user would. Skipped when it is not built there.
@@ -284,7 +285,10 @@ test('select, ⌘D, ⌘G, colour, delete; an edge drawn from a side dot', async 
 test('a heading dropped from the navigator becomes a live card with its :ID:; ⌘V of a link adds a link; double click opens it at the side', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('nav:headings', '1'));
   await openBoard(page);
-  await page.getByRole('treeitem', { name: /plan$/ }).locator('.chev').click({ force: true });
+  // its headings shown (the row may be open already: the chevron would fold it)
+  const planRow = page.getByRole('treeitem', { name: /plan$/ });
+  if ((await planRow.getAttribute('aria-expanded')) !== 'true') await planRow.locator('.chev').click({ force: true });
+  await expect(page.getByRole('treeitem', { name: /Риски$/ })).toBeVisible();
   await page.evaluate(() => {
     const dt = new DataTransfer();
     const row = [...document.querySelectorAll('[role=treeitem]')].find((r) => r.textContent?.trim().endsWith('Риски'))!;
@@ -294,8 +298,9 @@ test('a heading dropped from the navigator becomes a live card with its :ID:; �
     st.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 200, clientY: r.top + 500 }));
   });
   await expect(cardOf(page, 'Риски')).toBeVisible();
-  const j = await json(page);
-  const card = j.nodes.find((n: any) => n.subpath === '#Риски');
+  // shown at once, written right after
+  await expect.poll(async () => (await json(page)).nodes.some((n: any) => n.subpath === '#Риски')).toBe(true);
+  const card = (await json(page)).nodes.find((n: any) => n.subpath === '#Риски');
   expect(card).toMatchObject({ type: 'file', file: 'plan.org' });
   expect(card.orgId).toMatch(/^[0-9a-f-]{36}$/);
   await expect.poll(() => text(page)).toMatch(new RegExp(`\\* Риски\\n:PROPERTIES:\\n:ID: +${card.orgId}\\n:END:\\n`));
@@ -334,7 +339,6 @@ test('«Новый холст» in a folder\'s menu: an empty JSON Canvas file; 
 
 // ---- part C: export, «Разложить на холсте» ----
 const savePick = (page: Page, ...paths: string[]) => page.evaluate((p) => ((window as any).__savePicks = p), paths);
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string | undefined, p);
 
 test('«Экспорт ▾» of a mindmap: the menu; a .excalidraw file — rectangles with their text, lines without heads; SVG', async ({ page }) => {
   await open(page);

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { diskAll as disk, toast, palette as pal } from './helpers';
 
 // ТЗ 27 §2 (roadmap 2.1 A): the core's extension points for plugins with their own structure in a file, shown by
 // «Привет»: a form with lines, a day, a place and a field of its own; tx.update with onUndo; a sheet; a menu; a
@@ -12,9 +13,6 @@ const FILES = {
   '/mock/Дом.org': '#+TITLE: Дом\n',
   '/mock/Идеи.org': '* IDEA Мысль\n',
 };
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
-const toast = (page: Page) => page.locator('.toast');
-const pal = (page: Page) => page.getByRole('dialog', { name: 'Командная палитра' });
 const iso = (n: number) => {
   const d = new Date();
   d.setDate(d.getDate() + n);

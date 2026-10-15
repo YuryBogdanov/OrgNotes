@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { diskFile as disk } from './helpers';
 import { FILES, iso, shift, NOW } from './todayFixture';
 
 // ТЗ 34, part B: the rows of «Сегодня» are one list of tasks — a click chooses, a double click or ↩ opens, ↑ ↓ go
 // from block to block; the menu and the keys act on the chosen task; a changed row stays until ⌘R.
 
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string, p);
 const screen = (page: Page) => page.getByRole('region', { name: 'Сегодня', exact: true });
 const block = (page: Page, name: string) => screen(page).getByRole('region', { name });
 const tabs = (page: Page) => page.locator('.pane').first().getByRole('tab');

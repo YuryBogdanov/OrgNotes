@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { diskAll as disk } from './helpers';
 
 // Roadmap 0.6: a feature keeps its settings in the notes folder (`.orgnotes/plugins/<id>.json`) and on this Mac;
 // what config.json had before is read until the first change moves it; a feature's set of statuses is in memory.
 
 const CFG = '/mock/.orgnotes/config.json';
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
 const json = async (page: Page, p: string) => JSON.parse((await disk(page))[p] ?? 'null');
 const NOTES = { '/mock/Work.org': '* Q4\n', '/mock/me.org': '#+TITLE: Юрий\n* Квартальные задачи\n** Квартал Q4 2026\n*** ACTIVE Цель\n',
   '/mock/oleg.org': '* Квартальные задачи\n** Квартал Q4 2026\n*** ACTIVE Цель Олега\n' };

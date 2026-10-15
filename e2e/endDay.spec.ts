@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { diskFile as disk } from './helpers';
 import { DAY, FILES, iso, stamp, NOW } from './todayFixture';
 
 // ТЗ 32 (part B): «Завершить день» — done, left, the three for tomorrow, a note; all written into the journal's
 // datetree at once (one ⌘Z), tasks get an :ID:, a second time replaces; [[id:…]] links open from the editor.
 
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string | undefined, p);
 const sheet = (page: Page) => page.getByRole('dialog', { name: 'Завершить день' });
 const WD = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 const next = (() => {

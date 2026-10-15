@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, pluginsReady } from './tauriMock';
+import { diskAll as disk, palette as pal } from './helpers';
 
 // The command palette (ТЗ «Командная палитра»).
 const WORK = '#+TITLE: Работа\n\n* Q4 2026\n** TODO [#A] Подготовить бюджет 2027 :budget:finance:\nDEADLINE: <2026-10-24 Сб> SCHEDULED: <2026-10-14 Ср>\nСвести заявки.\n*** DONE Собрать заявки\n** NEXT План найма\n';
@@ -17,13 +18,11 @@ const open = async (page: Page, files: Record<string, string> = FILES()) => {
   await page.locator('.nav .row[data-key="/mock/work.org"]').click();
   await expect(page.locator('.cm-content').first()).toContainText('Q4 2026');
 };
-const pal = (page: Page) => page.getByRole('dialog', { name: 'Командная палитра' });
 const field = (page: Page) => pal(page).getByRole('combobox');
 const rows = (page: Page) => pal(page).locator('.row');
 const titles = (page: Page) => pal(page).locator('.row .t').allInnerTexts();
 const groups = (page: Page) => pal(page).locator('.gh').allInnerTexts();
 const selected = (page: Page) => pal(page).locator('.row.on .t');
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
 const at = async (page: Page, text: string) => {
   await page.locator('.cm-line', { hasText: text }).first().click();
 };

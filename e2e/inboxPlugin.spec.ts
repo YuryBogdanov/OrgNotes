@@ -1,15 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
+import { diskAll as disk, settingsSheet as sheet } from './helpers';
 import { FILES } from './reviewFixture';
 
 // ТЗ 28 (roadmap 3.1 B): the Inbox and its review are the built-in plugin «inbox». Its settings of config.json, the
 // shortcuts changed and the navigator's mode move to it; turned off, the quick entry still writes to the Inbox file.
 
 const IB = '/mock/inbox.org';
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
 const modes = (page: Page) => page.getByRole('tablist', { name: 'Режимы навигатора' });
 const panel = (page: Page) => page.locator('.inbox');
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Настройки' });
 
 async function open(page: Page, files: Record<string, string>, init: Record<string, string> = {}) {
   await page.setViewportSize({ width: 1440, height: 900 });

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
+import { diskFile as disk, settingsSheet as sheet } from './helpers';
 
 // ТЗ 37, PR C: «Установить по ссылке…» — a git repository of the organisation: its newest tag or its branch, the
 // plugin found there (rights, fits), installed with the link kept for its updates; errors in words. git is the mock's.
@@ -18,9 +19,7 @@ const GIT = {
   'https://git.company.local/team/old.git': { refs: { head: 'main', tags: [['v1.0.0', 'o1']], branches: [['main', 'o2']] }, refsFor: { 'v1.0.0': { ...files('1.0.0', { id: 'old', name: 'Старый', minAppVersion: '9.0.0', contributes: { commands: [] } }) } } },
   'https://git.company.local/team/src.git': { refs: { head: 'main', tags: [], branches: [['main', 's1']] }, refsFor: {} },
 };
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Настройки' });
 const dlg = (page: Page) => page.getByRole('dialog', { name: 'Установка по ссылке' });
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string | undefined, p);
 async function open(page: Page) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript((g) => {

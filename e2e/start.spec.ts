@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
+import { log } from './helpers';
 
 // ТЗ «Первый запуск и рабочая папка».
 const FILES = () => ({
@@ -23,7 +24,6 @@ const open = async (page: Page, s: Setup = {}, files: Record<string, string> = F
   await page.goto('/');
 };
 const picks = (page: Page, ...p: (string | null)[]) => page.evaluate((p) => ((window as any).__picks = p), p);
-const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 const start = (page: Page) => page.locator('.start');
 const btn = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 

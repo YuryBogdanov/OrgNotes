@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { diskFile as disk } from './helpers';
 import { FILES, NOW, PETROV, ME } from './goalsFixture';
 
 // ТЗ 23, part 3: «Отчёт за квартал», «Перенести незакрытые», the settings of the goals.
@@ -18,7 +19,6 @@ async function open(page: Page, now = NOW) {
   await page.getByRole('navigation', { name: 'Цели' }).getByRole('button', { name: /Обзор квартала/ }).click();
 }
 const view = (page: Page) => page.locator('section.pane.active .goals');
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string, p);
 const clip = (page: Page) => page.evaluate(() => (window as any).__clip as string);
 
 test('«Отчёт за квартал»: per person the goals with their result, the last marks; copied as text and Markdown', async ({ page }) => {

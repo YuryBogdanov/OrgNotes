@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { diskAll as disk } from './helpers';
 import { CONFIG, FILES, NOW } from './goalsFixture';
 
 // ТЗ 27 (roadmap 2.1 B2): the goals of the quarter are the built-in plugin «quarter-goals». What the core kept under
@@ -7,7 +8,6 @@ import { CONFIG, FILES, NOW } from './goalsFixture';
 // mode); turned off, nothing of it is left and the files are plain Org.
 
 const { goals: SOURCES, ...REST } = CONFIG;
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Цели' });
 const modes = (page: Page) => page.getByRole('tablist', { name: 'Режимы навигатора' });
 

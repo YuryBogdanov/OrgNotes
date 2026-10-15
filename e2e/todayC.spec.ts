@@ -1,12 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, pluginsReady } from './tauriMock';
+import { diskFile as disk } from './helpers';
 import { FILES, NOW, PETROV } from './goalsFixture';
 
 // ТЗ 32 (part C): «1-1 сегодня» — a card for a meeting of the day, with the goals' line and «Разбор целей» from the
 // plugin «Цели квартала» (its API: `ui.oneOnOne`); the plugin's block «Цели квартала» (`ui.todayBlock`); the reminder
 // to end the day (without macOS's notification — the window's own). «Now» is Mon 12 Oct 2026, 14:00.
 
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string, p);
 const screen = (page: Page) => page.getByRole('region', { name: 'Сегодня', exact: true });
 
 /** Petrov's 1-1 every two weeks on Mondays, the last on 28 Sep with an agreement open. */

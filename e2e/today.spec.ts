@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { diskFile as disk } from './helpers';
 import { FILES, iso, shift, stamp, NOW } from './todayFixture';
 
 // ТЗ 32 (part A): «Сегодня» — the pinned tab first in the left pane, opened by itself at the start of the day; the
 // note and the choice from the journal, the agenda of the day, the tasks, the overdue ones; «Настройки → Сегодня».
 
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string, p);
 const screen = (page: Page) => page.getByRole('region', { name: 'Сегодня', exact: true });
 const tabs = (page: Page) => page.locator('.pane').first().getByRole('tab');
 

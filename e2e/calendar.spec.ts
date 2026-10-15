@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, pluginsReady } from './tauriMock';
+import { palette as pal } from './helpers';
 
 // ТЗ «Выбор даты в календаре (палитра, ⇧ + стрелки)».
 const W = '/mock/work.org';
@@ -11,7 +12,6 @@ const stamp = (d: Date) => `${iso(d)} ${RU[d.getDay()]}`;
 const S = day(3); // the task's current SCHEDULED
 const WORK = () => `* Q4\n** TODO Подготовить бюджет\nSCHEDULED: <${stamp(S)} 10:00 +1w>\n** TODO Без даты\n** NEXT Ещё одна\nDEADLINE: <${stamp(day(5))}>\n`;
 const disk = (page: Page) => page.evaluate((p) => (window as any).__disk[p] as string, W);
-const pal = (page: Page) => page.getByRole('dialog', { name: 'Командная палитра' });
 const cal = (page: Page) => pal(page).locator('.cal');
 const selDay = (page: Page) => cal(page).locator('.day.sel');
 

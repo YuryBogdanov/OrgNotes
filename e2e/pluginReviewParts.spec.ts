@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { diskAll as disk, toast, palette as pal } from './helpers';
 
 // ТЗ 27 §2.3 and the goals' own sheets (roadmap 2.1 B): a review of the plugin's own on the core's frame — its
 // header, quick buttons, a panel with a note (a core widget) saved before the card changes, actions on keys with
@@ -7,9 +8,6 @@ import { installTauriMock } from './tauriMock';
 
 const WORK = '/mock/Work.org';
 const FILES = { [WORK]: '* TODO Подготовить бюджет\n* TODO Позвонить\n' };
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
-const toast = (page: Page) => page.locator('.toast');
-const pal = (page: Page) => page.getByRole('dialog', { name: 'Командная палитра' });
 
 async function open(page: Page) {
   await page.setViewportSize({ width: 1440, height: 900 });

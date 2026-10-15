@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, pluginsReady } from './tauriMock';
+import { diskFile as disk } from './helpers';
 import { CONFIG, FILES, NOW } from './goalsFixture';
 
 // API 1.8 (ТЗ 36, PR C1): a plugin puts its pieces into a place another one declares (the calendar's
@@ -32,7 +33,6 @@ const MAIN = `export default { activate(ctx) {
   });
 } };`;
 
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string | undefined, p);
 async function open(page: Page, files: Record<string, string>) {
   await page.clock.setFixedTime(NOW); // Mon 12 Oct 2026: W42
   await page.setViewportSize({ width: 1440, height: 900 });

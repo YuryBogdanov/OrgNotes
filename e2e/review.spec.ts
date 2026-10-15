@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
+import { toast } from './helpers';
 import { FILES, INBOX, WORK } from './reviewFixture';
 
 // ТЗ «Разбор Inbox по карточкам».
@@ -11,7 +12,6 @@ const panel = (page: Page) => page.locator('.inbox');
 const card = (page: Page) => page.locator('.review .card');
 const cardLines = (page: Page) => card(page).locator('.cm-line');
 const queue = (page: Page) => panel(page).locator('.rrow');
-const toast = (page: Page) => page.locator('.toast');
 
 async function open(page: Page, files: Record<string, string> = FILES()) {
   await page.setViewportSize({ width: 1440, height: 900 });

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { diskFile as disk } from './helpers';
 import { CONFIG, FILES, KOZLOV, ME, NOW, PETROV } from './goalsFixture';
 
 // ТЗ 23, the first part: the «Цели» navigator, «Обзор квартала» and a person's goals, «Добавить цели», «Новая цель».
@@ -15,7 +16,6 @@ async function open(page: Page, config: object | null = CONFIG) {
 }
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Цели' });
 const view = (page: Page) => page.locator('section.pane.active .goals');
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string, p);
 const config = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/config.json'] ?? '{}'));
 /** The sources of goals: their file in the notes folder (roadmap 0.6). */
 // the goals are the plugin «quarter-goals» (ТЗ 27): its data in the notes folder
