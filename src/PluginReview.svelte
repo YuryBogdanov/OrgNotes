@@ -38,15 +38,22 @@
       return true;
     },
   };
+  // What the card's parts show: they are drawn again only when it changes — not when the file is merely parsed anew
+  // (an autosave read back from the disk would take the focus from a note being typed in the panel)
+  const cardSig = $derived.by(() => {
+    const run = plugins.review;
+    const cur = plugins.reviewHeading();
+    return run && cur ? JSON.stringify([plugins.reviewRedraw, run.cur, run.gen, cur.info]) : '';
+  });
   /** A card's part of the plugin: drawn for each card, and again when an action stays or the plugin asks. */
   function part(node: HTMLElement, which: () => CardRender | undefined) {
     let done: (() => void) | void;
     const clean = $effect.root(() => {
       $effect(() => {
-        void plugins.reviewRedraw;
-        const run = plugins.review;
-        const cur = plugins.reviewHeading();
+        void cardSig;
         const render = which();
+        const run = untrack(() => plugins.review);
+        const cur = untrack(() => plugins.reviewHeading());
         if (!run || !cur || !render) return;
         const card: ReviewCard = { heading: cur.info, index: run.cur, total: run.refs.length };
         done = plugins.guard(run.plugin, () => render(node, card), undefined);
