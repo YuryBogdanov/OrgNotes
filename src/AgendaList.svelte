@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ConfirmDialog from './ConfirmDialog.svelte';
   import { store } from './store.svelte';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
 
@@ -53,17 +54,10 @@
 
 {#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
 {#if confirmDel}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="modal" onmousedown={() => (confirmDel = null)}>
-    <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Удаление агенды" onmousedown={(e) => e.stopPropagation()}>
-      <h2>Удалить агенду «{confirmDel.name}»?</h2>
-      <p>Задачи и файлы не изменятся: удаляется только сама агенда.</p>
-      <div class="btns">
-        <button onclick={() => (confirmDel = null)}>Отмена</button>
-        <button class="danger-b" onclick={() => { const id = confirmDel!.id; confirmDel = null; void store.deleteAgenda(id); }}>Удалить</button>
-      </div>
-    </div>
-  </div>
+  {@const id = confirmDel.id}
+  <ConfirmDialog label="Удаление агенды" title="Удалить агенду «{confirmDel.name}»?" onclose={() => (confirmDel = null)} actions={[{ label: 'Удалить', kind: 'danger', run: () => void store.deleteAgenda(id) }]}>
+    Задачи и файлы не изменятся: удаляется только сама агенда.
+  </ConfirmDialog>
 {/if}
 
 <style>
@@ -78,11 +72,4 @@
   .ag:focus-visible, .new:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
   .new { flex: 0 0 auto; margin-top: 6px; height: 28px; border: 1px dashed var(--line); background: transparent; color: var(--fg2); border-radius: 6px; font-size: 12.5px; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .new:hover { color: var(--acc); }
-  .modal { position: fixed; inset: 0; z-index: 110; background: rgba(0, 0, 0, 0.28); display: flex; align-items: flex-start; justify-content: center; padding-top: 14vh; }
-  .dlg { width: 420px; max-width: calc(100% - 32px); padding: 18px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); }
-  .dlg h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
-  .dlg p { margin: 0 0 14px; color: var(--fg2); line-height: 1.45; }
-  .btns { display: flex; justify-content: flex-end; gap: 8px; }
-  .btns button { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--field); }
-  .btns .danger-b { background: var(--danger); color: var(--on-danger); font-weight: 600; }
 </style>

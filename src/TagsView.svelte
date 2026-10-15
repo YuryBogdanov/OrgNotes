@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Segmented from './Segmented.svelte';
   import { draggedHeading, setDragged } from './dragData';
   import { untrack } from 'svelte';
   import { store } from './store.svelte';
@@ -251,11 +252,7 @@
         <button class="save" onclick={saveAsAgenda}>Сохранить как агенду…</button>
       </div>
       <div class="r2">
-        <div class="seg" role="radiogroup" aria-label="Какие заголовки">
-          {#each [['all', 'Все заголовки'], ['tasks', 'Задачи'], ['open', 'Только открытые']] as [v, l] (v)}
-            <button role="radio" aria-checked={st.show === v} class:on={st.show === v} onclick={() => set({ show: v as TagTab['show'] })}>{l}</button>
-          {/each}
-        </div>
+        <Segmented label="Какие заголовки" value={st.show} onchange={(v) => set({ show: v as TagTab['show'] })} options={[{ value: 'all' as const, label: 'Все заголовки' }, { value: 'tasks' as const, label: 'Задачи' }, { value: 'open' as const, label: 'Только открытые' }]} />
         <button class="sw" role="switch" aria-checked={st.inherit} onclick={() => set({ inherit: !st.inherit })}><span class="tr"><span></span></span>с наследованием</button>
         {#if often.length}
           <span class="dot">·</span>
@@ -313,9 +310,6 @@
   .sug i { font: 11.5px var(--ui, system-ui); font-style: normal; color: var(--fg3); }
   .sum { font-size: 12.5px; color: var(--fg2); }
   .save { margin-left: auto; height: 26px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
-  .seg { display: flex; padding: 2px; gap: 2px; background: var(--field); border-radius: 7px; }
-  .seg button { height: 22px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 12px; }
-  .seg button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); font-weight: 600; }
   .sw { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--fg2); font-size: 12px; }
   .tr { position: relative; width: 26px; height: 15px; border-radius: 8px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); }
   .tr span { position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 6px; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s; }
