@@ -8,7 +8,7 @@ import { displayName, isArchive, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags, weekdayNames } from './edits';
 import { bareTitle, caretAfter, keyOf, moveTo, moveWithin } from './refile';
 import type { CalSpec, Plate } from './commands';
-import { lsGet, lsGetJson, lsSet } from './storage';
+import { lsGet, lsSet } from './storage';
 import { notify } from './notify.svelte';
 import { prefs } from './prefs.svelte';
 import { themes } from './themes.svelte';
@@ -16,6 +16,8 @@ import { shortcuts } from './shortcuts.svelte';
 import { PluginStore } from './pluginData.svelte';
 import { searchAll } from './searchAll.svelte';
 import { invoke, isTauri } from './tauri';
+import { MiniSync, type MiniNote } from './mirror.svelte';
+export type { MiniNote } from './mirror.svelte';
 export { DEFAULT_CAPTURE_KEY, type ScopeKeys } from './shortcuts.svelte';
 export type { PluginData, StorageSpec } from './pluginData.svelte';
 export { SEARCH_CAP, type SearchGroup, type SearchState } from './searchAll.svelte';
@@ -43,19 +45,6 @@ export interface NoteFile {
 
 /** A link (ТЗ 35): the icon of its toasts. */
 const LINK_ICON = 'M8.5 11.5a3.5 3.5 0 0 0 5 0l2.5-2.5a3.5 3.5 0 0 0-5-5l-1 1M11.5 8.5a3.5 3.5 0 0 0-5 0L4 11a3.5 3.5 0 0 0 5 5l1-1';
-/** The note of the mini window (ТЗ 31): a heading of a file (by its title near its line), or the file whole. */
-export interface MiniNote {
-  path: string; // the file's name in the notes folder
-  line: number;
-  title: string;
-  whole?: boolean;
-}
-interface MiniSnapshot {
-  dir: string | null;
-  configRaw: string | null;
-  note: MiniNote | null;
-  files: { name: string; path: string; text: string; disk: string; diskRaw: string; eol: string }[];
-}
 
 function build(name: string, path: string, text: string, disk: string, diskRaw: string, eol: Eol, cfg: ProjectConfig): NoteFile {
   const wf = resolveWorkflow(text, name, cfg);
@@ -1321,82 +1310,40 @@ class Store {
     if (p) await this.useFolder(p);
   }
 
-  // ---- the mini window (ТЗ 31): one state of the files in two windows ----------------------------------------------
-  // The main window owns the files (it reads, watches and writes them); the mini window mirrors them: it gets them
-  // all at its start, sends its edits here, and gets every change of another (typed here, from disk) back.
-  /** This store is the mini window's: no disk of its own, its edits go to the main window. */
-  mirror = false;
-  /** The note of the mini window (shown in it, or for its next show): a heading, or the file whole. */
-  miniNote = $state<MiniNote | null>(lsGetJson<MiniNote>('mini:note'));
-  /** The main window: the text the mini window has of each file (sent or got from it); null — no mini window yet. */
-  private mini: Map<string, string> | null = null;
-  private async emitMini(event: string, payload: unknown) {
-    if (!isTauri) return;
-    const { emitTo } = await import('@tauri-apps/api/event');
-    await emitTo(this.mirror ? 'main' : 'mini', event, payload).catch(() => {});
-  }
-  /** The main window: the files and the statuses the mini window's snapshot had. */
-  private miniPaths = '';
-  private miniCfg: string | null = null;
-  private snapshot() {
-    this.mini = new Map(this.files.map((f) => [f.path, f.text]));
-    this.miniPaths = this.files.map((f) => f.path).join('\n');
-    this.miniCfg = this.configRaw;
-    return { dir: this.dir, configRaw: this.configRaw, note: this.miniNote, files: this.files.map((f) => ({ name: f.name, path: f.path, text: f.text, disk: f.disk, diskRaw: f.diskRaw, eol: f.eol })) };
-  }
-  /** The main window: the mini window started (or asks again) — everything it mirrors; then each change. */
-  private async serveMini() {
-    const { listen } = await import('@tauri-apps/api/event');
-    await listen('mini-hello', () => void this.emitMini('mini-snapshot', this.snapshot()));
-    await listen<{ path: string; text: string }>('mini-edit', (e) => {
-      this.mini?.set(e.payload.path, e.payload.text); // it has it: not sent back
-      this.setText(e.payload.text, e.payload.path);
-    });
-    await listen<{ path: string; line: number }>('mini-open-main', (e) => void this.openFromMini(e.payload.path, e.payload.line));
-    $effect.root(() => {
-      $effect(() => {
-        const files = this.files;
-        const m = this.mini;
-        if (!m) return;
-        // a file came or went, the statuses changed: all of it again
-        if (files.map((f) => f.path).join('\n') !== this.miniPaths || this.configRaw !== this.miniCfg) return void this.emitMini('mini-snapshot', this.snapshot());
-        for (const f of files)
-          if (m.get(f.path) !== f.text) {
-            m.set(f.path, f.text);
-            void this.emitMini('mini-file', { path: f.path, text: f.text, disk: f.disk, diskRaw: f.diskRaw });
-          }
-      });
-    });
-  }
-  /** The mini window: its files from the main window. */
-  async loadMirror() {
-    this.mirror = true;
-    if (!isTauri) {
-      this.loaded = true;
-      return;
-    }
-    const { listen } = await import('@tauri-apps/api/event');
-    await listen<MiniSnapshot>('mini-snapshot', (e) => {
-      const s = e.payload;
+  // ---- the mini window (ТЗ 31): one state of the files in two windows (mirror.svelte.ts) ---------------------------
+  private sync = new MiniSync({
+    files: () => this.files,
+    configRaw: () => this.configRaw,
+    dir: () => this.dir,
+    edit: (path, text) => this.setText(text, path),
+    openMain: (name, line) => void this.openFromMini(name, line),
+    take: (s) => {
       this.dir = s.dir;
       this.takeConfig(s.configRaw);
       this.files = s.files.map((f) => build(f.name, f.path, f.text, f.disk, f.diskRaw, f.eol as Eol, this.config));
-      if (s.note && !this.miniNote) this.miniNote = s.note;
       this.loaded = true;
-    });
-    await listen<{ path: string; text: string; disk: string; diskRaw: string }>('mini-file', (e) => {
-      const p = e.payload;
+    },
+    takeFile: (p) => {
       const f = this.files.find((x) => x.path === p.path);
       if (!f || f.text === p.text) return;
       this.files = this.files.map((x) => (x.path === p.path ? build(x.name, x.path, p.text, p.disk, p.diskRaw, x.eol, this.config) : x));
-    });
-    await listen<MiniNote>('mini-open', (e) => this.setMiniNote(e.payload));
-    void this.emitMini('mini-hello', null);
+    },
+    ready: () => (this.loaded = true),
+  });
+  /** This store is the mini window's: no disk of its own, its edits go to the main window. */
+  get mirror() {
+    return this.sync.mirror;
   }
-  /** The note the mini window shows, kept for its next show. */
-  setMiniNote(n: MiniNote | null) {
-    this.miniNote = n;
-    lsSet('mini:note', JSON.stringify(n));
+  get miniNote() {
+    return this.sync.miniNote;
+  }
+  set miniNote(n) {
+    this.sync.miniNote = n;
+  }
+  readonly setMiniNote = this.sync.setMiniNote.bind(this.sync);
+  /** The mini window: its files from the main window. */
+  loadMirror() {
+    return this.sync.load();
   }
   /** ⇧⌘M: the heading the caret is in (the file whole above the first one, or as set), in the mini window. */
   openInMini(whole = miniSettings.cfg.what === 'file') {
@@ -1445,7 +1392,7 @@ class Store {
       });
     });
     void miniSettings.apply(); // the panel's settings, kept by Rust until it is made
-    await this.serveMini();
+    await this.sync.serve();
     await listen('quit-requested', () => this.quit()); // «Завершить» from the Dock
   }
 
@@ -1660,8 +1607,6 @@ class Store {
     lsSet('lastFile:' + (this.dir ?? ''), f.path);
   }
 
-  // ---- panes and tabs ---------------------------------------------------------------
-
   // ---- views of a file (ТЗ 33): a file tab shown as a plugin's view («Доска») or as text ------------------------------
   /** The view each file was shown in last (name → '' text, or a view's id), on this Mac per folder. */
   private viewMemory = $state<Record<string, string>>({});
@@ -1698,6 +1643,7 @@ class Store {
     lsSet(this.viewKey(), JSON.stringify(this.viewMemory));
   }
 
+  // ---- panes and tabs (layout.ts does the work; the store keeps the layout of each folder) -------------------------
   private layoutKey() {
     return 'layout:' + (this.dir ?? '');
   }
@@ -1714,7 +1660,6 @@ class Store {
     p.active = ti;
     this.layout.active = pi;
   }
-  /** The editor of a tab reports its caret; leaving the heading opened from the agenda drops the caption. */
   /** The first line in view of a file tab, as it was scrolled (a tab shown again comes back there). */
   setTabTop(tab: Tab, line: number) {
     if (tab.top !== line) tab.top = line;
@@ -1724,6 +1669,7 @@ class Store {
     const was = tab.folds ?? [];
     if (was.length !== lines.length || was.some((x, i) => x !== lines[i])) tab.folds = lines;
   }
+  /** The editor of a tab reports its caret; leaving the heading opened from the agenda drops the caption. */
   setTabCursor(tab: Tab, line: number, col: number) {
     tab.cursor = { line, col };
     if (tab.kind === 'file' && tab.path) this.lastCursor[tab.path] = { line, col };
@@ -1734,7 +1680,6 @@ class Store {
       if (at !== from) tab.fromAgenda = null;
     }
   }
-  /** Toolbar: "Второй редактор" / "Агенда" in the second pane. */
   /** «Второй редактор», «Агенда», or a feature's button: `make` gives the feature's new tab. */
   toggleSecond(kind: string, make?: () => Tab | undefined) {
     toggleSecond(this.layout, kind, make ?? (() => {
@@ -2199,7 +2144,7 @@ class Store {
     if (this.mirror) {
       // the mini window: the main window writes it (and says if it could not)
       const f = this.files.find((x) => x.path === path);
-      if (f) void this.emitMini('mini-edit', { path, text: f.text });
+      if (f) this.sync.sendEdit(path, f.text);
       return;
     }
     if (!isTauri || this.conflicts[path]) return; // a conflict waits for the user's choice
