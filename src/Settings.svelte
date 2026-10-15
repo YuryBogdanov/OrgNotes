@@ -647,7 +647,7 @@
                     <input class="qk" class:auto={!s.key && keyEdits[s.id] === undefined} class:red={!!errors['k' + s.id]} aria-label="Клавиша" aria-invalid={!!errors['k' + s.id]}
                       spellcheck="false" autocomplete="off" disabled={s.pending}
                       value={keyShown(s)} onfocus={(e) => e.currentTarget.select()} onmouseup={(e) => { e.preventDefault(); e.currentTarget.select(); }}
-                      oninput={(e) => { typingKey(s, (e as InputEvent).data || e.currentTarget.value); e.currentTarget.value = keyEdits[s.id] ?? ''; }} onkeydown={(e) => keyKeydown(e, s)} onblur={() => keyBlur(s)} />
+                      oninput={(e) => { typingKey(s, (e instanceof InputEvent ? e.data : null) || e.currentTarget.value); e.currentTarget.value = keyEdits[s.id] ?? ''; }} onkeydown={(e) => keyKeydown(e, s)} onblur={() => keyBlur(s)} />
                   </span>
                   <span class="acts">
                     <button class="x" aria-label="Удалить состояние {displayName(s.keyword)}" disabled={!canRemoveWorkflow(draft) && false || !canRemoveState(wf, s.id)}
@@ -817,9 +817,6 @@
   .opts { display: flex; flex-direction: column; gap: 6px; }
   .sel { height: 26px; max-width: 260px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 0 6px; font-size: 12.5px; }
   .val { font-size: 12.5px; color: var(--fg2); }
-  .segs { display: flex; padding: 2px; background: var(--field); border-radius: 7px; gap: 2px; }
-  .segs button { height: 22px; padding: 0 10px; white-space: nowrap; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 12px; }
-  .segs button.on { background: var(--segon); color: var(--fg); box-shadow: var(--shadow); font-weight: 500; }
   .ibfile { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .ibfile .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .stepper { display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 7px; background: var(--field); }
@@ -840,10 +837,6 @@
   .change { flex: 0 0 auto; height: 24px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
   .opt { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; background: var(--side); border: 1px solid var(--line); border-radius: 8px; }
   .opt label { font-size: 13px; }
-  .olab { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .olab small { font-size: 11.5px; color: var(--fg2); }
-  .sel.txt { width: 200px; padding: 0 8px; -webkit-user-select: text; user-select: text; }
-  .hrs { display: flex; align-items: center; gap: 6px; color: var(--fg2); }
   /* a macOS switch */
   .switch { flex: 0 0 auto; position: relative; width: 32px; height: 18px; padding: 0; border: 0; border-radius: 9px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); transition: background 0.15s; }
   .switch span { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: var(--onpacc); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s; }

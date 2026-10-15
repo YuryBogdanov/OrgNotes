@@ -222,6 +222,5 @@
   /* the mark goes under the name when both do not fit */
   .nm { cursor: default; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; padding: 0 2px; }
   .tn { flex: 1 0 auto; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; }
-  .card.on .tn { font-weight: 600; }
   .tag { font-size: 11px; color: var(--fg3); }
 </style>

@@ -144,8 +144,7 @@
       e.preventDefault();
       const it = list[l.sel];
       if (it?.kind === 'folder') sub(it);
-      else if (!it && levels.length === 1) neighbour(1);
-      else if (levels.length === 1 && it?.kind !== 'folder') neighbour(1);
+      else if (levels.length === 1) neighbour(1); // a file, or nothing chosen: the next column of the bar
     } else if (k === 'ArrowLeft') {
       e.preventDefault();
       if (levels.length > 1) levels = levels.slice(0, -1);

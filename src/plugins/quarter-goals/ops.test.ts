@@ -16,7 +16,7 @@ const P = '/p.org';
 /** The plugin's `Tx` over the core's, as the host gives it (paths as they are). */
 function run<R>(text: string, fn: (tx: Tx, src: HeadingRef) => R): { text: string; r: R; conflict: boolean } {
   const core = new CoreTx((path) => (path === P ? { path, text, wf: WF } : undefined));
-  const info = (h: Heading): HeadingInfo => ({ ref: { path: P, line: h.line, title: h.title }, level: h.level, keyword: h.keyword, done: false, priority: h.priority, title: h.title, tags: h.tags, ...(h.deadline ? { deadline: h.deadline } : {}) });
+  const info = (h: Heading): HeadingInfo => ({ ref: { path: P, line: h.line, title: h.title }, level: h.level, keyword: h.keyword, done: false, priority: h.priority, title: h.title, tags: h.tags, properties: {}, ...(h.deadline ? { deadline: h.deadline } : {}) });
   const tx = {
     setStatus: (h: HeadingRef, k: string | null) => core.setStatus(h, k),
     setPlanning: (h: HeadingRef, k: 'SCHEDULED' | 'DEADLINE', d: Date | null) => core.setPlanning(h, k, d),

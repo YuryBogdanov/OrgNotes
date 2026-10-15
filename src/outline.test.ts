@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { changeStatusAt, cyclePriority, foldTargets, insertHeading, moveSubtree, nextCycleState, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree, insertItem, type Result } from './outline';
-import { DEFAULT_WORKFLOW, resolveWorkflow } from './org';
+import { DEFAULT_WORKFLOW, EMPTY_CONFIG, resolveWorkflow } from './org';
 
 const apply = (text: string, r: Result | null) => {
   if (!r) return null;
@@ -187,6 +187,7 @@ describe('visibility cycle (S-Tab)', () => {
 
 describe('status and workflow rotation', () => {
   const wf = resolveWorkflow('', 'x.org', {
+    ...EMPTY_CONFIG,
     workflows: [
       { name: 'Задачи', states: [{ name: 'NEW', done: false }, { name: 'TODO', done: false }, { name: 'DONE', done: true }] },
       { name: 'Встречи', states: [{ name: 'MEETING', done: false }, { name: 'FINISHED', done: true }] },

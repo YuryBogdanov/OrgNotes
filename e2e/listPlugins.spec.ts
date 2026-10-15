@@ -41,7 +41,7 @@ test('the board: the core\'s menu of a card — «Статус» moves it to tha
 test('«Добавить отметку…» of the goals: in the menu of a goal in the agenda and in the palette, writes the mark', async ({ page }) => {
   await page.clock.setFixedTime(NOW);
   await page.setViewportSize({ width: 1440, height: 900 });
-  const files = GOAL_FILES();
+  const files: Record<string, string> = GOAL_FILES();
   files[PETROV] = files[PETROV].replace('DEADLINE: <2026-11-30 Пн>', 'DEADLINE: <2026-10-20 Вт>'); // in the agenda's 30 days
   await installTauriMock(page, files);
   await page.goto('/');
