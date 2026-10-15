@@ -53,5 +53,5 @@
   .box i { font-style: normal; color: var(--fg2); }
   .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
   .btn { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); font: inherit; }
-  .danger { padding: 0 14px; border: 0; background: #c9303a; color: #fff; font-weight: 600; }
+  .danger { padding: 0 14px; border: 0; background: var(--danger); color: var(--on-danger); font-weight: 600; }
 </style>

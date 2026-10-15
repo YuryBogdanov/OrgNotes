@@ -144,9 +144,4 @@
   .blk.over { box-shadow: inset 0 2px 0 var(--acc); }
   .grip { display: flex; align-items: center; color: var(--fg3); cursor: grab; padding: 2px; border-radius: 4px; }
   .grip:focus-visible { outline: 2px solid var(--acc); }
-  .switch { flex: 0 0 auto; position: relative; width: 32px; height: 18px; padding: 0; border: 0; border-radius: 9px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); transition: background 0.15s; }
-  .switch span { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: var(--onpacc); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s; }
-  .switch[aria-checked='true'] { background: var(--acc); box-shadow: none; }
-  .switch[aria-checked='true'] span { transform: translateX(14px); }
-  .switch:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 </style>

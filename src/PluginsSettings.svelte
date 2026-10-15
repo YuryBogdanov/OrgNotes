@@ -166,8 +166,8 @@
         <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5" /><path d="M13.2 13.2L17 17" /></svg>
         <input bind:value={query} placeholder="Найти плагин" aria-label="Найти плагин" spellcheck="false" />
       </label>
-      <button class="change" onclick={folder}>Открыть папку плагинов</button>
-      <button class="change pri" onclick={() => (page = 'catalog')}>Каталог плагинов…</button>
+      <button class="btn" onclick={folder}>Открыть папку плагинов</button>
+      <button class="btn pri" onclick={() => (page = 'catalog')}>Каталог плагинов…</button>
     </div>
     {#if builtin.length}
       <div class="cap">ВСТРОЕННЫЕ <span>— идут с приложением</span></div>
@@ -184,7 +184,7 @@
       <p class="help">Плагинов пока нет — откройте <button class="more inline" onclick={() => (page = 'catalog')}>каталог</button> или положите папку плагина (<code>manifest.json</code> и <code>main.js</code>) в папку плагинов и нажмите «Перезагрузить плагины».</p>
     {/if}
     <div class="acts">
-      <button class="change" disabled={busy} onclick={reload}>Перезагрузить плагины</button>
+      <button class="btn" disabled={busy} onclick={reload}>Перезагрузить плагины</button>
       <span class="ver2">API {API_VERSION} · приложение {APP_VERSION}</span>
     </div>
     <p class="help">Плагин работает внутри приложения: права защищают от ошибок, но не от намеренно вредного кода. Включайте плагины только из источников, которым доверяете. Какие плагины включены — хранится на этом Mac.</p>
@@ -217,9 +217,7 @@
   .more { margin-left: 6px; padding: 0; border: 0; background: none; color: var(--acc); font-size: 12px; }
   .stack { margin: 0; max-height: 160px; overflow: auto; padding: 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); font: 11px/1.45 var(--mono); white-space: pre-wrap; }
   .acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .change { height: 26px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
-  .change:disabled { opacity: 0.5; }
-  .change.pri { border: 0; background: var(--acc); color: var(--onacc); font-weight: 600; }
+  .btn { height: 26px; } /* the plugins' bar: as tall as its search */
   .more.inline { margin: 0; font-size: inherit; }
   .bar { display: flex; align-items: center; gap: 8px; }
   .find { flex: 1; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: 6px; background: var(--field); color: var(--fg3); }
@@ -234,9 +232,4 @@
   .gear { height: 24px; width: 26px; padding: 0; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); }
   .ver2 { margin-left: auto; font: 11.5px var(--mono); color: var(--fg3); }
   code { font-family: var(--mono); }
-  .switch { flex: 0 0 auto; position: relative; width: 32px; height: 18px; padding: 0; border: 0; border-radius: 9px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); transition: background 0.15s; }
-  .switch span { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: var(--onpacc); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s; }
-  .switch[aria-checked='true'] { background: var(--acc); box-shadow: none; }
-  .switch[aria-checked='true'] span { transform: translateX(14px); }
-  .switch:disabled { opacity: 0.45; }
 </style>

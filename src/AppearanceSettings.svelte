@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { portal } from './portal';
   import { tick } from 'svelte';
   import { store } from './store.svelte';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
@@ -76,12 +77,6 @@
         { label: 'Удалить', action: () => (confirmDel = t), danger: true, disabled: t.builtin },
       ],
     };
-  }
-  /** The sheet is moved by a transform, which would hold `position: fixed` inside it: the menu and the dialog go to
-   *  the body. */
-  function portal(node: HTMLElement) {
-    document.body.appendChild(node);
-    return { destroy: () => node.remove() };
   }
   // ⎋ closes what is open here first, not the whole settings sheet
   function escFirst(e: KeyboardEvent) {
@@ -213,7 +208,7 @@
   .dlg p { margin: 0 0 14px; color: var(--fg2); line-height: 1.45; font-size: 12.5px; }
   .btns { display: flex; justify-content: flex-end; gap: 8px; }
   .btns button { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--field); color: var(--fg); }
-  .btns .danger-b { background: var(--todo); color: var(--onacc); font-weight: 600; }
+  .btns .danger-b { background: var(--danger); color: var(--on-danger); font-weight: 600; }
   .pv { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 9px 10px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 9px; font: 10px/14px var(--mono); white-space: nowrap; overflow: hidden; }
   .card.on .pv { border: 2px solid var(--acc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 22%, transparent); padding: 8px 9px; }
   .card:focus-visible { outline: none; }

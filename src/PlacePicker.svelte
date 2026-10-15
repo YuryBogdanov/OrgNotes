@@ -4,6 +4,7 @@
 </script>
 
 <script lang="ts">
+  import { portal } from './portal';
   import { moved } from './pointer';
   import { onMount, tick, type Snippet } from 'svelte';
   import { store, type NoteFile } from './store.svelte';
@@ -209,11 +210,6 @@
       : [['↑ ↓', 'выбрать'], ['↩', 'к заголовкам файла'], ...(top ? [['⌘↩', 'сразу на 1-й уровень']] : []), ...(onback ? [['⌫', 'к командам']] : []), ['⎋', 'закрыть']],
   );
   const FOOT2 = $derived([['↑ ↓', 'выбрать'], ['← →', 'свернуть / развернуть'], ['↩', top ? 'перенести сюда' : 'выбрать'], ...(top ? [['⌘↩', 'на 1-й уровень']] : []), ['⌫', 'к файлам'], ['⎋', 'закрыть']]);
-  /** The palette goes to the body: a sheet's transform (the settings) would hold its `position: fixed`. */
-  function portal(node: HTMLElement) {
-    document.body.appendChild(node);
-    return { destroy: () => node.remove() };
-  }
 
   // ---- the columns ---------------------------------------------------------------------------------------------
   let cq = $state('');

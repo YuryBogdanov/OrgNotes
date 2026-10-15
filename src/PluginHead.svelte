@@ -41,9 +41,4 @@
   .ds { font-size: 12.5px; color: var(--fg2); margin-top: 2px; }
   .meta { display: flex; align-items: baseline; gap: 12px; font-size: 12px; color: var(--fg2); }
   .meta .lnk { margin-left: auto; font-size: 12px; }
-  .switch { flex: 0 0 auto; position: relative; width: 32px; height: 18px; padding: 0; border: 0; border-radius: 9px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); transition: background 0.15s; }
-  .switch span { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: var(--onpacc, #fff); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s; }
-  .switch[aria-checked='true'] { background: var(--acc); box-shadow: none; }
-  .switch[aria-checked='true'] span { transform: translateX(14px); }
-  .switch:disabled { opacity: 0.45; }
 </style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { portal } from './portal';
   import { store } from './store.svelte';
   import Editor from './Editor.svelte';
   import ColorPop from './ColorPop.svelte';
@@ -79,10 +80,6 @@
     if (!isDeep(k)) return;
     e.preventDefault();
     menu = { x: e.clientX, y: e.clientY, items: [{ label: 'Как уровень 4', action: () => set(k, undefined), disabled: inherited(k) }] };
-  }
-  function portal(node: HTMLElement) {
-    document.body.appendChild(node);
-    return { destroy: () => node.remove() };
   }
 
   // ---- the example ----------------------------------------------------------------------------------------------------

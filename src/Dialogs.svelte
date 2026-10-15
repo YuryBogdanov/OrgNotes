@@ -74,5 +74,5 @@
   .hint { margin-left: auto; font-size: 11px; color: var(--fg3); }
   .btns { display: flex; justify-content: flex-end; gap: 8px; }
   .btns button { height: 28px; padding: 0 14px; border: 0; border-radius: 6px; background: var(--field); }
-  .btns .danger { background: var(--todo); color: var(--onacc); font-weight: 600; }
+  .btns .danger { background: var(--danger); color: var(--on-danger); font-weight: 600; }
 </style>
