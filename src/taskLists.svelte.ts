@@ -15,7 +15,8 @@ import type { NoteFile } from './store.svelte';
 import type { Tab } from './layout';
 
 /** The date a row stands by in its list: ⌥⇧← → moves this one. */
-export type DateKind = 'SCHEDULED' | 'DEADLINE' | 'event';
+export type { DateKind } from './org';
+import type { DateKind } from './org';
 /** A task of a list: its heading (found by line and title, as the journal finds it) and the date of its row. */
 export interface ListTask extends HeadingRef {
   dk?: DateKind | null;
@@ -93,6 +94,14 @@ class TaskLists {
   private stack: Step[] = [];
   /** The texts the lists wrote: a list does not take them for a change from outside. */
   own = new Map<string, string>();
+  /** A frozen list (its rows kept until ⌘R) is computed again when a file came, went, or changed not by the lists:
+   *  `texts` are the files as the list was frozen. */
+  changedOutside(files: readonly { path: string; text: string }[], texts: ReadonlyMap<string, string>): boolean {
+    return files.length !== texts.size || files.some((f) => {
+      const was = texts.get(f.path);
+      return was === undefined || (f.text !== was && this.own.get(f.path) !== f.text);
+    });
+  }
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
   /** The plugins' actions on a task. */
   actions = $state.raw<TaskAction[]>([]);

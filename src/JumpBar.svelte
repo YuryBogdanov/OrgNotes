@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { parentOf } from './navTree';
   import { clickOutside } from './clickOutside';
   import { moved } from './pointer';
   import { tick, untrack } from 'svelte';
@@ -12,7 +13,6 @@
   type Level = { items: Item[]; sel: number; filter: string; parent?: string; at?: { left: number; top: number } };
 
   const file = $derived(store.file);
-  const parentOf = (rel: string) => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
   const byName = (a: Item, b: Item) => a.label.localeCompare(b.label, 'ru');
   /** The segments: every folder of the path, then the file. */
   const segs = $derived.by(() => {

@@ -2,19 +2,13 @@
   import { untrack } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { store } from './store.svelte';
-  import { subtreeProgress, toneFor } from './org';
-  import { toneStyle } from './colors';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import { headingActionsFor } from './headingActions.svelte';
   import { fileTypeOf, fileTypes } from './fileTypes.svelte';
   import { draggedHeading, setDragged } from './dragData';
-  import { buttons, expandAll, folderKey, headingKey, pathKeys, readOpen, subtreeKeys, treeNodes, writeOpen } from './navTree';
+  import { buttons, expandAll, folderKey, parentOf, pathKeys, readOpen, subtreeKeys, treeNodes, writeOpen } from './navTree';
+  import { visibleRows, type NavRow as Row } from './navRows';
 
-  type Row = {
-    key: string; kind: 'folder' | 'file' | 'heading' | 'new'; depth: number; label: string;
-    open: boolean; hasKids: boolean; rel: string; file?: number; line?: number;
-    kw?: string | null; tone?: string; cnt?: string; selected?: boolean; done?: boolean;
-  };
   // ТЗ 02: the open nodes, kept per notes folder; everything else is folded
   const open = new SvelteSet<string>();
   let openDir: string | null = null; // the folder whose state `open` holds
@@ -34,73 +28,10 @@
   const path = $derived(pathKeys(store.file, store.selected, store.navHeadings));
   const can = $derived(buttons(nodes, open, path));
   let capped = $state(false); // «Развернуть всё» left the headings closed
-  const base = (n: string) => n.split('/').pop()!;
-  const parentOf = (rel: string) => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
-  const noExt = (n: string) => n.replace(/\.org$/, '').replace(fileTypeOf(n) ? /\.[^.]+$/ : /$^/, '');
 
-  const rows = $derived.by(() => {
-    type Node = { name: string; rel: string; children: Map<string, Node>; files: number[] };
-    const root: Node = { name: '', rel: '', children: new Map(), files: [] };
-    const ensure = (rel: string) => {
-      let n = root;
-      let acc = '';
-      for (const p of rel.split('/').filter(Boolean)) {
-        acc = acc ? acc + '/' + p : p;
-        if (!n.children.has(p)) n.children.set(p, { name: p, rel: acc, children: new Map(), files: [] });
-        n = n.children.get(p)!;
-      }
-      return n;
-    };
-    store.folders.forEach(ensure);
-    store.files.forEach((f, i) => ensure(parentOf(f.name)).files.push(i));
-
-    const out: Row[] = [];
-    const newRow = (dir: string, depth: number) => {
-      if (store.creating && store.creating.dir === dir)
-        out.push({ key: '\u0000new:' + dir, kind: 'new', depth, label: '', open: false, hasKids: false, rel: dir });
-    };
-    const walk = (n: Node, depth: number) => {
-      newRow(n.rel, depth);
-      const kids = [...n.children.values()].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-      for (const c of kids) {
-        const key = folderKey(c.rel);
-        const isOpen = open.has(key);
-        // an empty folder has no chevron (its column stays, so the names line up)
-        const full = c.children.size + c.files.length > 0 || store.creating?.dir === c.rel;
-        out.push({ key, kind: 'folder', depth, label: c.name, open: isOpen && full, hasKids: full, rel: c.rel });
-        if (isOpen) walk(c, depth + 1);
-      }
-      for (const i of n.files) {
-        const f = store.files[i];
-        // headings show only with "Показывать заголовки в навигаторе"; the outline lives in the inspector
-        const kids = store.navHeadings && f.headings.length > 0;
-        const fopen = kids && open.has(f.path);
-        out.push({
-          key: f.path, kind: 'file', depth, label: noExt(base(f.name)), open: fopen, hasKids: kids,
-          rel: f.name, file: i, selected: i === store.cur && (!fopen || store.selected < 0),
-        });
-        if (!fopen) continue;
-        let hiddenUntil = -1;
-        f.headings.forEach((h, hi) => {
-          if (h.line < hiddenUntil) return;
-          const hasKids = f.headings[hi + 1]?.parent === hi;
-          const key = headingKey(f, hi);
-          const isOpen = hasKids && open.has(key);
-          if (hasKids && !isOpen) hiddenUntil = h.end;
-          const p = hasKids ? subtreeProgress(f.headings, hi, f.wf) : { done: 0, total: 0 };
-          out.push({
-            key, kind: 'heading', depth: depth + h.level, label: h.title, open: isOpen, hasKids, rel: f.name,
-            file: i, line: h.line, kw: h.keyword, tone: h.keyword ? toneStyle(toneFor(h.keyword, f.wf)) : undefined,
-            cnt: p.total ? `${p.done}/${p.total}` : '',
-            selected: i === store.cur && hi === store.selected,
-            done: !!h.keyword && f.wf.done.includes(h.keyword),
-          });
-        });
-      }
-    };
-    walk(root, 0);
-    return out;
-  });
+  const rows = $derived(
+    visibleRows(store.folders, store.files, open, { headings: store.navHeadings, creating: store.creating?.dir ?? null, cur: store.cur, selected: store.selected }),
+  );
 
   const toggle = (r: Row) => (open.has(r.key) ? open.delete(r.key) : open.add(r.key));
   /** ⌥-click, ⌥→ ⌥←: the node with everything under it. */

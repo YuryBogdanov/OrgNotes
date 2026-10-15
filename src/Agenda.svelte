@@ -1,8 +1,9 @@
 <script lang="ts">
+  import { builtinItemsOf, builtinSectionsOf, type AgendaItem as Item, type AgendaSection as Section } from './builtinAgenda';
   import { draggedHeading, setDragged } from './dragData';
   import { untrack } from 'svelte';
   import { store } from './store.svelte';
-  import { dayDiff, fmtDay, fmtLong, occurrences, repeaterLabel, toJs, toneFor, weekdayName, type Heading, type OrgDate } from './org';
+  import { dayDiff, fmtDay, titleIndex, toJs, toneFor, type OrgDate } from './org';
   import { toneOf, toneStyle } from './colors';
   import { displayName } from './names';
   import { runAgenda, tasksCount } from './agendas';
@@ -12,21 +13,6 @@
   // the pane the agenda lives in: a task opens in the neighbour pane (↩, double click) or here (⌥↩)
   let { pane = 0 }: { pane?: number } = $props();
 
-  type Item = {
-    day: number; // days from today
-    time: string; kw: string | null; tone: string; ev: boolean; prio: string | null; // [#A]: a capsule, as on the board (#106)
-    title: string; src: string; tags: string; mark: string; late: boolean; file: number; line: number; order: number;
-    key: string; // the row: its task and its place in the list (lines move with edits, so not by line)
-    path: string; n: number; // the task: its file, and which of the headings with its title there
-    dk: DateKind | null; // the date the row stands by (⌥⇧← → moves it)
-    stale?: boolean; // changed from the list and no longer fits it: dimmed until the list is refreshed (ТЗ 34)
-    done?: boolean; // …and done: struck through too
-  };
-  /** A heading above rows: a day of the built-in agenda, a block of a custom one, a group inside a block. */
-  type Section = {
-    key: string; title: string; sub: string; tone: string; dot?: string; level: 1 | 2;
-    items: Item[]; empty?: boolean; more?: number;
-  };
 
   // the colours of the priorities, as the board's (ТЗ 33): A — TODO's, B — WAIT's, C — the secondary
   const PRIO: Record<string, string> = { A: 'var(--todo)', B: 'var(--wait)', C: 'var(--fg2)' };
@@ -39,71 +25,11 @@
   const custom = $derived(store.agendaOf(tab));
   const midnight = $derived(new Date(store.today.getFullYear(), store.today.getMonth(), store.today.getDate()));
 
-  /** Which of the headings with this title in the file it is: the task's name in the list, whatever its line. */
-  const nth = (hs: Heading[], h: Heading) => {
-    let n = 0;
-    for (const x of hs) {
-      if (x === h) return n;
-      if (x.title === h.title) n++;
-    }
-    return n;
-  };
+  // ---- the built-in agenda: open tasks and events of the next 30 days, by day (builtinAgenda.ts) ------------------
+  const builtinItems = $derived(builtinItemsOf(store.agendaFiles, midnight));
+  const builtinSections = $derived(builtinSectionsOf(builtinItems, midnight));
 
-  // ---- the built-in agenda: open tasks and events of the next 30 days, by day ----------------------------------
-  const builtinItems = $derived.by(() => {
-    const from = midnight;
-    const horizon = new Date(from); horizon.setDate(horizon.getDate() + 30);
-    const out: Item[] = [];
-    store.agendaFiles.forEach((f, fi) => {
-      for (const h of f.headings) {
-        const isOpen = !!h.keyword && f.wf.open.includes(h.keyword);
-        const isEvent = !h.keyword && !!h.event;
-        if (!isOpen && !isEvent) continue;
-        const n = nth(f.headings, h);
-        const base = {
-          kw: h.keyword, tone: h.keyword ? toneStyle(toneFor(h.keyword, f.wf)) : '', ev: isEvent, prio: h.priority,
-          title: h.title, src: [displayName(f.name), ...h.path].join(' › '), tags: h.tags.join(' '),
-          file: fi, line: h.line, path: f.path, n,
-        };
-        const push = (d: Date, time: string, mark: string, order: number, dk: DateKind) => {
-          const day = dayDiff(d, from);
-          out.push({ ...base, day, time, mark, order, dk, late: day < 0, key: `${f.path}|${h.title}|${n}|${dk}|${day}` });
-        };
-        if (h.event) {
-          const rep = repeaterLabel(h.event.repeater);
-          for (const d of occurrences(h.event, from, horizon)) push(d, h.event.time ?? '', rep || 'Событие', 1, 'event');
-        }
-        if (h.scheduled) {
-          const base0 = toJs(h.scheduled);
-          const overdue = dayDiff(base0, from);
-          if (overdue < 0) push(base0, h.scheduled.time ?? '', `Запланировано ${fmtDay(base0)}`, 0, 'SCHEDULED');
-          else if (base0 <= horizon) push(base0, h.scheduled.time ?? '', h.scheduled.repeater ? repeaterLabel(h.scheduled.repeater) : 'Запланировано', 1, 'SCHEDULED');
-        }
-        if (h.deadline) {
-          const d = toJs(h.deadline);
-          const n = dayDiff(d, from);
-          if (n < 0) push(d, '', `Дедлайн ${fmtDay(d)}`, 0, 'DEADLINE');
-          else if (d <= horizon) push(d, '', `Дедлайн ${fmtDay(d)} · ${n === 0 ? 'сегодня' : `через ${n} дн.`}`, 2, 'DEADLINE');
-        }
-      }
-    });
-    return out.sort((a, b) => a.day - b.day || a.order - b.order || a.time.localeCompare(b.time));
-  });
-  const builtinSections = $derived.by(() => {
-    const map = new Map<string, Section>();
-    for (const it of builtinItems) {
-      const d = new Date(midnight); d.setDate(d.getDate() + it.day);
-      let key: string, title: string, sub: string, tone = '--fg';
-      if (it.day < 0) { key = 'over'; title = 'Просрочено'; sub = ''; tone = '--todo'; }
-      else if (it.day === 0) { key = 'today'; title = 'Сегодня'; sub = fmtLong(d); }
-      else if (it.day === 1) { key = 'd' + it.day; title = 'Завтра'; sub = fmtDay(d); }
-      else if (it.day <= 7) { key = 'd' + it.day; title = weekdayName(d); sub = fmtDay(d); }
-      else { key = 'later'; title = 'Позже'; sub = 'ближайшие 30 дней'; }
-      if (!map.has(key)) map.set(key, { key, title, sub, tone, level: 1, items: [] });
-      map.get(key)!.items.push(it);
-    }
-    return [...map.values()];
-  });
+
 
   // ---- a custom agenda: its blocks in order, each with its own heading -------------------------------------------
   const customRun = $derived(custom ? runAgenda(custom, store.agendaFiles, midnight) : []);
@@ -116,7 +42,7 @@
         tasks.map((t): Item => {
           const f = store.files[t.file];
           const h = f.headings.find((x) => x.line === t.line);
-          const n = h ? nth(f.headings, h) : 0;
+          const n = h ? titleIndex(f.headings, h.line, h.title) : 0;
           const d = t.scheduled ?? t.deadline;
           return {
             day: d ? dayDiff(toJs(d), midnight) : 0, time: t.scheduled?.time ?? '', kw: t.kw, tone: toneStyle(toneFor(t.kw, f.wf)), ev: false,
@@ -177,12 +103,7 @@
   $effect(() => {
     const fz = frozen;
     if (!fz) return;
-    const files = store.files;
-    const outside = files.length !== fz.texts.size || files.some((f) => {
-      const was = fz.texts.get(f.path);
-      return was === undefined || (f.text !== was && lists.own.get(f.path) !== f.text);
-    });
-    if (outside) untrack(refresh);
+    if (lists.changedOutside(store.files, fz.texts)) untrack(refresh);
   });
   // another agenda, another day
   $effect(() => {

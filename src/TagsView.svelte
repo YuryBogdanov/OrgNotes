@@ -101,11 +101,7 @@
   $effect(() => {
     const fz = frozen;
     if (!fz) return;
-    const outside = store.files.length !== fz.texts.size || store.files.some((f) => {
-      const was = fz.texts.get(f.path);
-      return was === undefined || (f.text !== was && lists.own.get(f.path) !== f.text);
-    });
-    if (outside) untrack(refresh);
+    if (lists.changedOutside(store.files, fz.texts)) untrack(refresh);
   });
   // another filter: the list again, the selection gone
   $effect(() => {

@@ -603,3 +603,17 @@ export function occurrences(d: OrgDate, from: Date, to: Date): Date[] {
   }
   return out;
 }
+
+/** Which of the headings with this title in the file the one at `line` is (0 when there is none): a task's name in a
+ *  list, whatever its line. */
+export function titleIndex(hs: readonly { line: number; title: string }[], line: number, title: string): number {
+  let n = 0;
+  for (const h of hs) {
+    if (h.line === line) return n;
+    if (h.title === title) n++;
+  }
+  return 0;
+}
+
+/** The date a task stands by in a list (⌥⇧← → moves it). */
+export type DateKind = 'SCHEDULED' | 'DEADLINE' | 'event';
