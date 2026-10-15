@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { diskAll as disk } from './helpers';
 
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const day = (offset: number) => {
@@ -25,7 +26,6 @@ const panes = (page: Page) => page.locator('section.pane');
 const tabsOf = (page: Page, i: number) => panes(page).nth(i).locator('.tab .lbl').allInnerTexts();
 const group = (page: Page) => page.getByRole('group', { name: 'Открыть в панели' });
 const btn = (page: Page, name: string) => group(page).getByRole('button', { name });
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
 const status = async (page: Page, i: number) => +/Стр\. (\d+)/.exec(await panes(page).nth(i).locator('.status').innerText())![1];
 
 test.describe('toolbar group', () => {

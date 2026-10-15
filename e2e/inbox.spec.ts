@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { log } from './helpers';
 import { FILES, INBOX, NOW } from './inboxFixture';
 
 // ТЗ «Inbox — раздел навигатора и быстрый ввод задачи (⇧⌘I)».
@@ -8,7 +9,6 @@ const disk = (page: Page, p = IB) => page.evaluate((p) => (window as any).__disk
 const config = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/config.json'] ?? 'null'));
 /** The plugin «Inbox»'s settings in the notes folder (ТЗ 28). */
 const own = (page: Page) => page.evaluate(() => JSON.parse((window as any).__disk['/mock/.orgnotes/plugins/inbox.json'] ?? 'null')?.settings);
-const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 const modes = (page: Page) => page.getByRole('tablist', { name: 'Режимы навигатора' });
 const panel = (page: Page) => page.locator('.inbox');
 const rows = (page: Page) => panel(page).locator('.row');

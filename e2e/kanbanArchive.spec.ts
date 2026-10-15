@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, pluginsReady } from './tauriMock';
+import { toast } from './helpers';
 import { FILES } from './kanbanFixture';
 
 // ТЗ 33 (part C): «В архив» and «Удалить» while a card is dragged (the archive as Emacs keeps it: «<file>_archive»,
@@ -10,7 +11,6 @@ const A = '/mock/work/platform.org_archive';
 const disk = (page: Page, p = P) => page.evaluate((x) => (window as any).__disk[x] as string | undefined, p);
 const board = (page: Page) => page.locator('.kanban');
 const card = (page: Page, title: string) => board(page).locator('.kb-card', { hasText: title });
-const toast = (page: Page) => page.locator('.toast');
 
 async function open(page: Page, files: Record<string, string> = FILES()) {
   await page.setViewportSize({ width: 1600, height: 900 });

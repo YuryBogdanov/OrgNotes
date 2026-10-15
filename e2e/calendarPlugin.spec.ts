@@ -1,16 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
+import { diskAll as disk, settingsSheet as sheet } from './helpers';
 import { FILES, NOW } from './calendarFixture';
 
 // ТЗ 29 (roadmap 3.2 B): the calendar is the built-in plugin «calendar». Its settings of before (flat, in its file and
 // on this Mac), the layers and the hidden files, a changed shortcut and a calendar tab of a saved layout move to it;
 // turned off, the agenda and the month under the Inbox review's card stay.
 
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
 const modes = (page: Page) => page.getByRole('tablist', { name: 'Режимы навигатора' });
 const panel = (page: Page) => page.getByRole('group', { name: 'Открыть в панели' });
 const cal = (page: Page) => page.locator('section.pane.active .cal');
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Настройки' });
 
 async function open(page: Page, files: Record<string, string>, init: Record<string, string> = {}, ready = '.cm-content') {
   await page.clock.setFixedTime(NOW);

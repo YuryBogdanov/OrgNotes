@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
+import { diskAll as disk, toast, palette as pal } from './helpers';
 
 // ТЗ 28 §1 (roadmap 3.1 A): what the Inbox needs of the core, shown by «Привет»: the Inbox file and its change, the
 // quick entry and the choice of the file, a badge on the section, the core's move, a step taken back, the palette's
@@ -13,9 +14,6 @@ const FILES = {
   '/mock/inbox.org': '',
   '/mock/.orgnotes/config.json': JSON.stringify({ version: 1, inbox: { file: 'inbox.org' } }),
 };
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
-const toast = (page: Page) => page.locator('.toast');
-const pal = (page: Page) => page.getByRole('dialog', { name: 'Командная палитра' });
 
 async function open(page: Page) {
   await page.setViewportSize({ width: 1440, height: 900 });

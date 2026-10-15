@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { settingsSheet as sheet } from './helpers';
 
 // ТЗ «Настройки: раздел „Клавиши“»: the list of commands, recording (one press, a chord, removing), clashes,
 // the two sets, and a changed shortcut working at once in the window and the editor.
@@ -19,7 +20,6 @@ const keysSheet = async (page: Page) => {
 };
 const row = (page: Page, id: string) => page.locator(`[data-cmd="${id}"]`);
 const chips = (page: Page, id: string) => row(page, id).locator('.chip');
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Настройки' });
 const stored = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('keys') ?? 'null'));
 const onHeading = async (page: Page, text: string) => {
   await page.locator('.cm-line', { hasText: text }).click();

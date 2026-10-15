@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { diskAll as disk, log } from './helpers';
 
 // Closing tabs with unsaved text (ТЗ «Закрытие несохранённой вкладки»). Files save themselves half a second
 // after an edit, so a file only counts as unsaved when its write failed: the tests make a file unwritable.
@@ -20,8 +21,6 @@ const navRow = (page: Page, label: string) => page.locator(`.nav .row[data-key="
 const panes = (page: Page) => page.locator('section.pane');
 const tabs = (page: Page, i = 0) => panes(page).nth(i).locator('.tab');
 const labels = (page: Page, i = 0) => tabs(page, i).locator('.lbl').allInnerTexts();
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
-const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 const sheet = (page: Page) => page.getByRole('alertdialog').filter({ has: page.locator('#cs-title') });
 const btn = (page: Page, name: string) => sheet(page).getByRole('button', { name, exact: true });
 const saveAs = (page: Page) => page.getByRole('dialog', { name: 'Сохранить как' });

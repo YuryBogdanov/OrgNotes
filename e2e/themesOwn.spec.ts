@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { diskAll as disk } from './helpers';
 
 // ТЗ 25, part 2: own themes — «+ Новая тема», duplicate, rename, delete, export, import; files in the themes folder.
 
@@ -13,7 +14,6 @@ async function open(page: Page, extra: Record<string, string> = {}) {
   await expect(page.locator('.cm-content').first()).toBeVisible();
   await openSettingsSheet(page, 'Оформление');
 }
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
 const dark = (page: Page) => page.getByRole('radiogroup', { name: 'Тема при тёмном оформлении' });
 const light = (page: Page) => page.getByRole('radiogroup', { name: 'Тема при светлом оформлении' });
 const edBg = (page: Page) => page.locator('.cm-editor').first().evaluate((el) => getComputedStyle(el).backgroundColor);

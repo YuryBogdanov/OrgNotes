@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
+import { settingsSheet as sheet } from './helpers';
 
 // The mockups of ТЗ 37: the settings in three groups — what comes with Panopticon, «ПЛАГИНЫ», «НАСТРОЙКИ ПЛАГИНОВ»
 // (a plugin's section with its head); in the palette a plugin's command has a purple mark and its plugin's name.
 
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Настройки' });
 async function open(page: Page) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript(() => localStorage.setItem('plugins:updatesChecked', String(Date.now())));

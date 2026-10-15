@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, expandTree } from './tauriMock';
+import { diskAll as disk, log } from './helpers';
 
 const FILES = () => ({
   '/mock/work.org': '#+TITLE: Work\n\n* Q4 2026\n** TODO Бюджет\nтекст\n',
@@ -25,8 +26,6 @@ const panes = (page: Page) => page.locator('section.pane');
 const tabs = (page: Page, i = 0) => panes(page).nth(i).locator('.tab');
 const labels = (page: Page, i = 0) => tabs(page, i).locator('.lbl').allInnerTexts();
 const activeLabel = (page: Page, i = 0) => panes(page).nth(i).locator('.tab.on .lbl').innerText();
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
-const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 const menuItem = (page: Page, name: string | RegExp) => page.getByRole('menuitem', { name });
 const strip = (page: Page, i = 0) => panes(page).nth(i).locator('.strip');
 const blank = async (page: Page, i = 0) => {

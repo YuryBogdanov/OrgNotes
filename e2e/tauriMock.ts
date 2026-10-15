@@ -51,6 +51,310 @@ export async function installTauriMock(page: Page, files: Record<string, string>
         delete disk[from];
         emit();
       };
+      // ---- what the commands share ----
+      // the notes folder: a test can start without one (__noDir), with a remembered one that is gone (__missing),
+      // or pick folders in the system dialog (__picks); files of another folder live under its own prefix
+      const root = () => (w.__noDir ? null : (w.__dir ?? '/mock'));
+      // the plugins' file types (ТЗ 39): listed and kept as notes
+      const isNote = (p: string) => /\.org(_archive)?$/.test(p) || ((w.__noteTypes ?? []) as string[]).some((t) => p.toLowerCase().endsWith('.' + t));
+      const badName = (n: string) => !n.trim() || /[/\\:]/.test(n) || n.trim().startsWith('.');
+      const exists = (p: string) => p in disk || folders.has(p.replace('/mock/', '')) || Object.keys(disk).some((k) => k.startsWith(p + '/'));
+      const relocate = (from: string, to: string) => {
+        if (from in disk) {
+          disk[to] = disk[from];
+          delete disk[from];
+        }
+        for (const k of Object.keys(disk)) {
+          if (k.startsWith(from + '/')) {
+            disk[to + k.slice(from.length)] = disk[k];
+            delete disk[k];
+          }
+        }
+        const rel = from.replace('/mock/', '');
+        const nrel = to.replace('/mock/', '');
+        for (const f of [...folders]) {
+          if (f === rel || f.startsWith(rel + '/')) {
+            folders.delete(f);
+            folders.add(nrel + f.slice(rel.length));
+          }
+        }
+      };
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      // where plugins come from (ТЗ 37): a test's fixtures in window.__sources —
+      //   catalog: { plugins, stats }, raw: { 'repo/file': text }, releases: { 'repo@version': { file: text } },
+      //   git: { url: { refs, refsFor?: { ref: files } } } — files of a ref: { 'manifest.json': text, … }
+      const src = () => w.__sources ?? {};
+      const put = (id: string, files: Record<string, string>, source: object) => {
+        for (const k of Object.keys(disk)) if (k.startsWith(`/config/plugins/${id}/`)) delete disk[k];
+        for (const [f, t] of Object.entries(files)) disk[`/config/plugins/${id}/${f}`] = t;
+        disk[`/config/plugins/${id}/.source.json`] = JSON.stringify(source);
+        return files['manifest.json'];
+      };
+      const NO_REPO = 'Репозиторий не найден или нет доступа: проверьте ссылку, ключ SSH или вход в git на этом Mac';
+      const refFiles = (url: string, ref: string) => {
+        const g = src().git?.[url];
+        if (!g) throw NO_REPO;
+        const files = g.refsFor?.[ref];
+        if (!files) throw 'В репозитории нет manifest.json (ни в корне, ни в dist/)';
+        return files as Record<string, string>;
+      };
+
+      // ---- the commands, by area ----
+      const handlers: Record<string, (args: any) => unknown> = {
+        // events of the Rust side
+        'plugin:event|listen': (a) => ((listeners[a.event] = a.handler), 1),
+        'plugin:event|unlisten': () => undefined,
+        'plugin:event|emit': (a) => (w.__log.push(['emit', a.target?.label ?? a.target ?? null, a.event, a.payload]), null),
+        'plugin:event|emit_to': (a) => (w.__log.push(['emit', a.target?.label ?? a.target ?? null, a.event, a.payload]), null),
+
+        // the notes folder
+        get_notes_dir: () => root(),
+        notes_dir_status: () => ({ dir: w.__missing ? null : root(), missing: w.__missing ?? null }),
+        retry_notes_dir: () => {
+          if (!w.__missing) return w.__gone ? null : root();
+          if (!w.__missingBack) return null;
+          w.__dir = w.__missing;
+          w.__missing = null;
+          w.__noDir = false;
+          return w.__dir;
+        },
+        set_notes_dir: (a) => {
+          w.__dir = a.path;
+          w.__noDir = false;
+          w.__missing = null;
+          w.__log.push(['set_dir', a.path]);
+        },
+        scan_folder: async (a) => {
+          if (w.__scanDelay) await wait(w.__scanDelay);
+          const keys = Object.keys(disk).filter((k) => k.startsWith(a.path + '/') && !k.slice(a.path.length + 1).split('/').some((x) => x.startsWith('.')));
+          const dirs = new Set<string>();
+          for (const k of keys) {
+            const parts = k.slice(a.path.length + 1).split('/').slice(0, -1);
+            parts.forEach((_, i) => dirs.add(parts.slice(0, i + 1).join('/')));
+          }
+          const org = keys.filter((k) => k.endsWith('.org')).length;
+          const name = a.path.split('/').pop();
+          return { name, path: a.path, shown: a.path.replace(/^\/Users\/[^/]+/, '~'), org, folders: dirs.size, other: keys.length - org, capped: !!w.__big, big: !!w.__big };
+        },
+        sample_notes_dir: () => null,
+
+        // the notes: list, save, the plugins' file types
+        set_note_types: (a) => ((w.__noteTypes = (a.types as string[]).map((t) => t.toLowerCase())), null),
+        list_org_files: async () => {
+          // snapshot first, answer later: like a slow disk read racing with the user's typing
+          if (w.__gone) throw 'unavailable'; // the folder went away while the app runs
+          const r = (root() ?? '/mock') + '/';
+          const snapshot = Object.entries(disk)
+            .filter(([path]) => path.startsWith(r) && isNote(path) && !path.slice(r.length).split('/').some((p) => p.startsWith('.')))
+            .map(([path, text]) => ({ name: path.slice(r.length), path, text, mtime: mtime[path] ?? 0 }));
+          if (listDelay) await wait(listDelay);
+          return snapshot;
+        },
+        save_org_file: async (a) => {
+          // a test can make a file unwritable: window.__failWrites = ['/mock/work.org']
+          if ((w.__failWrites ?? []).includes(a.path)) throw 'нет прав на запись';
+          if (disk[a.path] !== a.base) {
+            w.__log.push(['conflict', a.path]);
+            throw 'conflict';
+          }
+          // a slow disk when a test says so: window.__saveDelay = 150
+          await wait(w.__saveDelay ?? 5);
+          disk[a.path] = a.text;
+          w.__log.push(['save', a.path]);
+          emit();
+        },
+        save_new_file: (a) => {
+          if (badName(a.name)) throw 'bad name';
+          if (a.name.trim() === 'fail') throw 'disk full';
+          const n = /\.org$/i.test(a.name.trim()) ? a.name.trim() : a.name.trim() + '.org';
+          const path = a.parent + '/' + n;
+          if (path in disk && !a.overwrite) throw 'exists';
+          disk[path] = a.text;
+          w.__log.push(['save_new', path]);
+          emit();
+          return path;
+        },
+
+        // folders and entries
+        list_folders: async () => {
+          if (listDelay) await wait(listDelay);
+          const out = new Set<string>(folders);
+          const r = (root() ?? '/mock') + '/';
+          for (const p of Object.keys(disk).filter((k) => k.startsWith(r))) {
+            const parts = p.slice(r.length).split('/').slice(0, -1);
+            if (parts.some((x) => x.startsWith('.'))) continue;
+            parts.forEach((_, i) => out.add(parts.slice(0, i + 1).join('/')));
+          }
+          return [...out];
+        },
+        create_entry: (a) => {
+          if (badName(a.name)) throw 'bad name';
+          // as the app: «.org» added, unless it is there or it is an archive («platform.org_archive»)
+          const n = a.isDir ? a.name.trim() : isNote(a.name.trim()) ? a.name.trim() : a.name.trim() + '.org';
+          const path = a.parent + '/' + n;
+          if (exists(path)) throw 'exists';
+          if (a.isDir) folders.add(path.replace('/mock/', ''));
+          else disk[path] = typeof a.text === 'string' ? a.text : n.endsWith('.org') ? '#+TITLE: ' + n.replace(/\.org$/, '') + '\n\n' : '';
+          emit();
+          return path;
+        },
+        rename_entry: (a) => {
+          if (badName(a.newName)) throw 'bad name';
+          const isFile = a.path in disk;
+          const n = isFile ? (isNote(a.newName.trim()) ? a.newName.trim() : a.newName.trim().replace(/(\.org)?$/, '.org')) : a.newName.trim();
+          const to = a.path.slice(0, a.path.lastIndexOf('/')) + '/' + n;
+          if (to !== a.path && exists(to)) throw 'exists';
+          relocate(a.path, to);
+          emit();
+          return to;
+        },
+        move_entry: (a) => {
+          if (a.dest === a.path || a.dest.startsWith(a.path + '/')) throw 'cannot move into itself';
+          const to = a.dest + '/' + a.path.slice(a.path.lastIndexOf('/') + 1);
+          if (exists(to)) throw 'exists';
+          relocate(a.path, to);
+          emit();
+          return to;
+        },
+        trash_entry: (a) => {
+          for (const k of Object.keys(disk)) if (k === a.path || k.startsWith(a.path + '/')) delete disk[k];
+          folders.delete(a.path.replace('/mock/', ''));
+          w.__log.push(['trash', a.path]);
+          emit();
+        },
+
+        // the project config and the features' files in the notes folder (roadmap 0.6)
+        read_project_config: () => disk['/mock/.orgnotes/config.json'] ?? null,
+        write_project_config: (a) => {
+          disk['/mock/.orgnotes/config.json'] = a.text;
+          emit();
+        },
+        read_feature_file: (a) => disk[(root() ?? '/mock') + '/.orgnotes/plugins/' + a.id + '.json'] ?? null,
+        write_feature_file: (a) => {
+          disk[(root() ?? '/mock') + '/.orgnotes/plugins/' + a.id + '.json'] = a.text;
+        },
+
+        // own editor themes (ТЗ 25): files under /config/themes/
+        list_themes: () => Object.keys(disk).filter((k) => k.startsWith('/config/themes/')).sort().map((k) => disk[k]),
+        write_theme: (a) => {
+          disk['/config/themes/' + a.file] = a.text;
+          w.__log.push(['write_theme', a.file]);
+        },
+        delete_theme: (a) => {
+          delete disk['/config/themes/' + a.file];
+          w.__log.push(['delete_theme', a.file]);
+        },
+
+        // the system's panels and exports: the save panel answers from __savePicks, the open panel from __picks
+        'plugin:dialog|save': (a) => (w.__log.push(['save_panel', a.options]), (w.__savePicks ?? []).shift() ?? null),
+        'plugin:dialog|open': (a) => (w.__log.push(['pick', a.options]), (w.__picks ?? []).shift() ?? null),
+        export_bytes: (a) => {
+          disk[a.path] = 'base64:' + a.data;
+        },
+        export_text: (a) => {
+          disk[a.path] = a.text;
+        },
+        import_text: (a) => {
+          if (!(a.path in disk)) throw 'нет такого файла';
+          return disk[a.path];
+        },
+        'plugin:opener|open_url': (a) => void w.__log.push(['open_url', a.url]),
+        'plugin:opener|reveal_item_in_dir': (a) => void w.__log.push(['reveal', a.paths]),
+        clipboard_text: () => w.__clipText ?? '', // the test sets what the clipboard holds
+
+        // the installed plugins (roadmap 1.2): folders under /config/plugins/<dir>/
+        list_plugins: () => {
+          const dirs = [...new Set(Object.keys(disk).filter((k) => k.startsWith('/config/plugins/')).map((k) => k.split('/')[3]))].sort();
+          return dirs.map((dir) => ({ dir, manifest: disk[`/config/plugins/${dir}/manifest.json`] ?? null, source: disk[`/config/plugins/${dir}/.source.json`] ?? null }));
+        },
+        read_plugin_file: (a) => {
+          if (String(a.file).split('/').includes('..')) throw 'a plugin reads only its own folder';
+          const t = disk[`/config/plugins/${a.dir}/${a.file}`];
+          if (t === undefined) throw 'No such file';
+          return t;
+        },
+        open_plugins_folder: () => null,
+        // a plugin's net.fetch (roadmap 1.3): Rust checks the manifest; here the answer is the test's
+        net_fetch: (a) => (w.__log.push(['net', a.plugin, a.method, a.url]), w.__net ?? { status: 200, headers: [['content-type', 'application/json']], text: '{"ok":true}' }),
+
+        // the windows, the mini window, the shortcuts
+        'plugin:window|hide': () => void w.__log.push(['hide']),
+        'plugin:window|set_fullscreen': (a) => void w.__log.push(['fullscreen', a.value]),
+        'plugin:window|get_all_windows': () => (w.__windows as string[]) ?? ['main'],
+        'plugin:webview|create_webview_window': (a) => {
+          w.__log.push(['window', a.options]);
+          (w.__windows ??= ['main']).push(a.options.label);
+        },
+        set_mini_shortcut: (a) => (w.__log.push(['set_mini_shortcut', a ?? null]), null),
+        set_capture_shortcut: (a) => {
+          if (w.__shortcutTaken === a.accelerator) throw 'HotKey already registered';
+          w.__log.push(['shortcut', a.accelerator, a.global]);
+          return null;
+        },
+        show_main_window: () => null,
+        quit_app: () => void w.__log.push(['quit']),
+      };
+      // the plugins' sources (ТЗ 37): each logged with its arguments
+      const sources: Record<string, (args: any) => unknown> = {
+        catalog_fetch: () => {
+          if (!src().catalog) throw 'нет связи с GitHub';
+          return { plugins: JSON.stringify(src().catalog.plugins), stats: JSON.stringify(src().catalog.stats ?? {}), fetched: Date.now(), repo: 'Panopticon-Org-Notes/plugins' };
+        },
+        catalog_raw: (a) => {
+          const t = src().raw?.[`${a.repo}/${a.file}`];
+          if (t === undefined) throw 'не найдено';
+          return t;
+        },
+        catalog_releases: (a) => JSON.stringify(src().releaseList?.[a.repo] ?? []),
+        plugin_install_release: (a) => {
+          const files = src().releases?.[`${a.repo}@${a.version}`];
+          if (!files) throw `нет релиза ${a.version} в ${a.repo}`;
+          return put(a.id, files, { kind: 'catalog', repo: a.repo, version: a.version });
+        },
+        plugin_cancel: () => null,
+        plugin_remove: (a) => {
+          // to the Trash: kept under /Trash/<id>/ so «Вернуть» can bring it back (a test empties it by hand)
+          const ks = Object.keys(disk).filter((k) => k.startsWith(`/config/plugins/${a.id}/`));
+          if (!ks.length) throw `нет плагина «${a.id}»`;
+          for (const k of ks) {
+            disk[`/Trash/${a.id}/` + k.slice(`/config/plugins/${a.id}/`.length)] = disk[k];
+            delete disk[k];
+          }
+          return `/Trash/${a.id}`;
+        },
+        plugin_restore: (a) => {
+          const ks = Object.keys(disk).filter((k) => k.startsWith(a.from + '/'));
+          if (!a.from || !ks.length) throw 'Корзину уже очистили';
+          for (const k of ks) {
+            disk[`/config/plugins/${a.id}/` + k.slice(a.from.length + 1)] = disk[k];
+            delete disk[k];
+          }
+          return null;
+        },
+        plugin_reveal: () => null,
+        git_refs: (a) => {
+          if (!src().git?.[a.url]) throw NO_REPO;
+          return src().git[a.url].refs;
+        },
+        git_probe: (a) => {
+          const g = src().git?.[a.url];
+          const refs = g?.refs ?? { head: null, tags: [], branches: [] };
+          const ref = a.ref ?? refs.tags.find(([t]: [string]) => !t.includes('-'))?.[0] ?? refs.head;
+          const files = refFiles(a.url, ref);
+          const track = refs.tags.some(([t]: [string]) => t === ref) ? 'tag' : 'branch';
+          const commit = (track === 'tag' ? refs.tags : refs.branches).find(([t]: [string]) => t === ref)?.[1] ?? '';
+          return { refs, ref, track, commit, manifest: files['manifest.json'], dir: '' };
+        },
+        plugin_install_git: (a) => {
+          const files = refFiles(a.url, a.ref);
+          const m = JSON.parse(files['manifest.json']);
+          const refs = src().git[a.url].refs;
+          const commit = (a.track === 'tag' ? refs.tags : refs.branches).find(([t]: [string]) => t === a.ref)?.[1] ?? '';
+          return put(m.id, files, { kind: 'git', url: a.url, track: a.track, ref: a.ref, commit, checkUpdates: a.checkUpdates });
+        },
+      };
+      for (const [name, fn] of Object.entries(sources)) handlers[name] = (args) => (w.__log.push([name, args]), fn(args));
+
       w.__TAURI_INTERNALS__ = {
         metadata: { currentWindow: { label: 'main' }, currentWebview: { windowLabel: 'main', label: 'main' } },
         transformCallback(cb: (e: unknown) => void) {
@@ -61,333 +365,13 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           delete cbs[id];
         },
         async invoke(cmd: string, args: any) {
-          if (cmd === 'plugin:event|listen') {
-            listeners[args.event] = args.handler;
-            return 1;
-          }
-          if (cmd === 'plugin:event|unlisten') return;
-          // the notes folder: a test can start without one (__noDir), with a remembered one that is gone (__missing),
-          // or pick folders in the system dialog (__picks); files of another folder live under its own prefix
-          const root = () => (w.__noDir ? null : (w.__dir ?? '/mock'));
-          if (cmd === 'get_notes_dir') return root();
-          if (cmd === 'notes_dir_status') return { dir: w.__missing ? null : root(), missing: w.__missing ?? null };
-          if (cmd === 'retry_notes_dir') {
-            if (!w.__missing) return w.__gone ? null : root();
-            if (!w.__missingBack) return null;
-            w.__dir = w.__missing;
-            w.__missing = null;
-            w.__noDir = false;
-            return w.__dir;
-          }
-          if (cmd === 'set_notes_dir') {
-            w.__dir = args.path;
-            w.__noDir = false;
-            w.__missing = null;
-            w.__log.push(['set_dir', args.path]);
-            return;
-          }
-          if (cmd === 'scan_folder') {
-            if (w.__scanDelay) await new Promise((r) => setTimeout(r, w.__scanDelay));
-            const keys = Object.keys(disk).filter((k) => k.startsWith(args.path + '/') && !k.slice(args.path.length + 1).split('/').some((x) => x.startsWith('.')));
-            const dirs = new Set<string>();
-            for (const k of keys) {
-              const parts = k.slice(args.path.length + 1).split('/').slice(0, -1);
-              parts.forEach((_, i) => dirs.add(parts.slice(0, i + 1).join('/')));
-            }
-            const org = keys.filter((k) => k.endsWith('.org')).length;
-            const name = args.path.split('/').pop();
-            return { name, path: args.path, shown: args.path.replace(/^\/Users\/[^/]+/, '~'), org, folders: dirs.size, other: keys.length - org, capped: !!w.__big, big: !!w.__big };
-          }
-          // own editor themes (ТЗ 25): files under /config/themes/; the save panel answers from __savePicks
-          if (cmd === 'list_themes') return Object.keys(disk).filter((k) => k.startsWith('/config/themes/')).sort().map((k) => disk[k]);
-          if (cmd === 'write_theme') {
-            disk['/config/themes/' + args.file] = args.text;
-            w.__log.push(['write_theme', args.file]);
-            return;
-          }
-          if (cmd === 'delete_theme') {
-            delete disk['/config/themes/' + args.file];
-            w.__log.push(['delete_theme', args.file]);
-            return;
-          }
-          if (cmd === 'export_bytes') {
-            disk[args.path] = 'base64:' + args.data;
-            return;
-          }
-          if (cmd === 'export_text') {
-            disk[args.path] = args.text;
-            return;
-          }
-          if (cmd === 'import_text') {
-            if (!(args.path in disk)) throw 'нет такого файла';
-            return disk[args.path];
-          }
-          if (cmd === 'plugin:dialog|save') {
-            w.__log.push(['save_panel', args.options]);
-            return (w.__savePicks ?? []).shift() ?? null;
-          }
-          if (cmd === 'plugin:dialog|open') {
-            w.__log.push(['pick', args.options]);
-            return (w.__picks ?? []).shift() ?? null;
-          }
-          if (cmd === 'plugin:window|hide') {
-            w.__log.push(['hide']);
-            return;
-          }
-          if (cmd === 'plugin:window|set_fullscreen') {
-            w.__log.push(['fullscreen', args.value]);
-            return;
-          }
-          if (cmd === 'sample_notes_dir') return null;
-          // the plugins' file types (ТЗ 39): listed and kept as notes
-          const isNote = (p: string) => /\.org(_archive)?$/.test(p) || ((w.__noteTypes ?? []) as string[]).some((t) => p.toLowerCase().endsWith('.' + t));
-          if (cmd === 'set_note_types') {
-            w.__noteTypes = (args.types as string[]).map((t) => t.toLowerCase());
-            return null;
-          }
-          if (cmd === 'list_org_files') {
-            // snapshot first, answer later: like a slow disk read racing with the user's typing
-            if (w.__gone) throw 'unavailable'; // the folder went away while the app runs
-            const r = (root() ?? '/mock') + '/';
-            const snapshot = Object.entries(disk)
-              .filter(([path]) => path.startsWith(r) && isNote(path) && !path.slice(r.length).split('/').some((p) => p.startsWith('.')))
-              .map(([path, text]) => ({ name: path.slice(r.length), path, text, mtime: mtime[path] ?? 0 }));
-            if (listDelay) await new Promise((r) => setTimeout(r, listDelay));
-            return snapshot;
-          }
-          if (cmd === 'save_org_file') {
-            // a test can make a file unwritable: window.__failWrites = ['/mock/work.org']
-            if ((w.__failWrites ?? []).includes(args.path)) throw 'нет прав на запись';
-            if (disk[args.path] !== args.base) {
-              w.__log.push(['conflict', args.path]);
-              throw 'conflict';
-            }
-            // a slow disk when a test says so: window.__saveDelay = 150
-            await new Promise((r) => setTimeout(r, w.__saveDelay ?? 5));
-            disk[args.path] = args.text;
-            w.__log.push(['save', args.path]);
-            emit();
-            return;
-          }
-          if (cmd === 'read_project_config') return disk['/mock/.orgnotes/config.json'] ?? null;
-          // a feature's own settings in the notes folder (roadmap 0.6)
-          // the installed plugins (roadmap 1.2): folders under /config/plugins/<dir>/
-          if (cmd === 'list_plugins') {
-            const dirs = [...new Set(Object.keys(disk).filter((k) => k.startsWith('/config/plugins/')).map((k) => k.split('/')[3]))].sort();
-            return dirs.map((dir) => ({ dir, manifest: disk[`/config/plugins/${dir}/manifest.json`] ?? null, source: disk[`/config/plugins/${dir}/.source.json`] ?? null }));
-          }
-          // where plugins come from (ТЗ 37): a test's fixtures in window.__sources —
-          //   catalog: { plugins, stats }, raw: { 'repo/file': text }, releases: { 'repo@version': { file: text } },
-          //   git: { url: { refs, refsFor?: { ref: files } } } — files of a ref: { 'manifest.json': text, … }
-          if (['catalog_fetch', 'catalog_raw', 'catalog_releases', 'plugin_install_release', 'plugin_cancel', 'plugin_remove', 'git_refs', 'git_probe', 'plugin_install_git', 'plugin_restore', 'plugin_reveal'].includes(cmd)) {
-            const src = w.__sources ?? {};
-            w.__log.push([cmd, args]);
-            const put = (id: string, files: Record<string, string>, source: object) => {
-              for (const k of Object.keys(disk)) if (k.startsWith(`/config/plugins/${id}/`)) delete disk[k];
-              for (const [f, t] of Object.entries(files)) disk[`/config/plugins/${id}/${f}`] = t;
-              disk[`/config/plugins/${id}/.source.json`] = JSON.stringify(source);
-              return files['manifest.json'];
-            };
-            const refFiles = (url: string, ref: string) => {
-              const g = src.git?.[url];
-              if (!g) throw 'Репозиторий не найден или нет доступа: проверьте ссылку, ключ SSH или вход в git на этом Mac';
-              const files = g.refsFor?.[ref];
-              if (!files) throw 'В репозитории нет manifest.json (ни в корне, ни в dist/)';
-              return files as Record<string, string>;
-            };
-            if (cmd === 'catalog_fetch') {
-              if (!src.catalog) throw 'нет связи с GitHub';
-              return { plugins: JSON.stringify(src.catalog.plugins), stats: JSON.stringify(src.catalog.stats ?? {}), fetched: Date.now(), repo: 'Panopticon-Org-Notes/plugins' };
-            }
-            if (cmd === 'catalog_raw') {
-              const t = src.raw?.[`${args.repo}/${args.file}`];
-              if (t === undefined) throw 'не найдено';
-              return t;
-            }
-            if (cmd === 'catalog_releases') return JSON.stringify(src.releaseList?.[args.repo] ?? []);
-            if (cmd === 'plugin_install_release') {
-              const files = src.releases?.[`${args.repo}@${args.version}`];
-              if (!files) throw `нет релиза ${args.version} в ${args.repo}`;
-              return put(args.id, files, { kind: 'catalog', repo: args.repo, version: args.version });
-            }
-            if (cmd === 'plugin_cancel') return null;
-            if (cmd === 'plugin_remove') {
-              // to the Trash: kept under /Trash/<id>/ so «Вернуть» can bring it back (a test empties it by hand)
-              const ks = Object.keys(disk).filter((k) => k.startsWith(`/config/plugins/${args.id}/`));
-              if (!ks.length) throw `нет плагина «${args.id}»`;
-              for (const k of ks) {
-                disk[`/Trash/${args.id}/` + k.slice(`/config/plugins/${args.id}/`.length)] = disk[k];
-                delete disk[k];
-              }
-              return `/Trash/${args.id}`;
-            }
-            if (cmd === 'plugin_restore') {
-              const ks = Object.keys(disk).filter((k) => k.startsWith(args.from + '/'));
-              if (!args.from || !ks.length) throw 'Корзину уже очистили';
-              for (const k of ks) {
-                disk[`/config/plugins/${args.id}/` + k.slice(args.from.length + 1)] = disk[k];
-                delete disk[k];
-              }
-              return null;
-            }
-            if (cmd === 'plugin_reveal') return null;
-            if (cmd === 'git_refs') {
-              if (!src.git?.[args.url]) throw 'Репозиторий не найден или нет доступа: проверьте ссылку, ключ SSH или вход в git на этом Mac';
-              return src.git[args.url].refs;
-            }
-            if (cmd === 'git_probe') {
-              const g = src.git?.[args.url];
-              const refs = g?.refs ?? { head: null, tags: [], branches: [] };
-              const ref = args.ref ?? refs.tags.find(([t]: [string]) => !t.includes('-'))?.[0] ?? refs.head;
-              const files = refFiles(args.url, ref);
-              const track = refs.tags.some(([t]: [string]) => t === ref) ? 'tag' : 'branch';
-              const commit = (track === 'tag' ? refs.tags : refs.branches).find(([t]: [string]) => t === ref)?.[1] ?? '';
-              return { refs, ref, track, commit, manifest: files['manifest.json'], dir: '' };
-            }
-            if (cmd === 'plugin_install_git') {
-              const files = refFiles(args.url, args.ref);
-              const m = JSON.parse(files['manifest.json']);
-              const refs = src.git[args.url].refs;
-              const commit = (args.track === 'tag' ? refs.tags : refs.branches).find(([t]: [string]) => t === args.ref)?.[1] ?? '';
-              return put(m.id, files, { kind: 'git', url: args.url, track: args.track, ref: args.ref, commit, checkUpdates: args.checkUpdates });
-            }
-          }
-          if (cmd === 'read_plugin_file') {
-            if (String(args.file).split('/').includes('..')) throw 'a plugin reads only its own folder';
-            const t = disk[`/config/plugins/${args.dir}/${args.file}`];
-            if (t === undefined) throw 'No such file';
-            return t;
-          }
-          if (cmd === 'open_plugins_folder') return null;
-          // a plugin's net.fetch (roadmap 1.3): Rust checks the manifest; here the answer is the test's
-          if (cmd === 'net_fetch') {
-            w.__log.push(['net', args.plugin, args.method, args.url]);
-            return w.__net ?? { status: 200, headers: [['content-type', 'application/json']], text: '{"ok":true}' };
-          }
-          if (cmd === 'read_feature_file') return disk[(root() ?? '/mock') + '/.orgnotes/plugins/' + args.id + '.json'] ?? null;
-          if (cmd === 'write_feature_file') {
-            disk[(root() ?? '/mock') + '/.orgnotes/plugins/' + args.id + '.json'] = args.text;
-            return;
-          }
-          if (cmd === 'write_project_config') {
-            disk['/mock/.orgnotes/config.json'] = args.text;
-            emit();
-            return;
-          }
-          if (cmd === 'list_folders') {
-            if (listDelay) await new Promise((r) => setTimeout(r, listDelay));
-            const out = new Set<string>(folders);
-            const r = (root() ?? '/mock') + '/';
-            for (const p of Object.keys(disk).filter((k) => k.startsWith(r))) {
-              const parts = p.slice(r.length).split('/').slice(0, -1);
-              if (parts.some((x) => x.startsWith('.'))) continue;
-              parts.forEach((_, i) => out.add(parts.slice(0, i + 1).join('/')));
-            }
-            return [...out];
-          }
-          const badName = (n: string) => !n.trim() || /[/\\:]/.test(n) || n.trim().startsWith('.');
-          const exists = (p: string) => p in disk || folders.has(p.replace('/mock/', '')) || Object.keys(disk).some((k) => k.startsWith(p + '/'));
-          if (cmd === 'create_entry') {
-            if (badName(args.name)) throw 'bad name';
-            // as the app: «.org» added, unless it is there or it is an archive («platform.org_archive»)
-            const n = args.isDir ? args.name.trim() : isNote(args.name.trim()) ? args.name.trim() : args.name.trim() + '.org';
-            const path = args.parent + '/' + n;
-            if (exists(path)) throw 'exists';
-            if (args.isDir) folders.add(path.replace('/mock/', ''));
-            else disk[path] = typeof args.text === 'string' ? args.text : n.endsWith('.org') ? '#+TITLE: ' + n.replace(/\.org$/, '') + '\n\n' : '';
-            emit();
-            return path;
-          }
-          const relocate = (from: string, to: string) => {
-            if (from in disk) {
-              disk[to] = disk[from];
-              delete disk[from];
-            }
-            for (const k of Object.keys(disk)) {
-              if (k.startsWith(from + '/')) {
-                disk[to + k.slice(from.length)] = disk[k];
-                delete disk[k];
-              }
-            }
-            const rel = from.replace('/mock/', '');
-            const nrel = to.replace('/mock/', '');
-            for (const f of [...folders]) {
-              if (f === rel || f.startsWith(rel + '/')) {
-                folders.delete(f);
-                folders.add(nrel + f.slice(rel.length));
-              }
-            }
-          };
-          if (cmd === 'rename_entry') {
-            if (badName(args.newName)) throw 'bad name';
-            const isFile = args.path in disk;
-            const n = isFile ? (isNote(args.newName.trim()) ? args.newName.trim() : args.newName.trim().replace(/(\.org)?$/, '.org')) : args.newName.trim();
-            const to = args.path.slice(0, args.path.lastIndexOf('/')) + '/' + n;
-            if (to !== args.path && exists(to)) throw 'exists';
-            relocate(args.path, to);
-            emit();
-            return to;
-          }
-          if (cmd === 'move_entry') {
-            if (args.dest === args.path || args.dest.startsWith(args.path + '/')) throw 'cannot move into itself';
-            const to = args.dest + '/' + args.path.slice(args.path.lastIndexOf('/') + 1);
-            if (exists(to)) throw 'exists';
-            relocate(args.path, to);
-            emit();
-            return to;
-          }
-          if (cmd === 'save_new_file') {
-            if (badName(args.name)) throw 'bad name';
-            if (args.name.trim() === 'fail') throw 'disk full';
-            const n = /\.org$/i.test(args.name.trim()) ? args.name.trim() : args.name.trim() + '.org';
-            const path = args.parent + '/' + n;
-            if (path in disk && !args.overwrite) throw 'exists';
-            disk[path] = args.text;
-            w.__log.push(['save_new', path]);
-            emit();
-            return path;
-          }
-          if (cmd === 'quit_app') {
-            w.__log.push(['quit']);
-            return;
-          }
-          if (cmd === 'trash_entry') {
-            for (const k of Object.keys(disk)) if (k === args.path || k.startsWith(args.path + '/')) delete disk[k];
-            folders.delete(args.path.replace('/mock/', ''));
-            w.__log.push(['trash', args.path]);
-            emit();
-            return;
-          }
-          if (cmd === 'plugin:window|get_all_windows') return (w.__windows as string[]) ?? ['main'];
-          if (cmd === 'plugin:webview|create_webview_window') {
-            w.__log.push(['window', args.options]);
-            (w.__windows ??= ['main']).push(args.options.label);
-            return;
-          }
-          if (cmd === 'plugin:event|emit_to' || cmd === 'plugin:event|emit') {
-            w.__log.push(['emit', args.target?.label ?? args.target ?? null, args.event, args.payload]);
-            return null;
-          }
+          const h = handlers[cmd];
+          if (h) return h(args ?? {});
           if (cmd.startsWith('plugin:event|')) return null;
           // the mini window (ТЗ 31): its native panel is Rust's and Swift's; here only what the page asks
-          if (cmd === 'set_mini_shortcut' || cmd.startsWith('mini_')) {
+          if (cmd.startsWith('mini_')) {
             w.__log.push([cmd, args ?? null]);
             return null;
-          }
-          if (cmd === 'set_capture_shortcut') {
-            if (w.__shortcutTaken === args.accelerator) throw 'HotKey already registered';
-            w.__log.push(['shortcut', args.accelerator, args.global]);
-            return null;
-          }
-          if (cmd === 'show_main_window') return null;
-          if (cmd === 'clipboard_text') return (window as any).__clipText ?? ''; // the test sets what the clipboard holds
-          if (cmd === 'plugin:opener|open_url') {
-            w.__log.push(['open_url', args.url]);
-            return;
-          }
-          if (cmd === 'plugin:opener|reveal_item_in_dir') {
-            w.__log.push(['reveal', args.paths]);
-            return;
           }
           throw new Error('unmocked invoke: ' + cmd);
         },

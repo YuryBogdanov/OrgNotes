@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { settingsSheet as sheet } from './helpers';
 
 // Roadmap 2.3: the template of a plugin (templates/plugin) is built as its README says, put into the folder of
 // plugins and works — TypeScript and Svelte bundled into one main.js, a command, a section, a setting.
@@ -14,7 +15,6 @@ test.beforeAll(() => {
   manifest = readFileSync('templates/plugin/dist/manifest.json', 'utf8');
 });
 
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Настройки' });
 
 test('the built template comes in, is let in and works: its command, its section on Svelte, its setting', async ({ page }) => {
   expect(main).not.toMatch(/^import /m); // one module, nothing to import at run time

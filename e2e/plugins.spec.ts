@@ -1,14 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
+import { diskAll as disk, toast } from './helpers';
 
 // ТЗ 26, roadmap 1.1: the example plugin «Привет» — built only on the API — adds a command with its keys, a section
 // of the navigator, a kind of tab and a section of the settings; its edit is one step of ⌘Z. Off by default.
 
 const WORK = '/mock/Work.org';
 const FILES = { [WORK]: '* TODO Подготовить бюджет\n* TODO Позвонить\n* DONE Старое\n', '/mock/Дом.org': '* Покупки\n' };
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
 const modes = (page: Page) => page.getByRole('tablist', { name: 'Режимы навигатора' });
-const toast = (page: Page) => page.locator('.toast');
 
 async function open(page: Page, on: boolean) {
   await page.setViewportSize({ width: 1440, height: 900 });

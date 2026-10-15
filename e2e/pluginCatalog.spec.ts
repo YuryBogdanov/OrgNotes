@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
+import { settingsSheet as sheet } from './helpers';
 
 // ТЗ 37, PR B: the catalog in «Настройки → Плагины» — its list (the state of each plugin's button), the search, the
 // categories, the order; installing (rights, size, on at once), a plugin's page; no network. GitHub is the mock's.
@@ -36,7 +37,6 @@ const installed = (id: string, name: string, v: string) => ({
   [`/config/plugins/${id}/.source.json`]: JSON.stringify({ kind: 'catalog', repo: `o/${id}`, version: v }),
 });
 
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Настройки' });
 const card = (page: Page, name: string) => sheet(page).getByRole('group', { name, exact: true });
 async function open(page: Page, sources: object = SOURCES) {
   await page.setViewportSize({ width: 1440, height: 900 });

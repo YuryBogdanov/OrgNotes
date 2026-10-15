@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { log } from './helpers';
 
 // Full screen: macOS's own traffic lights are hidden (Rust); while the menu bar is shown the window moves down by it
 // and the toolbar shows its own lights, the navigator button moving right to make room; otherwise it moves left.
@@ -9,7 +10,6 @@ const top = async (page: Page) => Math.round((await navBtn(page).boundingBox())!
 const lights = (page: Page) => page.getByRole('group', { name: 'Кнопки окна' });
 const titlebar = (page: Page, fullscreen: boolean, shown: boolean, menu = 0) =>
   page.evaluate(([fullscreen, lights, menu]) => (window as any).__emitEvent('titlebar', { fullscreen, lights, menu }), [fullscreen, shown, menu] as const);
-const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 
 test('full screen: the navigator button moves left while the lights are hidden; with the menu bar our own lights come and the toolbar grows by it', async ({ page }) => {
   await installTauriMock(page, { '/mock/a.org': '* A\n' });

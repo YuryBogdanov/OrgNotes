@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock, pluginsReady } from './tauriMock';
+import { openApp } from './helpers';
 
 // API 1.9 (ТЗ 39, PR A): a plugin's item in the menu of a heading (the editor's, the navigator's), a file's view on
 // one branch in a tab of its own («work.org › Платформа»), the heading the user is at.
@@ -33,17 +33,11 @@ const MAIN = `export default { activate(ctx) {
 const WORK = ['* Платформа', '** Переезд в ДЦ', '** SLA', '* Найм', ''].join('\n');
 
 async function open(page: Page, navHeadings = false) {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.addInitScript((nav) => {
-    localStorage.setItem('plugins:updatesChecked', String(Date.now()));
-    if (nav) localStorage.setItem('nav:headings', '1');
-    localStorage.setItem('plugins:enabled', JSON.stringify({ probe: true }));
-    localStorage.setItem('plugins:trusted', JSON.stringify({ probe: JSON.stringify([['index.read'], []]) }));
-  }, navHeadings);
-  await installTauriMock(page, { [PROBE + '/manifest.json']: MANIFEST, [PROBE + '/main.js']: MAIN, '/mock/work.org': WORK });
-  await page.goto('/');
-  await pluginsReady(page);
-  await expect(page.locator('.cm-content')).toBeVisible();
+  await openApp(page, {
+    files: { [PROBE + '/manifest.json']: MANIFEST, [PROBE + '/main.js']: MAIN, '/mock/work.org': WORK },
+    plugins: { probe: ['index.read'] },
+    local: navHeadings ? { 'nav:headings': '1' } : {},
+  });
 }
 const menu = (page: Page) => page.getByRole('menu');
 

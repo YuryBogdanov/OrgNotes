@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { diskAll as disk, log } from './helpers';
 
 const FILES = () => ({
   '/mock/Index.org': '#+TITLE: Index\n\n* Ссылки\nСм. [[file:Weekly.org::*Первая][неделя]] и [[file:Other.org]].\n',
@@ -8,8 +9,6 @@ const FILES = () => ({
   '/mock/Team/lead.org': '* Тимлид\nсм. [[file:../Weekly.org]]\n',
 });
 
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
-const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 const open = async (page: Page, files: Record<string, string> = FILES()) => {
   await installTauriMock(page, files);
   await page.goto('/');

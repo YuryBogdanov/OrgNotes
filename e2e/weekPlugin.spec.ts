@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { installTauriMock, pluginsReady } from './tauriMock';
+import { diskFile as disk } from './helpers';
 
 // ТЗ 36: the plugin «Неделя» — an outside plugin (its own repository, panopticon-week next to this one), installed
 // from the app's folder of plugins as a user would. Skipped when it is not built there.
@@ -31,7 +32,6 @@ async function open(page: Page, files: Record<string, string> = {}, at?: string)
   await page.goto('/');
   await pluginsReady(page);
 }
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string | undefined, p);
 const today = (page: Page) => page.getByRole('region', { name: 'Сегодня', exact: true });
 
 test('no plan: «Спланировать» on «Сегодня»; the plan writes weeks.org — the week, its goals, one a task; the block shows them', async ({ page }) => {

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, expandTree } from './tauriMock';
+import { log } from './helpers';
 
 // ТЗ «Перенос заголовка в другой файл (файл → заголовок)».
 const W = '/mock/work.org';
@@ -36,7 +37,6 @@ const FILES = () => ({
 });
 
 const disk = (page: Page, p: string) => page.evaluate((p) => (window as any).__disk[p] as string, p);
-const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 const dlg = (page: Page) => page.getByRole('dialog', { name: /^Перенести/ });
 const field = (page: Page) => dlg(page).getByRole('combobox');
 const fileTitles = (page: Page) => dlg(page).locator('.row .t').allInnerTexts();

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { palette as pal } from './helpers';
 
 // ТЗ 35, part B: the palette «Ссылка на» (⌃C ⌃L, ⌥⌘K), the editor's context menu, the tooltip over a link.
 
@@ -60,7 +61,6 @@ const paste = (page: Page, text: string) =>
     document.querySelector('.cm-content')!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
   }, text);
 
-const pal = (page: Page) => page.getByRole('dialog', { name: 'Командная палитра' });
 const menu = (page: Page) => page.locator('.menu').first();
 const chord = async (page: Page, second: string) => {
   await page.keyboard.press('Control+c');

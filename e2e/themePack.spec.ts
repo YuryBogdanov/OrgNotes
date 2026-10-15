@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { settingsSheet as sheet } from './helpers';
 
 // Roadmap 1.4: the Emacs themes are a plugin of data («Темы из Emacs», JSON only). Off: its themes leave the choice,
 // a chosen one gives way to Panopticon; on: back. A chosen plugin's theme shows from the start (cached).
 
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Настройки' });
 const bg = (page: Page) => page.evaluate(() => getComputedStyle(document.querySelector('.cm-editor')!).backgroundColor);
 
 async function open(page: Page) {

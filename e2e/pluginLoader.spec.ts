@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
+import { settingsSheet as sheet, toast } from './helpers';
 
 // ТЗ 26 §4, §7 (roadmap 1.2): installed plugins from the app's folder of plugins — listed off, turned on and off at
 // once, a broken or incompatible one says why and leaves the others working; «Перезагрузить плагины»; a tab of a
@@ -12,8 +13,6 @@ const manifest = (o: object = {}) => JSON.stringify({
 });
 const MAIN = "export default { activate(ctx) { ctx.commands.on('jira.ping', async () => ctx.ui.notify('Jira: на связи, задач ' + (await ctx.index.query({ conds: [{ field: 'done', op: 'no' }] })).length)); } };";
 const FILES = { '/mock/Work.org': '* TODO Бюджет\n* TODO Отчёт\n' };
-const toast = (page: Page) => page.locator('.toast');
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Настройки' });
 const card = (page: Page, name: string) => sheet(page).getByRole('group', { name });
 
 // a plugin let in with these rights (as the sheet «Включить плагин» does)

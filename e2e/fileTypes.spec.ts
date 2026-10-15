@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock, pluginsReady } from './tauriMock';
+import { diskFile as disk, openApp } from './helpers';
 
 // API 1.10 (ТЗ 39, PR B): a plugin's own file type — listed in the navigator with its icon, opened in its view (never
 // the Org editor), made from a folder's menu with its template, renamed with its extension, written and taken back
@@ -43,18 +43,12 @@ const MAIN = `export default { activate(ctx) {
 const WORK = ['* Платформа', '** Переезд', 'Текст про items.', ''].join('\n');
 
 async function open(page: Page) {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.addInitScript(() => {
-    localStorage.setItem('plugins:updatesChecked', String(Date.now()));
-    localStorage.setItem('plugins:enabled', JSON.stringify({ probe: true }));
-    localStorage.setItem('plugins:trusted', JSON.stringify({ probe: JSON.stringify([['files.edit', 'index.read'], []]) }));
-    localStorage.setItem('nav:headings', '1');
+  await openApp(page, {
+    files: { [PROBE + '/manifest.json']: MANIFEST, [PROBE + '/main.js']: MAIN, '/mock/work.org': WORK, '/mock/plan.sketch': '{"items":[]}\n' },
+    plugins: { probe: ['files.edit', 'index.read'] },
+    local: { 'nav:headings': '1' },
   });
-  await installTauriMock(page, { [PROBE + '/manifest.json']: MANIFEST, [PROBE + '/main.js']: MAIN, '/mock/work.org': WORK, '/mock/plan.sketch': '{"items":[]}\n' });
-  await page.goto('/');
-  await pluginsReady(page);
 }
-const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string | undefined, p);
 const tree = (page: Page, name: string | RegExp) => page.getByRole('treeitem', { name });
 
 test('a plugin\'s file: in the navigator with its icon and without its extension; opened in the plugin\'s view; written and taken back', async ({ page }) => {

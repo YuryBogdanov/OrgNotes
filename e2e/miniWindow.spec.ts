@@ -1,12 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { log } from './helpers';
 
 // ТЗ 31: the mini window from the main window — ⌃⌥⌘M registered, ⇧⌘M opens the heading the caret is in, the main
 // window answers the mini window (its files) and takes its edits. The native panel is checked by hand on the app.
 
 const W = '/mock/Work.org';
 const TEXT = '* Созвон\n** Что показали\n- миграция\n* Другое\n';
-const log = (page: Page) => page.evaluate(() => (window as any).__log as unknown[][]);
 const disk = (page: Page) => page.evaluate((p) => (window as any).__disk[p] as string, W);
 
 async function open(page: Page) {

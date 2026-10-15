@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock } from './tauriMock';
+import { diskAll as disk } from './helpers';
 
 const CONFIG = JSON.stringify({
   version: 1,
@@ -15,7 +16,6 @@ const NOTES = {
   '/mock/.orgnotes/config.json': CONFIG,
 };
 
-const disk = (page: Page) => page.evaluate(() => (window as any).__disk as Record<string, string>);
 const open = async (page: Page, files: Record<string, string> = NOTES) => {
   await installTauriMock(page, files);
   await page.goto('/');
