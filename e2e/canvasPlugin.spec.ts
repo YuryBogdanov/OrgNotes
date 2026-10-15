@@ -32,7 +32,8 @@ async function open(page: Page, files: Record<string, string> = {}) {
   await page.addInitScript(() => {
     localStorage.setItem('plugins:updatesChecked', String(Date.now()));
     localStorage.setItem('plugins:enabled', JSON.stringify({ canvas: true }));
-    localStorage.setItem('plugins:trusted', JSON.stringify({ canvas: JSON.stringify([['files.edit', 'index.read'], []]) }));
+    localStorage.setItem('plugins:trusted', JSON.stringify({ canvas: JSON.stringify([['clipboard', 'files.edit', 'index.read'], []]) }));
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t: string) => ((window as any).__clip = t) }, configurable: true });
   });
   await installTauriMock(page, {
     '/mock/plan.org': PLAN,
@@ -330,4 +331,78 @@ test('«Новый холст» in a folder\'s menu: an empty JSON Canvas file; 
   await page.getByRole('dialog').getByRole('button', { name: 'Создать' }).click();
   await expect(page.locator('.tab.on')).toContainText('Ретро');
   await expect.poll(() => page.evaluate(() => (window as any).__disk['/mock/Ретро.canvas'])).toBe('{\n  "nodes": [],\n  "edges": []\n}\n');
+});
+
+// ---- part C: export, «Разложить на холсте» ----
+const savePick = (page: Page, ...paths: string[]) => page.evaluate((p) => ((window as any).__savePicks = p), paths);
+const disk = (page: Page, p: string) => page.evaluate((x) => (window as any).__disk[x] as string | undefined, p);
+
+test('«Экспорт ▾» of a mindmap: the menu; a .excalidraw file — rectangles with their text, lines without heads; SVG', async ({ page }) => {
+  await open(page);
+  await showMap(page);
+  await map(page).getByRole('button', { name: 'Экспорт ▾' }).click();
+  await expect(page.getByRole('menuitem')).toHaveText([/Excalidraw — файл \.excalidraw…/, /Копировать для Excalidraw/, 'PNG…', 'SVG…']);
+  await savePick(page, '/out/План 2027.excalidraw');
+  await page.getByRole('menuitem', { name: /Excalidraw — файл/ }).click();
+  await expect.poll(() => disk(page, '/out/План 2027.excalidraw')).toBeTruthy();
+  const x = JSON.parse((await disk(page, '/out/План 2027.excalidraw'))!);
+  expect(x).toMatchObject({ type: 'excalidraw', version: 2, source: 'panopticon', files: {} });
+  const rects = x.elements.filter((e: any) => e.type === 'rectangle');
+  const texts = x.elements.filter((e: any) => e.type === 'text');
+  const lines = x.elements.filter((e: any) => e.type === 'arrow');
+  expect(rects.length).toBe(10); // the root and the nine headings shown (three levels open: «Сценарий» folded)
+  expect(texts.map((t: any) => t.text)).toContain('План 2027');
+  expect(texts.find((t: any) => t.text === 'DOING Новый ДЦ').containerId).toBe(rects.find((r: any) => r.boundElements.some((b: any) => b.type === 'text' && texts.find((t: any) => t.id === b.id)?.text === 'DOING Новый ДЦ')).id);
+  expect(lines.length).toBe(9);
+  expect(lines.every((l: any) => l.endArrowhead === null && l.startBinding && l.endBinding)).toBe(true);
+  expect(await page.evaluate(() => (window as any).__log.find((l: any) => l[0] === 'save_panel')[1])).toMatchObject({ defaultPath: 'План 2027.excalidraw', filters: [{ name: 'Excalidraw', extensions: ['excalidraw'] }] });
+  // SVG: everything is visible, no question
+  await savePick(page, '/out/plan.svg');
+  await map(page).getByRole('button', { name: 'Экспорт ▾' }).click();
+  await page.getByRole('menuitem', { name: 'SVG…' }).click();
+  await expect.poll(() => disk(page, '/out/plan.svg')).toMatch(/^<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/);
+  expect(await disk(page, '/out/plan.svg')).toContain('>План 2027</text>');
+});
+
+test('a canvas: «Копировать для Excalidraw» — its clipboard with frames and bound arrows; PNG; «Показать файл .canvas в Finder»', async ({ page }) => {
+  await openBoard(page);
+  await board(page).getByRole('button', { name: 'Экспорт ▾' }).click();
+  await expect(page.getByRole('menuitem')).toHaveText([/Excalidraw — файл/, /Копировать для Excalidraw/, 'PNG…', 'SVG…', /Показать файл \.canvas в Finder/]);
+  await page.getByRole('menuitem', { name: /Копировать для Excalidraw/ }).click();
+  await expect(page.locator('.toast')).toContainText('Скопировано для Excalidraw');
+  const c = JSON.parse(await page.evaluate(() => (window as any).__clip));
+  expect(c.type).toBe('excalidraw/clipboard');
+  const frame = c.elements.find((e: any) => e.type === 'frame');
+  expect(frame.name).toBe('Переключение');
+  const note = c.elements.find((e: any) => e.type === 'text' && e.text === 'Окно — после QBR');
+  const noteBox = c.elements.find((e: any) => e.id === note.containerId);
+  expect(noteBox.frameId).toBe(frame.id);
+  const arrow = c.elements.find((e: any) => e.type === 'arrow');
+  expect(arrow).toMatchObject({ endArrowhead: 'arrow', startBinding: { elementId: noteBox.id } });
+  expect(c.elements.find((e: any) => e.type === 'text' && e.containerId === arrow.id).text).toBe('зачем');
+  const card = c.elements.find((e: any) => e.type === 'text' && e.text.startsWith('plan.org'));
+  expect(card.text).toContain('DOING Новый ДЦ');
+  // PNG: bytes in base64, the PNG's signature
+  await savePick(page, '/out/board.png');
+  await board(page).getByRole('button', { name: 'Экспорт ▾' }).click();
+  await page.getByRole('menuitem', { name: 'PNG…' }).click();
+  await expect.poll(() => disk(page, '/out/board.png'), { timeout: 10000 }).toMatch(/^base64:iVBORw0KGgo/);
+  await board(page).getByRole('button', { name: 'Экспорт ▾' }).click();
+  await page.getByRole('menuitem', { name: /Показать файл \.canvas в Finder/ }).click();
+  await expect.poll(() => page.evaluate(() => JSON.stringify((window as any).__log.filter((l: any) => l[0] === 'reveal')))).toContain('board.canvas');
+});
+
+test('«Разложить на холсте…» from a heading\'s menu: a new canvas named as it, its children as cards with arrows and :ID:', async ({ page }) => {
+  await open(page);
+  await page.locator('.cm-line', { hasText: '* Платформа' }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Разложить на холсте…' }).click();
+  await page.getByRole('option', { name: /Новый холст «Платформа»/ }).click();
+  await expect(board(page)).toBeVisible();
+  await expect(page.locator('.tab.on')).toContainText('Платформа');
+  const j = await json(page, '/mock/Платформа.canvas');
+  expect(j.nodes.map((n: any) => n.subpath)).toEqual(['#Платформа', '#Новый ДЦ', '#Учения', '#Алерты v2']); // two levels
+  expect(j.edges.length).toBe(3);
+  expect(j.nodes.every((n: any) => /^[0-9a-f-]{36}$/.test(n.orgId))).toBe(true);
+  await expect(cardOf(page, 'Учения')).toBeVisible();
+  expect(await text(page)).toMatch(/\* Платформа\n:PROPERTIES:\n:ID: +[0-9a-f-]{36}\n:END:\n/);
 });

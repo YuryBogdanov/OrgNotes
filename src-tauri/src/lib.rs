@@ -709,6 +709,10 @@ mod tests {
         assert_eq!(*NOTE_TYPES.lock().unwrap(), vec!["canvas".to_string()]);
         assert_eq!(with_org("b.canvas".into()), "b.canvas");
         set_note_types(vec![]);
+        // base64 of a plugin's export
+        assert_eq!(from_base64("iVBORw0KGgo=").unwrap(), vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]);
+        assert_eq!(from_base64("TWE=").unwrap(), b"Ma".to_vec());
+        assert!(from_base64("a*b").is_err());
         assert_eq!((with_org("a".into()), with_org("a.org".into()), with_org("a.org_archive".into())), ("a.org".into(), "a.org".into(), "a.org_archive".into()));
         let _ = fs::remove_dir_all(&d);
     }
@@ -1268,6 +1272,36 @@ fn export_text(path: String, text: String) -> Result<(), String> {
     fs::write(path, text).map_err(|e| e.to_string())
 }
 
+/// A plugin's export (ТЗ 39: PNG of a canvas): bytes in base64 where the system save panel says.
+#[tauri::command]
+fn export_bytes(path: String, data: String) -> Result<(), String> {
+    fs::write(path, from_base64(&data)?).map_err(|e| e.to_string())
+}
+
+fn from_base64(s: &str) -> Result<Vec<u8>, String> {
+    let val = |c: u8| -> Option<u32> {
+        Some(match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => return None,
+        } as u32)
+    };
+    let clean: Vec<u8> = s.bytes().filter(|c| !c.is_ascii_whitespace() && *c != b'=').collect();
+    let mut out = Vec::with_capacity(clean.len() * 3 / 4);
+    for chunk in clean.chunks(4) {
+        let mut n = 0u32;
+        for (i, &c) in chunk.iter().enumerate() {
+            n |= val(c).ok_or("not base64")? << (18 - 6 * i);
+        }
+        let bytes = [(n >> 16) as u8, (n >> 8) as u8, n as u8];
+        out.extend_from_slice(&bytes[..chunk.len().saturating_sub(1)]);
+    }
+    Ok(out)
+}
+
 /// «Импорт…»: the path comes from the system open panel; a theme is small, anything big is refused.
 #[tauri::command]
 fn import_text(path: String) -> Result<String, String> {
@@ -1642,6 +1676,7 @@ pub fn run() {
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             set_note_types,
+            export_bytes,
             plugin_sources::catalog_fetch,
             plugin_sources::catalog_raw,
             plugin_sources::catalog_releases,
