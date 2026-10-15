@@ -40,7 +40,7 @@ import { listen } from './events.svelte';
 import { clone, watch } from './watch.svelte';
 import { clipboardApi, editApi, filesApi, indexApi, netApi } from './ctxData';
 import { put, schemaOf, settingsValues, whole, type Dynamic } from './pluginSettings';
-import { invoke, isTauri } from '../tauri';
+import { invoke, isTauri, pickSave } from '../tauri';
 export { RIGHTS, rightsText };
 
 /** The data files of the built-in plugins (their themes), as text. */
@@ -759,9 +759,8 @@ class Host {
           L.active = pi;
         },
         saveFile: async (o) => {
-          const { save } = await import('@tauri-apps/plugin-dialog');
           const name = String(o?.name ?? 'export').replace(/[/\\:]/g, '-');
-          const path = await save({ title: o.title ?? 'Сохранить как', defaultPath: name, ...(o.filter ? { filters: [{ name: String(o.filter.name), extensions: o.filter.extensions.map(String) }] } : {}) });
+          const path = await pickSave(o.title ?? 'Сохранить как', name, o.filter ? { name: String(o.filter.name), extensions: o.filter.extensions.map(String) } : undefined);
           if (!path) return null;
           if (typeof o.base64 === 'string') await invoke('export_bytes', { path, data: o.base64 });
           else await invoke('export_text', { path, text: String(o.text ?? '') });

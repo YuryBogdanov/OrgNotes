@@ -5,7 +5,7 @@
 import { cachedTheme, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
 import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
 import { notify } from './notify.svelte';
-import { invoke, isTauri } from './tauri';
+import { invoke, isTauri, pickOpen, pickSave } from './tauri';
 
 
 class Themes {
@@ -121,8 +121,7 @@ class Themes {
   /** «Экспорт…»: the theme's file where the system save panel says. */
   async exportTheme(t: Theme) {
     if (!isTauri) return;
-    const { save } = await import('@tauri-apps/plugin-dialog');
-    const path = await save({ title: 'Экспорт темы', defaultPath: themeFile(t.name), filters: [{ name: 'Тема Panopticon', extensions: ['json'] }] });
+    const path = await pickSave('Экспорт темы', themeFile(t.name), { name: 'Тема Panopticon', extensions: ['json'] });
     if (!path) return;
     try {
       await invoke('export_text', { path, text: themeJson({ ...t, builtin: false }) });
@@ -134,9 +133,8 @@ class Themes {
   /** «Импорт…»: a theme file of this format becomes an own theme (a taken name gets «(2)»). */
   async importTheme() {
     if (!isTauri) return;
-    const { open } = await import('@tauri-apps/plugin-dialog');
-    const path = await open({ title: 'Импорт темы', multiple: false, directory: false, filters: [{ name: 'Тема Panopticon', extensions: ['json'] }] });
-    if (typeof path !== 'string') return;
+    const path = await pickOpen('Импорт темы', { name: 'Тема Panopticon', extensions: ['json'] });
+    if (!path) return;
     let t: Theme | null = null;
     try {
       t = parseTheme(await invoke<string>('import_text', { path }));

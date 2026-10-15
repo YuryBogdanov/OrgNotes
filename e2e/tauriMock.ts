@@ -248,6 +248,9 @@ export async function installTauriMock(page: Page, files: Record<string, string>
         // the system's panels and exports: the save panel answers from __savePicks, the open panel from __picks
         'plugin:dialog|save': (a) => (w.__log.push(['save_panel', a.options]), (w.__savePicks ?? []).shift() ?? null),
         'plugin:dialog|open': (a) => (w.__log.push(['pick', a.options]), (w.__picks ?? []).shift() ?? null),
+        // the panels Rust shows for an export or an import (tech sprint 5.1): logged as the plugin's were
+        pick_save: (a) => (w.__log.push(['save_panel', { title: a.title, defaultPath: a.defaultName, ...(a.filter ? { filters: [a.filter] } : {}) }]), (w.__savePicks ?? []).shift() ?? null),
+        pick_open: (a) => (w.__log.push(['pick', { title: a.title, ...(a.filter ? { filters: [a.filter] } : {}) }]), (w.__picks ?? []).shift() ?? null),
         export_bytes: (a) => {
           disk[a.path] = 'base64:' + a.data;
         },
