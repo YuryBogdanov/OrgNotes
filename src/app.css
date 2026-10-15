@@ -194,3 +194,17 @@ button { cursor: default; }
 .btn:disabled { opacity: 0.5; }
 .btn.pri { border: 0; background: var(--acc); color: var(--onacc); font-weight: 600; }
 .btn.danger { border: 0; background: var(--danger); color: var(--on-danger); font-weight: 600; }
+
+/* A page of the settings sheet (tech sprint 4.2: one copy for the pages of Settings.svelte): a column of groups — a
+   caption, the options in boxes, a help line. SchemaSettings keeps its own: its embedded groups have no page around. */
+.spage { flex: 1; min-width: 0; max-width: 760px; overflow: auto; padding: 18px 22px 24px; display: flex; flex-direction: column; gap: 14px; }
+.spage > * { flex-shrink: 0; }
+.spage .cap { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--fg2); padding: 0 6px 6px; }
+.spage .help { font-size: 12px; line-height: 1.5; color: var(--fg2); padding: 10px 6px; }
+.spage .opts { display: flex; flex-direction: column; gap: 6px; }
+.spage .sel { height: 26px; max-width: 260px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 0 6px; font-size: 12.5px; }
+.spage .val { font-size: 12.5px; color: var(--fg2); }
+.spage .ibfile { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.spage .ibfile .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spage .opt { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; background: var(--side); border: 1px solid var(--line); border-radius: 8px; }
+.spage .opt label { font-size: 13px; }
