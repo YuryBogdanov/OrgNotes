@@ -2516,7 +2516,7 @@ dependencies = [
 
 [[package]]
 name = "org-prototype"
-version = "1.10.0"
+version = "1.10.1"
 dependencies = [
  "muda",
  "notify-debouncer-mini",
