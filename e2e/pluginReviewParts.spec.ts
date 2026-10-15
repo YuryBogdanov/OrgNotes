@@ -42,6 +42,10 @@ test('the card\'s header, quick buttons and panel are the plugin\'s; a note on �
   await page.keyboard.press('Meta+Enter');
   await expect.poll(async () => (await disk(page))[WORK]).toBe('* TODO Подготовить бюджет\n- бюджет согласован\n* TODO Позвонить\n');
   await expect(note).toHaveValue(''); // the panel drawn again
+  // the file read back after its save does not draw the panel again: a note being typed keeps the focus
+  await note.evaluate((e) => (e.dataset.mark = '1'));
+  await page.waitForTimeout(1500);
+  await expect(card.locator('.hello-aside textarea[data-mark]')).toHaveCount(1);
   // a note typed and the card changed: saved first
   await note.click();
   await page.keyboard.type('позвонить в пятницу');
