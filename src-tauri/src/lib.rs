@@ -15,6 +15,28 @@ use notify_debouncer_mini::{
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+/// A lock that a panic elsewhere (a poisoned mutex) does not take down with it: what it guards is plain data, still
+/// good to read (tech sprint 5.1).
+fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Write a file whole or not at all: `data` into `tmp` beside the target, synced to the disk, then renamed over it.
+/// A crash or a full disk leaves the old file (tech sprint 5.1: one copy of what five commands did).
+fn atomic_write(tmp: &Path, target: &Path, data: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+    let write = || -> std::io::Result<()> {
+        let mut f = fs::File::create(tmp)?;
+        f.write_all(data)?;
+        f.sync_all()
+    };
+    if let Err(e) = write() {
+        let _ = fs::remove_file(tmp);
+        return Err(e.to_string());
+    }
+    fs::rename(tmp, target).map_err(|e| e.to_string())
+}
+
 /// Per-project settings live with the notes: `<notes folder>/.orgnotes/config.json`.
 const CONFIG_DIR: &str = ".orgnotes";
 const CONFIG_FILE: &str = "config.json";
@@ -128,7 +150,7 @@ mod titlebar {
         if content.is_null() {
             return;
         }
-        let mut hidden = HIDDEN.lock().unwrap();
+        let mut hidden = super::lock(&HIDDEN);
         let mut stack = vec![content];
         while let Some(v) = stack.pop() {
             if keep.contains(&v) {
@@ -156,7 +178,7 @@ mod titlebar {
 
     /// Back from full screen: the buttons and the title bar's views go home to the window, as they were.
     unsafe fn restore() {
-        let mut hidden = HIDDEN.lock().unwrap();
+        let mut hidden = super::lock(&HIDDEN);
         for (v, was) in hidden.0.drain(..) {
             let _: () = msg_send![&*v, setHidden: was];
         }
@@ -329,16 +351,13 @@ fn watch(app: &AppHandle, dir: &Path) -> Option<Debouncer<RecommendedWatcher>> {
 }
 
 fn activate(app: &AppHandle, state: &AppState, dir: PathBuf) {
-    *state.watcher.lock().unwrap() = watch(app, &dir);
-    *state.dir.lock().unwrap() = Some(dir);
+    *lock(&state.watcher) = watch(app, &dir);
+    *lock(&state.dir) = Some(dir);
 }
 
 #[tauri::command]
 fn get_notes_dir(state: State<AppState>) -> Option<String> {
-    state
-        .dir
-        .lock()
-        .unwrap()
+    lock(&state.dir)
         .as_ref()
         .map(|p| p.to_string_lossy().to_string())
 }
@@ -355,8 +374,8 @@ struct DirStatus {
 #[tauri::command]
 fn notes_dir_status(state: State<AppState>) -> DirStatus {
     DirStatus {
-        dir: state.dir.lock().unwrap().as_ref().map(|p| p.to_string_lossy().to_string()),
-        missing: state.missing.lock().unwrap().clone(),
+        dir: lock(&state.dir).as_ref().map(|p| p.to_string_lossy().to_string()),
+        missing: lock(&state.missing).clone(),
     }
 }
 
@@ -381,7 +400,7 @@ fn remember(app: &AppHandle, path: &str) {
 #[tauri::command]
 fn retry_notes_dir(app: AppHandle, state: State<AppState>) -> Option<String> {
     let dir = remembered_dir(&app)?;
-    *state.missing.lock().unwrap() = None;
+    *lock(&state.missing) = None;
     activate(&app, &state, dir.clone());
     Some(dir.to_string_lossy().to_string())
 }
@@ -393,7 +412,7 @@ fn set_notes_dir(app: AppHandle, state: State<AppState>, path: String) -> Result
         return Err("not a directory".into());
     }
     activate(&app, &state, dir);
-    *state.missing.lock().unwrap() = None;
+    *lock(&state.missing) = None;
     remember(&app, &path);
     Ok(())
 }
@@ -483,7 +502,7 @@ fn sample_notes_dir() -> Option<String> {
 
 #[tauri::command]
 fn list_org_files(state: State<AppState>) -> Result<Vec<OrgFile>, String> {
-    let Some(root) = state.dir.lock().unwrap().clone() else {
+    let Some(root) = lock(&state.dir).clone() else {
         return Ok(Vec::new());
     };
     // the folder went away while the app runs (deleted, unmounted): say so, the open tabs keep their text
@@ -500,7 +519,7 @@ fn list_org_files(state: State<AppState>) -> Result<Vec<OrgFile>, String> {
 fn is_org(p: &Path) -> bool {
     match p.extension().and_then(|x| x.to_str()) {
         Some("org" | "org_archive") => true,
-        Some(x) => NOTE_TYPES.lock().unwrap().iter().any(|t| t.eq_ignore_ascii_case(x)),
+        Some(x) => lock(&NOTE_TYPES).iter().any(|t| t.eq_ignore_ascii_case(x)),
         None => false,
     }
 }
@@ -515,7 +534,7 @@ fn note_type_ok(x: &str) -> bool {
 
 #[tauri::command]
 fn set_note_types(types: Vec<String>) {
-    *NOTE_TYPES.lock().unwrap() = types.into_iter().filter(|t| note_type_ok(t)).map(|t| t.to_ascii_lowercase()).collect();
+    *lock(&NOTE_TYPES) = types.into_iter().filter(|t| note_type_ok(t)).map(|t| t.to_ascii_lowercase()).collect();
 }
 
 /// Atomic write (temp file + rename) restricted to .org files inside the notes folder.
@@ -534,8 +553,7 @@ fn save_checked(root: &Path, path: &str, text: &str, base: &str) -> Result<(), S
     let mut tmp_name = target.file_name().unwrap_or_default().to_os_string();
     tmp_name.push(".tmp");
     let tmp = target.with_file_name(tmp_name);
-    fs::write(&tmp, text).map_err(|e| e.to_string())?;
-    fs::rename(&tmp, &target).map_err(|e| e.to_string())
+    atomic_write(&tmp, &target, text.as_bytes())
 }
 
 #[tauri::command]
@@ -545,7 +563,7 @@ fn save_org_file(
     text: String,
     base: String,
 ) -> Result<(), String> {
-    let root = state.dir.lock().unwrap().clone().ok_or("no notes folder")?;
+    let root = lock(&state.dir).clone().ok_or("no notes folder")?;
     save_checked(&root, &path, &text, &base)
 }
 
@@ -558,6 +576,42 @@ mod tests {
         let _ = fs::remove_dir_all(&d);
         fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    #[test]
+    fn atomic_write_replaces_whole_and_leaves_no_tmp() {
+        let d = tmp("atomic");
+        let (t, x) = (d.join("a.org"), d.join(".a.org.tmp"));
+        fs::write(&t, "old").unwrap();
+        atomic_write(&x, &t, b"new").unwrap();
+        assert_eq!(fs::read_to_string(&t).unwrap(), "new");
+        assert!(!x.exists());
+        // the tmp cannot be made (no such folder): the target stays as it was
+        assert!(atomic_write(&d.join("no/x.tmp"), &t, b"lost").is_err());
+        assert_eq!(fs::read_to_string(&t).unwrap(), "new");
+    }
+
+    #[test]
+    fn a_picked_path_is_written_once() {
+        lock(&PICKED).push("/tmp/org-picked.json".into());
+        assert!(take_picked("/tmp/org-other.json").is_err()); // never chosen
+        assert!(take_picked("/tmp/org-picked.json").is_ok());
+        assert!(take_picked("/tmp/org-picked.json").is_err()); // used already
+        assert!(export_text("/tmp/org-not-picked.txt".into(), "x".into()).is_err());
+        assert!(!Path::new("/tmp/org-not-picked.txt").exists());
+    }
+
+    #[test]
+    fn a_poisoned_lock_still_gives_its_data() {
+        let m = std::sync::Arc::new(Mutex::new(5));
+        let m2 = m.clone();
+        let _ = std::thread::spawn(move || {
+            let _g = m2.lock().unwrap();
+            panic!("a panic while it is held");
+        })
+        .join();
+        assert!(m.is_poisoned());
+        assert_eq!(*lock(&m), 5);
     }
 
     #[test]
@@ -706,7 +760,7 @@ mod tests {
         assert!(!is_org(Path::new("b.canvas")));
         set_note_types(vec!["canvas".into(), "bad.ext".into(), "org".into()]);
         assert!(is_org(Path::new("b.canvas")) && is_org(Path::new("b.CANVAS")) && !is_org(Path::new("b.md")));
-        assert_eq!(*NOTE_TYPES.lock().unwrap(), vec!["canvas".to_string()]);
+        assert_eq!(*lock(&NOTE_TYPES), vec!["canvas".to_string()]);
         assert_eq!(with_org("b.canvas".into()), "b.canvas");
         set_note_types(vec![]);
         // base64 of a plugin's export
@@ -896,17 +950,14 @@ fn dirs_in(dir: &Path, root: &Path, out: &mut Vec<String>) {
 }
 
 fn root_of(state: &State<AppState>) -> Result<PathBuf, String> {
-    state
-        .dir
-        .lock()
-        .unwrap()
+    lock(&state.dir)
         .clone()
         .ok_or_else(|| "no notes folder".to_string())
 }
 
 #[tauri::command]
 fn list_folders(state: State<AppState>) -> Vec<String> {
-    let Some(root) = state.dir.lock().unwrap().clone() else {
+    let Some(root) = lock(&state.dir).clone() else {
         return Vec::new();
     };
     let mut out = Vec::new();
@@ -953,13 +1004,12 @@ fn write_config_in(root: &Path, text: &str) -> Result<(), String> {
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let target = dir.join(CONFIG_FILE);
     let tmp = dir.join(format!("{CONFIG_FILE}.tmp"));
-    fs::write(&tmp, text).map_err(|e| e.to_string())?;
-    fs::rename(&tmp, &target).map_err(|e| e.to_string())
+    atomic_write(&tmp, &target, text.as_bytes())
 }
 
 #[tauri::command]
 fn read_project_config(state: State<AppState>) -> Option<String> {
-    let root = state.dir.lock().unwrap().clone()?;
+    let root = lock(&state.dir).clone()?;
     read_config_in(&root)
 }
 
@@ -990,8 +1040,7 @@ fn write_feature_file(state: State<AppState>, id: String, text: String) -> Resul
     let dir = p.parent().ok_or("no folder")?;
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let tmp = p.with_extension("json.tmp");
-    fs::write(&tmp, text).map_err(|e| e.to_string())?;
-    fs::rename(&tmp, &p).map_err(|e| e.to_string())
+    atomic_write(&tmp, &p, text.as_bytes())
 }
 
 /// "Сохранить как…" for a tab that has no file yet. `.org` is added unless the name already has an
@@ -1011,8 +1060,7 @@ fn save_new_in(root: &Path, parent: &str, name: &str, text: &str, overwrite: boo
         return Err("a folder has that name".into());
     }
     let tmp = parent.join(format!(".{name}.tmp"));
-    fs::write(&tmp, text).map_err(|e| e.to_string())?;
-    fs::rename(&tmp, &target).map_err(|e| e.to_string())?;
+    atomic_write(&tmp, &target, text.as_bytes())?;
     Ok(as_known(root, &target))
 }
 
@@ -1253,8 +1301,7 @@ fn list_themes(app: AppHandle) -> Vec<String> {
 fn write_theme(app: AppHandle, file: String, text: String) -> Result<(), String> {
     let p = theme_file(&themes_dir(&app)?, &file)?;
     let tmp = p.with_extension("json.tmp");
-    fs::write(&tmp, text).map_err(|e| e.to_string())?;
-    fs::rename(&tmp, &p).map_err(|e| e.to_string())
+    atomic_write(&tmp, &p, text.as_bytes())
 }
 
 #[tauri::command]
@@ -1266,15 +1313,60 @@ fn delete_theme(app: AppHandle, file: String) -> Result<(), String> {
     }
 }
 
-/// «Экспорт…»: the path comes from the system save panel.
+/// The paths the user picked in a panel shown by `pick_save` / `pick_open`, each good for one export or import: the
+/// page (and a plugin's code in it) cannot write or read a file the user did not choose (tech sprint 5.1).
+static PICKED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+fn take_picked(path: &str) -> Result<(), String> {
+    let mut picked = lock(&PICKED);
+    let i = picked.iter().position(|p| p == path).ok_or("путь не выбран в окне сохранения или открытия")?;
+    picked.remove(i);
+    Ok(())
+}
+fn remember_picked(p: Option<tauri_plugin_dialog::FilePath>) -> Option<String> {
+    let path = p?.into_path().ok()?.to_string_lossy().to_string();
+    let mut picked = lock(&PICKED);
+    picked.push(path.clone());
+    let n = picked.len();
+    if n > 16 {
+        picked.drain(..n - 16); // panels answered and never used: forgotten
+    }
+    Some(path)
+}
+#[derive(Deserialize)]
+struct PanelFilter {
+    name: String,
+    extensions: Vec<String>,
+}
+fn panel(app: &AppHandle, title: &str, filter: &Option<PanelFilter>) -> tauri_plugin_dialog::FileDialogBuilder<tauri::Wry> {
+    use tauri_plugin_dialog::DialogExt;
+    let d = app.dialog().file().set_title(title);
+    match filter {
+        Some(f) => d.add_filter(&f.name, &f.extensions.iter().map(String::as_str).collect::<Vec<_>>()),
+        None => d,
+    }
+}
+/// The system save panel; the path chosen may then be written by `export_text` / `export_bytes`, once.
+#[tauri::command]
+async fn pick_save(app: AppHandle, title: String, default_name: String, filter: Option<PanelFilter>) -> Option<String> {
+    remember_picked(panel(&app, &title, &filter).set_file_name(default_name).blocking_save_file())
+}
+/// The system open panel (a file); the path chosen may then be read by `import_text`, once.
+#[tauri::command]
+async fn pick_open(app: AppHandle, title: String, filter: Option<PanelFilter>) -> Option<String> {
+    remember_picked(panel(&app, &title, &filter).blocking_pick_file())
+}
+
+/// «Экспорт…»: where the user said in `pick_save`.
 #[tauri::command]
 fn export_text(path: String, text: String) -> Result<(), String> {
+    take_picked(&path)?;
     fs::write(path, text).map_err(|e| e.to_string())
 }
 
-/// A plugin's export (ТЗ 39: PNG of a canvas): bytes in base64 where the system save panel says.
+/// A plugin's export (ТЗ 39: PNG of a canvas): bytes in base64 where the user said in `pick_save`.
 #[tauri::command]
 fn export_bytes(path: String, data: String) -> Result<(), String> {
+    take_picked(&path)?;
     fs::write(path, from_base64(&data)?).map_err(|e| e.to_string())
 }
 
@@ -1302,9 +1394,10 @@ fn from_base64(s: &str) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 
-/// «Импорт…»: the path comes from the system open panel; a theme is small, anything big is refused.
+/// «Импорт…»: the file the user chose in `pick_open`; a theme is small, anything big is refused.
 #[tauri::command]
 fn import_text(path: String) -> Result<String, String> {
+    take_picked(&path)?;
     let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
     if meta.len() > 256 * 1024 {
         return Err("файл слишком большой".into());
@@ -1385,7 +1478,7 @@ static MINI_KEY: std::sync::Mutex<String> = std::sync::Mutex::new(String::new())
 fn set_global(app: &AppHandle, slot: &std::sync::Mutex<String>, accelerator: String, run: fn(&AppHandle)) -> Result<(), String> {
     use tauri_plugin_global_shortcut::GlobalShortcutExt;
     let gs = app.global_shortcut();
-    let mut was = slot.lock().unwrap();
+    let mut was = lock(slot);
     if !was.is_empty() {
         let _ = gs.unregister(was.as_str());
         was.clear();
@@ -1509,13 +1602,25 @@ fn on_main<R: Send + 'static>(app: &AppHandle, f: impl FnOnce() -> R + Send + 's
     rx.recv().ok()
 }
 
-/// The settings of «Мини-окно» as last given by the page: opacity, the pause after typing (s), smooth, over full-screen
-/// programs, hidden from capture, remember the frame. Kept here: the panel is made later, on its first show.
-static MINI_OPTS: std::sync::Mutex<(f64, f64, bool, bool, bool, bool)> = std::sync::Mutex::new((0.3, 3.0, true, true, true, true));
+/// The settings of «Мини-окно» as last given by the page. Kept here: the panel is made later, on its first show.
+#[derive(Clone, Copy)]
+struct MiniOpts {
+    opacity: f64,
+    /// The pause after typing before the panel fades (s).
+    linger: f64,
+    smooth: bool,
+    /// Over full-screen programs.
+    fullscreen: bool,
+    hide_from_capture: bool,
+    /// Remember the panel's frame.
+    remember: bool,
+}
+static MINI_OPTS: std::sync::Mutex<MiniOpts> =
+    std::sync::Mutex::new(MiniOpts { opacity: 0.3, linger: 3.0, smooth: true, fullscreen: true, hide_from_capture: true, remember: true });
 
 /// The saved frame, if the settings keep it and a screen still has its corner.
 fn mini_saved_frame(app: &AppHandle) -> Option<MiniFrame> {
-    if !MINI_OPTS.lock().unwrap().5 {
+    if !lock(&MINI_OPTS).remember {
         return None;
     }
     let f = read_config(app).mini_frame?;
@@ -1529,7 +1634,7 @@ fn mini_saved_frame(app: &AppHandle) -> Option<MiniFrame> {
 }
 /// The window moved or resized: its frame kept (when the settings say so).
 fn mini_keep_frame(w: &tauri::Window) {
-    if !MINI_OPTS.lock().unwrap().5 {
+    if !lock(&MINI_OPTS).remember {
         return;
     }
     let (Ok(pos), Ok(size), Ok(s)) = (w.outer_position(), w.inner_size(), w.scale_factor()) else { return };
@@ -1560,10 +1665,10 @@ fn make_mini_window(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     if let Ok(ns) = w.ns_window() {
         let ptr = ns as usize;
-        let o = *MINI_OPTS.lock().unwrap();
+        let o = *lock(&MINI_OPTS);
         on_main(app, move || unsafe {
-            mini_native::mini_setup(ptr as *mut std::ffi::c_void, o.3.into(), o.4.into());
-            mini_native::mini_options(o.0, o.1, o.2.into(), o.3.into(), o.4.into());
+            mini_native::mini_setup(ptr as *mut std::ffi::c_void, o.fullscreen.into(), o.hide_from_capture.into());
+            mini_native::mini_options(o.opacity, o.linger, o.smooth.into(), o.fullscreen.into(), o.hide_from_capture.into());
         });
     }
     if let Some(f) = mini_saved_frame(app) {
@@ -1649,7 +1754,7 @@ fn mini_return_focus(app: AppHandle) {
 /// The settings of «Мини-окно» (ТЗ 31 §6), applied at once (and kept for the panel made later).
 #[tauri::command]
 fn mini_options(app: AppHandle, opacity: f64, linger: f64, smooth: bool, fullscreen: bool, hide_from_capture: bool, remember: bool) {
-    *MINI_OPTS.lock().unwrap() = (opacity, linger, smooth, fullscreen, hide_from_capture, remember);
+    *lock(&MINI_OPTS) = MiniOpts { opacity, linger, smooth, fullscreen, hide_from_capture, remember };
     #[cfg(target_os = "macos")]
     on_main(&app, move || unsafe { mini_native::mini_options(opacity, linger, smooth.into(), fullscreen.into(), hide_from_capture.into()) });
 }
@@ -1677,6 +1782,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             set_note_types,
             export_bytes,
+            pick_save,
+            pick_open,
             plugin_sources::catalog_fetch,
             plugin_sources::catalog_raw,
             plugin_sources::catalog_releases,
@@ -1751,7 +1858,7 @@ pub fn run() {
                 activate(&handle, &state, dir);
             } else if let Some(p) = read_config(&handle).notes_dir {
                 // remembered but not there: the page shows «Папка недоступна»; the setting is never dropped by itself
-                *state.missing.lock().unwrap() = Some(p);
+                *lock(&state.missing) = Some(p);
             }
             Ok(())
         })
