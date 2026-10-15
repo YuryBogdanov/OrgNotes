@@ -3,7 +3,7 @@
 
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Ctx, Named } from '@panopticon/api';
-import { parseHeadings, workflow, type Heading, type Workflow } from '@panopticon/api/org';
+import { readOrg, type Heading, type Workflow } from '@panopticon/api/org';
 import { archiveEntry, archivePath, categoryOf } from './archive';
 import { withBoard, type StatusSet } from './board';
 
@@ -42,16 +42,14 @@ class Kanban {
     this.folded = (this.ctx.storage.local.get<Folded>() as Folded | undefined) ?? {};
   }
   async read(path: string): Promise<BFile | null> {
-    try {
-      const [text, wf] = await Promise.all([this.ctx.files!.read(path), this.ctx.index!.workflow(path)]);
-      const w = workflow(wf);
-      const f: BFile = { path, text, wf: w, headings: parseHeadings(text, w), sets: wf.sets.map((s) => ({ name: s.name, states: s.states.map((x) => ({ name: x.name, done: x.done })) })), done: wf.done };
-      this.files.set(path, f);
-      return f;
-    } catch {
+    const o = await readOrg(this.ctx, path);
+    if (!o) {
       this.files.delete(path);
       return null;
     }
+    const f: BFile = { path, text: o.text, wf: o.wf, headings: o.headings, sets: o.info.sets.map((s) => ({ name: s.name, states: s.states.map((x) => ({ name: x.name, done: x.done })) })), done: o.info.done };
+    this.files.set(path, f);
+    return f;
   }
   /** A file changed: read again if we have it. */
   refresh(path: string) {

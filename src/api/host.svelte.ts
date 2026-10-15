@@ -18,30 +18,27 @@ import type { MenuItem as CoreMenuItem } from '../ContextMenu.svelte';
 import { registerTodayBlock } from '../todayBlocks';
 import PluginTodayBlock from '../PluginTodayBlock.svelte';
 import { fuzzy } from '../fuzzy';
-import { DEFAULT_WORKFLOW, headingAt, namedFor, type WorkflowDef } from '../org';
+import { headingAt, type WorkflowDef } from '../org';
 import { parseTheme, type Theme } from '../themes';
-import { displayName, isArchive } from '../names';
-import type { Tx as CoreTx } from '../journal';
 import type { Values } from '../settingsSchema';
 import { builtinEntries, declareKeys, entries, viewScope, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, type Entry, type Listed } from './declare';
 import PluginsSettings from '../PluginsSettings.svelte';
-import { hostAllowed, hostOf, iconOf, type Manifest } from './manifest';
-import type { MenuItem as ApiMenuItem, Ctx, Dispose, Named, SheetSpec, FormSpec, HeadingRef, Place, Plugin, Render, Store, ViewSpec } from './index';
+import { iconOf, type Manifest } from './manifest';
+import type { MenuItem as ApiMenuItem, Ctx, Dispose, SheetSpec, FormSpec, HeadingRef, Place, Plugin, Render, Store, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
 import PluginInspector from '../PluginInspector.svelte';
 import PluginNav from '../PluginNav.svelte';
 import PluginReview from '../PluginReview.svelte';
 import { mountWidget } from './widgets.svelte';
 import { lists } from '../taskLists.svelte';
-import { bodyOf } from '../orgOps';
 import { RIGHTS, rightsText, trust, trusted } from './trust';
-import { apiRef, apiTx, coreRef, fileOf, findHeading, infoOf, type Changed } from './refs';
-import { query } from './query';
+import { apiRef, coreRef, fileOf, findHeading, infoOf } from './refs';
 import { coreCommand } from './coreCommands';
 import { REVIEW_KIND, ReviewController, type ReviewRun } from './review.svelte';
 export { REVIEW_KIND, type ReviewRun };
-import { headingChanged, listen } from './events.svelte';
+import { listen } from './events.svelte';
 import { clone, watch } from './watch.svelte';
+import { clipboardApi, editApi, filesApi, indexApi, netApi } from './ctxData';
 import { put, schemaOf, settingsValues, whole, type Dynamic } from './pluginSettings';
 import { invoke, isTauri } from '../tauri';
 export { RIGHTS, rightsText };
@@ -989,88 +986,11 @@ class Host {
         },
       },
     };
-    if (can('clipboard'))
-      ctx.clipboard = { write: (text) => navigator.clipboard.writeText(String(text)) };
-    if (can('net'))
-      ctx.net = {
-        fetch: async (url, init = {}) => {
-          const host = hostOf(url);
-          if (!host) throw new Error('адрес — http или https');
-          if (!hostAllowed(m.net, host)) throw new Error(`хоста ${host} нет в манифесте`);
-          const r = await invoke<{ status: number; headers: [string, string][]; text: string }>('net_fetch', {
-            plugin: id, url, method: init.method ?? 'GET', headers: Object.entries(init.headers ?? {}), body: init.body ?? null,
-          });
-          return { status: r.status, ok: r.status >= 200 && r.status < 300, headers: Object.fromEntries(r.headers), text: r.text };
-        },
-      };
-    if (can('index.read'))
-      ctx.index = {
-        query: async (q) => query(q),
-        heading: async (ref) => {
-          const f = fileOf(ref.path);
-          const h = f && findHeading(f.headings, ref);
-          return f && h ? infoOf(f, h) : null;
-        },
-        body: async (ref) => {
-          const f = fileOf(ref.path);
-          const h = f && findHeading(f.headings, ref);
-          return f && h ? bodyOf(f.text, h) : null;
-        },
-        byId: async (id) => {
-          const want = String(id).trim();
-          for (const f of store.files)
-            for (const h of f.headings) if (h.id === want) return { path: f.name, line: h.line, title: h.title };
-          return null;
-        },
-        outline: async (path) => {
-          const f = fileOf(path);
-          return f ? f.headings.map((h) => infoOf(f, h)) : [];
-        },
-        files: async () => store.files.filter((f) => !isArchive(f.name)).map((f) => ({ path: f.name, title: displayName(f.name) })), // not the archives: as the agenda
-        statusTone: async (kw, path) => {
-          const f = fileOf(path);
-          return f && kw ? (namedFor(kw, f.wf) as Named) : null;
-        },
-        inbox: async () => ({ path: store.inboxFile?.name ?? null, chosen: store.inboxCfg.file, add: store.inboxCfg.add }),
-        folder: async () => store.dir ?? null,
-        workflow: async (path) => {
-          const f = fileOf(path);
-          const seqs = f?.wf.sequences ?? store.config.workflows;
-          return {
-            open: [...(f?.wf.open ?? DEFAULT_WORKFLOW.open)], done: [...(f?.wf.done ?? DEFAULT_WORKFLOW.done)],
-            sets: seqs.map((q) => ({ name: q.name, states: q.states.map((x) => ({ name: x.name, done: !!x.done, ...(x.color ? { color: x.color as Named } : {}) })) })),
-            logbook: !!(f?.wf.behavior ?? store.config.behavior).logbook,
-          };
-        },
-      };
-    if (can('files.read') || can('files.edit'))
-      ctx.files = {
-        read: async (path) => {
-          const f = fileOf(path);
-          if (!f) throw new Error(`нет файла «${path}» в рабочей папке`);
-          return f.text;
-        },
-      };
-    if (can('files.edit'))
-      ctx.edit = {
-        transaction: async (label, build, o = {}) => {
-          let t: CoreTx | null = null;
-          const ev: Changed[] = [];
-          const onUndo = o.onUndo ? () => this.guard(id, () => o.onUndo!(), undefined) : undefined;
-          const step = await store.transaction(label, (tx) => {
-            t = tx;
-            build(apiTx(tx, ev));
-          }, onUndo);
-          const tx = t as CoreTx | null;
-          if (step) {
-            for (const [r, w] of ev) headingChanged(r, w);
-            return 'ok';
-          }
-          return tx?.conflict ? 'conflict' : tx && !tx.error && !tx.result().length ? 'ok' : 'error';
-        },
-        undo: () => store.undoLast(),
-        ensureFile: async (path: string) => !!(await store.ensureFile(String(path))),
-      };
+    if (can('clipboard')) ctx.clipboard = clipboardApi();
+    if (can('net')) ctx.net = netApi(m);
+    if (can('index.read')) ctx.index = indexApi();
+    if (can('files.read') || can('files.edit')) ctx.files = filesApi();
+    if (can('files.edit')) ctx.edit = editApi((fn) => this.guard(id, fn, undefined));
     return ctx;
   }
 
