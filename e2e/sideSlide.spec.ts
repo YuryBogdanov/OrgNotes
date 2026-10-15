@@ -28,11 +28,29 @@ for (const [name, slot, button] of [
     await open(page);
     const full = (await sizes(page, slot))!;
     expect(full.slot).toBeGreaterThan(full.side); // the panel and its splitter
-    await page.getByRole('button', { name: button }).click();
-    await page.waitForTimeout(90);
-    const mid = await sizes(page, slot);
-    expect(mid).not.toBeNull(); // still going
-    expect(mid!.slot).toBeLessThan(full.slot);
+    // every frame of the slide written down (a single sample at a fixed moment misses it on a slow machine)
+    const frames = await page.evaluate(
+      ([s, b]) =>
+        new Promise<{ slot: number; side: number; left: number; right: number }[]>((done) => {
+          const out: { slot: number; side: number; left: number; right: number }[] = [];
+          const t0 = performance.now();
+          const frame = () => {
+            const el = document.querySelector(s) as HTMLElement | null;
+            if (el) {
+              const a = el.getBoundingClientRect();
+              const c = (el.querySelector('.side') as HTMLElement).getBoundingClientRect();
+              out.push({ slot: a.width, side: c.width, left: Math.round(c.left - a.left), right: Math.round(a.right - c.right) });
+            }
+            if (el && performance.now() - t0 < 2000) requestAnimationFrame(frame);
+            else done(out);
+          };
+          (document.querySelector(`[aria-label="${b}"]`) as HTMLElement).click();
+          requestAnimationFrame(frame);
+        }),
+      [slot, button] as const,
+    );
+    const mid = frames.find((f) => f.slot > 0 && f.slot < full.slot);
+    expect(mid).toBeTruthy(); // seen on its way
     expect(mid!.side).toBe(full.side); // its content keeps its width: it slides, it is not squeezed
     // the navigator's content is held by its right edge (it goes left), the inspector's by its left one (it goes right)
     if (slot === '.nav-slot') expect(mid!.left).toBeLessThan(0);

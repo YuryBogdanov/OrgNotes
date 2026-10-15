@@ -6,8 +6,11 @@ const port = process.env.E2E_PORT ?? '1420';
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
-  // in CI one more try, and a test that passed only then is reported «flaky» — not hidden
+  // in CI one more try, and a test that passed only then is reported «flaky» — not hidden; the runners are slower
+  // than a desk Mac: the waits are twice as long there
   retries: process.env.CI ? 1 : 0,
+  timeout: process.env.CI ? 60_000 : 30_000,
+  expect: { timeout: process.env.CI ? 10_000 : 5_000 },
   workers: process.env.CI ? 3 : undefined,
   reporter: process.env.CI ? [['list'], ['github']] : [['list']],
   use: { baseURL: `http://localhost:${port}`, trace: 'retain-on-failure' },
