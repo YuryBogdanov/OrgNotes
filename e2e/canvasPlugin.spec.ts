@@ -405,3 +405,47 @@ test('«Разложить на холсте…» from a heading\'s menu: a new 
   await expect(cardOf(page, 'Учения')).toBeVisible();
   expect(await text(page)).toMatch(/\* Платформа\n:PROPERTIES:\n:ID: +[0-9a-f-]{36}\n:END:\n/);
 });
+
+// ---- the usual keys: S a shape on the pointer, A an arrow by two clicks ----
+test('S: a shape follows the pointer, a click puts it there and its text is typed; ⎋ lets it go', async ({ page }) => {
+  await openBoard(page);
+  const st = (await board(page).locator('.cv-stage').boundingBox())!;
+  await page.mouse.move(st.x + 300, st.y + 520);
+  await board(page).focus();
+  await page.keyboard.press('s');
+  await expect(board(page).locator('.cv-ghost')).toBeVisible();
+  await expect(board(page).locator('.cv-hint')).toContainText('Кликните, чтобы положить фигуру');
+  await page.keyboard.press('Escape');
+  await expect(board(page).locator('.cv-ghost')).toHaveCount(0);
+  await page.keyboard.press('s');
+  await page.mouse.move(st.x + 420, st.y + 560, { steps: 4 });
+  const g = (await board(page).locator('.cv-ghost').boundingBox())!;
+  await page.mouse.click(st.x + 420, st.y + 560);
+  await expect(board(page).getByRole('textbox', { name: 'Текст заметки' })).toBeFocused();
+  await page.keyboard.type('Новая мысль');
+  await page.keyboard.press('Escape');
+  const made = cardOf(page, 'Новая мысль');
+  await expect(made).toBeVisible();
+  const b = (await made.boundingBox())!;
+  expect(Math.abs(b.x - g.x)).toBeLessThan(2); // where the ghost was
+  expect(Math.abs(b.y - g.y)).toBeLessThan(2);
+  await expect.poll(async () => (await json(page)).nodes.some((n: any) => n.type === 'text' && n.text === 'Новая мысль')).toBe(true);
+});
+
+test('A: the nodes show their dots; a click on one node and one on another make an arrow between their nearest sides', async ({ page }) => {
+  await openBoard(page);
+  await board(page).focus();
+  await page.keyboard.press('a');
+  await expect(board(page).locator('.cv-dot')).toHaveCount(4 * 3); // every node but the group: note, card, link
+  await expect(board(page).locator('.cv-hint')).toContainText('Кликните фигуру у точки');
+  const note = (await cardOf(page, 'Окно — после QBR').boundingBox())!;
+  const link = (await cardOf(page, 'wiki.company.local').boundingBox())!;
+  await page.mouse.click(note.x + note.width / 2, note.y + note.height - 4); // near its bottom
+  await expect(board(page).locator('.cv-hint')).toContainText('Кликните вторую фигуру');
+  await page.mouse.move(link.x + 4, link.y + link.height / 2, { steps: 4 });
+  await expect(cardOf(page, 'wiki.company.local').locator('.cv-dot.left.on')).toBeVisible();
+  await page.mouse.click(link.x + 4, link.y + link.height / 2); // near its left
+  await expect.poll(async () => (await json(page)).edges.length).toBe(2);
+  expect((await json(page)).edges[1]).toMatchObject({ fromNode: 'n1', fromSide: 'bottom', toNode: 'l1', toSide: 'left', toEnd: 'arrow' });
+  await expect(board(page).getByRole('toolbar', { name: 'Добавить на холст' })).toBeVisible(); // the mode is over
+});
