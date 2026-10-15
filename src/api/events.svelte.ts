@@ -31,7 +31,7 @@ export function listen(e: EventName, send: (p: unknown) => void, ownsView: (kind
     case 'heading.changed':
       headingListeners.add(send);
       return () => void headingListeners.delete(send);
-    case 'tab.active':
+    case 'tab.active': {
       const now = () => {
         const t = store.tab;
         const own = !!t && ownsView(t.kind);
@@ -39,6 +39,7 @@ export function listen(e: EventName, send: (p: unknown) => void, ownsView: (kind
       };
       queueMicrotask(now); // the tab shown now, then each change
       return watch(() => [store.tab?.id, store.tab?.data, store.viewOf(store.tab)], now);
+    }
     case 'inbox.changed':
       return watch(() => store.inboxFile?.name ?? null, (p) => send({ path: p }));
     case 'folder.changed':

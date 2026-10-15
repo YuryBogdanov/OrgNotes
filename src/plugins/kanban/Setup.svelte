@@ -34,7 +34,6 @@
   onMount(() => root?.focus());
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="kb-setup" role="dialog" aria-label="Показать как доску" tabindex="0" bind:this={root} onkeydown={key}>
   <div class="kb-sh">
     <b>Показать {name} как доску</b>

@@ -83,7 +83,6 @@
       <Segmented label="Порядок тегов" size="small" push value={ts.sort} onchange={(v) => ts.setSort(v)} options={[{ value: 'count' as const, label: 'по частоте' }, { value: 'name' as const, label: 'А–Я' }]} />
     </div>
   </div>
-  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <div class="list" role="listbox" aria-label="Теги" tabindex="0" bind:this={listEl} onkeydown={key}>
     {#each shown as t, i (t.tag)}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -104,7 +103,6 @@
 {#if removing && removeInfo}
   <div class="layer" use:portal>
     <div class="scrim" aria-hidden="true"></div>
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Убрать тег" tabindex="-1"
       onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); removing = null; } }}>
       <b>Убрать :{removing}: у {removeInfo.n} {pl(removeInfo.n, 'заголовка', 'заголовков', 'заголовков')} в {removeInfo.files} {pl(removeInfo.files, 'файле', 'файлах', 'файлах')}?</b>

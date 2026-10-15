@@ -22,19 +22,12 @@ const open = async (page: Page, text = DOC) => {
   await expect(page.locator('.cm-content')).toContainText('Org keys');
 };
 const doc = (page: Page) => page.evaluate(() => (window as any).__disk['/mock/Keys.org'] as string);
-/** Editor text as the user sees it (folded text is hidden). */
-const visible = async (page: Page) => (await page.locator('.cm-line').allInnerTexts()).filter((t) => t.trim() !== '' || true);
 const place = async (page: Page, text: string, where: 'end' | 'start' = 'end') => {
   await page.locator('.cm-line', { hasText: text }).first().click();
   await page.keyboard.press(where === 'end' ? 'End' : 'Home');
 };
-const editorText = (page: Page) => page.locator('.cm-content').evaluate((el) => (el as any).cmView?.view?.state?.doc?.toString() as string | undefined);
 const saved = async (page: Page, expected: string) => {
   await expect.poll(async () => doc(page)).toBe(expected);
-};
-const cursorLine = async (page: Page) => {
-  const t = await page.locator('.status').innerText();
-  return +/Стр\. (\d+)/.exec(t)![1];
 };
 
 test('Option+Enter makes a heading of the current level, at root, in content and on deeper levels', async ({ page }) => {

@@ -19,6 +19,7 @@
   {#if jd?.note}
     <div class="ntext">
       {#each noteLines(jd.note.text) as l, i (i)}
+        <!-- eslint-disable-next-line svelte/no-at-html-tags -- a line of the note escaped by today.ts noteLines -->
         <div class="nl" style:padding-left="{l.depth * 16}px">{#if l.item}<span class="mk">–</span>{/if}<span>{@html l.html}</span></div>
       {/each}
     </div>

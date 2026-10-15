@@ -362,7 +362,7 @@
 
 {#if ask}
   {@const a = ask}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="modal" onmousedown={() => (ask = null)}>
     <div class="dlg" role="alertdialog" aria-modal="true" aria-label="Повторяющаяся запись" onmousedown={(e) => e.stopPropagation()}>
       <h2>Перенести повторяющуюся запись?</h2>

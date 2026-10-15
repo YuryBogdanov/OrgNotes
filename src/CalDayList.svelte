@@ -61,7 +61,6 @@
 
 <svelte:window onmousedown={(e) => { if (el && !el.contains(e.target as Node) && !(e.target as Element).closest('.more')) onclose(); }} />
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="daylist" role="dialog" aria-label="Записи на день" tabindex="-1" bind:this={el} style="left:{pos.left}px;top:{pos.top}px" onkeydown={key} onmouseenter={onenter} onmouseleave={onleave}>
   <div class="dh"><b>{dayShort(fromIso(day))}</b><span>{entriesWord(entries.length)}</span></div>
   <div role="listbox" aria-label="Записи">

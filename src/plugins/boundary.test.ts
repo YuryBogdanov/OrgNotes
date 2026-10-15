@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, dirname } from 'node:path';
 
 // ТЗ 26 §2: a built-in plugin sees only the API. Its files import `@panopticon/api`, its own files, svelte — nothing
-// of the core. This test is the rule (there is no ESLint in the project).
+// of the core. This test is the rule (ESLint's import rules do not know which plugin a file belongs to).
 
 const ROOT = resolve(__dirname);
 const ALLOWED = [/^@panopticon\/api(\/org)?$/, /^svelte(\/.*)?$/];

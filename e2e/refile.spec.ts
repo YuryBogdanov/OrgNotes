@@ -41,7 +41,6 @@ const dlg = (page: Page) => page.getByRole('dialog', { name: /^Перенест�
 const field = (page: Page) => dlg(page).getByRole('combobox');
 const fileTitles = (page: Page) => dlg(page).locator('.row .t').allInnerTexts();
 const groups = (page: Page) => dlg(page).locator('.gh').allInnerTexts();
-const nodes = (page: Page) => dlg(page).locator('.node');
 const node = (page: Page, title: string) => dlg(page).locator('.node', { has: page.locator('.nt', { hasText: new RegExp('^' + title + '$') }) });
 const nodeTitles = (page: Page) => dlg(page).locator('.node .nt').allInnerTexts();
 const on = (page: Page) => dlg(page).locator('[aria-selected="true"]');

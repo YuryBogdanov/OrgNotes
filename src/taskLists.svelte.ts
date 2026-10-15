@@ -6,7 +6,7 @@
 import { store } from './store.svelte';
 import { Tx, type HeadingRef, type Step } from './journal';
 import { firstDone, sequenceFor, setKeyword, setPriority, toJs, toneFor, type Heading } from './org';
-import { setPlanning, setTags, shiftEvent } from './edits';
+import { setTags, shiftEvent } from './edits';
 import { priorityAfter, rotateStatus } from './outline';
 import { bare, headingStep, setListTask, setMoreTaskCommands, taskCommands, type Ctx, type HeadingAct, type Icon, type TaskCommand, type TaskCtx } from './commands';
 import { toneStyle } from './colors';

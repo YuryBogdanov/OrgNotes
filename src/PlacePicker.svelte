@@ -250,9 +250,8 @@
 
 {#if variant === 'palette'}
   <div use:portal>
-    <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
-    <div class="scrim" class:full onmousedown={(e) => { e.preventDefault(); close(); }}></div>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="scrim" class:full onmousedown={(e) => { e.preventDefault(); close(); }}></div>
     <div class="pal" class:full role="dialog" aria-modal="true" aria-label={title} onmousedown={keepFocus}>
       {#if plate}<div class="plate">{@render plate()}</div>{/if}
 

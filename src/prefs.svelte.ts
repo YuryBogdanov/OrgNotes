@@ -76,8 +76,14 @@ class Prefs {
   findCase = $state(lsGet('find:cs') === '1');
   findWord = $state(lsGet('find:word') === '1');
   setFindOpts(o: { cs?: boolean; word?: boolean }) {
-    if (o.cs !== undefined) lsSet('find:cs', (this.findCase = o.cs) ? '1' : '0');
-    if (o.word !== undefined) lsSet('find:word', (this.findWord = o.word) ? '1' : '0');
+    if (o.cs !== undefined) {
+      this.findCase = o.cs;
+      lsSet('find:cs', o.cs ? '1' : '0');
+    }
+    if (o.word !== undefined) {
+      this.findWord = o.word;
+      lsSet('find:word', o.word ? '1' : '0');
+    }
   }
 }
 

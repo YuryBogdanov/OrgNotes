@@ -7,7 +7,7 @@
   import { toneOf, toneStyle } from './colors';
   import { displayName } from './names';
   import { runAgenda, tasksCount } from './agendas';
-  import { lists, type DateKind } from './taskLists.svelte';
+  import { lists } from './taskLists.svelte';
   import ListToast from './ListToast.svelte';
 
   // the pane the agenda lives in: a task opens in the neighbour pane (↩, double click) or here (⌥↩)
@@ -215,7 +215,6 @@
       </div>
       {#if custom}<button class="edit" onclick={(e) => store.editAgenda(custom.id, e.currentTarget)}>Редактировать…</button>{/if}
     </header>
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="scroll" bind:this={list} role="listbox" tabindex="0" aria-label="Задачи агенды" aria-activedescendant={sel >= 0 ? `ag-${pane}-${sel}` : undefined}
       onkeydown={keydown} onclick={clickEmpty}>

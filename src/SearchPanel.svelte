@@ -132,7 +132,6 @@
       {#if !s.running && !s.total}
         <div class="nothing">Проверьте «Aa», «Слово» и где искать: «Везде», «Заголовки» или «Текст».</div>
       {/if}
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div class="list" bind:this={list} role="listbox" tabindex="0" aria-label="Результаты поиска" onkeydown={listKey}>
         {#each s.groups as g, gi (g.path)}
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->

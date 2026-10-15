@@ -53,14 +53,6 @@ async function select(page: Page, line: string, piece: string) {
   }, { line, piece });
   await page.waitForTimeout(50);
 }
-/** ⌘V with this in the clipboard (a paste event, as the web view gives it). */
-const paste = (page: Page, text: string) =>
-  page.evaluate((text) => {
-    const dt = new DataTransfer();
-    dt.setData('text/plain', text);
-    document.querySelector('.cm-content')!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
-  }, text);
-
 const menu = (page: Page) => page.locator('.menu').first();
 const chord = async (page: Page, second: string) => {
   await page.keyboard.press('Control+c');

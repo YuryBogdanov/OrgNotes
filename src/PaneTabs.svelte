@@ -135,7 +135,6 @@
 <!-- svelte-ignore a11y_interactive_supports_focus -->
 <div class="strip" class:fl={fadeL} class:fr={fadeR} role="tablist" aria-label="Вкладки" bind:this={strip} ondblclick={stripDblClick} onscroll={() => { edges(); tipEnd(); }}>
   {#each pane.tabs as t, ti (t.id)}
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="tab" class:on={ti === pane.active} class:dirty={dirty(t)} class:untitled={t.kind === 'untitled'} class:gone={gone(t)} class:menu={menuTab === t.id} class:pinned={isPinned(t)}
       role="tab" aria-selected={ti === pane.active} tabindex={ti === pane.active ? 0 : -1} data-tab={t.id}
       onmouseenter={(e) => tipStart(e, t)} onmouseleave={tipEnd} onmousedown={tipEnd}

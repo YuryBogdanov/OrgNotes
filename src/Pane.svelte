@@ -140,7 +140,6 @@
   });
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <section class="pane" class:active aria-label={active ? 'Активная панель' : 'Панель'} data-pane={pi}
   onmousedowncapture={() => store.setActivePane(pi)} onfocusin={() => store.setActivePane(pi)}>
   {#if two}<div class="accent" aria-hidden="true"></div>{/if}

@@ -124,7 +124,6 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="gadd" role="dialog" aria-modal="true" aria-label="Добавить цели" tabindex="-1" onkeydown={key}>
   <header>
     <b>{req.replace ? 'Сменить заголовок' : 'Добавить цели'}</b>

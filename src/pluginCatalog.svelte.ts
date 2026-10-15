@@ -97,7 +97,7 @@ class Catalog {
   }
   async manifestOf(e: CatalogEntry): Promise<Manifest | null> {
     if (this.manifests.has(e.id)) return this.manifests.get(e.id)!;
-    let m: Manifest | null = null;
+    let m: Manifest | null;
     try {
       const r = parseManifest(JSON.parse(await invoke<string>('catalog_raw', { repo: e.repo, file: 'manifest.json' })));
       m = r.ok && r.manifest.id === e.id ? r.manifest : null;

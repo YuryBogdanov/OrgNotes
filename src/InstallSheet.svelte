@@ -33,7 +33,6 @@
 
 <div class="layer" use:portal>
 <div class="scrim" aria-hidden="true"></div>
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="dlg" role="dialog" aria-modal="true" aria-label="Установка плагина" tabindex="-1" onkeydown={key}>
   <b class="t">Установить «{e.name}»?</b>
   <div class="dim">{m.permissions.length ? 'Плагин получит:' : 'Плагину не нужно никаких прав: только свои настройки и данные.'}</div>

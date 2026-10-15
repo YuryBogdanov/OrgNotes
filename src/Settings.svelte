@@ -1,8 +1,7 @@
 <script lang="ts">
-  import Switch from './Switch.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import { store, type SettingsSection } from './store.svelte';
-  import { allSettings, blocksOf, settingsOf } from './views';
+  import { allSettings, settingsOf } from './views';
   import SchemaSettings from './SchemaSettings.svelte';
   import TagsSettings from './TagsSettings.svelte';
   import KeysSettings from './KeysSettings.svelte';
@@ -19,7 +18,7 @@
   import SettingsAgendas from './SettingsAgendas.svelte';
   import {
     MAX_KEYWORD, addState, checkKey, normalizeKey, addWorkflow, canRemoveState, canRemoveWorkflow, checkKeyword, displayName, dropState, dropWorkflow,
-    effectiveKeys, fromConfig, initialOf, moveState, normalizeKeyword, orgLine, pendingState, removeState, removeWorkflow,
+    effectiveKeys, fromConfig, initialOf, moveState, normalizeKeyword, orgLine, removeState, removeWorkflow,
     toJson, validate, type DraftState,
   } from './workflowEditor';
 
@@ -343,7 +342,6 @@
       <button class="done-b" onclick={() => store.closeSettings()}>Готово</button>
     </header>
     <div class="main">
-    <!-- svelte-ignore a11y_interactive_supports_focus -->
     <div class="sections" role="tablist" aria-orientation="vertical" aria-label="Разделы настроек" tabindex="-1" onkeydown={sideKey}>
       {#each sections as t (t)}
         {#if HEADS[t]}<div class="shead" role="presentation">{HEADS[t]}</div>{/if}
@@ -440,7 +438,6 @@
               {:else}
                 {@const s = item}
                 {@const kw = valueOf(s)}
-                <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
                 <div class="grid srow" class:over={rowDrag.overId === s.id} class:isdone={s.done} class:bad={!!errors[s.id]} role="row" tabindex="0" data-row={s.id}
                   aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" aria-label="{displayName(s.keyword) || 'Новое состояние'}. Option со стрелками вверх и вниз меняет порядок"
                   onkeydown={(e) => rowKey(e, s)} use:rowDrag.zone={s.id}>
@@ -467,7 +464,7 @@
                       oninput={(e) => { typingKey(s, (e instanceof InputEvent ? e.data : null) || e.currentTarget.value); e.currentTarget.value = keyEdits[s.id] ?? ''; }} onkeydown={(e) => keyKeydown(e, s)} onblur={() => keyBlur(s)} />
                   </span>
                   <span class="acts">
-                    <button class="x" aria-label="Удалить состояние {displayName(s.keyword)}" disabled={!canRemoveWorkflow(draft) && false || !canRemoveState(wf, s.id)}
+                    <button class="x" aria-label="Удалить состояние {displayName(s.keyword)}" disabled={!canRemoveState(wf, s.id)}
                       title={canRemoveState(wf, s.id) ? '' : 'Последнее открытое состояние удалить нельзя'} onclick={() => askDelete(s)}>×</button>
                   </span>
                 </div>

@@ -532,7 +532,7 @@ export function setPriority(text: string, h: Heading, p: string | null): string 
   const lines = text.split('\n');
   const m = /^(\*+\s+)(?:(\S+)\s+)?(.*)$/.exec(lines[h.line]);
   if (!m) return text;
-  let head = m[1];
+  const head = m[1];
   let rest = lines[h.line].slice(head.length);
   let kw = '';
   if (h.keyword && rest.startsWith(h.keyword)) {

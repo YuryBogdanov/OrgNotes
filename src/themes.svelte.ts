@@ -135,7 +135,7 @@ class Themes {
     if (!isTauri) return;
     const path = await pickOpen('Импорт темы', { name: 'Тема Panopticon', extensions: ['json'] });
     if (!path) return;
-    let t: Theme | null = null;
+    let t: Theme | null;
     try {
       t = parseTheme(await invoke<string>('import_text', { path }));
     } catch (e) {

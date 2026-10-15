@@ -248,7 +248,6 @@
 </section>
 
 {#if confirmReset}
-  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <ConfirmDialog label="Сбросить сочетания" title="Вернуть все сочетания по умолчанию для набора «{presetName}»?" onclose={() => (confirmReset = false)} actions={[{ label: 'Сбросить', kind: 'primary', run: () => void store.resetKeys() }]}>
     Изменено: {changed}.
   </ConfirmDialog>

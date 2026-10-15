@@ -18,10 +18,7 @@
   const low = $derived(c ? lowContrast(c) : new Map<ColorKey, number>());
 
   // ---- the name ---------------------------------------------------------------------------------------------------
-  let draft = $state('');
-  $effect(() => {
-    draft = name;
-  });
+  let draft = $derived(name);
   const commitName = () => {
     if (theme && draft.trim() && draft.trim() !== name) void store.renameTheme(theme, draft);
     else draft = name;
@@ -106,10 +103,7 @@
 ** CANCELLED Внешний аудит
 **** Уровень 4
 ${deepLines ? '***** Уровень 5\n' : ''}`;
-  let sample = $state(SAMPLE(false));
-  $effect(() => {
-    sample = SAMPLE(deep);
-  });
+  let sample = $derived(SAMPLE(deep));
   const wf = $derived(resolveWorkflow(sample, 'пример.org', store.config));
   const reveal = { line: 10, n: 1, col: 30 };
   const label = (t: Theme) => `${t.basedOn ? `на основе ${t.basedOn} · ` : ''}для ${t.appearance === 'dark' ? 'тёмного' : 'светлого'} оформления`;

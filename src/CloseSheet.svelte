@@ -55,7 +55,6 @@
 <svelte:window onkeydowncapture={key} />
 
 <!-- the window behind does not react: the title bar is covered too, the rest is dimmed -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="block" aria-hidden="true" onmousedown={keepFocus}></div>
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="dim" onmousedown={keepFocus}>

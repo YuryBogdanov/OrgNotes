@@ -32,7 +32,6 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="carry" role="dialog" aria-modal="true" aria-label="Перенести незакрытые" tabindex="-1" onkeydown={key}>
   <header>
     <b>Перенести незакрытые в {quarterLabel(to)}</b>

@@ -30,9 +30,7 @@ const openSettings = async (page: Page, files: Record<string, string> = { '/mock
   await expect(page.locator('.srow').first()).toBeVisible();
 };
 const rows = (page: Page) => page.locator('.srow');
-const row = (page: Page, kw: string) => page.locator('.srow').filter({ has: page.locator(`input.kw`) }).filter({ hasText: new RegExp(`^⋮⋮\\s*${kw.replace(/-/g, '[- ]')}`) });
 const keywords = (page: Page) => page.locator('input.kw').evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value));
-const kwInput = (page: Page, kw: string) => page.locator('input.kw').filter({ has: page.locator('xpath=self::*') }).and(page.locator(`input.kw[value="${kw}"]`));
 
 test.describe('table', () => {
   test('columns: lock on the derived name, pencil on the editable one, one grid for header and rows', async ({ page }) => {

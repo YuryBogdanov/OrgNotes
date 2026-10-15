@@ -378,7 +378,6 @@
         {#each draft.blocks as b (b.id)}
           <div class="bwrap" class:over={drag.overId === b.id && drag.dragId !== b.id} use:drag.zone={b.id}>
             {#if open !== b.id}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
               <div class="block" data-block={b.id} role="button" tabindex="0" aria-expanded="false" aria-label="Блок «{b.name}»: {summary(b)}"
                 onclick={() => (open = b.id)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open = b.id; } }}>
                 {@render grip(b)}
@@ -473,7 +472,7 @@
   </div>
 
   {#if confirmCancel}
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="cdim" onmousedown={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}>
       <div class="csheet" role="alertdialog" aria-modal="true" aria-label="Отменить изменения агенды?">
         <h2>Отменить изменения агенды?</h2>
@@ -492,7 +491,6 @@
     {@const w = pop.kind === 'status' && sets.length > 1 ? 280 : pop.kind === 'path' || pop.kind === 'sources' ? 300 : pop.kind === 'group' || pop.kind === 'sort' ? Math.max(200, r.width) : pop.kind === 'date' ? 230 : 200}
     {@const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8))}
     {@const below = window.innerHeight - r.bottom > 260 || r.top < window.innerHeight / 2}
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <!-- a click elsewhere takes the choice -->
     <div class="pop" bind:this={popEl} use:clickOutside={{ onoutside: () => closePop(true, false), also: () => [pop?.anchor] }} role={pop.kind === 'add' ? 'menu' : 'listbox'} tabindex="-1" aria-multiselectable={isMulti || undefined}
       aria-label={pop.kind === 'add' ? 'Поле условия' : pop.kind === 'sources' ? 'Источники' : 'Значение'} onkeydown={popKey}
@@ -527,7 +525,6 @@
               <div class="gh"><span>{o.label}</span><span class="cnt">{o.count}</span></div>
             {:else}
               {@const i = items.indexOf(o)}
-              <!-- svelte-ignore a11y_click_events_have_key_events -->
               <div class="opt" class:hi={i === hi} role={pop.kind === 'add' ? 'menuitem' : 'option'} aria-selected={(pop ? isChecked(pop.kind, o.id, { multi: isMulti, picked, cond: pop.cond, block: pop.block }) : false)} data-opt={o.id}
                 style="padding-left:{8 + (o.depth ?? 0) * 14}px" onmousemove={(e) => moved(e) && (hi = i)} onclick={() => choose(o)}>
                 <span class="ck">{(pop ? isChecked(pop.kind, o.id, { multi: isMulti, picked, cond: pop.cond, block: pop.block }) : false) ? '✓' : ''}</span>
