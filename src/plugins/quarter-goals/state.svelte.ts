@@ -9,7 +9,7 @@ import { weekdayNames } from '@panopticon/api/org';
 import { core, type PFile } from './core.svelte';
 import {
   readGoals, readGoalSettings, sourcesJson, avatarColor, initials, quarterOf, readSource, sourceKey, findSource, cmpQuarter,
-  shiftQuarter, goalsIn, reviewQueue as goalQueue, shortDay, GOAL_STATES, quarterLabel, isSilent, deadlineSoon,
+  shiftQuarter, goalsIn, shortDay, GOAL_STATES, quarterLabel, isSilent, deadlineSoon,
   isDone, type GoalSettings, type Goal, type GoalSource, type NewGoal, type Quarter, type SourceGoals,
 } from './goals';
 import { addGoal, addMark, carryOver, moveGoal } from './ops';

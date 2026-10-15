@@ -374,6 +374,10 @@ net?: { fetch(url: string, init?: { method?; headers?; body?: string }): Promise
 - Чтение внутри транзакции: `tx.heading`, `tx.children`, `tx.body`.
 - `tx.update` остаётся запасным путём для своей структуры в файле.
 
+## Загрузчик Org (тех. спринт 3.3)
+
+- `readOrg(ctx, path)` в `@panopticon/api/org`: читает файл как Org — текст, статусы файла (`info` из `index.workflow` и `wf` для `parseHeadings`) и заголовки. Если файла уже нет, возвращает `null`. Нужны права `files.read` (или `files.edit`) и `index.read`. Раньше встроенные плагины писали этот код каждый у себя.
+
 ## Разбивка и приёмка
 
 | Задача | Что | Готово, когда |

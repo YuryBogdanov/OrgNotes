@@ -3,7 +3,7 @@
 // moving and making entries.
 
 import type { Ctx, HeadingRef } from '@panopticon/api';
-import { byDay, entriesIn, hasDated, isoDay, parseHeadings, sequenceFor, startOf, weekdayNames, workflow, type CalEntry, type CalFile, type Layer, type Workflow } from '@panopticon/api/org';
+import { byDay, entriesIn, hasDated, isoDay, readOrg, sequenceFor, startOf, weekdayNames, type CalEntry, type CalFile, type Layer, type Workflow } from '@panopticon/api/org';
 import { DEFAULT_CAL, insertEntry, moveEntry, readCal, type CalSettings, type NewEntry } from './edit';
 
 export interface PFile extends CalFile {
@@ -25,13 +25,8 @@ class Calendar {
   private folder: string | null = null;
   private reading = 0;
   async read(path: string): Promise<PFile | null> {
-    try {
-      const [text, w] = await Promise.all([this.ctx.files!.read(path), this.ctx.index!.workflow(path)]);
-      const wf = workflow(w) as Workflow;
-      return { name: path, path, text, wf, headings: parseHeadings(text, wf) };
-    } catch {
-      return null; // gone meanwhile
-    }
+    const f = await readOrg(this.ctx, path);
+    return f && { name: path, path, text: f.text, wf: f.wf, headings: f.headings };
   }
   /** Every file again (the folder changed). */
   async load() {

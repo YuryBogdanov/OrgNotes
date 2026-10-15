@@ -3,7 +3,7 @@
 // again when a file, the Inbox file or the folder changes.
 
 import type { Ctx, HeadingRef } from '@panopticon/api';
-import { parseHeadings, sequenceFor, workflow, type Heading, type Workflow } from '@panopticon/api/org';
+import { readOrg, sequenceFor, type Heading, type Workflow } from '@panopticon/api/org';
 import { DEFAULT_SETTINGS, inboxItems, readSettings, type InboxItem, type ListSettings } from './list';
 import { closingStatus, locate, reviewQueue, type ReviewItem } from './review';
 
@@ -41,13 +41,8 @@ class Data {
   }
 
   async read(path: string): Promise<PFile | null> {
-    try {
-      const [text, w] = await Promise.all([this.ctx.files!.read(path), this.ctx.index!.workflow(path)]);
-      const wf = workflow(w) as Workflow;
-      return { path, text, wf, headings: parseHeadings(text, wf) };
-    } catch {
-      return null; // gone meanwhile
-    }
+    const f = await readOrg(this.ctx, path);
+    return f && { path, text: f.text, wf: f.wf, headings: f.headings };
   }
   /** One file again (an edit, a change on disk, a task moved there). */
   async refresh(path: string) {

@@ -2,7 +2,7 @@
 // library with the file's statuses) — read once and again when a file changes; and the tab shown.
 
 import type { Ctx } from '@panopticon/api';
-import { parseHeadings, workflow, type Heading } from '@panopticon/api/org';
+import { readOrg, type Heading } from '@panopticon/api/org';
 
 export interface PFile {
   /** The path in the notes folder (the API's): the name and the path are one here. */
@@ -21,12 +21,8 @@ class Core {
   private reading = 0;
 
   async read(path: string): Promise<PFile | null> {
-    try {
-      const [text, wf] = await Promise.all([this.ctx.files!.read(path), this.ctx.index!.workflow(path)]);
-      return { name: path, path, text, wf, headings: parseHeadings(text, workflow(wf)) };
-    } catch {
-      return null; // gone meanwhile
-    }
+    const f = await readOrg(this.ctx, path);
+    return f && { name: path, path, text: f.text, wf: f.info, headings: f.headings };
   }
   /** Every file again (the folder changed, the statuses changed). */
   async load() {
