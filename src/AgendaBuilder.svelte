@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { moved } from './pointer';
   import { onMount, tick } from 'svelte';
   import { store } from './store.svelte';
   import { resolveWorkflow, toneFor, type Workflow } from './org';
@@ -671,7 +672,7 @@
               {@const i = items.indexOf(o)}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <div class="opt" class:hi={i === hi} role={pop.kind === 'add' ? 'menuitem' : 'option'} aria-selected={checked(o)} data-opt={o.id}
-                style="padding-left:{8 + (o.depth ?? 0) * 14}px" onmousemove={() => (hi = i)} onclick={() => choose(o)}>
+                style="padding-left:{8 + (o.depth ?? 0) * 14}px" onmousemove={(e) => moved(e) && (hi = i)} onclick={() => choose(o)}>
                 <span class="ck">{checked(o) ? '✓' : ''}</span>
                 {#if o.tone}<span class="sdot tone-bg" style={o.tone}></span>{/if}
                 {#if pop.kind === 'path' || pop.kind === 'sources'}

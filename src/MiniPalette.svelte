@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { moved } from './pointer';
   import { isOrgName } from './fileTypes.svelte';
   import { onMount, tick } from 'svelte';
   import { store, type MiniNote } from './store.svelte';
@@ -96,7 +97,7 @@
   <div class="list" bind:this={list} role="listbox" aria-label="Заметки">
     {#each rows as r, i (r.key)}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <div class="row" class:on={i === sel} role="option" aria-selected={i === sel} tabindex="-1" onmousemove={() => (sel = i)} onclick={(e) => pick(r, e.metaKey)}>
+      <div class="row" class:on={i === sel} role="option" aria-selected={i === sel} tabindex="-1" onmousemove={(e) => moved(e) && (sel = i)} onclick={(e) => pick(r, e.metaKey)}>
         <span class="lvl">{r.level}</span><span class="t">{r.title}</span><span class="sub">{r.sub}</span>
       </div>
     {:else}

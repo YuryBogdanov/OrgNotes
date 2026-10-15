@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { moved } from './pointer';
   import { openEntry } from './calOpen';
   import { onMount, tick } from 'svelte';
   import { dayShort, entriesWord, fromIso, type CalEntry } from './calIndex';
@@ -65,7 +66,7 @@
   <div class="dh"><b>{dayShort(fromIso(day))}</b><span>{entriesWord(entries.length)}</span></div>
   <div role="listbox" aria-label="Записи">
     {#each entries as e, i (e.path + e.line + e.layer + (e.time ?? ''))}
-      <button role="option" aria-selected={i === sel} class:on={i === sel} class:mine={mark?.(e)} onmousemove={() => (sel = i)} onclick={(ev) => open(e, ev.metaKey)}>
+      <button role="option" aria-selected={i === sel} class:on={i === sel} class:mine={mark?.(e)} onmousemove={(e) => moved(e) && (sel = i)} onclick={(ev) => open(e, ev.metaKey)}>
         <span class="k tone-chip" class:ev={e.layer === 'event' || e.layer === 'deadline'} style={tone(e)}>{label(e)}</span>
         <span class="tt"><span class="t" class:done={e.layer === 'done'}>{e.priority ? `[#${e.priority}] ` : ''}{e.title}{mark?.(e) ? ' — эта задача' : ''}</span><span class="w">{e.where}</span></span>
         <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="var(--fg2)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-label="Открыть в новой вкладке"><path d="M8 4H4v12h12v-4M11 3h6v6M17 3l-8 8" /></svg>

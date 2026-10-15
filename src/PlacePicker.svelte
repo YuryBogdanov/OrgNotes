@@ -4,6 +4,7 @@
 </script>
 
 <script lang="ts">
+  import { moved } from './pointer';
   import { onMount, tick, type Snippet } from 'svelte';
   import { store, type NoteFile } from './store.svelte';
   import { ICONS } from './commands';
@@ -278,7 +279,7 @@
             {#if f.group !== files[i - 1]?.group}<div class="gh" role="presentation">{f.group}</div>{/if}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div class="row" id={'rf-f:' + f.path} role="option" aria-selected={sel === 'f:' + f.path} class:on={sel === 'f:' + f.path}
-              onmousemove={() => (sel = 'f:' + f.path)} onclick={() => act('f:' + f.path)}>
+              onmousemove={(e) => moved(e) && (sel = 'f:' + f.path)} onclick={() => act('f:' + f.path)}>
               <svg class="ic" width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICONS.file} /></svg>
               <span class="t">{#each runs(f.label, f.at) as part}{#if part.hit}<b>{part.s}</b>{:else}{part.s}{/if}{/each}</span>
               <span class="hint">{f.sub}{f.self ? ' · этот файл' : ''}</span>
@@ -289,7 +290,7 @@
         {:else if target}
           {#if top}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <div class="row" id="rf-top" role="option" aria-selected={sel === 'top'} class:on={sel === 'top'} onmousemove={() => (sel = 'top')} onclick={() => act('top')}>
+            <div class="row" id="rf-top" role="option" aria-selected={sel === 'top'} class:on={sel === 'top'} onmousemove={(e) => moved(e) && (sel = 'top')} onclick={() => act('top')}>
               <svg class="ic" width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={TOP} /></svg>
               <span class="t">{top}</span>
               <span class="hint">в конец {fileName}</span>
@@ -302,7 +303,7 @@
             {@const on = sel === 'h:' + r.i}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div class="node" id={'rf-h:' + r.i} role="option" aria-selected={on} aria-disabled={r.blocked} class:on class:dim={r.dim} class:blocked={r.blocked}
-              onmousemove={() => { if (!r.blocked) sel = 'h:' + r.i; }} onclick={() => { if (!r.blocked) act('h:' + r.i); }}>
+              onmousemove={(e) => { if (moved(e) && !r.blocked) sel = 'h:' + r.i; }} onclick={() => { if (!r.blocked) act('h:' + r.i); }}>
               {#each { length: r.depth } as _}<span class="guide" aria-hidden="true"><span></span></span>{/each}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <svg class="chev" class:open={r.open} class:none={!r.hasKids} width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"

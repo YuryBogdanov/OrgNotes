@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { moved } from './pointer';
   import { onMount, tick } from 'svelte';
   import { store } from './store.svelte';
   import { sequenceFor, setKeyword, setPriority, toneFor } from './org';
@@ -68,7 +69,7 @@
   {#each items as it, i (it.id)}
     {#if it.sep}<div class="sep" role="separator"></div>{/if}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <div class="row" class:on={i === sel} role="menuitem" tabindex="-1" onmousemove={() => (sel = i)} onclick={it.run}>
+    <div class="row" class:on={i === sel} role="menuitem" tabindex="-1" onmousemove={(e) => moved(e) && (sel = i)} onclick={it.run}>
       <span class="ck">{it.check ? '✓' : ''}</span>
       {#if it.cap}<span class="cap" class:tone-chip={!!it.style} class:prio={pick.kind === 'priority'} style={it.style}>{it.cap}</span>{:else}<span class="lbl">{it.label}</span>{/if}
       {#if it.hint}<span class="hint">{it.hint}</span>{/if}

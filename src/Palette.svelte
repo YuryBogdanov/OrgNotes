@@ -4,7 +4,8 @@
 </script>
 
 <script lang="ts">
-  import { onDestroy, onMount, tick } from 'svelte';
+  import { moved } from './pointer';
+  import { onDestroy, onMount, tick, untrack } from 'svelte';
   import { store } from './store.svelte';
   import { ICONS, bare, calStep, contextOf, gotoStep, headingStep, mainStep, nameStep, type Row, type Step, type Unit } from './commands';
   import Calendar from './Calendar.svelte';
@@ -32,10 +33,15 @@
   const pickable = $derived(rows.flatMap((r, i) => (r.run ? [i] : [])));
   const plate = $derived(step.plate(q));
   const current = $derived(rows[pickable[sel] ?? -1]);
-  // typing selects the first result (or the row the list prefers: the heading the cursor is in)
+  // typing selects the first result (or the row the list prefers: the heading the cursor is in) — only typing: the
+  // rows read again for another reason (a file saved, a plugin's command now available) keep the row chosen
   $effect(() => {
     void q;
-    sel = Math.max(0, pickable.findIndex((i) => rows[i].prefer));
+    untrack(() => (sel = Math.max(0, pickable.findIndex((i) => rows[i].prefer))));
+  });
+  // fewer rows than the one chosen: back into the list
+  $effect(() => {
+    if (sel >= pickable.length) untrack(() => (sel = Math.max(0, pickable.length - 1)));
   });
 
   let input: HTMLInputElement | undefined = $state();
@@ -151,7 +157,7 @@
       close();
     } else if (e.key === 'Tab') e.preventDefault(); // the focus stays in the field
   }
-  // the pointer picks a row only when it moves, not when keyboard scrolling slides a row under it
+  // the pointer picks a row only when it moves (`moved`), not when keyboard scrolling slides a row under it
   const hover = (i: number) => {
     const k = pickable.indexOf(i);
     if (k >= 0) sel = k;
@@ -223,7 +229,7 @@
       {#if r.run}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="row" id={'pal-' + r.id} role="option" aria-selected={current === r} aria-label={label(r)} class:on={current === r}
-          style:padding-left={10 + (r.level ?? 0) * 18 + 'px'} onmousemove={() => hover(i)} onclick={() => run(r)}>
+          style:padding-left={10 + (r.level ?? 0) * 18 + 'px'} onmousemove={(e) => moved(e) && hover(i)} onclick={() => run(r)}>
           {#if r.icon || r.iconPath}
             <span class="ico"><svg class="ic" width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={r.iconPath ?? ICONS[r.icon!]} /></svg>{#if r.plugin}<i class="pm" title="Команда плагина"></i>{/if}</span>
           {/if}

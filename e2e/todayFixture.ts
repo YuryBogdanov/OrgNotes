@@ -3,6 +3,9 @@
 
 const now = new Date();
 export const DAY = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getHours() < 4 ? 1 : 0));
+/** The time the window lives in (`page.clock.setFixedTime`): noon of that day — a run across midnight or 4:00 does
+ *  not change the day under the test. */
+export const NOW = new Date(DAY.getFullYear(), DAY.getMonth(), DAY.getDate(), 12, 0);
 const WD = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 const p = (n: number) => String(n).padStart(2, '0');
 export const shift = (n: number) => new Date(DAY.getFullYear(), DAY.getMonth(), DAY.getDate() + n);

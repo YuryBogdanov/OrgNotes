@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installTauriMock, openSettingsSheet } from './tauriMock';
+import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
 
 // ТЗ 26, roadmap 1.1: the example plugin «Привет» — built only on the API — adds a command with its keys, a section
 // of the navigator, a kind of tab and a section of the settings; its edit is one step of ⌘Z. Off by default.
@@ -16,6 +16,7 @@ async function open(page: Page, on: boolean) {
   await installTauriMock(page, FILES);
   await page.goto('/');
   await expect(page.locator('.cm-content').first()).toBeVisible();
+  await pluginsReady(page); // its keys work once the plugins have started
 }
 
 test('off by default: no section, no commands', async ({ page }) => {
