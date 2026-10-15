@@ -48,6 +48,16 @@ export interface ManifestFileView {
   icon: string;
   key?: string;
 }
+/** A file type of the plugin (ТЗ 39, API 1.10): files with this extension are listed in the folder and opened in
+ *  the plugin's file view `view`; `template` — what a new one holds, `newLabel` — the folder menu's item. */
+export interface ManifestFileType {
+  ext: string;
+  title: string;
+  icon: string;
+  view: string;
+  template: string;
+  newLabel: string;
+}
 /** A block of «Сегодня» (ТЗ 32): in the settings' list of blocks; `attach` puts it under the block before it. */
 export interface ManifestTodayBlock {
   id: string;
@@ -92,6 +102,7 @@ export interface Manifest {
     views: ManifestView[];
     todayBlocks: ManifestTodayBlock[];
     fileViews: ManifestFileView[];
+    fileTypes: ManifestFileType[];
     settings: ManifestSettings[];
     statusSets: ManifestStatusSet[];
     themes: string[];
@@ -203,6 +214,20 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
     if (x.key !== undefined && !commands.some((k) => k.id === x.key)) problems.push(`вид файла «${x.id}»: key — не команда этого плагина`);
     fileViews.push({ id: x.id as string, title: String(x.title ?? ''), icon: isStr(x.icon) ? x.icon : 'M4 4h12v12H4z', ...(isStr(x.key) ? { key: x.key } : {}) });
   }
+  const fileTypes: ManifestFileType[] = [];
+  for (const x of arr(c.fileTypes).map(obj)) {
+    const ext = isStr(x.ext) ? x.ext.replace(/^\./, '').toLowerCase() : '';
+    if (!/^[a-z0-9]{1,16}$/.test(ext) || ext === 'org' || ext === 'org_archive') {
+      problems.push(`тип файла «${String(x.ext)}»: расширение — латинские буквы и цифры, не org`);
+      continue;
+    }
+    if (!isStr(x.view) || !fileViews.some((v) => v.id === x.view)) {
+      problems.push(`тип файла «.${ext}»: view — вид файла этого плагина`);
+      continue;
+    }
+    const title = isStr(x.title) ? x.title : ext;
+    fileTypes.push({ ext, title, icon: isStr(x.icon) ? x.icon : 'M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1z', view: x.view, template: isStr(x.template) ? x.template : '', newLabel: isStr(x.newLabel) ? x.newLabel : `Новый ${title.toLowerCase()}` });
+  }
   const settings: ManifestSettings[] = [];
   for (const x of arr(c.settings).map(obj)) {
     if (!isStr(x.section) && !isStr(x.block)) {
@@ -235,7 +260,7 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
       defaultEnabled: typeof j.defaultEnabled === 'boolean' ? j.defaultEnabled : undefined,
       icon: isStr(j.icon) && /^[MmLlHhVvCcSsQqTtAaZz0-9.,\s-]+$/.test(j.icon) ? j.icon : undefined,
       permissions: permissions as Permission[], net,
-      contributes: { commands, navSections, views, todayBlocks, fileViews, settings, statusSets, themes: arr(c.themes).filter(isStr) as string[], slots },
+      contributes: { commands, navSections, views, todayBlocks, fileViews, fileTypes, settings, statusSets, themes: arr(c.themes).filter(isStr) as string[], slots },
       exports,
       warnings,
     },

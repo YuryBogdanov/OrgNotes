@@ -1,8 +1,14 @@
 // The app only works with .org files, so the extension is never shown: "Планёрка тимлидов", not "Планёрка тимлидов.org".
 // It stays where the real file is meant: "Скопировать путь", the tab tooltip, the text of the files.
 
+import { fileTypeOf } from './fileTypes.svelte';
+
 /** "Команда/report.v2.org" → "report.v2": the last segment without its final ".org". */
-export const displayName = (rel: string) => noOrg(rel.split('/').pop() ?? rel);
+export const displayName = (rel: string) => {
+  const n = rel.split('/').pop() ?? rel;
+  // a plugin's file (ТЗ 39): «план.canvas» → «план»
+  return fileTypeOf(n) ? n.replace(/\.[^.]+$/, '') : noOrg(n);
+};
 export const noOrg = (s: string) => s.replace(/\.org$/i, '');
 /** An archive of a note as Emacs makes them («platform.org_archive», ТЗ 33): in the navigator, not in the agenda. */
 export const isArchive = (rel: string) => /\.org_archive$/i.test(rel);

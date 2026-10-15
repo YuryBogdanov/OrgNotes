@@ -19,6 +19,7 @@ import { mini as miniSettings } from './miniOptions.svelte';
 import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
 import { fileLink, headingLink, labelOf, linkHooks } from './linkEdit';
 import { newId } from './endDay';
+import { fileTypeOf, fileTypes, isOrgName, watchFileTypes, withExt } from './fileTypes.svelte';
 import { bindingsOf, fromAccelerator, parseState, toAccelerator, withKeys, DEFAULT_STATE, type KeyState, type Preset } from './keys';
 import { DEFAULT_SEQUENCE, EMPTY_CONFIG, firstDone, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow, type WorkflowDef } from './org';
 
@@ -60,10 +61,12 @@ function lsGetJson<T>(k: string): T | null {
 
 function build(name: string, path: string, text: string, disk: string, diskRaw: string, eol: Eol, cfg: ProjectConfig): NoteFile {
   const wf = resolveWorkflow(text, name, cfg);
-  const ft = /^#\+FILETAGS:\s*(.+)$/m.exec(text);
+  // a plugin's file (a canvas, ТЗ 39): no headings — the agenda, the tags, the links do not see it
+  const org = isOrgName(name);
+  const ft = org ? /^#\+FILETAGS:\s*(.+)$/m.exec(text) : null;
   return {
     name, path, text, disk, diskRaw, eol, wf,
-    headings: parseHeadings(text, wf),
+    headings: org ? parseHeadings(text, wf) : [],
     filetags: ft ? ft[1].split(':').map((s) => s.trim()).filter(Boolean) : [],
   };
 }
@@ -120,7 +123,7 @@ class Store {
   get configText() {
     return this.configRaw;
   }
-  creating = $state<{ dir: string; kind: 'file' | 'folder' } | null>(null); // inline "new" row in the navigator
+  creating = $state<{ dir: string; kind: 'file' | 'folder'; type?: string } | null>(null); // inline "new" row in the navigator (`type`: a plugin's file type)
   renaming = $state<string | null>(null); // relative path of the entry being renamed inline
   dialog = $state<{ type: 'delete' | 'move'; rel: string; isDir: boolean } | null>(null);
   /** Editor panes and their tabs; see layout.ts. */
@@ -801,7 +804,7 @@ class Store {
     const i = rel.lastIndexOf('/');
     try {
       await this.flush();
-      if (isTauri) await invoke<string>('create_entry', { parent: this.abs(i < 0 ? '' : rel.slice(0, i)), name: rel.slice(i + 1), isDir: false });
+      if (isTauri) await invoke<string>('create_entry', { parent: this.abs(i < 0 ? '' : rel.slice(0, i)), name: rel.slice(i + 1), isDir: false, text: fileTypeOf(rel)?.template ?? null });
       await this.reload();
     } catch (e) {
       if (!String(e).includes('exist')) {
@@ -1669,7 +1672,7 @@ class Store {
     const opts = { cs: this.findCase, word: this.findWord };
     const scope = this.search.scope;
     const open = new Set(this.layout.panes.flatMap((p) => p.tabs.flatMap((t) => (t.kind === 'file' && t.path ? [t.path] : []))));
-    const files = [...this.files];
+    const files = this.files.filter((f) => isOrgName(f.name)); // not a plugin's file (a canvas's JSON)
     const groups: SearchGroup[] = [];
     let total = 0;
     let capped = false;
@@ -1774,6 +1777,9 @@ class Store {
   viewOf(tab: Tab | undefined): string {
     if (!tab || tab.kind !== 'file') return '';
     const ok = (v: string | undefined) => (v && fileViewOf(v) ? v : '');
+    // a plugin's file type: always its view (the Org editor never shows it)
+    const ft = fileTypeOf(tab.path);
+    if (ft) return ft.view;
     if (tab.view !== undefined) return ok(tab.view);
     const f = this.fileOf(tab);
     if (!f) return '';
@@ -2329,12 +2335,13 @@ class Store {
     for (const f of this.files.filter((x) => x.text !== x.disk && !this.conflicts[x.path])) await this.save(f.path);
   }
 
-  async createEntry(parentRel: string, name: string, kind: 'file' | 'folder') {
+  async createEntry(parentRel: string, name: string, kind: 'file' | 'folder', type?: string) {
     this.creating = null;
     if (!name.trim()) return;
+    const ft = type ? fileTypes().find((t) => t.ext === type) : undefined;
     try {
       await this.flush();
-      const path = await invoke<string>('create_entry', { parent: this.abs(parentRel), name, isDir: kind === 'folder' });
+      const path = await invoke<string>('create_entry', { parent: this.abs(parentRel), name: ft ? withExt(name.trim(), ft) : name, isDir: kind === 'folder', text: ft?.template ?? null });
       await this.reload();
       if (kind === 'file') {
         const i = this.files.findIndex((f) => f.path === path);
@@ -2348,6 +2355,9 @@ class Store {
   async renameEntry(rel: string, newName: string) {
     this.renaming = null;
     const base = rel.split('/').pop()!;
+    // a plugin's file keeps its extension («план» → «план.canvas»)
+    const ft = fileTypeOf(base);
+    if (ft) newName = withExt(newName.trim(), ft);
     if (!newName.trim() || newName.trim() === base || newName.trim() + '.org' === base) return;
     await this.relocate(rel, (path) => invoke<string>('rename_entry', { path, newName }));
   }
@@ -2586,6 +2596,18 @@ export type DiskAnswer = 'disk' | 'mine' | 'later' | 'saveas' | 'keep' | 'close'
 const CONFLICT = 'файл на диске изменён другой программой';
 
 export const store = new Store();
+// a plugin's file type came or went (ТЗ 39): the Rust side lists those files too, the folder is read again
+let typesQueued = false;
+watchFileTypes(() => {
+  if (typesQueued) return;
+  typesQueued = true;
+  queueMicrotask(async () => {
+    typesQueued = false;
+    if (!isTauri) return;
+    await invoke('set_note_types', { types: fileTypes().map((t) => t.ext) });
+    if (store.loaded && store.dir) await store.reload();
+  });
+});
 
 // the editor's part of links (ТЗ 35): it does not import the store
 // the editor knows its file by its name in the folder (its path in a tab of a file that is not in it)

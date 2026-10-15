@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { draggedHeading, setDragged } from './dragData';
   import { untrack } from 'svelte';
   import { store } from './store.svelte';
   import { dayDiff, fmtDay, toJs, toneFor, type OrgDate } from './org';
@@ -273,6 +274,7 @@
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <div class="row" class:sel={i === sel} class:done={r.done} class:stale={r.stale} data-i={i} role="option" aria-selected={i === sel}
             onclick={() => choose(i)} ondblclick={() => openRow(i, 'neighbor-focus')}
+            draggable="true" ondragstart={(e) => { const d = draggedHeading(r.path, r.line); if (d) setDragged(e.dataTransfer, d); }}
             oncontextmenu={(e) => { choose(i); list?.focus({ preventScroll: true }); const sp = lists.spec(listId); if (sp) lists.openMenu(e, sp); }}>
             <span class="kwc">{#if r.kw}<span class="kw tone-chip" style={r.tone}>{r.kw}</span>{/if}</span>
             <div class="main"><span class="ttl">{r.title}</span><span class="src">{r.src}</span></div>

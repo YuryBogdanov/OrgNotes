@@ -6,6 +6,8 @@
   import { toneStyle } from './colors';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import { headingActionsFor } from './headingActions.svelte';
+  import { fileTypeOf, fileTypes } from './fileTypes.svelte';
+  import { draggedHeading, setDragged } from './dragData';
   import { buttons, expandAll, folderKey, headingKey, pathKeys, readOpen, subtreeKeys, treeNodes, writeOpen } from './navTree';
 
   type Row = {
@@ -34,7 +36,7 @@
   let capped = $state(false); // «Развернуть всё» left the headings closed
   const base = (n: string) => n.split('/').pop()!;
   const parentOf = (rel: string) => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
-  const noExt = (n: string) => n.replace(/\.org$/, '');
+  const noExt = (n: string) => n.replace(/\.org$/, '').replace(fileTypeOf(n) ? /\.[^.]+$/ : /$^/, '');
 
   const rows = $derived.by(() => {
     type Node = { name: string; rel: string; children: Map<string, Node>; files: number[] };
@@ -205,14 +207,17 @@
   // ---- context menu -----------------------------------------------------------
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
 
-  const startCreate = (dir: string, kind: 'file' | 'folder') => {
+  const startCreate = (dir: string, kind: 'file' | 'folder', type?: string) => {
     if (dir) open.add(folderKey(dir)); // make sure the folder is expanded
-    store.creating = { dir, kind };
+    store.creating = { dir, kind, ...(type ? { type } : {}) };
   };
   const createItems = (dir: string): MenuItem[] => [
     { label: 'Новый файл', action: () => startCreate(dir, 'file') },
+    // the plugins' file types: «Новый холст» (ТЗ 39)
+    ...fileTypes().map((t): MenuItem => ({ label: t.newLabel, action: () => startCreate(dir, 'file', t.ext) })),
     { label: 'Новая папка', action: () => startCreate(dir, 'folder') },
   ];
+  const creatingType = $derived(store.creating?.type ? fileTypes().find((t) => t.ext === store.creating!.type) : undefined);
 
   function rowMenu(e: MouseEvent, r: Row) {
     // a heading: the link to it (ТЗ 35)
@@ -253,7 +258,7 @@
     el.select();
   }
   function keyNew(e: KeyboardEvent, r: Row) {
-    if (e.key === 'Enter') store.createEntry(r.rel, (e.currentTarget as HTMLInputElement).value, store.creating?.kind ?? 'file');
+    if (e.key === 'Enter') store.createEntry(r.rel, (e.currentTarget as HTMLInputElement).value, store.creating?.kind ?? 'file', store.creating?.type);
     else if (e.key === 'Escape') store.creating = null;
   }
   function keyRename(e: KeyboardEvent, r: Row) {
@@ -270,9 +275,18 @@
     return !(dest === dragRel || dest.startsWith(dragRel + '/'));
   };
   function dragStart(e: DragEvent, r: Row) {
+    // a heading: only to a plugin's view (a card on a canvas, ТЗ 39)
+    if (r.kind === 'heading') {
+      const f = r.file !== undefined ? store.files[r.file] : undefined;
+      const d = f && r.line !== undefined ? draggedHeading(f.path, r.line) : null;
+      if (d) setDragged(e.dataTransfer, d);
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+      return;
+    }
     dragRel = r.rel;
     e.dataTransfer?.setData('text/plain', r.rel);
-    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+    if (r.kind === 'file') setDragged(e.dataTransfer, { kind: 'file', path: r.rel });
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copyMove';
   }
   function over(e: DragEvent, dest: string) {
     if (!canDrop(dest)) return;
@@ -329,10 +343,10 @@
       {#if r.kind === 'new'}
         <div class="row" style="padding-left:{6 + r.depth * 14 + 16}px">
           <svg class="ic" width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.5" stroke-linejoin="round">
-            {#if store.creating?.kind === 'folder'}<path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" />{:else}<path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" />{/if}
+            {#if store.creating?.kind === 'folder'}<path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" />{:else if creatingType}<path d={creatingType.icon} />{:else}<path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" />{/if}
           </svg>
           <input class="name" aria-label={store.creating?.kind === 'folder' ? 'Имя новой папки' : 'Имя нового файла'}
-            placeholder={store.creating?.kind === 'folder' ? 'Новая папка' : 'Новый файл'}
+            placeholder={store.creating?.kind === 'folder' ? 'Новая папка' : (creatingType?.newLabel ?? 'Новый файл')}
             use:focusSelect onkeydown={(e) => keyNew(e, r)} onblur={() => (store.creating = null)} />
         </div>
       {:else}
@@ -340,7 +354,7 @@
         <div class="row" class:sel={r.selected} class:flash={r.kind === 'file' && flash === r.key} class:dim={r.done} data-key={r.key} class:drop={r.kind === 'folder' && dropOn === r.rel}
           style="padding-left:{6 + r.depth * 14}px" role="treeitem" aria-selected={r.selected} aria-expanded={r.hasKids ? r.open : undefined}
           tabindex={r.key === focusKey ? 0 : -1}
-          draggable={store.canManageFiles && (r.kind === 'file' || r.kind === 'folder') && store.renaming !== r.rel}
+          draggable={r.kind === 'heading' || (store.canManageFiles && (r.kind === 'file' || r.kind === 'folder') && store.renaming !== r.rel)}
           ondragstart={(e) => dragStart(e, r)} ondragend={() => (dragRel = dropOn = null)}
           ondragover={(e) => r.kind === 'folder' && over(e, r.rel)}
           ondrop={(e) => r.kind === 'folder' && drop(e, r.rel)}
@@ -352,6 +366,9 @@
           </button>
           {#if r.kind === 'folder'}
             <svg class="ic" width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="var(--acc)" stroke-width="1.5" stroke-linejoin="round"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" /></svg>
+          {:else if r.kind === 'file' && fileTypeOf(r.rel)}
+            <!-- a plugin's file type: its icon, in the plugins' colour -->
+            <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="var(--purple, var(--fg2))" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-type={fileTypeOf(r.rel)!.ext}><path d={fileTypeOf(r.rel)!.icon} /></svg>
           {:else if r.kind === 'file'}
             <svg class="ic" width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="var(--fg2)" stroke-width="1.6" stroke-linejoin="round"><path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" /></svg>
           {/if}

@@ -42,7 +42,7 @@ async function open(page: Page, files: Record<string, string> = {}) {
   });
   await page.goto('/');
   await pluginsReady(page);
-  await expect(page.locator('.cm-content')).toBeVisible();
+  await expect(page.locator('.cm-content, .cv').first()).toBeVisible();
 }
 const text = (page: Page) => page.evaluate(async () => (await import('/src/store.svelte.ts' as string)).store.files.find((f: any) => f.name === 'plan.org').text as string);
 const map = (page: Page) => page.getByRole('application', { name: 'Mindmap' });
@@ -179,4 +179,155 @@ test('drag a node onto another: it goes under it', async ({ page }) => {
   await expect(nodeOf(page, 'Найм')).toHaveClass(/into/);
   await page.mouse.up();
   await expect.poll(() => text(page)).toContain('** Тимлид данных\n** Алерты v2\n* Платформа');
+});
+
+// ---- part B: the free canvas (.canvas, JSON Canvas) ----
+const BOARD = JSON.stringify({
+  nodes: [
+    { id: 'g1', type: 'group', x: 0, y: 0, width: 660, height: 286, label: 'Переключение', color: '5' },
+    { id: 'n1', type: 'text', text: 'Окно — после QBR', x: 22, y: 66, width: 250, height: 66, color: '3' },
+    { id: 'c1', type: 'file', file: 'plan.org', subpath: '#Новый ДЦ', x: 330, y: 66, width: 300, height: 150 },
+    { id: 'l1', type: 'link', url: 'https://wiki.company.local/dc/plan', x: 770, y: 66, width: 280, height: 80 },
+  ],
+  edges: [{ id: 'e1', fromNode: 'n1', fromSide: 'right', toNode: 'c1', toSide: 'left', toEnd: 'arrow', label: 'зачем' }],
+  extra: { from: 'obsidian' },
+}, null, '\t');
+const board = (page: Page) => page.getByRole('application', { name: 'Холст' });
+const cardOf = (page: Page, text: string) => board(page).locator('.cv-node', { hasText: text });
+const json = async (page: Page, p = '/mock/board.canvas') => JSON.parse((await page.evaluate((x) => (window as any).__disk[x] as string, p)) || '{}');
+async function openBoard(page: Page) {
+  await open(page, { '/mock/board.canvas': BOARD });
+  await page.getByRole('treeitem', { name: /^board$/ }).click();
+  await expect(board(page)).toBeVisible();
+}
+
+test('a .canvas from Obsidian: the group, the note, the live card of a heading, the link, the edge with its label', async ({ page }) => {
+  await openBoard(page);
+  await expect(board(page).locator('.cv-glabel')).toHaveText('Переключение');
+  await expect(cardOf(page, 'Окно — после QBR')).toBeVisible();
+  const card = cardOf(page, 'Новый ДЦ');
+  await expect(card.locator('.cv-kw')).toHaveText('DOING');
+  await expect(card.locator('.cv-src')).toContainText('plan.org › Платформа');
+  await expect(cardOf(page, 'wiki.company.local')).toContainText('/dc/plan');
+  await expect(board(page).locator('.cv-elabel')).toHaveText('зачем');
+  // the card is live: the heading renamed in the file shows at once
+  const now = (await page.evaluate(() => (window as any).__disk['/mock/plan.org'])) as string;
+  await page.evaluate((t) => (window as any).__setDisk('/mock/plan.org', t), now.replace('** DOING Новый ДЦ', '** DONE Новый ДЦ'));
+  await expect(card.locator('.cv-kw')).toHaveText('DONE');
+});
+
+test('a note: «Заметка» in the bar, typed, written; moved with the grid; the group carries what is in it; ⌘Z', async ({ page }) => {
+  await openBoard(page);
+  await board(page).getByRole('toolbar', { name: 'Добавить на холст' }).getByRole('button', { name: 'Заметка' }).click();
+  await expect(board(page).getByRole('textbox', { name: 'Текст заметки' })).toBeFocused();
+  await page.keyboard.type('Спросить про бюджет');
+  await page.keyboard.press('Escape');
+  await expect(cardOf(page, 'Спросить про бюджет')).toBeVisible();
+  await expect.poll(async () => (await json(page)).nodes.find((n: any) => n.text === 'Спросить про бюджет')?.color).toBe('3');
+  expect((await json(page)).extra).toEqual({ from: 'obsidian' }); // unknown fields kept
+  // the group dragged: the note and the card inside go with it
+  const label = board(page).locator('.cv-glabel');
+  const b = (await label.boundingBox())!;
+  await page.mouse.move(b.x + 200, b.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(b.x + 230, b.y + 30, { steps: 5 });
+  await page.mouse.move(b.x + 244, b.y + 48, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => (await json(page)).nodes.find((n: any) => n.id === 'c1')?.x).not.toBe(330);
+  const j = await json(page);
+  const g = j.nodes.find((n: any) => n.id === 'g1');
+  const c = j.nodes.find((n: any) => n.id === 'c1');
+  expect(g.x % 22).toBe(0);
+  expect(c.x - g.x).toBe(330);
+  expect(j.nodes.find((n: any) => n.id === 'l1').x).toBe(770); // outside the group: stays
+  await board(page).focus();
+  await page.keyboard.press('Meta+z');
+  await expect.poll(async () => (await json(page)).nodes.find((n: any) => n.id === 'c1')?.x).toBe(330);
+});
+
+test('select, ⌘D, ⌘G, colour, delete; an edge drawn from a side dot', async ({ page }) => {
+  await openBoard(page);
+  const note = cardOf(page, 'Окно — после QBR');
+  await note.click();
+  await page.keyboard.press('Meta+d');
+  await expect.poll(async () => (await json(page)).nodes.filter((n: any) => n.text === 'Окно — после QBR').length).toBe(2);
+  await page.keyboard.press('Backspace');
+  await expect.poll(async () => (await json(page)).nodes.filter((n: any) => n.text === 'Окно — после QBR').length).toBe(1);
+  // colour
+  await note.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Цвет…' }).click();
+  await expect(board(page).locator('.cv-note')).toContainText('«color» в JSON Canvas');
+  await board(page).getByRole('toolbar', { name: 'Цвет' }).getByRole('button', { name: 'Красный' }).click();
+  await expect.poll(async () => (await json(page)).nodes.find((n: any) => n.id === 'n1').color).toBe('1');
+  // an edge: from the link's left dot to the note
+  const link = cardOf(page, 'wiki.company.local');
+  await link.hover();
+  const dot = link.locator('.cv-dot.bottom');
+  const d = (await dot.boundingBox())!;
+  const t = (await note.boundingBox())!;
+  await page.mouse.move(d.x + 5, d.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(t.x + t.width / 2, t.y + t.height - 5, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await json(page)).edges.length).toBe(2);
+  expect((await json(page)).edges[1]).toMatchObject({ fromNode: 'l1', fromSide: 'bottom', toNode: 'n1', toSide: 'bottom', toEnd: 'arrow' });
+  // ⌘G: a group around the note and the card
+  await note.click();
+  await cardOf(page, 'Новый ДЦ').click({ modifiers: ['Shift'] });
+  await page.keyboard.press('Meta+g');
+  await expect(board(page).getByRole('textbox', { name: 'Подпись группы' })).toBeFocused();
+  await page.keyboard.type('Сроки');
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await json(page)).nodes[0]).toMatchObject({ type: 'group', label: 'Сроки' });
+});
+
+test('a heading dropped from the navigator becomes a live card with its :ID:; ⌘V of a link adds a link; double click opens it at the side', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('nav:headings', '1'));
+  await openBoard(page);
+  await page.getByRole('treeitem', { name: /plan$/ }).locator('.chev').click({ force: true });
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    const row = [...document.querySelectorAll('[role=treeitem]')].find((r) => r.textContent?.trim().endsWith('Риски'))!;
+    row.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+    const st = document.querySelector('.cv-stage')!;
+    const r = st.getBoundingClientRect();
+    st.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 200, clientY: r.top + 500 }));
+  });
+  await expect(cardOf(page, 'Риски')).toBeVisible();
+  const j = await json(page);
+  const card = j.nodes.find((n: any) => n.subpath === '#Риски');
+  expect(card).toMatchObject({ type: 'file', file: 'plan.org' });
+  expect(card.orgId).toMatch(/^[0-9a-f-]{36}$/);
+  await expect.poll(() => text(page)).toMatch(new RegExp(`\\* Риски\\n:PROPERTIES:\\n:ID: +${card.orgId}\\n:END:\\n`));
+  // the card at the side: the heading's text, edited in the file
+  await cardOf(page, 'Новый ДЦ').dblclick();
+  const side = page.getByRole('dialog', { name: 'Карточка заголовка' });
+  await expect(side).toContainText('Карточка из plan.org — правки сразу идут в файл');
+  await expect(side.locator('.cm-content')).toContainText('Учения');
+  await page.keyboard.press('Escape');
+  // ⌘V of an address: a link
+  await board(page).focus();
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', 'https://jira.company.local/browse/OPS-1');
+    document.querySelector('.cv')!.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
+  });
+  await expect.poll(async () => (await json(page)).nodes.some((n: any) => n.type === 'link' && n.url.includes('OPS-1'))).toBe(true);
+});
+
+test('«Новый холст» in a folder\'s menu: an empty JSON Canvas file; «Холст: новый» in the palette', async ({ page }) => {
+  await open(page);
+  await page.locator('.list').click({ button: 'right', position: { x: 100, y: 400 } });
+  await page.getByRole('menuitem', { name: 'Новый холст' }).click();
+  await page.getByRole('textbox', { name: 'Имя нового файла' }).fill('Идеи');
+  await page.keyboard.press('Enter');
+  await expect(board(page)).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__disk['/mock/Идеи.canvas'])).toBe('{\n  "nodes": [],\n  "edges": []\n}\n');
+  await page.keyboard.press('Shift+Meta+p');
+  await page.keyboard.type('Холст: новый');
+  await page.keyboard.press('Enter');
+  await page.getByLabel('Название').fill('Ретро');
+  await page.getByRole('dialog').getByRole('button', { name: 'Создать' }).click();
+  await expect(page.locator('.tab.on')).toContainText('Ретро');
+  await expect.poll(() => page.evaluate(() => (window as any).__disk['/mock/Ретро.canvas'])).toBe('{\n  "nodes": [],\n  "edges": []\n}\n');
 });

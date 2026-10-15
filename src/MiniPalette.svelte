@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isOrgName } from './fileTypes.svelte';
   import { onMount, tick } from 'svelte';
   import { store, type MiniNote } from './store.svelte';
   import { fuzzy } from './fuzzy';
@@ -34,6 +35,7 @@
   const all = $derived.by((): Row[] => {
     const out: Row[] = [];
     for (const f of store.files) {
+      if (!isOrgName(f.name)) continue; // a plugin's file (a canvas) is not a note to write in
       out.push(rowOf({ path: f.name, line: 0, title: '', whole: true }));
       for (const h of f.headings) out.push(rowOf({ path: f.name, line: h.line, title: h.title }));
     }

@@ -5,6 +5,7 @@
 import { fuzzy, type Match } from './fuzzy';
 import { headingLines, type Heading } from './org';
 import { displayName, displayPath } from './names';
+import { isOrgName } from './fileTypes.svelte';
 
 /** «Бюджет [1/3]» → «Бюджет» (the cookie is not searched or shown). */
 export const bareTitle = (title: string) => title.replace(/\s*\[\d*(?:\/\d*|%)\]/g, '').trim();
@@ -41,7 +42,7 @@ export interface FileRow {
  */
 export function fileRows(files: FileLike[], o: { q: string; exclude?: string; self?: string; recent: string[]; root: string }): FileRow[] {
   const where = (rel: string) => displayPath(rel).slice(0, -1).join(' › ') || o.root;
-  const pool = files.filter((f) => f.path !== o.exclude);
+  const pool = files.filter((f) => f.path !== o.exclude && isOrgName(f.name)); // not a plugin's file (a canvas)
   const row = (f: FileLike, group: FileRow['group'], at: number[] = []): FileRow => ({
     path: f.path, label: displayName(f.name), sub: where(f.name), group, at, ...(f.path === o.self ? { self: true } : {}),
   });
