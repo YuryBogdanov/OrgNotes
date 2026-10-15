@@ -6,7 +6,7 @@ import {
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { displayName, isArchive, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags, weekdayNames } from './edits';
-import { bareTitle, caretAfter, keyOf, moveTo, moveWithin } from './refile';
+import { caretAfter } from './refile';
 import type { CalSpec, Plate } from './commands';
 import { lsGet, lsSet } from './storage';
 import { notify } from './notify.svelte';
@@ -17,12 +17,16 @@ import { PluginStore } from './pluginData.svelte';
 import { searchAll } from './searchAll.svelte';
 import { invoke, isTauri } from './tauri';
 import { MiniSync, type MiniNote } from './mirror.svelte';
+import { AgendaStore } from './agendaStore.svelte';
+import { InboxStore } from './inboxStore.svelte';
+import { RefileStore } from './refileStore.svelte';
+import { closeFromFullscreen, hideWindow, leaveFullscreen } from './appWindow';
 export type { MiniNote } from './mirror.svelte';
 export { DEFAULT_CAPTURE_KEY, type ScopeKeys } from './shortcuts.svelte';
 export type { PluginData, StorageSpec } from './pluginData.svelte';
 export { SEARCH_CAP, type SearchGroup, type SearchState } from './searchAll.svelte';
-import { DEFAULT_INBOX, append, entry, prepend, readInbox, withInbox, type InboxConfig } from './inbox';
-import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
+import { readInbox } from './inbox';
+import { readAgendas, type Agenda } from './agendas';
 import { allFileViews, fileViewOf, navOf, viewOf } from './views';
 import { mini as miniSettings } from './miniOptions.svelte';
 import { Journal, Tx, canUndo, type HeadingRef, type Step } from './journal';
@@ -79,6 +83,112 @@ function fromDisk(l: Listed, cfg: ProjectConfig): NoteFile {
 
 
 class Store {
+  // ---- owned (tech sprint 2.4): the agendas and their builder, the Inbox, «Перенести» --------------------------
+  private agendaStore = new AgendaStore({ updateConfig: (make) => this.updateConfig(make), show: (id) => this.openAgendaHere(id) });
+  get agendas() {
+    return this.agendaStore.list;
+  }
+  set agendas(v) {
+    this.agendaStore.list = v;
+  }
+  get builder() {
+    return this.agendaStore.builder;
+  }
+  set builder(v) {
+    this.agendaStore.builder = v;
+  }
+  get builderSave() {
+    return this.agendaStore.builderSave;
+  }
+  set builderSave(v) {
+    this.agendaStore.builderSave = v;
+  }
+  get builderDirty() {
+    return this.agendaStore.builderDirty;
+  }
+  readonly agendaOf = this.agendaStore.of.bind(this.agendaStore);
+  readonly newAgendaInBuilder = this.agendaStore.newAgendaInBuilder.bind(this.agendaStore);
+  readonly editAgenda = this.agendaStore.editAgenda.bind(this.agendaStore);
+  readonly closeBuilder = this.agendaStore.closeBuilder.bind(this.agendaStore);
+  readonly saveAgenda = this.agendaStore.saveAgenda.bind(this.agendaStore);
+  readonly deleteAgenda = this.agendaStore.deleteAgenda.bind(this.agendaStore);
+  private inbox = new InboxStore({
+    files: () => this.files,
+    updateConfig: (make) => this.updateConfig(make),
+    transaction: (label, build) => this.transaction(label, build),
+    create: async (name) => {
+      try {
+        await this.flush();
+        if (isTauri) await invoke<string>('create_entry', { parent: this.abs(''), name, isDir: false });
+        await this.reload();
+        return null;
+      } catch (e) {
+        return String(e).includes('exist') ? null : String(e);
+      }
+    },
+    sheetOpen: () => this.sheetOpen,
+  });
+  get inboxCfg() {
+    return this.inbox.cfg;
+  }
+  set inboxCfg(v) {
+    this.inbox.cfg = v;
+  }
+  get capture() {
+    return this.inbox.capture;
+  }
+  set capture(v) {
+    this.inbox.capture = v;
+  }
+  get pickInbox() {
+    return this.inbox.pickInbox;
+  }
+  set pickInbox(v) {
+    this.inbox.pickInbox = v;
+  }
+  get inboxFile() {
+    return this.inbox.file;
+  }
+  readonly setInbox = this.inbox.setInbox.bind(this.inbox);
+  readonly createInboxFile = this.inbox.createInboxFile.bind(this.inbox);
+  readonly addToInbox = this.inbox.addToInbox.bind(this.inbox);
+  readonly openCapture = this.inbox.openCapture.bind(this.inbox);
+  private refiling = new RefileStore({
+    files: () => this.files,
+    dir: () => this.dir,
+    current: () => {
+      const f = this.file;
+      const h = f?.headings[this.selected];
+      return f && h ? { f, h } : null;
+    },
+    opened: () => [...this.layout.panes.flatMap((p) => p.tabs.flatMap((t) => (t.kind === 'file' && t.path ? [t.path] : []))), ...this.history.map((h) => h.path), this.curPath].reverse(),
+    saveNow: async (path) => {
+      if (this.conflicts[path]) return null; // a conflict waits for the user's choice
+      clearTimeout(this.timers.get(path));
+      this.timers.delete(path);
+      return this.save(path);
+    },
+    reload: () => this.reload(),
+    writeAll: (label, texts) => this.writeAll(label, texts),
+    undo: (step) => this.undo(step),
+    open: (i, line) => this.open(i, line),
+    caretAfter: (path, h, movedAt) => this.caretAfterRefile(path, h, movedAt),
+  });
+  get refile() {
+    return this.refiling.req;
+  }
+  set refile(v) {
+    this.refiling.req = v;
+  }
+  readonly startRefile = this.refiling.start.bind(this.refiling);
+  readonly refileHeading = this.refiling.heading.bind(this.refiling);
+  readonly refileSource = this.refiling.source.bind(this.refiling);
+  readonly refileRecent = this.refiling.recent.bind(this.refiling);
+  readonly refileRecentFiles = this.refiling.recentFiles.bind(this.refiling);
+  readonly refileMove = this.refiling.move.bind(this.refiling);
+  readonly leaveFullscreen = leaveFullscreen;
+  readonly closeFromFullscreen = closeFromFullscreen;
+  readonly hideWindow = hideWindow;
   // ---- forwarded (tech sprint 2.2): the shortcuts, what features keep, the search in every file -------------
   get keyState() {
     return shortcuts.keyState;
@@ -715,13 +825,9 @@ class Store {
   }
 
   // ---- custom agendas («Мои агенды», `agendas` in config.json) -------------------------------------------------
-  agendas = $state.raw<Agenda[]>([]);
   /** The custom agenda shown by the active tab (undefined: a file, or the built-in agenda). */
   get agenda(): Agenda | undefined {
-    return this.agendaOf(this.tab);
-  }
-  agendaOf(t: Tab | undefined): Agenda | undefined {
-    return t?.kind === 'agenda' && t.agenda ? this.agendas.find((a) => a.id === t.agenda) : undefined;
+    return this.agendaStore.of(this.tab);
   }
   /** The left navigator: the files, or the list of agendas. A setting of the window: switching tabs or panes keeps it. */
   // a feature's mode that is not there falls back to «Файлы» (NavPanel); «Цели» became the plugin «quarter-goals» (ТЗ 27)
@@ -756,37 +862,6 @@ class Store {
     this.persistLayout();
   }
   // ---- Inbox (`inbox` in config.json: the file and how it works; every change goes to disk at once) -----------
-  inboxCfg = $state.raw<InboxConfig>(DEFAULT_INBOX);
-  get inboxFile(): NoteFile | undefined {
-    const f = this.inboxCfg.file;
-    return f ? this.files.find((x) => x.name === f) : undefined;
-  }
-  async setInbox(c: Partial<InboxConfig>) {
-    const next = { ...this.inboxCfg, ...c };
-    await this.updateConfig((raw) => withInbox(raw, { ...readInbox(this.inboxIn(raw)), ...c }));
-    this.inboxCfg = next;
-  }
-  private inboxIn(raw: string | null) {
-    try {
-      return raw ? JSON.parse(raw)?.inbox : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-  /** «Создать inbox.org в рабочей папке»: an empty file in the root, set as the Inbox at once (an existing one is
-   *  simply taken). */
-  async createInboxFile() {
-    if (!this.files.some((f) => f.name === 'inbox.org')) {
-      try {
-        await this.flush();
-        if (isTauri) await invoke<string>('create_entry', { parent: this.abs(''), name: 'inbox.org', isDir: false });
-        await this.reload();
-      } catch (e) {
-        if (!String(e).includes('exist')) return this.say('Не удалось создать inbox.org: ' + e);
-      }
-    }
-    await this.setInbox({ file: 'inbox.org' });
-  }
   /** A file of the folder, made empty when it is not there yet (the journal of «Завершить день»); none if it failed. */
   async ensureFile(rel: string): Promise<NoteFile | undefined> {
     const have = this.files.find((f) => f.name === rel);
@@ -883,82 +958,7 @@ class Store {
       return s ? this.undoNow(s) : false;
     });
   }
-  /** Quick entry: a task at the top or the end of the Inbox file (as set), on disk at once. */
-  async addToInbox(title: string, details: string): Promise<'ok' | 'nofile' | 'empty' | 'error'> {
-    if (!title.trim()) return 'empty';
-    const f = this.inboxFile;
-    if (!f) return 'nofile';
-    const status = this.inboxCfg.status && f.wf.open.includes(this.inboxCfg.status) ? this.inboxCfg.status : startOf(sequenceFor(f.wf, null));
-    const task = entry(title, details, status, this.inboxCfg.created ? new Date() : null);
-    const add = this.inboxCfg.add === 'end' ? append : prepend;
-    return (await this.transaction('Новая задача в Inbox', (tx) => tx.update(f.path, (t) => add(t, task)))) ? 'ok' : 'error';
-  }
-  /** The quick entry inside the window (⇧⌘I with the window in front, «+» in the Inbox panel). */
-  capture = $state<{ n: number } | null>(null);
-  /** «Выбрать файл…» for the Inbox: the palette of files. */
-  pickInbox = $state(0);
-  openCapture() {
-    if (this.sheetOpen && !this.capture) return;
-    this.capture = { n: Date.now() };
-  }
 
-  /** The builder: an editable copy of the agenda; `orig` is null for a new one. */
-  builder = $state<{ draft: Agenda; orig: Agenda | null; n: number } | null>(null);
-  /** ⌘S while the builder is open: «Сохранить агенду» (the builder watches this). */
-  builderSave = $state(0);
-  /** «Новая агенда»: opens the builder with an empty agenda (nothing is saved until «Сохранить агенду»). */
-  newAgendaInBuilder(from?: Element | null, draft?: Agenda) {
-    if (this.builder) return;
-    this.builderFrom = from ?? (document.activeElement as Element | null);
-    this.builder = { draft: draft ?? newAgenda(), orig: null, n: Date.now() };
-  }
-  editAgenda(id: string, from?: Element | null) {
-    const a = this.agendas.find((x) => x.id === id);
-    if (!a || this.builder) return;
-    this.builderFrom = from ?? (document.activeElement as Element | null);
-    this.builder = { draft: cloneAgenda(a), orig: a, n: Date.now() };
-  }
-  /** Where the builder was opened from: the focus goes back there when it closes (a clicked button has none in WebKit). */
-  private builderFrom: Element | null = null;
-  private leaveBuilder() {
-    this.builder = null;
-    const el = this.builderFrom as HTMLElement | null;
-    this.builderFrom = null;
-    // after the window under the sheet takes input again
-    if (el?.isConnected) setTimeout(() => el.isConnected && el.focus({ preventScroll: true }));
-  }
-  get builderDirty() {
-    const b = this.builder;
-    return !!b && (!b.orig || !sameAgenda(b.draft, b.orig));
-  }
-  closeBuilder() {
-    this.leaveBuilder();
-  }
-  /** «Сохранить агенду»: writes it (a saved one is replaced whole), closes the builder and shows the agenda. */
-  async saveAgenda(a: Agenda): Promise<boolean> {
-    const copy = cloneAgenda(a);
-    const ok = await this.updateConfig((raw) => {
-      const list = this.agendasIn(raw);
-      const i = list.findIndex((x) => x.id === copy.id);
-      if (i >= 0) list[i] = copy;
-      else list.push(copy);
-      return withAgendas(raw, list);
-    });
-    if (!ok) return false;
-    this.leaveBuilder();
-    this.openAgendaHere(copy.id);
-    return true;
-  }
-  async deleteAgenda(id: string) {
-    await this.updateConfig((raw) => withAgendas(raw, this.agendasIn(raw).filter((x) => x.id !== id)));
-  }
-  private agendasIn(raw: string | null): Agenda[] {
-    try {
-      return readAgendas(raw ? JSON.parse(raw)?.agendas : null);
-    } catch {
-      return [];
-    }
-  }
   /** The files as the agenda, the calendar and «Сегодня» see them: an archive («.org_archive», ТЗ 33) has no headings
    *  there. The same list as `files` (the indexes of one are the other's). */
   agendaFiles = $derived(this.files.map((f) => (isArchive(f.name) ? { ...f, headings: [] } : f)));
@@ -1290,20 +1290,6 @@ class Store {
     const { revealItemInDir } = await import('@tauri-apps/plugin-opener');
     await revealItemInDir(this.dir);
   }
-  /** ⌘⇧W, the red button: the window goes, the app stays in the Dock with everything in memory. */
-  /** The traffic lights drawn in our toolbar in full screen: green leaves full screen, red closes (hides) the window. */
-  async leaveFullscreen() {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window');
-    await getCurrentWindow().setFullscreen(false);
-  }
-  async closeFromFullscreen() {
-    await this.leaveFullscreen();
-    setTimeout(() => void this.hideWindow(), 800); // after the window is back from its space
-  }
-  async hideWindow() {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window');
-    await getCurrentWindow().hide();
-  }
 
   async useSample() {
     const p = await invoke<string | null>('sample_notes_dir');
@@ -1429,113 +1415,6 @@ class Store {
   setPlanning(kind: 'SCHEDULED' | 'DEADLINE', date: Date | null) { this.patch((t, h, wf) => setPlanning(t, h, kind, date, wf.behavior?.logbook ? new Date() : undefined)); }
   setTags(tags: string[]) { this.patch((t, h) => setTags(t, h, tags)); }
 
-  // ---- «Перенести»: a heading with its subtree into a file, under a heading there or at its 1st level ----------
-  /** What is being moved: the heading under the cursor (the palette's command), or one a feature hands over. */
-  refile = $state<RefileReq | null>(null);
-  /** «Перенести…» of the palette: the heading under the cursor; its own file is a place too, the caret follows. */
-  startRefile() {
-    const f = this.file;
-    const h = f?.headings[this.selected];
-    if (f && h) this.refile = { path: f.path, line: h.line, title: h.title, self: true, n: Date.now() };
-  }
-  /** A feature moves a heading of its own (an Inbox task, a review card) with its hooks around the write. */
-  refileHeading(f: NoteFile, h: Heading, hooks: RefileHooks) {
-    this.refile = { path: f.path, line: h.line, title: h.title, self: false, hooks, n: Date.now() };
-  }
-  /** The heading being moved, as it is now. */
-  refileSource(): { f: NoteFile; h: Heading } | null {
-    const r = this.refile;
-    if (!r) return null;
-    const f = this.files.find((x) => x.path === r.path);
-    const h = f?.headings.find((x) => x.line === r.line && x.title === r.title);
-    return f && h ? { f, h } : null;
-  }
-  private recentKey() {
-    return 'refile:recent:' + (this.dir ?? '');
-  }
-  /** The last places moved to, newest first, one per file: its path and the heading's key ('' = the 1st level). */
-  refileRecent(): { path: string; key: string }[] {
-    try {
-      const v = JSON.parse(lsGet(this.recentKey()) ?? '[]');
-      return Array.isArray(v) ? v.filter((x) => x && typeof x.path === 'string' && typeof x.key === 'string') : [];
-    } catch {
-      return [];
-    }
-  }
-  /** «НЕДАВНИЕ» of step 1: the last places moved to, then recently opened files (the own file only as a place
-   *  moved to before). */
-  refileRecentFiles(self: string): string[] {
-    const opened = [...this.layout.panes.flatMap((p) => p.tabs.flatMap((t) => (t.kind === 'file' && t.path ? [t.path] : []))), ...this.history.map((h) => h.path), this.curPath].reverse();
-    return [...new Set([...this.refileRecent().map((x) => x.path), ...opened.filter((p) => p && p !== self)])];
-  }
-  /**
-   * Move it. The target is saved first (its unsaved edits go along) and re-read from disk; a heading chosen there
-   * that is gone now gives 'gone' and the dialog stays. Then the target is written, and only then the source.
-   */
-  async refileMove(dstPath: string, under: { key: string; line: number } | null): Promise<'ok' | 'gone' | 'error'> {
-    const hooks = this.refile?.hooks;
-    hooks?.busy?.(true);
-    try {
-      return await this.refileMoveNow(dstPath, under);
-    } finally {
-      hooks?.busy?.(false);
-    }
-  }
-  private async refileMoveNow(dstPath: string, under: { key: string; line: number } | null): Promise<'ok' | 'gone' | 'error'> {
-    const req = this.refile;
-    if (!req) return 'error';
-    const d0 = this.files.find((x) => x.path === dstPath);
-    if (d0 && d0.text !== d0.disk && !this.conflicts[dstPath]) {
-      clearTimeout(this.timers.get(dstPath));
-      this.timers.delete(dstPath);
-      const err = await this.save(dstPath);
-      if (err) {
-        this.say('Не удалось записать «' + displayName(d0.name) + '»: ' + err);
-        return 'error';
-      }
-    }
-    await this.reload();
-    const src = this.refileSource();
-    const dst = this.files.find((x) => x.path === dstPath);
-    if (!src || !dst) {
-      this.refile = null;
-      this.say('Не удалось перенести: файл изменился');
-      return 'error';
-    }
-    const same = dst.path === src.f.path;
-    let uh: Heading | null = null;
-    if (under) {
-      const inside = (x: Heading) => same && x.line >= src.h.line && x.line < src.h.end;
-      const found = dst.headings.filter((x) => keyOf(x) === under.key && !inside(x));
-      uh = found.sort((a, b) => Math.abs(a.line - under.line) - Math.abs(b.line - under.line))[0] ?? null;
-      if (!uh) return 'gone';
-    }
-    this.refile = null;
-    await req.hooks?.before?.(src.h);
-    let steps: { path: string; text: string }[];
-    let line: number;
-    if (same) {
-      const r = moveWithin(src.f.text, src.h, uh);
-      steps = [{ path: dst.path, text: r.text }];
-      line = r.line;
-    } else {
-      const r = moveTo(src.f.text, src.h, dst.text, uh);
-      steps = [{ path: dst.path, text: r.dst }, { path: src.f.path, text: r.src }]; // the target first: nothing is lost
-      line = r.line;
-    }
-    const done = await this.writeAll(`Перенесено: ${bareTitle(src.h.title)}`, steps);
-    if (!done) return 'error';
-    const rec = [{ path: dst.path, key: uh ? keyOf(uh) : '' }, ...this.refileRecent().filter((x) => x.path !== dst.path)].slice(0, 20);
-    lsSet(this.recentKey(), JSON.stringify(rec));
-    if (req.self) this.caretAfterRefile(src.f.path, src.h, same ? line : null);
-    const name = displayName(dst.name);
-    if (req.hooks?.done?.({ path: dst.path, line, label: `${name}${uh ? ' › ' + bareTitle(uh.title) : ''}`, step: done })) return 'ok';
-    this.note(`Перенесено в ${name}${uh ? ' › ' + bareTitle(uh.title) : ''}`, [
-      { label: 'Открыть', run: () => { const i = this.files.findIndex((x) => x.path === dst.path); if (i >= 0) this.open(i, line); } },
-      { label: 'Отменить', run: () => void this.undo(done) },
-    ], 3000);
-    return 'ok';
-  }
   // ---- search: ⌘F in a pane, ⇧⌘F in every file ------------------------------------------------------------
   /** What a pane's find bar is asked (the menu, the keys, a jump from the search in every file). */
   findReq = $state<{ kind: 'open' | 'next' | 'prev' | 'useSel' | 'jump'; pane: number; n: number; q?: string; at?: { path: string; line: number; col: number } } | null>(null);
