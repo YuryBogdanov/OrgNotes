@@ -14,6 +14,7 @@
   import Toolbar from './Toolbar.svelte';
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
+  import { nextPrefs } from './prefs.svelte';
   import { CloseSheet, ContextMenu, Dialogs, DiskSheet, Palette, PluginSheets, Refile, Settings, type MenuItem } from './bridges';
   import { untrack } from 'svelte';
 
@@ -42,6 +43,8 @@
     closeWindow: () => store.hideWindow(),
     splitRight: () => store.splitRight(),
     rich: () => store.setRich(!store.rich),
+    // ⌥⌘0: the old inspector's keys show «Структура» here (§8)
+    insp: () => nextPrefs.setStructure(!nextPrefs.structure),
   };
   // one pane in the new shell (§4.3): a second one of the old is folded in, and back with the old shell
   $effect(() => {
