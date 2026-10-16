@@ -1,9 +1,9 @@
 <script lang="ts">
   import { store } from './store.svelte';
-  import { allFileViews, fileViewOf, viewOf } from './views';
-  import { fileTypeOf } from './fileTypes.svelte';
+  import { fileViewOf, viewOf } from './views';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
-  import { isPinned, targetOf, type Tab } from './layout';
+  import { isPinned, type Tab } from './layout';
+  import { tabMenuItems } from './tabMenu';
   import { displayName } from './names';
   import { OFF_ICON, isCore as core, isDirty as dirty, isGone as gone, tabLabel as label } from './tabLabels';
 
@@ -19,36 +19,11 @@
   let menuTab = $state<string | null>(null); // highlighted, with its cross, while the menu is open
   function tabMenu(e: MouseEvent, t: Tab, ti: number) {
     e.preventDefault();
-    const to = targetOf(store.layout, pi);
-    const hasFile = t.kind === 'file';
-    const items: MenuItem[] = [
-      { label: 'Закрыть', shortcut: store.keyHint('closeTab'), action: () => store.closeTab(pi, idx(t)) },
-      { label: 'Закрыть остальные', shortcut: store.keyHint('closeOthers'), disabled: pane.tabs.length < 2, action: () => store.closeOthers(pi, idx(t)) },
-      'sep',
-      { label: 'Переместить в соседний редактор', shortcut: store.keyHint(to > pi ? 'moveRight' : 'moveLeft'), disabled: to < 0 || isPinned(t), action: () => store.moveTab(pi, idx(t)) },
-      { label: 'Продублировать в соседнем редакторе', shortcut: store.keyHint(to > pi ? 'dupRight' : 'dupLeft'), disabled: to < 0 || t.kind === 'untitled' || !!viewOf(t.kind)?.single || isPinned(t), action: () => store.duplicateTab(pi, idx(t)) },
-    ];
-    if (hasFile) {
-      // «Показать как ›»: the text and the views of the plugins (ТЗ 33); a plugin's file type has its one view
-      const now = store.viewOf(t);
-      items.push('sep');
-      if (!fileTypeOf(t.path)) items.push({
-        label: 'Показать как', action: () => {},
-        sub: [
-          { label: 'Текст', checked: now === '', action: () => store.showAs(t, '') },
-          ...allFileViews().map((v) => ({ label: v.title, checked: now === v.id, shortcut: v.key ? store.keyHint(v.key) : undefined, action: () => store.showAs(t, v.id) })),
-          'sep', { note: 'Виды добавляют плагины' },
-        ],
-      });
-      items.push('sep');
-      items.push({ label: 'Показать в навигаторе', shortcut: store.keyHint('revealInNav'), action: () => store.revealInNavigator(t) });
-      items.push({ label: 'Скопировать путь', shortcut: store.keyHint('copyPath'), action: () => store.copyPath(t) });
-    }
+    const items = tabMenuItems(pi, t);
     menuTab = t.id;
     menu = { x: e.clientX, y: e.clientY, items };
     void ti;
   }
-  const idx = (t: Tab) => pane.tabs.findIndex((x) => x.id === t.id);
 
   // ---- the tab row: scrolls when the tabs do not fit at their minimum width ---------------------------------
   let strip: HTMLDivElement | undefined = $state();
