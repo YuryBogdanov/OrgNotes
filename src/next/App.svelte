@@ -6,6 +6,9 @@
   import { keyHandler } from '../keyDispatch';
   import { installMenu, type AppMenu } from '../menu';
   import { toAccelerator } from '../keys';
+  import { applyAppearance } from '../appearance';
+  import { tokenVars, FONTS } from './tokens';
+  import './fonts';
   import { CloseSheet, DiskSheet, Palette, PluginSheets, Settings } from './bridges';
 
   // The new shell (ТЗ 42), part 42.1: the frame — the store, the plugins, the window's keys and the menu, the old
@@ -21,7 +24,13 @@
     run();
     return true;
   };
+  // the appearance and the editor theme (by default «Синька» here, §3.2), macOS's dark followed
+  $effect(() => applyAppearance(store.appearanceChoice, store.appearance, store.theme));
   onMount(() => {
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    const sys = () => (store.systemDark = mq.matches);
+    mq.addEventListener('change', sys);
+    void store.loadThemes();
     store.load();
     store.listen();
     void plugins.start().then(() => pluginUpdates.check());
@@ -31,6 +40,7 @@
     let gone = false;
     void installMenu(actions, (id) => toAccelerator(store.bindings.get(id)?.[0] ?? '')).then((m) => (gone ? m?.close() : (menu = m)));
     return () => {
+      mq.removeEventListener('change', sys);
       gone = true;
       window.removeEventListener('keydown', key, true);
       menu?.close();
@@ -41,10 +51,10 @@
     `${n} ${n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many}`;
 </script>
 
-<div class="next" data-ui="next">
+<div class="next" data-ui="next" style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--text:{FONTS.text};--title:{FONTS.title};--mono:{FONTS.mono}">
   <main class="frame" inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
     <div class="card">
-      <h1>Новый интерфейс</h1>
+      <h1 class="title">Новый интерфейс</h1>
       <p>Каркас готов: файлы, вкладки, плагины и настройки работают, окно и редактор собираются по частям.</p>
       <p class="meta">{store.loaded ? `${word(store.files.length, ['файл', 'файла', 'файлов'])} · ${word(tabs, ['вкладка открыта', 'вкладки открыты', 'вкладок открыто'])}` : 'Читаем папку…'}</p>
       <div class="acts">
@@ -57,20 +67,22 @@
   {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
   {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
   {#if store.toast}<div class="toast" role="status">{store.toast.text}{#each store.toast.actions ?? [] as a (a.label)}<button onclick={() => { store.toast = null; a.run(); }}>{a.label}</button>{/each}</div>{/if}
+  {#if store.settingsOpen && store.loaded}<Settings />{/if}
+  <PluginSheets />
 </div>
-{#if store.settingsOpen && store.loaded}<Settings />{/if}
-<PluginSheets />
 
 <style>
-  .next { position: fixed; inset: 0; display: flex; background: var(--bg); color: var(--fg); font: 13px -apple-system, system-ui, sans-serif; }
-  .frame { flex: 1; display: flex; align-items: center; justify-content: center; padding: 52px 16px 16px; -webkit-app-region: drag; }
-  .card { -webkit-app-region: no-drag; max-width: 440px; display: flex; flex-direction: column; gap: 10px; padding: 24px 28px; border: 1px solid var(--line); border-radius: 12px; background: var(--side); }
-  h1 { margin: 0; font-size: 20px; }
-  p { margin: 0; line-height: 1.5; color: var(--fg2); }
-  .meta { font-size: 12px; color: var(--fg3); }
-  .acts { display: flex; gap: 8px; margin-top: 6px; }
-  .acts button { height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
-  .acts .pri { border-color: var(--acc); background: var(--acc); color: var(--onacc); }
-  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 8px 14px; border-radius: 8px; background: var(--pop); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); }
-  .toast button { border: 0; background: none; color: var(--acc); font-weight: 600; }
+  .next { position: fixed; inset: 0; display: flex; background: var(--bg); color: var(--ink); font: 13px/1.45 var(--ui); }
+  /* the editor's ground: a grid of 24 pt (§5.1) */
+  .frame { flex: 1; display: flex; align-items: center; justify-content: center; padding: 52px 16px 16px; -webkit-app-region: drag;
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; background-position: -1px -1px; }
+  .card { -webkit-app-region: no-drag; max-width: 460px; display: flex; flex-direction: column; gap: 10px; padding: 26px 30px; border: 1px solid var(--rule); border-radius: 12px; background: var(--card); box-shadow: var(--popshadow); }
+  .title { margin: 0; font: 400 28px/1.15 var(--title); }
+  p { margin: 0; font: 500 19px/1.55 var(--text); color: var(--ink2); }
+  .meta { font: 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
+  .acts { display: flex; gap: 8px; margin-top: 8px; }
+  .acts button { height: 32px; padding: 0 14px; border: 0; border-radius: 7px; background: var(--chip2); color: var(--ink); font: 13px var(--ui); }
+  .acts .pri { background: var(--lamp); color: var(--onlamp); font-weight: 600; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 8px 14px; border-radius: 8px; background: var(--card); border: 1px solid var(--rule); box-shadow: var(--popshadow); }
+  .toast button { border: 0; background: none; color: var(--lampink); font-weight: 600; }
 </style>

@@ -34,7 +34,7 @@ test('the pack is a built-in plugin of data; off — its themes go and the chose
   await expect(pack.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
   await expect.poll(() => bg(page)).toBe('rgb(30, 30, 34)'); // Panopticon тёмная
   await sheet(page).getByRole('tab', { name: 'Оформление' }).click();
-  expect(await dark.getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Panopticon тёмная']);
+  expect(await dark.getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Panopticon тёмная', 'Синька — тёмная']);
   await expect(dark.getByRole('radio', { name: 'Panopticon тёмная' })).toHaveAttribute('aria-checked', 'true');
   // after a restart: still off, still Panopticon
   await page.reload();
@@ -43,5 +43,5 @@ test('the pack is a built-in plugin of data; off — its themes go and the chose
   await openSettingsSheet(page, 'Плагины');
   await sheet(page).getByRole('group', { name: 'Темы из Emacs' }).getByRole('switch').click();
   await sheet(page).getByRole('tab', { name: 'Оформление' }).click();
-  await expect(dark.getByRole('radio')).toHaveCount(5);
+  await expect(dark.getByRole('radio')).toHaveCount(6);
 });

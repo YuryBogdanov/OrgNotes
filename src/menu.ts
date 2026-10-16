@@ -10,6 +10,14 @@ export interface AppMenu {
   close(): void;
 }
 
+/** «О программе»: the licences of what the app bundles (ТЗ 42 §3.3: the new interface's fonts). */
+const CREDITS = [
+  'Шрифты — под лицензией SIL Open Font License 1.1:',
+  'Yeseva One © 2012 The Yeseva One Project Authors',
+  'Cormorant Garamond © 2015 The Cormorant Project Authors',
+  'IBM Plex Mono © 2017 IBM Corp.',
+].join('\n');
+
 let generation = 0;
 
 export async function installMenu(actions: MenuActions, accel: (id: string) => string | undefined): Promise<AppMenu | null> {
@@ -28,7 +36,7 @@ export async function installMenu(actions: MenuActions, accel: (id: string) => s
         {
           text: 'Panopticon',
           // a custom "Выйти" so unsaved tabs are asked about first
-          items: [{ item: { About: null } }, sep, it('settings', 'Настройки…'), sep, { item: 'Services' }, sep, { item: 'Hide' }, { item: 'HideOthers' }, { item: 'ShowAll' }, sep, it('quit', 'Выйти из Panopticon', 'CmdOrCtrl+Q')],
+          items: [{ item: { About: { credits: CREDITS } } }, sep, it('settings', 'Настройки…'), sep, { item: 'Services' }, sep, { item: 'Hide' }, { item: 'HideOthers' }, { item: 'ShowAll' }, sep, it('quit', 'Выйти из Panopticon', 'CmdOrCtrl+Q')],
         },
         {
           text: 'Файл',
