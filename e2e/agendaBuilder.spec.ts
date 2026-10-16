@@ -74,7 +74,7 @@ test.describe('entering, saving, cancelling', () => {
     await builder(page).getByRole('button', { name: '+ Условие' }).click();
     await expect(pop(page)).toBeVisible();
     await expect(pop(page)).toContainText('ПОЛЕ УСЛОВИЯ');
-    await expect(pop(page).locator('.opt .ol')).toHaveText(['Статус', 'Запланировано', 'Дедлайн', 'Тег', 'Приоритет', 'Файл или папка', 'Заголовок содержит', 'Выполнено']);
+    await expect(pop(page).locator('.opt .ol')).toHaveText(['Статус', 'Запланировано', 'Дедлайн', 'Тег', 'Приоритет', 'Файл или папка', 'Заголовок содержит', 'Выполнено', 'Касание']);
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter'); // Дедлайн
@@ -530,7 +530,7 @@ test.describe('the sheet', () => {
     await add.scrollIntoViewIfNeeded();
     await add.click();
     const menu = pop(page);
-    await expect(menu.locator('.opt')).toHaveCount(8);
+    await expect(menu.locator('.opt')).toHaveCount(9);
     const m = (await menu.boundingBox())!;
     expect(m.y).toBeGreaterThanOrEqual(0);
     expect(m.y + m.height).toBeLessThanOrEqual(700);

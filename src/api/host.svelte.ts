@@ -987,7 +987,7 @@ class Host {
     };
     if (can('clipboard')) ctx.clipboard = clipboardApi();
     if (can('net')) ctx.net = netApi(m);
-    if (can('index.read')) ctx.index = indexApi();
+    if (can('index.read')) ctx.index = indexApi(can('index.touch'));
     if (can('files.read') || can('files.edit')) ctx.files = filesApi();
     if (can('files.edit')) ctx.edit = editApi((fn) => this.guard(id, fn, undefined));
     return ctx;

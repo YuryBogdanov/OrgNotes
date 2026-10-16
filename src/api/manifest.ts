@@ -3,7 +3,7 @@
 
 import type { Group } from '../settingsSchema';
 
-export const PERMISSIONS = ['index.read', 'files.read', 'files.edit', 'clipboard', 'net', 'process'] as const;
+export const PERMISSIONS = ['index.read', 'index.touch', 'files.read', 'files.edit', 'clipboard', 'net', 'process'] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 /** Never a plugin's: the core's own keys (save, close, quit, settings, undo). */
 export const RESERVED_KEYS = ['⌘S', '⌘W', '⌘Q', '⌘,', '⌘Z', '⇧⌘Z'];

@@ -378,6 +378,15 @@ net?: { fetch(url: string, init?: { method?; headers?; body?: string }): Promise
 
 - `readOrg(ctx, path)` в `@panopticon/api/org`: читает файл как Org — текст, статусы файла (`info` из `index.workflow` и `wf` для `parseHeadings`) и заголовки. Если файла уже нет, возвращает `null`. Нужны права `files.read` (или `files.edit`) и `index.read`. Раньше встроенные плагины писали этот код каждый у себя.
 
+## API v1.12 — касания заголовков (ТЗ 40)
+
+- `HeadingInfo.touched`, `index.touched(ref)`: когда в последний раз менялось поддерево заголовка, `{ at, approx }`.
+- `index.lastNote(ref)`: последняя заметка из `:LOGBOOK:` самого заголовка.
+- `index.markReviewed(ref)`: «Осмотрено», касание без правки файла. Новое право `index.touch`.
+- `Tx.addNote(ref, text)`: заметка в `:LOGBOOK:`, как по `C-c C-z` в Emacs.
+- `edit.transaction(…, { touch: false })`: массовая правка не касается заголовков.
+- Событие `heading.touched {ref, at}`, пачками не чаще раза в секунду.
+
 ## Разбивка и приёмка
 
 | Задача | Что | Готово, когда |

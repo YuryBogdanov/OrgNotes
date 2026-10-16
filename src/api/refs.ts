@@ -2,6 +2,7 @@
 // core's are absolute), a heading found by its title near its line, its info with its own parts (event, properties,
 // reschedules); the plugin's Tx over the core's, with what changed for the events.
 
+import { touches } from '../touchIndex.svelte';
 import { store } from '../store.svelte';
 import { newId } from '../endDay';
 import type { Heading, OrgDate } from '../org';
@@ -38,7 +39,13 @@ export function infoOf(f: (typeof store.files)[number], h: Heading): HeadingInfo
     priority: h.priority, title: h.title, tags: [...new Set([...h.tags, ...inherited])],
     ...(h.scheduled ? { scheduled: { ...h.scheduled } } : {}), ...(h.deadline ? { deadline: { ...h.deadline } } : {}), ...(h.closed ? { closed: { ...h.closed } } : {}),
     ...extraOf(f.text, h),
+    ...touchedOf(f.name, h.line),
   } as HeadingInfo;
+}
+/** The touch of a heading as the plugins see it (ТЗ 40); nothing while the index is being built. */
+export function touchedOf(file: string, line: number): { touched?: { at: Date; approx: boolean } } {
+  const r = touches.at(file, line);
+  return r ? { touched: { at: new Date(r.at), approx: r.approx } } : {};
 }
 /** What changed in a heading, for the plugins' events. */
 export type Change = 'status' | 'planning' | 'tags' | 'title' | 'property' | 'body' | 'moved' | 'removed';
@@ -70,6 +77,7 @@ export function apiTx(tx: CoreTx, ev: Changed[]) {
     setTags: (h: HeadingRef, tags: string[]) => (tx.setTags(coreRef(h), tags), ev.push([h, 'tags'])),
     setTitle: (h: HeadingRef, title: string) => (tx.setTitle(coreRef(h), String(title)), ev.push([h, 'title'])),
     setProperty: (h: HeadingRef, k: string, v: string | null) => (tx.setProperty(coreRef(h), k, v), ev.push([h, 'property'])),
+    addNote: (h: HeadingRef, text: string) => (tx.addNote(coreRef(h), String(text)), ev.push([h, 'body'])),
     insertHeading: (at: { under: HeadingRef; position: 'first' | 'last' } | { under: HeadingRef; before: HeadingRef } | { file: string; position: 'top' | 'end' } | { after: HeadingRef }, org: string) =>
       apiRef(
         tx.insertHeading(

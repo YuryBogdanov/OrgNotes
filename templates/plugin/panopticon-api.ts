@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.11.0';
+export const API_VERSION = '1.12.0';
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;
@@ -65,6 +65,9 @@ export interface HeadingInfo {
   /** The moves of its SCHEDULED its :LOGBOOK: notes (`- Rescheduled from "<…>" on […]`): from which day, when (its
    *  time too). The app writes them while the file's workflow keeps a journal (`workflow().logbook`). Since 1.8. */
   reschedules?: { from: OrgDate; at: OrgDate }[];
+  /** The last change of its subtree (ТЗ 40): `approx` — a date taken from the file (no history yet: the newest
+   *  :LOGBOOK: entry, CLOSED, or the file's time), shown with «≈». None while the index is being built. Since 1.12. */
+  touched?: { at: Date; approx: boolean };
 }
 export interface FileInfo {
   path: string;
@@ -80,15 +83,17 @@ export type DateVal =
 /**
  * A condition of the agenda builder (ТЗ 05), the same engine as the agenda's. `op` by field: status — in / notin
  * (values: keywords «TODO», or «Набор␟TODO»); done — yes / no; tag, title — has / hasnot (values / text); priority —
- * eq / higher / lower / none (prio); scheduled, deadline — eq / before / after / none (date); path — in / notin.
+ * eq / higher / lower / none (prio); scheduled, deadline — eq / before / after / none (date); path — in / notin;
+ * touched — older / within (days: «давнее чем N дней» / «за последние N дней», since 1.12).
  */
 export interface Cond {
-  field: 'status' | 'scheduled' | 'deadline' | 'tag' | 'priority' | 'path' | 'title' | 'done';
+  field: 'status' | 'scheduled' | 'deadline' | 'tag' | 'priority' | 'path' | 'title' | 'done' | 'touched';
   op: string;
   values?: string[];
   date?: DateVal;
   prio?: string;
   text?: string;
+  days?: number;
 }
 export interface Query {
   /** Files or folders (relative); none: every file of the notes folder. */
@@ -128,6 +133,9 @@ export interface Tx {
   /** Rename the heading (its stars, status, priority and tags stay). Since 1.7. */
   setTitle(h: HeadingRef, title: string): void;
   setProperty(h: HeadingRef, key: string, value: string | null): void;
+  /** A note on top of the heading's :LOGBOOK: — `- Note taken on [now] \\` and the text under it, as Org's
+   *  `C-c C-z` writes it. Since 1.12. */
+  addNote(h: HeadingRef, text: string): void;
   /** Org text of one heading with its subtree, its stars relevelled to the place: under a heading (its first or last
    *  child — the last before the blank lines ending the parent — or right before one of its children), at the top or
    *  the end of a file, or right after another heading's subtree at its level (`after`, 1.5). Its reference (1.3), for
@@ -163,7 +171,8 @@ export interface Store {
   set<T>(value: T): Promise<void>;
   onChange(fn: () => void): Dispose;
 }
-export type EventName = 'file.changed' | 'heading.changed' | 'tab.active' | 'day.changed' | 'theme.changed' | 'folder.changed' | 'inbox.changed';
+/** `heading.touched` {ref, at} (1.12): a heading changed or marked «Осмотрено»; in batches, at most once a second. */
+export type EventName = 'file.changed' | 'heading.changed' | 'heading.touched' | 'tab.active' | 'day.changed' | 'theme.changed' | 'folder.changed' | 'inbox.changed';
 export interface Opt {
   value: string | number | boolean | null;
   label: string;
@@ -508,12 +517,21 @@ export interface Ctx {
     folder(): Promise<string | null>;
     /** The statuses the file knows: open and done keywords (for `@panopticon/api/org`), and its sets in order. */
     workflow(path: string): Promise<{ open: string[]; done: string[]; sets: StatusSet[]; logbook: boolean }>;
+    /** The last change of the heading's subtree (as `HeadingInfo.touched`); null — not found, or not known yet.
+     *  Since 1.12. */
+    touched(ref: HeadingRef): Promise<{ at: Date; approx: boolean } | null>;
+    /** The newest note of the heading's own :LOGBOOK: (a note taken, or the words after a change of status); null —
+     *  none. Since 1.12. */
+    lastNote(ref: HeadingRef): Promise<{ at: Date; text: string } | null>;
+    /** «Осмотрено»: a touch without a change of the file (the index only). Needs `index.touch`. Since 1.12. */
+    markReviewed(ref: HeadingRef): Promise<void>;
   };
   /** Needs `files.read` (or `files.edit`). */
   files?: { read(path: string): Promise<string> };
   /** Needs `files.edit`. One step of ⌘Z, as an edit by hand. */
   edit?: {
-    transaction(label: string, build: (tx: Tx) => void, o?: { onUndo?(): void }): Promise<'ok' | 'conflict' | 'error'>;
+    /** `touch: false` (1.12): a mass edit (a renaming across the files) — not a touch of the headings it changes. */
+    transaction(label: string, build: (tx: Tx) => void, o?: { onUndo?(): void; touch?: boolean }): Promise<'ok' | 'conflict' | 'error'>;
     /** Take back the last step of the journal (a toast's «Отменить»): false — there is none, or its files changed. */
     undo(): Promise<boolean>;
     /** A file of the folder, made empty when it is not there yet (an archive, `<file>_archive`); false — not made.

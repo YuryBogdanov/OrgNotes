@@ -23,7 +23,7 @@ export function trust(m: Manifest) {
 }
 /** The rights in words, for the sheet and the list. */
 export const RIGHTS: Record<string, string> = {
-  'index.read': 'чтение заметок', 'files.read': 'чтение файлов заметок', 'files.edit': 'правка заметок',
+  'index.read': 'чтение заметок', 'index.touch': 'отметка «Осмотрено»', 'files.read': 'чтение файлов заметок', 'files.edit': 'правка заметок',
   clipboard: 'запись в буфер обмена', net: 'сеть', process: 'запуск процессов',
 };
 export const rightsText = (m: Manifest) =>

@@ -756,6 +756,7 @@ class Store {
         }
       }
       if (changed) {
+        touches.quietly(f.name, lines.join('\n')); // a status renamed in every file is not a touch (ТЗ 40)
         this.setText(lines.join('\n'), f.path);
         total += changed;
       }
@@ -910,7 +911,8 @@ class Store {
    * Build a transaction, write its files at once and record it as a step; `onUndo` puts the feature's own state
    * back when the step is taken back. Null: nothing changed, a heading was not found (said), or a write failed (said).
    */
-  async transaction(label: string, build: (tx: Tx) => void, onUndo?: () => void): Promise<Step | null> {
+  /** `o.touch: false`: a mass edit (a tag or a status renamed in every file) — not a touch of its headings (ТЗ 40). */
+  async transaction(label: string, build: (tx: Tx) => void, onUndo?: () => void, o: { touch?: boolean } = {}): Promise<Step | null> {
     const tx = new Tx((path) => {
       const f = this.files.find((x) => x.path === path);
       return f && { path: f.path, text: f.text, wf: f.wf };
@@ -922,9 +924,18 @@ class Store {
     }
     const steps = tx.result();
     if (!steps.length) return null;
+    if (o.touch === false)
+      for (const st of steps) {
+        const f = this.files.find((x) => x.path === st.path);
+        if (f) touches.quietly(f.name, st.text);
+      }
     const done = await this.writeSteps(steps);
-    return done ? this.journal.record(label, done, onUndo) : null;
+    const step = done ? this.journal.record(label, done, onUndo) : null;
+    if (step && o.touch === false) this.quietSteps.add(step);
+    return step;
   }
+  /** The steps of mass edits: taking one back is not a touch either. */
+  private quietSteps = new WeakSet<Step>();
   /** Texts the feature has made itself, as one transaction. */
   writeAll(label: string, texts: { path: string; text: string }[], onUndo?: () => void): Promise<Step | null> {
     return this.transaction(label, (tx) => texts.forEach((x) => tx.update(x.path, () => x.text)), onUndo);
@@ -947,7 +958,11 @@ class Store {
       this.say('Отменить нельзя: файл уже изменился');
       return false;
     }
-    for (const c of [...step.changes].reverse()) await this.writeNow(c.path, c.before);
+    for (const c of [...step.changes].reverse()) {
+      const f = this.quietSteps.has(step) ? this.files.find((x) => x.path === c.path) : undefined;
+      if (f) touches.quietly(f.name, c.before);
+      await this.writeNow(c.path, c.before);
+    }
     this.journal.drop(step);
     step.onUndo?.();
     return true;

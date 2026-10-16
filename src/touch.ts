@@ -100,8 +100,9 @@ export function initialTouch(lines: readonly string[], h: Heading, fileTime: num
 }
 
 /** How a file's headings were read: a change seen now (an edit written, a file changed on disk), or the folder opened
- *  (what changed while the app was closed, or no history yet). */
-export type TouchMode = 'change' | 'open';
+ *  (what changed while the app was closed, or no history yet); `quiet`: a mass edit (a tag renamed in every file),
+ *  the records follow the text and keep their dates. */
+export type TouchMode = 'change' | 'open' | 'quiet';
 
 /**
  * A file's headings matched against the records (§2.2–2.3). `at`: the time of this version (the write, or the file's
@@ -133,7 +134,7 @@ export function reconcileFile(
     const base = { hash, body, file, line: h.line };
     const old = prev[key];
     if (old) {
-      records[key] = old.hash === hash ? { ...old, ...base } : { at, approx: false, ...base };
+      records[key] = old.hash === hash || mode === 'quiet' ? { ...old, ...base } : { at, approx: false, ...base };
       return;
     }
     // moved here unchanged: from where it went (a file written before this one), from another file still holding it

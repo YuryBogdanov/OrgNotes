@@ -112,7 +112,7 @@ class TagsState {
         if (retag(f.text, f.headings.map((h) => h.line), from, to).text === f.text) continue;
         tx.update(f.path, (t, wf) => retag(t, parseHeadings(t, wf).map((h) => h.line), from, to).text);
       }
-    });
+    }, undefined, { touch: false }); // a tag renamed in every file is not a touch of its headings (ТЗ 40)
   }
   /** «Переименовать во всех файлах…» / «Объединить с…»: the headings and #+FILETAGS (one ⌘Z); its colour, «не
    *  наследовать» and the agendas' conditions follow it; the tabs that show it too. */
