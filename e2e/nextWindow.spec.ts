@@ -19,7 +19,7 @@ async function open(page: Page) {
 
 test('the tree: folders first and folded, a click opens a file (the toolbar says which), ⌥-click — a tab of its own', async ({ page }) => {
   await open(page);
-  await expect(page.getByLabel('Боковая панель').locator('.grp')).toContainText('Файлы4');
+  await expect(page.getByLabel('Боковая панель').locator('.grp.head')).toContainText('Файлы4');
   await expect(tree(page).getByRole('treeitem')).toHaveText(['1on1', 'inbox', 'Midterm']);
   await item(page, '1on1').click();
   await expect(item(page, '1on1')).toHaveAttribute('aria-expanded', 'true');
