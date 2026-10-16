@@ -30,10 +30,10 @@ describe('palette', () => {
 });
 
 describe('built-in themes', () => {
-  it('the core has Panopticon only; the pack four for the light appearance with it, five for the dark; every colour set', () => {
-    expect(BUILTIN.map((t) => t.name)).toEqual(['Panopticon светлая', 'Panopticon тёмная']);
-    expect(ALL.filter((t) => t.appearance === 'light').map((t) => t.name)).toEqual(['Panopticon светлая', 'Leuven', 'Solarized Light', 'Modus Operandi']);
-    expect(ALL.filter((t) => t.appearance === 'dark').map((t) => t.name)).toEqual(['Panopticon тёмная', 'Nord', 'Gruvbox Dark', 'Dracula', 'Modus Vivendi']);
+  it('the core has Panopticon and «Синька» (ТЗ 42); the pack four for the light appearance with them, five for the dark; every colour set', () => {
+    expect(BUILTIN.map((t) => t.name)).toEqual(['Panopticon светлая', 'Panopticon тёмная', 'Синька — светлая', 'Синька — тёмная']);
+    expect(ALL.filter((t) => t.appearance === 'light').map((t) => t.name)).toEqual(['Panopticon светлая', 'Синька — светлая', 'Leuven', 'Solarized Light', 'Modus Operandi']);
+    expect(ALL.filter((t) => t.appearance === 'dark').map((t) => t.name)).toEqual(['Panopticon тёмная', 'Синька — тёмная', 'Nord', 'Gruvbox Dark', 'Dracula', 'Modus Vivendi']);
     for (const t of ALL) for (const n of NAMED) expect(t.colors.palette[n], t.name + ' ' + n).toMatch(/^#[0-9a-f]{6}$/);
   });
   it('the Panopticon themes keep the text readable: text, headings and the palette ≥ 4.5:1', () => {

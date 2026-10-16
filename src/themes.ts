@@ -48,8 +48,24 @@ export const BUILTIN: Theme[] = [
     date: '#f58ad4', tag: '#c9c9d2', link: '#6cb4ff', meta: '#9a9aa5', code: '#f58ad4',
     palette: { red: '#ff7b80', orange: '#f0b04d', yellow: '#e8d26a', green: '#6fd58a', teal: '#5fd3c2', blue: '#6cb4ff', purple: '#c39bff', gray: '#a9a9b3' },
   }),
+  // «Синька» (ТЗ 42 §3.2): the new interface's «бумага» and «синька» — the default there, a choice here; the colours
+  // of its tokens (next/tokens.ts) made opaque on the background
+  T('Синька — светлая', 'light', {
+    bg: '#f8f6f0', fg: '#15243a', dim: '#69727d', curLine: '#e3aa3c2b', selection: '#e3aa3c5c', cursor: '#e3aa3c',
+    h1: '#15243a', h2: '#15243a', h3: '#15243a', h4: '#15243a',
+    date: '#1f5fbf', tag: '#69727d', link: '#8a5f0e', meta: '#69727d', code: '#495464',
+    palette: { red: '#c4432f', orange: '#a2700c', yellow: '#8a6a0a', green: '#2f7d4f', teal: '#1f7a78', blue: '#1f5fbf', purple: '#7a3fc4', gray: '#69727d' },
+  }),
+  T('Синька — тёмная', 'dark', {
+    bg: '#101c2c', fg: '#e6edf6', dim: '#778495', curLine: '#f2c66d21', selection: '#f2c66d4d', cursor: '#f2c66d',
+    h1: '#e6edf6', h2: '#e6edf6', h3: '#e6edf6', h4: '#e6edf6',
+    date: '#8ab8ff', tag: '#778495', link: '#f2c66d', meta: '#778495', code: '#9ca7b5',
+    palette: { red: '#ff8f7e', orange: '#f0a868', yellow: '#f2c66d', green: '#8fd6a6', teal: '#7fd4cf', blue: '#8ab8ff', purple: '#c9a2ff', gray: '#a3adbb' },
+  }),
 ];
 export const DEFAULT_THEME: Record<Appearance, string> = { light: 'Panopticon светлая', dark: 'Panopticon тёмная' };
+/** The new interface's themes by default (ТЗ 42 §3.2), till one is chosen. */
+export const NEXT_THEME: Record<Appearance, string> = { light: 'Синька — светлая', dark: 'Синька — тёмная' };
 export const builtinFor = (a: Appearance) => BUILTIN.find((t) => t.name === DEFAULT_THEME[a])!;
 
 /** A heading level's colour: 5…9 as level 4 unless set; deeper than 9 as 9. */
