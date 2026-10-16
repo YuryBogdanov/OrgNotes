@@ -119,7 +119,7 @@
         <button onclick={() => store.widenTab(tab)}>Показать весь файл</button>
       </div>
     {/if}
-    <div class="with" bind:clientWidth={areaW}>
+    <div class="with grid" bind:clientWidth={areaW} style:--sw={structure ? '220px' : '0px'}>
     <div class="ed">
       {#if fb.open}
         <FindPanel bind:q={() => fb.q, (v) => { fb.q = v; fb.at = null; }} bind:re={() => fb.re, (v) => (fb.re = v)} replacing={fb.replacing} info={found} focusN={fb.focusN}
@@ -138,7 +138,7 @@
     {#if structure}<Structure range={narrowed} />{/if}
     </div>
   {:else if tab?.kind === 'untitled'}
-    <div class="ed">
+    <div class="ed grid">
       <Editor text={tab.text ?? ''} fileKey={tab.id} wf={store.untitledWf} reveal={tab.reveal} initial={tab.cursor} hint="Начните писать…" levels={store.levels} drawers={store.foldDrawers}
         rich={store.rich} onchange={(t) => (tab.text = t)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>
@@ -154,14 +154,22 @@
   .area { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .ed, .view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .ed { position: relative; min-width: 0; }
-  .with { flex: 1; min-height: 0; display: flex; }
+  /* §7.1: the editor scrolls up to the window's edge, its bar there; «Структура» lies over the right part of it, the
+     text kept clear of it by the scroller's padding (--sw, the column's width) */
+  .with { position: relative; flex: 1; min-height: 0; display: flex; }
+  .with :global(.cm-scroller) { padding-right: var(--sw); }
+  /* the grid of 24 pt under the text and «Структура» alike (the mockup's PEditor, PEditorSrc): one ground, no seam */
+  .grid {
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px; background-position: -1px -1px;
+  }
   /* the narrowing's strip (§5.8): 40 pt of the lamp over the column */
   .narrow { flex: 0 0 40px; display: flex; align-items: center; gap: 10px; padding: 0 20px; box-sizing: border-box; background: var(--lampsoft); border-bottom: 1px solid var(--lampline); font-size: 12.5px; color: var(--ink2); }
   .narrow b { color: var(--lampink); }
   .narrow .np { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .narrow .k { font: 11px var(--mono); color: var(--ink3); }
   .narrow button { height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--card); color: var(--ink); font: 12.5px var(--ui); }
-  .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; pointer-events: none; color: var(--ink3); font: 500 17px var(--text); }
+  .empty { position: absolute; inset: 0 var(--sw, 0px) 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; pointer-events: none; color: var(--ink3); font: 500 17px var(--text); }
   .empty .et { font: 400 28px/1.2 var(--title); color: var(--ink2); }
   .empty code { padding: 0 4px; border-radius: 4px; font: 0.85em var(--mono); background: var(--chip); }
   .ed :global(.cm-editor) { height: 100%; }

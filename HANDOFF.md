@@ -324,6 +324,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   current: the caret's, a deeper one counted as its ancestor of level ≤ 3), a click `store.open`; «Ссылаются» —
   `links.backlinks` of the deepest heading under the caret, 6 and «ещё N». On by `nextPrefs.svelte.ts`
   (`next:structure`, ⌥⌘0 = the old `insp` key) and only when the area is ≥ 900 px wide.
+  The grid of 24 pt is EditorArea's `.grid` (the text and «Структура» on one ground, as the mockup has it); the
+  editor's own ground (`--ed-bg`) is transparent there.
+  §7.1 scrolling: the editor's scroller runs to the window's edge (its bar there); «Структура» is absolute over its
+  right part (`pointer-events` only on its content), the text kept clear by the scroller's `padding-right: var(--sw)`
+  (FindPanel, the empty file's word and the link card's `tooltipSpace` read the same). No `::-webkit-scrollbar` in
+  `.next` (app.css scopes them `:not(.next, .next *)`): macOS's overlay bars. The column's list has no bar and fades
+  24 pt at the edge it goes on past (`.ft`/`.fb` masks).
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

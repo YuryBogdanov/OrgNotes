@@ -35,15 +35,33 @@
   const nameOf = (i: number) => store.files[i]?.name.replace(/\.org$/, '').split('/').pop() ?? '';
 
   let list: HTMLDivElement | undefined = $state();
+  // §7.1: no bar; a list longer than the room fades out at the edge it goes on past
+  let fadeTop = $state(false);
+  let fadeBot = $state(false);
+  const edges = () => {
+    if (!list) return;
+    fadeTop = list.scrollTop > 1;
+    fadeBot = list.scrollTop + list.clientHeight < list.scrollHeight - 1;
+  };
   $effect(() => {
     void current;
-    queueMicrotask(() => list?.querySelector<HTMLElement>('.on')?.scrollIntoView({ block: 'nearest' }));
+    void heads;
+    queueMicrotask(() => {
+      list?.querySelector<HTMLElement>('.on')?.scrollIntoView({ block: 'nearest' });
+      edges();
+    });
+  });
+  $effect(() => {
+    if (!list) return;
+    const ro = new ResizeObserver(edges);
+    ro.observe(list);
+    return () => ro.disconnect();
   });
 </script>
 
 <aside class="struct" aria-label="Структура">
   <div class="lbl">Структура</div>
-  <div class="list" bind:this={list}>
+  <div class="list" class:ft={fadeTop} class:fb={fadeBot} bind:this={list} onscroll={edges}>
     {#each heads as { h, i } (i)}
       <button class="row lv{h.level}" class:on={i === current} class:done={isDone(h.keyword)} aria-current={i === current ? 'true' : undefined}
         title={plain(h.title)} onclick={() => store.open(fi, h.line)}>
@@ -66,9 +84,17 @@
 </aside>
 
 <style>
-  .struct { flex: 0 0 220px; width: 220px; min-height: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 46px 22px 16px 0; overflow: hidden; }
+  /* §7.1: over the right part of the editor's scroller (EditorArea), no ground, no line between; the editor's bar at
+     the window's edge, under the right padding. Only the column's content takes the pointer: a wheel over the air
+     scrolls the text. */
+  .struct { position: absolute; top: 0; right: 0; bottom: 0; z-index: 2; width: 220px; min-height: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 46px 22px 16px 0; overflow: hidden; pointer-events: none; }
+  .struct > * { pointer-events: auto; }
   .lbl { padding-left: 22px; margin-bottom: 12px; font-size: 11px; font-weight: 600; color: var(--ink3); }
-  .list { position: relative; min-height: 0; overflow: auto; padding-left: 22px; }
+  .list { position: relative; min-height: 0; overflow: auto; padding-left: 22px; scrollbar-width: none; }
+  .list::-webkit-scrollbar { display: none; }
+  .list.ft { -webkit-mask-image: linear-gradient(transparent, #000 24px); mask-image: linear-gradient(transparent, #000 24px); }
+  .list.fb { -webkit-mask-image: linear-gradient(#000 calc(100% - 24px), transparent); mask-image: linear-gradient(#000 calc(100% - 24px), transparent); }
+  .list.ft.fb { -webkit-mask-image: linear-gradient(transparent, #000 24px, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(transparent, #000 24px, #000 calc(100% - 24px), transparent); }
   .list::before { content: ''; position: absolute; left: 5px; top: 6px; bottom: 6px; width: 1px; background: var(--rule); }
   .row { position: relative; width: 100%; height: 26px; display: flex; align-items: center; padding: 0; border: 0; background: none; color: var(--ink2); font: 12.5px var(--ui); text-align: left; white-space: nowrap; cursor: default; }
   .row:hover .t { color: var(--ink); }
