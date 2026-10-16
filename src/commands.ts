@@ -8,6 +8,7 @@ import { fuzzy, better, type Match } from './fuzzy';
 import { displayName, isArchive } from './names';
 import { clipTarget } from './linkEdit';
 import { focusedEditor } from './editorKeys';
+import { openNote } from './noteReq.svelte';
 import { parseDate, weekdayNames } from './edits';
 import { shiftDate } from './calendar';
 import type { Heading, OrgDate } from './org';
@@ -29,6 +30,7 @@ export const ICONS = {
   cal: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3M6.5 11h2M11.5 11h2M6.5 14h2',
   inbox: 'M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4',
   prio: 'M10 3v10M10 16.5v.01',
+  note: 'M4 3.5h12v9.5l-4 3.5H4zM12 16.5V13h4M7 7.5h6M7 10.5h4', // a sheet with a turned corner
   clear: 'M5 5l10 10M15 5L5 15',
   goal: 'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z',
   plug: 'M8 2.5v4M12 2.5v4M5.5 6.5h9v3a4.5 4.5 0 0 1-9 0zM10 14v3.5',
@@ -210,6 +212,11 @@ register({
   when: onHeading, hint: (c) => c.heading!.tags.join(', '),
   // in a file's editor: the field of the heading's tags (ТЗ 38 §6), once the palette has given the focus back
   run: (c) => (store.tab?.kind === 'file' ? void inEditor('tags', c.heading!.line) : tagsStep(c)),
+});
+register({
+  id: 'addNote', title: 'Добавить заметку…', icon: 'note', group: 'heading', synonyms: ['заметка', 'статус', 'note', 'logbook'],
+  // in a file's editor: under the heading's line; elsewhere (an agenda) at the top of the window
+  when: onHeading, run: (c) => (store.tab?.kind === 'file' ? void inEditor('addNote', c.heading!.line) : void setTimeout(() => openNote(c.file!.name, c.heading!.line))),
 });
 register({
   id: 'copyLink', title: 'Копировать ссылку на заголовок', icon: 'goto', group: 'heading', synonyms: ['ссылка', 'link', 'id'],

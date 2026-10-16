@@ -5,6 +5,7 @@ import { openFile, openFromAgenda } from '../layout';
 import { viewOf } from '../views';
 import type { HeadingRef } from './index';
 import { fileOf, findHeading } from './refs';
+import { openNote } from '../noteReq.svelte';
 
 /** The core's commands a plugin may run (ТЗ 26: a minimum, grows with our plugins). */
 export function coreCommand(cmd: string, arg: unknown) {
@@ -51,6 +52,15 @@ export function coreCommand(cmd: string, arg: unknown) {
       return void (store.pickInbox = Date.now());
     case 'inbox.createFile':
       return store.createInboxFile();
+    case 'heading.note': {
+      // «Добавить заметку…» (ТЗ 40 §3): the popover at { x, y } of the window (under the plugin's row), else at the top
+      const f = a.ref ? fileOf(a.ref.path) : undefined;
+      const h = f && a.ref ? findHeading(f.headings, a.ref) : undefined;
+      if (!f || !h) throw new Error('заголовок не найден');
+      const o = (arg ?? {}) as { x?: unknown; y?: unknown };
+      const at = typeof o.x === 'number' && typeof o.y === 'number' ? { x: o.x, y: o.y } : undefined;
+      return openNote(f.name, h.line, at);
+    }
     case 'heading.status':
     case 'heading.schedule':
     case 'heading.deadline':

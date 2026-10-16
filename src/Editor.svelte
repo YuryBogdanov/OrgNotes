@@ -21,6 +21,7 @@
   import { clipTarget, linkHooks, linkPaste } from './linkEdit';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import TagPop from './TagPop.svelte';
+  import { openNote } from './noteReq.svelte';
   import { headingActionsFor } from './headingActions.svelte';
   import { tagsState } from './tagsState.svelte';
   import { lineTags, withTags } from './tags';
@@ -157,6 +158,13 @@
       openTagPop(v, l.number);
       return true;
     },
+    // ⌃C ⌃Z: a note into the heading's :LOGBOOK: (ТЗ 40 §3), for the heading the caret is in
+    addNote: (v, line?: number) => {
+      const at = line !== undefined && line >= 0 && line < v.state.doc.lines ? line : headingAbove(v);
+      if (at < 0) return false;
+      noteAt(v, at);
+      return true;
+    },
     // ⌥⇧⌘V: the clipboard's text in place of the selection, never a link
     pasteText: (v) => {
       void linkHooks.readClip().then((t) => {
@@ -260,6 +268,7 @@
     const hl = v.state.doc.lineAt(s.head);
     if (s.empty && headLine(hl.text)) {
       items.push({ label: 'Теги…', shortcut: key('tags'), action: () => openTagPop(v, hl.number) });
+      items.push({ label: 'Добавить заметку…', shortcut: key('addNote'), action: () => noteAt(v, hl.number - 1) });
       // the plugins' items on a heading (ТЗ 39)
       const more = headingActionsFor(path, hl.number - 1);
       if (more.length) items.push('sep', ...more.map((a): MenuItem => ({ label: a.label, action: () => a.run(path, hl.number - 1) })));
@@ -268,6 +277,16 @@
   }
 
   const headLine = (t: string) => /^\*+\s/.test(t);
+  /** The line of the heading the caret is in (-1 above the first one). */
+  function headingAbove(v: EditorView) {
+    for (let n = v.state.doc.lineAt(v.state.selection.main.head).number; n >= 1; n--) if (headLine(v.state.doc.line(n).text)) return n - 1;
+    return -1;
+  }
+  function noteAt(v: EditorView, line: number) {
+    const l = v.state.doc.line(line + 1);
+    const c = v.coordsAtPos(l.from + Math.min(l.length, /^\*+\s*/.exec(l.text)![0].length));
+    openNote(path, line, c ? { x: c.left, y: c.bottom + 6 } : undefined, () => v.focus());
+  }
   // ---- «Теги заголовка» (ТЗ 38 §6): each change in the line at once, kept out of the undo history; on closing, the
   // whole change is put in as one step — one ⌘Z per opening ----------------------------------------------------------
   let tagPop = $state<{ v: EditorView; line: number; orig: string; tags: string[]; x: number; y: number } | null>(null);

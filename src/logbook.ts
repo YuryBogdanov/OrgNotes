@@ -24,12 +24,15 @@ export function addNote(text: string, h: Heading, note: string, now = new Date()
 const STAMP = /\[(\d{4})-(\d{2})-(\d{2})(?:\s+[^\s\]\d]+)?(?:\s+(\d{1,2}):(\d{2}))?[^\]]*\]/;
 const ENTRY = /^\s*-\s+(Note taken on|State\s+"[^"]*"\s+from(?:\s+"[^"]*")?)\s*(\[[^\]]+\])\s*(\\\\)?\s*$/;
 
+/** The last note of the heading itself; null when it has none. */
+export const lastNote = (lines: readonly string[], h: Heading) => notesOf(lines, h)[0] ?? null;
+
 /**
- * The last note of the heading itself (its own :LOGBOOK:, not its children's): a note taken, or the words after a
- * change of status (`- State "WAIT" from "NEXT" […] \\` and a line under it). Null when it has none.
+ * The notes of the heading itself (its own :LOGBOOK:, not its children's), the newest first: a note taken, or the
+ * words after a change of status (`- State "WAIT" from "NEXT" […] \\` and a line under it).
  */
-export function lastNote(lines: readonly string[], h: Heading): { at: Date; text: string } | null {
-  let best: { at: Date; text: string } | null = null;
+export function notesOf(lines: readonly string[], h: Heading): { at: Date; text: string }[] {
+  const out: { at: Date; text: string }[] = [];
   let inLog = false;
   for (let i = h.line + 1; i < lines.length && i < h.end; i++) {
     const l = lines[i];
@@ -56,7 +59,8 @@ export function lastNote(lines: readonly string[], h: Heading): { at: Date; text
       if (/^\s*/.exec(n)![0].length <= indent) break;
       words.push(n.trim());
     }
-    if (!best || at > best.at) best = { at, text: words.join(' ') };
+    out.push({ at, text: words.join(' ') });
   }
-  return best;
+  // the newest first; of the same minute, the one higher in the drawer (Org puts a new note on top)
+  return out.map((n, i) => ({ n, i })).sort((a, b) => +b.n.at - +a.n.at || a.i - b.i).map((x) => x.n);
 }

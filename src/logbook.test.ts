@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORKFLOW, parseHeadings } from './org';
-import { addNote, lastNote } from './logbook';
+import { addNote, lastNote, notesOf } from './logbook';
 
 // ТЗ 40 §3: the status of a matter as a note of Org in :LOGBOOK:, and the last one read back.
 
@@ -48,6 +48,13 @@ describe('the last note', () => {
     const t = T.replace('[2026-10-12 Пн 09:00]', '[2026-09-12 Сб 09:00]');
     expect(lastNote(t.split('\n'), hs(t)[0])).toEqual({ at: new Date(2026, 9, 2, 11, 20), text: 'черновик у Глеба до пятницы' });
     expect(lastNote(T.split('\n'), hs(T)[1])!.text).toBe('это заметка подзадачи');
+  });
+  it('all of them, the newest first (the popover shows three)', () => {
+    expect(notesOf(T.split('\n'), hs(T)[0]).map((n) => n.text)).toEqual(['ждём бизнес', 'черновик у Глеба до пятницы']);
+  });
+  it('two notes of the same minute: the upper one is the newer', () => {
+    const t = addNote(addNote('* A\n', hs('* A\n')[0], 'первая', NOW), hs(addNote('* A\n', hs('* A\n')[0], 'первая', NOW))[0], 'вторая', NOW);
+    expect(notesOf(t.split('\n'), hs(t)[0]).map((n) => n.text)).toEqual(['вторая', 'первая']);
   });
   it('none: null', () => {
     expect(lastNote(['* A', 'тело'], hs('* A\nтело')[0])).toBeNull();
