@@ -238,7 +238,7 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
     for (const g of groups)
       for (const f of arr(g.fields).map(obj)) {
         if (!isStr(f.key) || !isStr(f.label)) problems.push('настройки: у поля нужны key и label');
-        if (!['choice', 'switch', 'text', 'file', 'pair'].includes(String(f.type))) problems.push(`настройки: тип поля «${String(f.type)}»`);
+        if (!['choice', 'switch', 'text', 'file', 'pair', 'custom'].includes(String(f.type))) problems.push(`настройки: тип поля «${String(f.type)}»`);
         if (f.where !== 'folder' && f.where !== 'local') problems.push(`настройки «${String(f.key)}»: where — folder или local`);
       }
     settings.push({ section: isStr(x.section) ? x.section : undefined, block: isStr(x.block) ? x.block : undefined, icon: isStr(x.icon) ? x.icon : undefined, groups: groups as unknown as Group[] });

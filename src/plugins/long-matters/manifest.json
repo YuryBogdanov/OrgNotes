@@ -86,6 +86,116 @@
         "title": "Долгие дела",
         "icon": "M4 16.5V10M8 16.5V4M12 16.5V12M16 16.5V7"
       }
+    ],
+    "settings": [
+      {
+        "section": "Долгие дела",
+        "icon": "M4 16.5V10M8 16.5V4M12 16.5V12M16 16.5V7",
+        "groups": [
+          {
+            "caption": "ИСТОЧНИКИ",
+            "fields": [
+              {
+                "key": "sources",
+                "type": "custom",
+                "where": "folder",
+                "label": "Где долгие дела",
+                "default": [
+                  {
+                    "kind": "file",
+                    "file": "Midterm.org",
+                    "level": 1
+                  },
+                  {
+                    "kind": "tag",
+                    "tag": "long"
+                  }
+                ],
+                "hint": "Файл — заголовки выбранного уровня; тег — любой заголовок со своим тегом (наследованный не считается)"
+              }
+            ]
+          },
+          {
+            "caption": "ПРОВЕРКА",
+            "fields": [
+              {
+                "key": "norm",
+                "type": "choice",
+                "look": "menu",
+                "where": "folder",
+                "label": "Норма проверки",
+                "default": 14,
+                "options": [
+                  {
+                    "value": 7,
+                    "label": "7 дней"
+                  },
+                  {
+                    "value": 10,
+                    "label": "10 дней"
+                  },
+                  {
+                    "value": 14,
+                    "label": "14 дней"
+                  },
+                  {
+                    "value": 21,
+                    "label": "21 день"
+                  },
+                  {
+                    "value": 30,
+                    "label": "30 дней"
+                  },
+                  {
+                    "value": 45,
+                    "label": "45 дней"
+                  },
+                  {
+                    "value": 60,
+                    "label": "60 дней"
+                  }
+                ],
+                "hint": "Срок проверки — касание плюс норма, если у дела нет :NEXT_REVIEW:"
+              },
+              {
+                "key": "wait",
+                "type": "choice",
+                "look": "menu",
+                "where": "folder",
+                "label": "Статус ожидания",
+                "default": "WAIT",
+                "options": [
+                  {
+                    "value": "WAIT",
+                    "label": "WAIT"
+                  }
+                ],
+                "hint": "Его ставит «Ждём…»; «Больше не ждём» возвращает статус до него"
+              }
+            ]
+          },
+          {
+            "caption": "«СЕГОДНЯ»",
+            "fields": [
+              {
+                "key": "today",
+                "type": "switch",
+                "where": "local",
+                "label": "Блок в «Сегодня»",
+                "default": true,
+                "hint": "До трёх дел, которые пора проверить"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "todayBlocks": [
+      {
+        "id": "long-matters.today",
+        "title": "Долгие дела",
+        "hint": "Добавляет плагин «Долгие дела»: дела, которые пора проверить"
+      }
     ]
   }
 }

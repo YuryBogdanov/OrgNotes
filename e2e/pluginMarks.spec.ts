@@ -23,7 +23,7 @@ test('the settings: the app\'s sections, then «ПЛАГИНЫ», then «НАС�
   expect(order.slice(0, iPl)).toEqual(expect.arrayContaining(['Основные', 'Сегодня', 'Оформление', 'Статусы', 'Агенды', 'Inbox', 'Клавиши', 'Мини-окно']));
   expect(order[iPl + 1]).toBe('Плагины');
   expect(iSet).toBe(iPl + 2);
-  expect(order.slice(iSet + 1)).toEqual(['Календарь', 'Канбан']); // the built-in plugins' sections that are on, by name
+  expect(order.slice(iSet + 1)).toEqual(['Долгие дела', 'Календарь', 'Канбан']); // the built-in plugins' sections that are on, by name
   // the gear of a plugin in the list opens its section
   await sheet(page).getByRole('button', { name: 'Настройки плагина Канбан' }).click();
   await expect(side.getByRole('tab', { name: 'Канбан' })).toHaveAttribute('aria-selected', 'true');

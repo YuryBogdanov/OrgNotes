@@ -39,9 +39,12 @@ class LongMatters {
   /** Most dates are approximate (the first start on a folder). */
   mostlyApprox = $derived(this.matters.length > 0 && this.matters.filter((m) => m.touched?.approx).length * 2 > this.matters.length);
 
+  /** The settings of «Настройки → Долгие дела» (the sources and the norm with the notes folder, the block on this Mac). */
   readStored() {
-    this.settings = readSettings(this.ctx.storage.folder.get());
+    this.settings = readSettings(this.ctx.settings.values());
   }
+  /** The open statuses of the files read: the choice of «Статус ожидания». */
+  openStates = $state<string[]>([]);
 
   private reading = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -90,6 +93,7 @@ class LongMatters {
     );
     if (n !== this.reading) return;
     this.files = read;
+    this.openStates = [...new Set([...read.values()].flatMap((f) => f.info.open))];
     this.matters = out.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line);
     this.progress = null;
     this.today = startOfDay();
@@ -125,7 +129,7 @@ class LongMatters {
     void this.ctx.ui.open(VIEW, null);
   }
   openSources() {
-    void this.ctx.commands.run('settings.open', { section: 'Плагины' });
+    void this.ctx.commands.run('settings.open', { section: 'Долгие дела' });
   }
 }
 
