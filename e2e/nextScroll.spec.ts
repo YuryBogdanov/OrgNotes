@@ -39,7 +39,7 @@ test('the column scrolls with no bar, fades where it goes on, keeps the current 
   const list = col(page).locator('.list');
   await expect(list).toHaveClass(/fb/);
   await expect(list).not.toHaveClass(/ft/);
-  expect(await list.evaluate((e) => e.offsetWidth - e.clientWidth)).toBe(0);
+  expect(await list.evaluate((e: HTMLElement) => e.offsetWidth - e.clientWidth)).toBe(0);
   await col(page).getByRole('button', { name: 'Заголовок 60' }).click();
   await expect(list).toHaveClass(/ft/);
   await expect(list).not.toHaveClass(/fb/);
