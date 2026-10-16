@@ -29,6 +29,23 @@ export default ts.config(
       'svelte/no-useless-mustaches': 'off',
     },
   },
+  // ТЗ 42 §2: the new interface grows beside the old one. `src/next/` takes any module of `src/` (`.ts`, `.svelte.ts` —
+  // imported as `../store.svelte`) but no component of the old interface (a capital name: `../Settings.svelte`), except
+  // through `next/bridges.ts`; the old code never imports `next/` (the entry, main.ts, chooses the shell).
+  {
+    files: ['src/next/**/*.ts', 'src/next/**/*.svelte'],
+    ignores: ['src/next/bridges.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ regex: '^(\\.\\./)+(?:[^/]+/)*[A-Z][^/]*\\.svelte$', caseSensitive: true, message: 'Компонент старого интерфейса — только через next/bridges.ts (ТЗ 42 §2).' }] }],
+    },
+  },
+  {
+    files: ['src/**/*.ts', 'src/**/*.svelte'],
+    ignores: ['src/next/**', 'src/main.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ regex: '(^|/)next/', message: 'Старый интерфейс не импортирует src/next/ (ТЗ 42 §2).' }] }],
+    },
+  },
   {
     files: ['**/*.svelte', '**/*.svelte.ts'],
     languageOptions: { parserOptions: { parser: ts.parser, extraFileExtensions: ['.svelte'], svelteConfig } },

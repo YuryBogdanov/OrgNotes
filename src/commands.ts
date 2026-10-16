@@ -279,6 +279,15 @@ register({
   id: 'endDay', title: 'Завершить день…', icon: 'moon', group: 'general', synonyms: ['вечер', 'журнал', 'итоги', 'на завтра'],
   when: () => !!store.dir || store.files.length > 0, run: () => void setTimeout(() => today.openEndDay()),
 });
+// «Новый интерфейс (бета)» (ТЗ 42 §1): the window reloads with the other shell
+register({
+  id: 'nextUiOn', title: 'Включить новый интерфейс', icon: 'window', group: 'general', synonyms: ['бета', 'дизайн', 'синька', 'новый вид'],
+  when: () => !store.nextUi, run: () => void setTimeout(() => store.setInterface(true)),
+});
+register({
+  id: 'nextUiOff', title: 'Вернуть старый интерфейс', icon: 'window', group: 'general', synonyms: ['бета', 'дизайн', 'старый вид'],
+  when: () => store.nextUi, run: () => void setTimeout(() => store.setInterface(false)),
+});
 register({
   id: 'settings', title: 'Настройки…', icon: 'gear', group: 'general', synonyms: ['параметры', 'клавиши', 'сочетания', 'preferences'],
   when: () => true, run: () => void setTimeout(() => store.openSettings()), // once the palette is closed
