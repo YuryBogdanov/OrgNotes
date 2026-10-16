@@ -137,3 +137,17 @@
 /* ⌘F (§5.7): the matches on `lampsoft`, the current one on the lamp */
 .next .cm-editor .cm-find { background: var(--lampsoft); border-radius: 2px; }
 .next .cm-editor .cm-find.cm-find-cur { background: var(--lamp); color: var(--onlamp); }
+
+/* the card over a link (§5.6): 400 pt on `card`, a shadow, 12 pt corners */
+.next .cm-tooltip.cm-tooltip-hover:has(.cm-lcard) { border: 0; background: transparent; box-shadow: none; }
+.next .cm-lcard { width: 400px; max-width: 80vw; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px 12px; border: 1px solid var(--rule); border-radius: 12px; background: var(--card); box-shadow: var(--popshadow); font: 12px var(--ui); color: var(--ink2); }
+.next .lc-path { font: 11px var(--mono); letter-spacing: 0.02em; color: var(--ink3); }
+.next .lc-title { display: flex; align-items: baseline; gap: 8px; font: 700 22px/1.2 var(--text); color: var(--ink); }
+.next .lc-kw { flex: 0 0 auto; padding: 0 6px; border-radius: 4px; font: 700 10.5px/18px var(--ui); color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); vertical-align: 0.25em; }
+.next .lc-body { font: 500 17px/1.45 var(--text); color: var(--ink2); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.next .lc-url { font: 12.5px var(--mono); color: var(--lampink); overflow-wrap: anywhere; }
+.next .lc-miss { font: 700 15px var(--ui); color: var(--todo); }
+.next .lc-foot { display: flex; align-items: center; gap: 12px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--rule); font-size: 11.5px; color: var(--ink3); }
+.next .lc-k.off { opacity: 0.55; }
+.next .lc-ref { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--mono); }
+.next .lc-fix { margin-left: auto; height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--lamp); color: var(--onlamp); font: 600 12px var(--ui); }

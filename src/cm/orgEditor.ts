@@ -4,7 +4,7 @@
 // next/Editor.svelte each wrap one: they give the props and draw the menu and the popover it asks for.
 
 import { Compartment, EditorState, StateField, Transaction } from '@codemirror/state';
-import { Decoration, EditorView, ViewPlugin, hoverTooltip, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+import { Decoration, EditorView, ViewPlugin, hoverTooltip, tooltips, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
 import { codeFolding, foldGutter, foldKeymap, foldedRanges, toggleFold } from '@codemirror/language';
 import { autocompletion, type CompletionContext } from '@codemirror/autocomplete';
@@ -29,6 +29,7 @@ import { cycleState, cycleVisibility, newHeading, onHeading, orgFold, run, sel }
 import { decorate } from './decorate';
 import { narrowRange, narrowing, setNarrow } from './narrow';
 import { sectionBar } from './section';
+import { linkCard } from './linkCard';
 
 /** What the wrapping component gives: the file and how it is shown, and what the editor tells back. */
 export interface EditorProps {
@@ -469,6 +470,19 @@ export class OrgEditor {
     { hoverTime: 400 },
   );
 
+  /** The new interface (ТЗ 42 §5.6): over a link for half a second, the card of what it goes to. */
+  private linkCardTip = hoverTooltip(
+    (v, pos) => {
+      const l = linkAt(v.state.doc, pos);
+      if (!l) return null;
+      return {
+        pos: l.from, end: l.to, above: false,
+        create: () => ({ dom: linkCard(linkHooks.preview(l, this.path), () => this.pickLink(v, l)) }),
+      };
+    },
+    { hoverTime: 500 },
+  );
+
   private makeState(doc: string, words: Workflow) {
     this.words = words;
     const p = this.p;
@@ -519,7 +533,9 @@ export class OrgEditor {
         ...(gutter ? [foldGutter()] : []), plugin, ...lineLinkExt(() => this.path), selectionClass, this.note.of(noteExt(p.lineNote ?? null)), this.structure.of(this.structureExt(words)),
         ...(p.hint ? [cmPlaceholder(p.hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
-        this.linkTip,
+        p.next ? this.linkCardTip : this.linkTip,
+        // the card stays within the text's area: the column «Структура» to the right would cover it
+        p.next ? tooltips({ tooltipSpace: (v) => v.scrollDOM.getBoundingClientRect() }) : [],
         // the tab keeps its folded headings (S-Tab, ⇥): shown again, it comes back folded as it was
         EditorView.updateListener.of((u) => {
           // a fold changed, or an edit moved the lines of the folds
