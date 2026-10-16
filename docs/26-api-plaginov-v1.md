@@ -380,7 +380,7 @@ net?: { fetch(url: string, init?: { method?; headers?; body?: string }): Promise
 
 ## API v1.12 — касания заголовков (ТЗ 40)
 
-- `HeadingInfo.touched`, `index.touched(ref)`: когда в последний раз менялось поддерево заголовка, `{ at, approx }`.
+- `HeadingInfo.touched`, `index.touched(ref)`: когда в последний раз менялось поддерево заголовка, `{ at, approx, src? }`; `src` у приблизительной даты — `logbook`, `closed` или `file`.
 - `index.lastNote(ref)`: последняя заметка из `:LOGBOOK:` самого заголовка.
 - `index.markReviewed(ref)`: «Осмотрено», касание без правки файла. Новое право `index.touch`.
 - `Tx.addNote(ref, text)`: заметка в `:LOGBOOK:`, как по `C-c C-z` в Emacs.

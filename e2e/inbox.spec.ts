@@ -32,7 +32,7 @@ test.describe('the navigator', () => {
     await expect(page.locator('.cm-content').first()).toBeVisible();
     const tabs = modes(page).getByRole('tab');
     // the built-in plugins' sections («Inbox», «Цели», «Календарь») in their places among the core's (ТЗ 38)
-    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Агенда', 'Цели', 'Календарь', 'Теги', 'Поиск по заметкам']);
+    expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Агенда', 'Цели', 'Долгие дела', 'Календарь', 'Теги', 'Поиск по заметкам']);
     await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
     await expect(tabs.nth(1)).toHaveAttribute('title', /^Inbox/);
     await expect(modes(page).locator('.badge')).toHaveText('4');

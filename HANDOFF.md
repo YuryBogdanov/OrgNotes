@@ -242,6 +242,16 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   `NotePop.svelte`: the field «Новый статус» (↩ writes, ⇧↩ a line, ⎋), the three last notes (`logbook.ts`
   `notesOf`, the newest first; `lastNote` is its first), written by `store.transaction('Заметка', tx.addNote)` — one
   ⌘Z. The module is not `notePop.svelte.ts`: macOS sees it as the same file as `NotePop.svelte` for svelte-check.
+- **«Долгие дела» (ТЗ 40.4, the built-in plugin `src/plugins/long-matters/`):** `long.ts` (pure): the settings
+  (`readSettings`, the defaults Midterm.org level 1 and the own tag `long`, 14 days, WAIT, the block on «Сегодня» —
+  their sheet comes in 40.6), `longIn` (not done, no `:ARCHIVE:` up the tree, not an archive file), `shown` (age,
+  the day to look — `:NEXT_REVIEW:` or the touch + the norm —, group `due` / `waiting` / `ok`, tone: late, soon
+  under 30% of the norm left), `grouped`, the words. `state.svelte.ts`: `readOrg` of the files the sources need, then
+  `index.heading` (properties, `touched` with `src`) and `index.lastNote` per matter; read again 150 ms after
+  `file.changed` / `heading.touched`, and each second while a touch is unknown. `Panel.svelte` (the navigator, mode
+  after «Цели», ⌃⌘9: ⌃⌘5 stays the calendar's), `List.svelte` (the tab: filter as the tab's state, «В норме» folded
+  in «Все» only, the bar of approximate dates dismissed in `storage.local`, ↑↓ ↩ ⌘↩). «Источники…» opens Settings →
+  Плагины until 40.6. `HeadingInfo.touched.src` (API 1.12) gives the hint «Примерно: по записи от …».
 - **Reordering by dragging (tech sprint 4.3):** `reorder.svelte.ts`, `new Reorder(onDrop, onStart?)` with `use:r.handle={{ id, image? }}` (what is dragged; `image`: the closest element drawn while dragging) and `use:r.zone={id}` (a row or a place: 'end', 'separator'); `r.dragId` / `r.overId` draw the line. Used by the agenda builder's blocks, the statuses and their sets (Settings), the blocks of «Сегодня» (TodaySettings), «Главное на завтра» (EndDay). The keys (⌥↑ ⌥↓) stay with each list. The lists' ↑↓ were not made one action: they differ (wrap or stop, with Esc, Tab, a field).
 - **Editor split (tech sprint 4.3):** `src/cm/` holds the editor's CodeMirror parts that do not hang on the component: `doc.ts` (heading lines, drawers, links per document version), `drawers.ts` (folding drawers and asked-for headings), `structure.ts` (applying an outline command, M-RET, S-Tab's cycle, `orgFold`), `decorate.ts` (the plain editor's marks), `narrow.ts` (narrowing to a subtree: `narrowing(n, onnarrow)` gives `{ field, ext }`), `lineLinks.ts`, `lineNote.ts`. Editor.svelte keeps the state, the commands table, the menus and the effects. Checked by screenshots (plain and rich, folded with S-Tab, light and dark): identical.
 - **Pane and App split (tech sprint 4.2):** `PaneTabs.svelte` (a pane's row of tabs: scrolling with faded edges, «⌵», a tab's menu, the path tooltip), `tabLabels.ts` (`tabLabel`, `isCore`, `isGone`, `isDirty`, `OFF_ICON`; Pane uses them too), `Toolbar.svelte` (the window's toolbar and title bar: our traffic lights in full screen, the path, «Открыть в панели»). Checked by screenshots (many tabs, a dirty one, the menus, the tooltip, two panes, the agenda pressed, full screen; light and dark): identical, but for a scrollbar thumb that differs between runs of the same code.

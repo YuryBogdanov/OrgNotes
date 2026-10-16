@@ -544,7 +544,7 @@ test.describe('the navigator mode «Агенда»', () => {
   test('a mode of the bar: «Файлы» and «Агенда» switch, the others are not there yet; ⌃⌘1 / ⌃⌘3; it survives a reload', async ({ page }) => {
     await start(page);
     const modes = page.getByRole('tablist', { name: 'Режимы навигатора' });
-    await expect(modes.getByRole('tab')).toHaveCount(7); // «Задачи» is gone (ТЗ 38)
+    await expect(modes.getByRole('tab')).toHaveCount(8); // «Задачи» is gone (ТЗ 38), «Долгие дела» came (ТЗ 40)
     await expect(modes.getByRole('tab', { name: 'Агенда' })).toHaveAttribute('aria-selected', 'true');
     await expect(modes.getByRole('tab', { name: 'Теги' })).toBeEnabled();
     await expect(list(page)).toContainText('ВСТРОЕННЫЕ');

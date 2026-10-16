@@ -8,7 +8,7 @@ import { newId } from '../endDay';
 import type { Heading, OrgDate } from '../org';
 import type { Tx as CoreTx } from '../journal';
 import { propertiesOf, reschedulesOf } from '../orgOps';
-import type { HeadingInfo, HeadingRef } from './index';
+import type { HeadingInfo, HeadingRef, Touched } from './index';
 
 export const fileOf = (path: string) => store.files.find((f) => f.name === path);
 export function findHeading(hs: Heading[], ref: HeadingRef) {
@@ -43,9 +43,9 @@ export function infoOf(f: (typeof store.files)[number], h: Heading): HeadingInfo
   } as HeadingInfo;
 }
 /** The touch of a heading as the plugins see it (ТЗ 40); nothing while the index is being built. */
-export function touchedOf(file: string, line: number): { touched?: { at: Date; approx: boolean } } {
+export function touchedOf(file: string, line: number): { touched?: Touched } {
   const r = touches.at(file, line);
-  return r ? { touched: { at: new Date(r.at), approx: r.approx } } : {};
+  return r ? { touched: { at: new Date(r.at), approx: r.approx, ...(r.approx && r.src ? { src: r.src } : {}) } } : {};
 }
 /** What changed in a heading, for the plugins' events. */
 export type Change = 'status' | 'planning' | 'tags' | 'title' | 'property' | 'body' | 'moved' | 'removed';

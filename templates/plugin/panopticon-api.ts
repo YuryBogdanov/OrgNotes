@@ -66,8 +66,16 @@ export interface HeadingInfo {
    *  time too). The app writes them while the file's workflow keeps a journal (`workflow().logbook`). Since 1.8. */
   reschedules?: { from: OrgDate; at: OrgDate }[];
   /** The last change of its subtree (ТЗ 40): `approx` — a date taken from the file (no history yet: the newest
-   *  :LOGBOOK: entry, CLOSED, or the file's time), shown with «≈». None while the index is being built. Since 1.12. */
-  touched?: { at: Date; approx: boolean };
+   *  :LOGBOOK: entry, CLOSED, or the file's time), shown with «≈»; `src` — where that date was taken from. None while
+   *  the index is being built. Since 1.12. */
+  touched?: Touched;
+}
+/** The last change of a heading's subtree (ТЗ 40). */
+export interface Touched {
+  at: Date;
+  approx: boolean;
+  /** For an approximate date: a :LOGBOOK: entry, CLOSED, the file's time. */
+  src?: 'logbook' | 'closed' | 'file';
 }
 export interface FileInfo {
   path: string;
@@ -520,7 +528,7 @@ export interface Ctx {
     workflow(path: string): Promise<{ open: string[]; done: string[]; sets: StatusSet[]; logbook: boolean }>;
     /** The last change of the heading's subtree (as `HeadingInfo.touched`); null — not found, or not known yet.
      *  Since 1.12. */
-    touched(ref: HeadingRef): Promise<{ at: Date; approx: boolean } | null>;
+    touched(ref: HeadingRef): Promise<Touched | null>;
     /** The newest note of the heading's own :LOGBOOK: (a note taken, or the words after a change of status); null —
      *  none. Since 1.12. */
     lastNote(ref: HeadingRef): Promise<{ at: Date; text: string } | null>;
