@@ -1,0 +1,78 @@
+/* «Оформление» of the new interface (ТЗ 42 §5): the column of 700 pt on a grid of 24 pt, Cormorant Garamond for the
+   text, the lamp for the caret and the current section; the elements of §5.2; the caret's line keeps its font and
+   size, its markup small and monospaced (§5.4); an unfolded drawer a block (§5.5). Scoped to the new shell. */
+
+.next .cm-rich .cm-scroller {
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px; background-position: -1px -1px;
+}
+.next .cm-rich .cm-content {
+  width: 100%; max-width: var(--col, 700px); margin: 0 auto; box-sizing: border-box; padding: 40px 48px 120px;
+  font: 500 19px/1.55 var(--text); color: var(--ink2); caret-color: var(--lamp);
+}
+.next .cm-rich .cm-line { line-height: 1.55; }
+.next .cm-editor .cm-cursor { border-left: 2px solid var(--lamp); }
+.next .cm-editor .cm-selectionBackground, .next .cm-editor.cm-focused .cm-selectionBackground { background: var(--lampsoft) !important; }
+/* the caret's line: lampsoft on the line itself, not on the room above a heading */
+.next .cm-rich .cm-activeLine { background: linear-gradient(var(--lampsoft), var(--lampsoft)) content-box; }
+.next .cm-rich .cm-activeLine.cm-r-h { background-clip: content-box; }
+
+/* the document's title and its line above it */
+.next .cm-rich .cm-r-title { font: 700 44px/1.05 var(--text); color: var(--ink); padding-bottom: 10px; }
+.next .cm-rich .cm-r-title[data-eyebrow]::before { content: attr(data-eyebrow); display: block; margin-bottom: 10px; font: 400 11px/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
+.next .cm-rich .cm-r-ftags { line-height: 30px; padding-bottom: 18px; }
+.next .cm-rich .cm-r-ftags .cm-r-tags { margin-left: 0; gap: 8px; }
+.next .cm-rich .cm-r-ftags .cm-r-cap.tag { height: 20px; padding: 0 7px; border-radius: 5px; font: 11.5px/20px var(--ui); color: var(--ink2); background: var(--chip); }
+
+/* headings: no stars, no dots; the level by size and indent */
+.next .cm-rich .cm-r-h { font-family: var(--text); color: var(--ink); }
+.next .cm-rich .cm-r-h1 { font-size: 27px; font-weight: 700; line-height: 1.2; padding-top: 22px; }
+.next .cm-rich .cm-r-h2 { font-size: 22px; font-weight: 600; line-height: 1.25; padding-top: 12px; }
+.next .cm-rich .cm-r-h3 { font-size: 19px; font-weight: 600; line-height: 1.3; padding-top: 6px; }
+.next .cm-rich .cm-r-h4 { font-size: 17px; font-weight: 600; line-height: 1.35; padding-top: 4px; }
+.next .cm-rich .cm-r-hdone { color: var(--ink3) !important; }
+.next .cm-rich .cm-r-status { display: inline-block; height: 18px; margin-right: 4px; padding: 0 6px; border-radius: 4px; font: 700 10.5px/18px var(--ui); letter-spacing: 0.02em; vertical-align: 0.35em; color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); }
+.next .cm-rich .cm-r-cap.prio { vertical-align: 0.35em; }
+.next .cm-rich .cm-r-tags.colons { display: inline; margin-left: 8px; font: 400 12px var(--ui); color: var(--ink3); vertical-align: 0.3em; }
+.next .cm-rich .cm-r-tagn:hover { color: var(--ink); text-decoration: underline; }
+
+/* dates, drawers, a cookie: chips of 20 pt */
+.next .cm-rich .cm-r-plan { line-height: 32px; }
+.next .cm-rich .cm-r-chip { height: 20px; gap: 5px; padding: 0 7px; border-radius: 5px; font: 11.5px/20px var(--ui); color: var(--ink2); background: var(--chip); vertical-align: 0.2em; }
+.next .cm-rich .cm-r-chip .cm-r-ct { font-weight: 500; }
+.next .cm-rich .cm-r-chip.sched svg { color: var(--lampink); }
+.next .cm-rich .cm-r-chip.dead.near { color: var(--wait); }
+.next .cm-rich .cm-r-chip.dead.over { color: var(--todo); background: var(--chip); }
+.next .cm-rich .cm-r-chip.closed, .next .cm-rich .cm-r-chip.plain { color: var(--ink3); }
+.next .cm-rich .cm-r-chip.drawer { color: var(--ink3); background: var(--chip); padding: 0 7px; }
+.next .cm-rich .cm-r-chip.cookie { margin-left: 6px; }
+
+/* lists, links, code */
+.next .cm-rich .cm-r-box { width: 15px; height: 15px; margin-right: 10px; border: 1.5px solid var(--ink3); border-radius: 4px; color: var(--bg); vertical-align: 0.1em; }
+.next .cm-rich .cm-r-box.on { background: var(--done); border-color: var(--done); }
+.next .cm-rich .cm-r-checked { color: var(--ink3); text-decoration: line-through; }
+.next .cm-rich .cm-r-bullet { color: var(--ink3); }
+.next .cm-rich .cm-link { color: var(--lampink); text-decoration: underline 1px var(--lampline); text-underline-offset: 3px; }
+.next .cm-rich .cm-r-code { padding: 0 4px; border-radius: 4px; font: 0.85em var(--mono); color: var(--ink2); background: var(--chip); }
+
+/* the caret's line: its markup small and monospaced, the status in its colour; no shift of the lines around (§5.4) */
+.next .cm-rich .cm-n-mk, .next .cm-rich .cm-linkmark { font: 400 0.75em var(--mono); color: var(--ink3); }
+.next .cm-rich .cm-n-kw { font: 600 0.75em var(--mono); color: var(--tl); }
+
+/* an unfolded drawer: a block on a chip, the keys grey (§5.5) */
+.next .cm-rich .cm-r-dline { font: 12.5px/1.65 var(--mono); color: var(--ink2); background: var(--chip); box-shadow: inset 2px 0 0 var(--rule); padding-right: 12px; }
+.next .cm-rich .cm-r-dline.head { cursor: pointer; color: var(--ink3); border-radius: 0 6px 0 0; }
+.next .cm-rich .cm-r-dline.end { color: var(--ink3); border-radius: 0 0 6px 0; }
+.next .cm-rich .cm-r-dline.end::after { content: attr(data-hint); float: right; font: 11px/1.9 var(--ui); color: var(--ink3); }
+
+/* the current section: a bar of the lamp left of the text */
+.next .cm-rich .cm-n-sec { position: relative; }
+.next .cm-rich .cm-n-sec::before { content: ''; position: absolute; left: -26px; top: 0; bottom: 0; width: 2px; background: var(--lamp); }
+.next .cm-rich .cm-n-sec.top::before { top: 0.35em; border-radius: 1px 1px 0 0; }
+.next .cm-rich .cm-n-sec.last::before { bottom: 0.2em; border-radius: 0 0 1px 1px; }
+
+/* the fold markers: quiet, shown on hover (the mockups have none) */
+.next .cm-rich .cm-gutters { background: transparent; border: 0; }
+.next .cm-rich .cm-foldGutter .cm-gutterElement { opacity: 0; transition: opacity 0.15s; }
+.next .cm-rich .cm-gutters:hover .cm-foldGutter .cm-gutterElement { opacity: 0.6; }
+.next .cm-rich .cm-activeLineGutter { background: transparent; }

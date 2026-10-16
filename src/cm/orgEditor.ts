@@ -28,6 +28,7 @@ import { dropStaleFolds, foldAllDrawers, foldLines, foldNewDrawers, toggleDrawer
 import { cycleState, cycleVisibility, newHeading, onHeading, orgFold, run, sel } from './structure';
 import { decorate } from './decorate';
 import { narrowRange, narrowing, setNarrow } from './narrow';
+import { sectionBar } from './section';
 
 /** What the wrapping component gives: the file and how it is shown, and what the editor tells back. */
 export interface EditorProps {
@@ -49,7 +50,11 @@ export interface EditorProps {
   rich?: boolean; // «Оформленный текст»: drawn like org-modern (implies the structural view)
   richNumbers?: boolean; // line numbers while drawn
   gutter?: boolean; // the line numbers and the fold markers on the left (none in the mini window, ТЗ 31)
-  find?: (FindQuery & { go: number; dir: 1 | -1 }) | null; // ⌘F: the query; a new `go` steps to the next / previous match
+  find?: (FindQuery & { go: number; dir: 1 | -1 }) | null;
+  /** The new interface (ТЗ 42 §5): its «Оформление» (orgRich `next`, the current section's bar). */
+  next?: boolean;
+  /** Above the document's title in the new «Оформление»: «Midterm.org · изменён 2 мин назад». */
+  eyebrow?: () => string | null; // ⌘F: the query; a new `go` steps to the next / previous match
   ontop?: (line: number) => void; // the first line in view, after a scroll
   onfolds?: (lines: number[]) => void; // the headings folded now, after a fold or an unfold
   onrich?: (p: RichPick) => void; // a click on a status, a priority or a date that asks for a choice
@@ -156,12 +161,14 @@ export class OrgEditor {
   private numbersExt = () => (!(this.p.gutter ?? true) || (this.p.rich && !this.p.richNumbers) ? [] : lineNumbers());
   private structureExt(words: Workflow) {
     if (!this.p.rich) return orgIndent(this.p.levels ?? DEFAULT_LEVELS, headingSet);
-    return orgRich({
+    const rich = orgRich({
       wf: words, heads: headingSet, drawers: drawerMap,
       links: (doc) => linksIn(doc).map((l) => ({ from: l.from, to: l.to })),
       onPick: (pick) => this.p.onrich?.(pick),
       onTag: (t) => tagsState.open([t]),
+      ...(this.p.next ? { next: { eyebrow: () => this.p.eyebrow?.() ?? null } } : {}),
     });
+    return this.p.next ? [rich, sectionBar] : rich;
   }
   private syncLook() {
     const k = this.viewKey();
