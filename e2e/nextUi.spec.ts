@@ -18,7 +18,7 @@ test('off by default: the old shell; on in the settings — the new one after a 
   await sheet.getByRole('switch', { name: 'Новый интерфейс (бета)' }).click();
   await expect(nextShell(page)).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('ui:next'))).toBe('1');
-  await expect(nextShell(page)).toContainText('2 файла');
+  await expect(nextShell(page).getByRole('tree', { name: 'Файлы' }).getByRole('treeitem')).toHaveCount(2);
   // the palette (a bridge) offers the way back
   await page.keyboard.press('Shift+Meta+p');
   await page.keyboard.type('старый интерфейс');
@@ -36,7 +36,7 @@ test('the tabs open before come back after the switch and back again', async ({ 
   await page.evaluate(async () => (await import('/src/store.svelte.ts' as string)).store.setInterface(true));
   await expect(nextShell(page)).toBeVisible();
   await expect.poll(tabs).toEqual(before);
-  await page.getByRole('button', { name: 'Вернуть старый интерфейс' }).click();
+  await page.evaluate(async () => (await import('/src/store.svelte.ts' as string)).store.setInterface(false));
   await expect(nextShell(page)).toHaveCount(0);
   await expect.poll(tabs).toEqual(before);
 });
