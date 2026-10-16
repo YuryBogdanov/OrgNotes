@@ -6,6 +6,7 @@
   import { OFF_ICON, isCore, tabLabel } from '../tabLabels';
   import { pickDate } from '../richPick';
   import type { RichPick } from '../orgRich';
+  import { touches } from '../touchIndex.svelte';
   import Editor from './Editor.svelte';
   import { PluginFileView, RichMenu } from './bridges';
 
@@ -17,6 +18,24 @@
   const file = $derived(store.fileOf(tab));
   const fview = $derived(tab?.kind === 'file' ? store.viewOf(tab) : '');
   let richPick = $state<{ pick: RichPick; path: string } | null>(null);
+  // «Midterm.org · изменён 2 мин назад» (§5.2): the file's last change, as the index of touches knows it
+  function eyebrow(): string | null {
+    if (!file) return null;
+    const name = file.name.split('/').pop()!;
+    let at = 0;
+    for (const r of Object.values(touches.records)) if (r.file === file.name && !r.approx && r.at > at) at = r.at;
+    return at ? `${name} · изменён ${ago(at)}` : name;
+  }
+  const MONTHS = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+  function ago(at: number) {
+    const min = Math.round((Date.now() - at) / 60_000);
+    if (min < 1) return 'только что';
+    if (min < 60) return `${min} мин назад`;
+    const h = Math.round(min / 60);
+    if (h < 24) return `${h} ч назад`;
+    const d = new Date(at);
+    return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  }
   function rich(pick: RichPick, path: string) {
     if (!pickDate(pick, path)) richPick = { pick, path };
   }
@@ -42,8 +61,10 @@
     <div class="ed">
       <Editor text={file.text} fileKey={tab.id + '|' + file.path} path={file.name} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} initialTop={tab.top}
         ontop={(l) => store.setTabTop(tab, l)} initialFolds={tab.folds} onfolds={(l) => store.setTabFolds(tab, l)} resetOn={store.diskGen[file.path] ?? 0}
-        levels={store.levels} drawers={store.foldDrawers} rich={store.rich} richNumbers={store.richNumbers} onrich={(p) => rich(p, file.path)}
+        levels={store.levels} drawers={store.foldDrawers} rich={store.rich} richNumbers={store.richNumbers} onrich={(p) => rich(p, file.path)} {eyebrow}
         onchange={(t) => store.setText(t, file.path)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
+      <!-- an empty file in «Оформление» (§5.4): the word over the column, the caret still in it -->
+      {#if store.rich && !file.text.trim()}<div class="empty" aria-hidden="true"><span class="et">Пустой файл</span><span>Начните с <code>* </code> — это заголовок</span></div>{/if}
     </div>
   {:else if tab?.kind === 'untitled'}
     <div class="ed">
@@ -61,6 +82,10 @@
 <style>
   .area { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .ed, .view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ed { position: relative; }
+  .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; pointer-events: none; color: var(--ink3); font: 500 17px var(--text); }
+  .empty .et { font: 400 28px/1.2 var(--title); color: var(--ink2); }
+  .empty code { padding: 0 4px; border-radius: 4px; font: 0.85em var(--mono); background: var(--chip); }
   .ed :global(.cm-editor) { height: 100%; }
   .word { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; color: var(--ink2); text-align: center; }
   .word b { color: var(--ink); font-size: 15px; }

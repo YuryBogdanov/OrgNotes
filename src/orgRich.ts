@@ -4,7 +4,7 @@
 
 import { Prec, StateField, type Extension, type Range, type Text } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin, WidgetType, keymap, type DecorationSet, type ViewUpdate } from '@codemirror/view';
-import { foldedRanges, unfoldEffect } from '@codemirror/language';
+import { foldEffect, foldedRanges, unfoldEffect } from '@codemirror/language';
 import { toneFor, type DrawerRange, type Workflow } from './org';
 import { toneStyle } from './colors';
 import { levelAt, levelDown, outlineOf } from './orgIndent';
@@ -28,12 +28,16 @@ export interface RichDeps {
   onPick: (p: RichPick) => void;
   /** A click on a tag's capsule: its tab «Тег» (ТЗ 38). */
   onTag?: (tag: string) => void;
+  /** The new interface's look (ТЗ 42 §5): no level dot, a level is (N−1)×22 px; tags as `:dev:` after the text; a
+   *  cookie as a chip; a folded drawer as «⋯ 3 свойства»; the caret's line keeps its font and size and shows its
+   *  markup small and monospaced; an unfolded drawer a block; above the title, `eyebrow` («Midterm.org · изменён…»). */
+  next?: { eyebrow?: () => string | null };
 }
 
 const MAX_LEVEL = 6;
 const STEP = 22; // px per level
 const HANG = 18; // px left for the level dot before a heading's text
-const indentOf = (level: number) => (level < 1 ? 0 : (Math.min(level, MAX_LEVEL) - 1) * STEP + HANG);
+const indentOf = (level: number, next = false) => (level < 1 ? 0 : (Math.min(level, MAX_LEVEL) - 1) * STEP + (next ? 0 : HANG));
 
 const ICON = {
   sched: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3',
@@ -100,14 +104,28 @@ class Cap extends WidgetType {
 }
 /** Tags, one capsule each (at the right end of a heading). */
 class Tags extends WidgetType {
-  constructor(readonly tags: string[], readonly right: boolean, readonly onTag?: (tag: string) => void) {
+  constructor(readonly tags: string[], readonly right: boolean, readonly onTag?: (tag: string) => void, readonly colons = false) {
     super();
   }
   eq(o: Tags) {
-    return o.tags.join(':') === this.tags.join(':') && o.right === this.right;
+    return o.tags.join(':') === this.tags.join(':') && o.right === this.right && o.colons === this.colons;
   }
   toDOM() {
     const s = document.createElement('span');
+    if (this.colons) {
+      // the new interface: after the heading's text, as the file has them — `:dev:ops:`
+      s.className = 'cm-r-tags colons';
+      s.append(':');
+      for (const t of this.tags) {
+        const c = document.createElement('span');
+        c.className = 'cm-r-tagn';
+        c.textContent = t;
+        c.dataset.tag = t;
+        if (this.onTag) clickable(c, `Тег ${t}`, () => this.onTag!(t));
+        s.append(c, ':');
+      }
+      return s;
+    }
     s.className = 'cm-r-tags' + (this.right ? ' right' : '');
     for (const t of this.tags) {
       const c = document.createElement('span');
@@ -266,6 +284,15 @@ function build(view: EditorView, deps: RichDeps): DecorationSet {
   });
   const open = new Set(deps.wf.open);
   const done = new Set(deps.wf.done);
+  const nx = !!deps.next;
+  const ind = (level: number) => indentOf(level, nx);
+  // the new interface: the lines of an unfolded drawer, drawn as one block (§5.5)
+  const drawerLines = new Map<number, 'head' | 'body' | 'end'>();
+  if (nx)
+    for (const [start, dr] of drawers) {
+      if (folded.has(start)) continue;
+      for (let k = start; k <= dr.end; k++) drawerLines.set(k, k === start ? 'head' : k === dr.end ? 'end' : 'body');
+    }
   const out: Range<Decoration>[] = [];
   const line = (from: number, cls: string, style = '') => out.push(Decoration.line({ class: cls, attributes: style ? { style } : undefined }).range(from));
   const hide = (from: number, to: number, widget?: WidgetType) => {
@@ -305,9 +332,23 @@ function build(view: EditorView, deps: RichDeps): DecorationSet {
         const n = m[1].length;
         const kw = /^(\S+)/.exec(t.slice(m[0].length))?.[1];
         const isKw = !!kw && (open.has(kw) || done.has(kw));
-        line(ln.from, `cm-r-h cm-r-h${Math.min(n, 4)}${isKw && done.has(kw!) ? ' cm-r-hdone' : ''}`, `padding-left: calc(6px + ${indentOf(n)}px)`);
-        if (isRaw) continue;
-        hide(ln.from, ln.from + m[0].length, new Dot(n));
+        line(ln.from, `cm-r-h cm-r-h${Math.min(n, 4)}${isKw && done.has(kw!) ? ' cm-r-hdone' : ''}`, `padding-left: calc(6px + ${ind(n)}px)`);
+        if (isRaw) {
+          // the new interface: the same font and size, the markup small and monospaced, the status in its colour
+          if (nx) {
+            mark(ln.from, ln.from + m[0].length, 'cm-n-mk');
+            if (isKw) mark(ln.from + m[0].length, ln.from + m[0].length + kw!.length, 'cm-n-kw', { style: toneStyle(toneFor(kw!, deps.wf)) });
+            const rest = m[0].length + (isKw ? kw!.length : 0);
+            const pr = /^\s+\[#[A-Z]\]/.exec(t.slice(rest));
+            if (pr) mark(ln.from + rest, ln.from + rest + pr[0].length, 'cm-n-mk');
+            const ck = cookieIn(t);
+            if (ck) mark(ln.from + ck.from, ln.from + ck.to, 'cm-n-mk');
+            const tt = /\s(:(?:[^\s:]+:)+)\s*$/.exec(t);
+            if (tt) mark(ln.from + tt.index + 1, ln.to, 'cm-n-mk');
+          }
+          continue;
+        }
+        hide(ln.from, ln.from + m[0].length, nx ? undefined : new Dot(n));
         let at = m[0].length;
         if (isKw) {
           const style = toneStyle(toneFor(kw!, deps.wf));
@@ -320,16 +361,16 @@ function build(view: EditorView, deps: RichDeps): DecorationSet {
           hide(ln.from + at + pr[0].length - 4, ln.from + at + pr[0].length, new Cap(p, 'prio', '', (el) => deps.onPick({ kind: 'priority', line: i, priority: p, rect: el.getBoundingClientRect() }), 'Приоритет: ' + p));
         }
         const c = cookieIn(t);
-        if (c) hide(ln.from + c.from, ln.from + c.to, new Bar(c.done, c.total, c.pct));
+        if (c) hide(ln.from + c.from, ln.from + c.to, nx ? new Chip(c.pct ? `${c.done}%` : `${c.done}/${c.total}`, '', 'cookie', '') : new Bar(c.done, c.total, c.pct));
         const tg = /\s(:(?:[^\s:]+:)+)\s*$/.exec(t);
         if (tg) {
           const tags = tg[1].split(':').filter(Boolean);
-          hide(ln.from + tg.index, ln.to, new Tags(tags, true, deps.onTag));
+          hide(ln.from + tg.index, ln.to, new Tags(tags, !nx, deps.onTag, nx));
         }
         continue;
       }
       const level = levelAt(outline, i);
-      const pad = indentOf(level);
+      const pad = ind(level);
       const inBlock = blocks.has(i);
       if (inBlock) {
         if (pad) line(ln.from, 'cm-r-text', `padding-left: calc(6px + ${pad}px)`);
@@ -338,7 +379,9 @@ function build(view: EditorView, deps: RichDeps): DecorationSet {
       // the document's title and tags
       const title = /^#\+TITLE:\s*/i.exec(t);
       if (title && i < (outline.lines[0] ?? Infinity)) {
-        line(ln.from, 'cm-r-title');
+        const eyebrow = nx ? deps.next?.eyebrow?.() : null;
+        if (eyebrow) out.push(Decoration.line({ class: 'cm-r-title', attributes: { 'data-eyebrow': eyebrow } }).range(ln.from));
+        else line(ln.from, 'cm-r-title');
         if (!isRaw) hide(ln.from, ln.from + title[0].length);
         continue;
       }
@@ -351,15 +394,24 @@ function build(view: EditorView, deps: RichDeps): DecorationSet {
         }
         continue;
       }
-      // a drawer: folded, a quiet «› Свойства»
+      // a drawer: folded, a quiet «› Свойства» (the new interface: «⋯ 3 свойства», «⋯ журнал · 3»)
       const dr = drawers.get(i);
       if (dr && folded.has(i)) {
         line(ln.from, 'cm-r-text cm-r-drawer', pad ? `padding-left: calc(6px + ${pad}px)` : '');
         if (!isRaw) {
           const name = /:([^:]+):/.exec(t)![1];
           const fold = { from: ln.to, to: doc.line(dr.end + 1).to };
-          hide(ln.from, ln.to, new Chip(drawerName(name), '', 'drawer', ICON.open, (_el, v) => v.dispatch({ effects: unfoldEffect.of(fold) }), 'Развернуть ' + drawerName(name)));
+          const label = nx ? drawerChip(name, dr, doc) : drawerName(name);
+          hide(ln.from, ln.to, new Chip(label, '', 'drawer', nx ? '' : ICON.open, (_el, v) => v.dispatch({ effects: unfoldEffect.of(fold) }), 'Развернуть ' + drawerName(name)));
         }
+        continue;
+      }
+      // the new interface: an unfolded drawer is a block; a click on its first line folds it (§5.5)
+      const dl = drawerLines.get(i);
+      if (dl) {
+        const attrs: Record<string, string> = pad ? { style: `padding-left: calc(6px + ${pad}px)` } : {};
+        if (dl === 'end') attrs['data-hint'] = '⌃C ⌃X D — свернуть';
+        out.push(Decoration.line({ class: 'cm-r-dline ' + dl, attributes: attrs }).range(ln.from));
         continue;
       }
       const role = tables[i];
@@ -369,7 +421,10 @@ function build(view: EditorView, deps: RichDeps): DecorationSet {
       }
       const plan = planningIn(t);
       line(ln.from, `cm-r-text${plan.length ? ' cm-r-plan' : ''}${role === 'head' ? ' cm-r-thead' : role ? ' cm-r-trow' : ''}`, pad ? `padding-left: calc(6px + ${pad}px)` : '');
-      if (isRaw) continue;
+      if (isRaw) {
+        if (nx && !role) rawMarks(t, ln.from, mark);
+        continue;
+      }
       if (role) {
         // a line between cells; none at the edges of the table
         const pipes: number[] = [];
@@ -411,6 +466,37 @@ function build(view: EditorView, deps: RichDeps): DecorationSet {
   return Decoration.set(out, true);
 }
 
+/** The new interface's caret line (§5.4): its markup — planning, stamps, emphasis marks — small
+ *  and monospaced, the text as drawn. */
+function rawMarks(t: string, from: number, mark: (a: number, b: number, cls: string) => void) {
+  const mk = (a: number, b: number) => mark(from + a, from + b, 'cm-n-mk');
+  const taken: Span[] = [];
+  for (const p of planningIn(t)) {
+    mk(p.from, p.to);
+    taken.push(p);
+  }
+  for (const s of stampsIn(t)) if (!taken.some((x) => s.from < x.to && s.to > x.from)) (mk(s.from, s.to), taken.push(s));
+  // a link's brackets: decorate.ts marks them (`cm-linkmark`) on the caret's line; no emphasis inside a link
+  for (const m of t.matchAll(/\[\[[^\]]*\](?:\[[^\]]*\])?\]/g)) taken.push({ from: m.index!, to: m.index! + m[0].length });
+  for (const e of emphasisIn(t, taken)) {
+    mk(e.from, e.inner.from);
+    mk(e.inner.to, e.to);
+  }
+}
+const plural = (n: number, one: string, few: string, many: string) => (n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many);
+/** A folded drawer in the new interface: «⋯ 3 свойства», «⋯ журнал · 3», «⋯ ИМЯ». */
+function drawerChip(name: string, dr: DrawerRange, doc: Text): string {
+  const up = name.toUpperCase();
+  const body: string[] = [];
+  for (let k = dr.start + 1; k < dr.end; k++) body.push(doc.line(k + 1).text);
+  if (up === 'PROPERTIES') {
+    const n = body.filter((x) => /^\s*:[^:\s]+:/.test(x)).length;
+    return `⋯ ${n} ${plural(n, 'свойство', 'свойства', 'свойств')}`;
+  }
+  if (up === 'LOGBOOK') return `⋯ журнал · ${body.filter((x) => /^\s*(-\s|CLOCK:)/.test(x)).length}`;
+  return `⋯ ${up}`;
+}
+
 /** The extension: the drawing, clicks on statuses, Backspace at a heading's start one level up, the day's change. */
 export function orgRich(deps: RichDeps): Extension {
   const plugin = ViewPlugin.fromClass(
@@ -444,6 +530,18 @@ export function orgRich(deps: RichDeps): Extension {
     EditorView.editorAttributes.of({ class: 'cm-rich' }),
     EditorView.domEventHandlers({
       mousedown(e, view) {
+        // the new interface: a click on an unfolded drawer's first line folds it (§5.5)
+        const dh = deps.next ? ((e.target as HTMLElement).closest?.('.cm-r-dline.head') as HTMLElement | null) : null;
+        if (dh && e.button === 0) {
+          const pos = view.posAtDOM(dh);
+          const l = view.state.doc.lineAt(pos);
+          const dr = deps.drawers(view.state.doc).get(l.number - 1);
+          if (dr) {
+            e.preventDefault();
+            view.dispatch({ effects: foldEffect.of({ from: l.to, to: view.state.doc.line(dr.end + 1).to }) });
+            return true;
+          }
+        }
         const el = (e.target as HTMLElement).closest?.('[data-rich-status]') as HTMLElement | null;
         if (!el || e.button !== 0) return false;
         e.preventDefault();
