@@ -3,7 +3,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { store } from './store.svelte';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
-  import { headingActionsFor } from './headingActions.svelte';
+  import { createItems as fileCreateItems, entryItems, headingItems } from './fileMenu';
   import { fileTypeOf, fileTypes } from './fileTypes.svelte';
   import { draggedHeading, setDragged } from './dragData';
   import { buttons, expandAll, folderKey, parentOf, pathKeys, readOpen, subtreeKeys, treeNodes, writeOpen } from './navTree';
@@ -142,12 +142,7 @@
     if (dir) open.add(folderKey(dir)); // make sure the folder is expanded
     store.creating = { dir, kind, ...(type ? { type } : {}) };
   };
-  const createItems = (dir: string): MenuItem[] => [
-    { label: 'Новый файл', action: () => startCreate(dir, 'file') },
-    // the plugins' file types: «Новый холст» (ТЗ 39)
-    ...fileTypes().map((t): MenuItem => ({ label: t.newLabel, action: () => startCreate(dir, 'file', t.ext) })),
-    { label: 'Новая папка', action: () => startCreate(dir, 'folder') },
-  ];
+  const createItems = (dir: string): MenuItem[] => fileCreateItems(dir, startCreate);
   const creatingType = $derived(store.creating?.type ? fileTypes().find((t) => t.ext === store.creating!.type) : undefined);
 
   function rowMenu(e: MouseEvent, r: Row) {
@@ -155,27 +150,14 @@
     if (r.kind === 'heading' && r.file !== undefined && r.line !== undefined) {
       e.preventDefault();
       e.stopPropagation();
-      const f = store.files[r.file];
-      if (!f) return;
-      const line = r.line;
-      // the plugins' items on a heading (ТЗ 39: «Показать ветку как mindmap»)
-      const more = headingActionsFor(f.name, line).map((a): MenuItem => ({ label: a.label, action: () => a.run(f.name, line) }));
-      menu = { x: e.clientX, y: e.clientY, items: [{ label: 'Копировать ссылку на заголовок', shortcut: store.keyHint('copyLink') || undefined, action: () => void store.copyHeadingLink(f.path, line) }, ...(more.length ? ['sep' as const, ...more] : [])] };
+      const items = headingItems(r.file, r.line);
+      if (items.length) menu = { x: e.clientX, y: e.clientY, items };
       return;
     }
     if (!store.canManageFiles || r.kind === 'heading' || r.kind === 'new') return;
     e.preventDefault();
     e.stopPropagation();
-    const isDir = r.kind === 'folder';
-    const items: MenuItem[] = [
-      ...(isDir ? [...createItems(r.rel), 'sep' as const] : []),
-      { label: 'Переименовать', action: () => (store.renaming = r.rel) },
-      { label: 'Переместить…', action: () => (store.dialog = { type: 'move', rel: r.rel, isDir }) },
-      { label: 'Показать в Finder', action: () => store.revealEntry(r.rel) },
-      'sep',
-      { label: 'Переместить в Корзину…', danger: true, action: () => (store.dialog = { type: 'delete', rel: r.rel, isDir }) },
-    ];
-    menu = { x: e.clientX, y: e.clientY, items };
+    menu = { x: e.clientX, y: e.clientY, items: entryItems(r.rel, r.kind === 'folder', startCreate) };
   }
   function emptyMenu(e: MouseEvent) {
     if (!store.canManageFiles) return;
