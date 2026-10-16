@@ -10,6 +10,7 @@
   import { narrowRangeOf } from '../narrowTab';
   import Editor from './Editor.svelte';
   import Structure from './Structure.svelte';
+  import FindPanel from './FindPanel.svelte';
   import { nextPrefs } from './prefs.svelte';
   import { PluginFileView, RichMenu } from './bridges';
 
@@ -25,6 +26,47 @@
   const narrowed = $derived(file && tab?.narrow ? narrowRangeOf(file.headings, tab.narrow) : null);
   $effect(() => {
     if (tab?.narrow && file && !narrowed) store.widenTab(tab);
+  });
+  // ⌘F (§5.7): the query, its steps, the replacements; ⌥⌘F opens it with «Заменить на…»
+  let fb = $state({ open: false, q: '', re: false, go: 0, dir: 1 as 1 | -1, at: null as number | null, focusN: 0, replacing: false, rep: null as { text: string; all: boolean; n: number } | null });
+  let found = $state<{ total: number; cur: number; folded: number; wrapped: boolean } | null>(null);
+  let api: { selection: () => string } | null = null;
+  let lastReq = 0;
+  const findProp = $derived(fb.q ? { q: fb.q, cs: store.findCase, word: store.findWord, re: fb.re, show: fb.open, at: fb.at, go: fb.go, dir: fb.dir, rep: fb.rep } : null);
+  const oneLine = () => {
+    const s = api?.selection() ?? '';
+    return s && !s.includes('\n') ? s : '';
+  };
+  function openFind(replacing = false) {
+    const s = oneLine();
+    if (s) fb.q = s;
+    fb.at = null;
+    fb.open = true;
+    fb.replacing = fb.replacing || replacing;
+    fb.focusN++;
+  }
+  function step(dir: 1 | -1) {
+    if (!fb.q) return void openFind();
+    fb.at = null;
+    fb.dir = dir;
+    fb.go++;
+  }
+  function closeFind() {
+    fb.open = false;
+    fb.replacing = false;
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-ui="next"] .cm-content')?.focus({ preventScroll: true }));
+  }
+  $effect(() => {
+    const r = store.findReq;
+    if (!r || r.n === lastReq) return;
+    lastReq = r.n;
+    if (r.kind === 'open') openFind();
+    else if (r.kind === 'replace') openFind(true);
+    else if (r.kind === 'next' || r.kind === 'prev') step(r.kind === 'next' ? 1 : -1);
+    else if (r.kind === 'useSel') {
+      const s = oneLine();
+      if (s) fb.q = s;
+    }
   });
   const crumb = $derived(narrowed && file ? [file.name.replace(/\.org$/, '').split('/').pop()!, ...narrowed.path].join(' › ') : '');
   // «Структура» right of the editor (§7): on by the preference, and when the area is 900 pt wide or more
@@ -79,9 +121,14 @@
     {/if}
     <div class="with" bind:clientWidth={areaW}>
     <div class="ed">
+      {#if fb.open}
+        <FindPanel bind:q={() => fb.q, (v) => { fb.q = v; fb.at = null; }} bind:re={() => fb.re, (v) => (fb.re = v)} replacing={fb.replacing} info={found} focusN={fb.focusN}
+          onnext={() => step(1)} onprev={() => step(-1)} onreplace={(text, all) => (fb.rep = { text, all, n: (fb.rep?.n ?? 0) + 1 })} onclose={closeFind} />
+      {/if}
       <Editor text={file.text} fileKey={tab.id + '|' + file.path + (narrowed ? '|n:' + narrowed.title : '')}
         narrow={narrowed ? { line: narrowed.line, end: narrowed.end } : null} onnarrow={(l) => { if (tab.narrow) tab.narrow.line = l; }}
-        onnarrowTo={(l) => store.narrowTab(tab, l)} onwiden={() => store.widenTab(tab)} path={file.name} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} initialTop={tab.top}
+        onnarrowTo={(l) => store.narrowTab(tab, l)} onwiden={() => store.widenTab(tab)}
+        find={findProp} onfound={(i) => (found = i)} onapi={(a) => (api = a)} path={file.name} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} initialTop={tab.top}
         ontop={(l) => store.setTabTop(tab, l)} initialFolds={tab.folds} onfolds={(l) => store.setTabFolds(tab, l)} resetOn={store.diskGen[file.path] ?? 0}
         levels={store.levels} drawers={store.foldDrawers} rich={store.rich} richNumbers={store.richNumbers} onrich={(p) => rich(p, file.path)} {eyebrow}
         onchange={(t) => store.setText(t, file.path)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />

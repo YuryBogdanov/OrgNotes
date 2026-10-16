@@ -45,6 +45,12 @@
     rich: () => store.setRich(!store.rich),
     // ⌥⌘0: the old inspector's keys show «Структура» here (§8)
     insp: () => nextPrefs.setStructure(!nextPrefs.structure),
+    // ⌘F, ⌘G, ⇧⌘G, ⌘E, ⌥⌘F (§5.7)
+    find: () => store.askFind('open'),
+    findNext: () => store.askFind('next'),
+    findPrev: () => store.askFind('prev'),
+    useSelection: () => store.askFind('useSel'),
+    replace: () => store.askFind('replace'),
   };
   // one pane in the new shell (§4.3): a second one of the old is folded in, and back with the old shell
   $effect(() => {

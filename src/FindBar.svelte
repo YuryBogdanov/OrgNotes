@@ -4,7 +4,7 @@
 
   // ⌘F: the bar of a pane, over its text. Searches as you type (~100 ms), «2 из 6», ↩ / ⇧↩ next / previous,
   // «Aa» and «Слово» (kept on this Mac, shared with the search in all files), ⎋ or «Готово» closes.
-  let { q = $bindable(''), info, global = false, focusN = 0, onnext, onprev, onclose }: {
+  let { q = $bindable(''), info, global = false, focusN = 0, replacing = false, onreplace, onnext, onprev, onclose }: {
     q: string;
     info: { total: number; cur: number; folded: number; wrapped: boolean } | null;
     global?: boolean; // the query came from the search in all files
@@ -12,7 +12,23 @@
     onnext: () => void;
     onprev: () => void;
     onclose: () => void;
+    replacing?: boolean; // ⌥⌘F (ТЗ 42 §5.7): a second line «Заменить на…» with «Заменить» and «Все»
+    onreplace?: (text: string, all: boolean) => void;
   } = $props();
+  let rep = $state('');
+  let repInput: HTMLInputElement | undefined = $state();
+  function repKey(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(timer);
+      q = text;
+      onreplace?.(rep, e.metaKey);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onclose();
+    }
+  }
 
   let input: HTMLInputElement | undefined = $state();
   // the field's own text; the query follows it after a short pause
@@ -75,6 +91,13 @@
   {#if info?.folded}<span class="note">и {info.folded} в свёрнутых заголовках</span>{/if}
   {#if global}<span class="note">из глобального поиска</span>{/if}
   <button class="done" onclick={onclose}>Готово <span>⎋</span></button>
+  {#if replacing}
+    <div class="rep">
+      <div class="fld"><input bind:this={repInput} bind:value={rep} onkeydown={repKey} aria-label="Заменить на" placeholder="Заменить на…" spellcheck="false" autocomplete="off" /></div>
+      <button class="tg" disabled={!text || !info?.total} onclick={() => (onreplace?.(rep, false), repInput?.focus())}>Заменить</button>
+      <button class="tg" disabled={!text || !info?.total} onclick={() => (onreplace?.(rep, true), repInput?.focus())}>Все</button>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -94,4 +117,6 @@
   .note { font-size: 11.5px; color: var(--fg3); }
   .done { margin-left: auto; height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--fg2); font-size: 12px; }
   .done span { color: var(--fg3); }
+  .rep { flex: 1 0 100%; display: flex; align-items: center; gap: 8px; }
+  .tg:disabled { opacity: 0.45; }
 </style>

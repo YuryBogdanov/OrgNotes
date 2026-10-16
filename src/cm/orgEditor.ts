@@ -14,7 +14,7 @@ import type { MenuItem } from '../ContextMenu.svelte';
 import { changeStatusAt, cyclePriority, moveSubtree, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree } from '../outline';
 import { DEFAULT_LEVELS, orgIndent, type LevelView } from '../orgIndent';
 import { orgRich, type RichPick } from '../orgRich';
-import { findExtension, findField, foundInfo, moveFind, setFind, type FindQuery } from '../findView';
+import { findExtension, findField, foundInfo, moveFind, replaceFound, setFind, type FindQuery } from '../findView';
 import { registerEditor } from '../editorKeys';
 import { clipTarget, linkHooks, linkPaste } from '../linkEdit';
 import { openNote } from '../noteReq.svelte';
@@ -50,7 +50,8 @@ export interface EditorProps {
   rich?: boolean; // «Оформленный текст»: drawn like org-modern (implies the structural view)
   richNumbers?: boolean; // line numbers while drawn
   gutter?: boolean; // the line numbers and the fold markers on the left (none in the mini window, ТЗ 31)
-  find?: (FindQuery & { go: number; dir: 1 | -1 }) | null;
+  find?: (FindQuery & { go: number; dir: 1 | -1; rep?: { text: string; all: boolean; n: number } | null }) | null; // a new `rep.n` replaces (ТЗ 42 §5.7)
+  onreplaced?: (n: number) => void; // how many matches the last «Заменить» / «Все» replaced
   /** The new interface (ТЗ 42 §5): its «Оформление» (orgRich `next`, the current section's bar). */
   next?: boolean;
   /** Above the document's title in the new «Оформление»: «Midterm.org · изменён 2 мин назад». */
@@ -97,6 +98,7 @@ export class OrgEditor {
   private lastNote: EditorProps['lineNote'] = null;
   private lastFind = '';
   private lastGo = 0;
+  private lastRep = 0;
   private topFrame = 0;
   private readonly undo = new Compartment();
   private readonly structure = new Compartment(); // switching the view is not an edit: no undo step, no unsaved mark
@@ -643,7 +645,7 @@ export class OrgEditor {
     const s = f.starts[f.cur];
     const scroll = EditorView.scrollIntoView(s, { y: 'start', yMargin: Math.round(v.scrollDOM.clientHeight / 3) });
     // «select.search»: a user's caret, so a drawn line («Оформленный текст») shows its text; a fold over it opens
-    v.dispatch(select ? { selection: { anchor: s, head: s + f.len }, effects: scroll, userEvent: 'select.search' } : { effects: scroll });
+    v.dispatch(select ? { selection: { anchor: s, head: f.ends[f.cur] }, effects: scroll, userEvent: 'select.search' } : { effects: scroll });
   }
   private syncFind() {
     const f = this.p.find;
@@ -654,12 +656,12 @@ export class OrgEditor {
         const st = view.state.field(findField)!;
         const s = st.cur >= 0 && st.show ? st.starts[st.cur] : null;
         // closing: the caret stays on the current match
-        view.dispatch({ effects: setFind.of(null), ...(s !== null ? { selection: { anchor: s, head: s + st.len } } : {}) });
+        view.dispatch({ effects: setFind.of(null), ...(s !== null ? { selection: { anchor: s, head: st.ends[st.cur] } } : {}) });
       }
       this.lastFind = '';
       return;
     }
-    const key = JSON.stringify([k, f.q, f.cs, f.word, f.show, f.at ?? null]);
+    const key = JSON.stringify([k, f.q, f.cs, f.word, !!f.re, f.show, f.at ?? null]);
     if (key !== this.lastFind) {
       this.lastFind = key;
       // ↩ right after typing (before the pause ran out) comes with the new query: it selects the first match
@@ -671,6 +673,13 @@ export class OrgEditor {
       this.lastGo = f.go;
       view.dispatch({ effects: moveFind.of(f.dir) });
       this.toMatch(view, true);
+    }
+    // «Заменить»: the current match, then the next one is current; «Все»: every match, one step of ⌘Z
+    if (f.rep && f.rep.n !== this.lastRep) {
+      this.lastRep = f.rep.n;
+      const n = replaceFound(view, f.rep.text, f.rep.all);
+      if (n && !f.rep.all) this.toMatch(view, true);
+      this.p.onreplaced?.(n);
     }
   }
 

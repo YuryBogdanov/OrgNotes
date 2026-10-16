@@ -1448,8 +1448,8 @@ class Store {
 
   // ---- search: ⌘F in a pane, ⇧⌘F in every file ------------------------------------------------------------
   /** What a pane's find bar is asked (the menu, the keys, a jump from the search in every file). */
-  findReq = $state<{ kind: 'open' | 'next' | 'prev' | 'useSel' | 'jump'; pane: number; n: number; q?: string; at?: { path: string; line: number; col: number } } | null>(null);
-  askFind(kind: 'open' | 'next' | 'prev' | 'useSel') {
+  findReq = $state<{ kind: 'open' | 'next' | 'prev' | 'useSel' | 'jump' | 'replace'; pane: number; n: number; q?: string; at?: { path: string; line: number; col: number } } | null>(null);
+  askFind(kind: 'open' | 'next' | 'prev' | 'useSel' | 'replace') {
     this.findReq = { kind, pane: this.layout.active, n: Date.now() + Math.random() };
   }
   /** ⇧⌘F: the section «Поиск», the field in focus (the editor's one-line selection in it, not searched yet). */

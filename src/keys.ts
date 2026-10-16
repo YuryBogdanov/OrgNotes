@@ -68,6 +68,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('find', 'Найти…', 'search', 'window', ['⌘F'], { synonyms: ['поиск'] }),
   C('findAll', 'Найти во всех файлах…', 'search', 'window', ['⇧⌘F'], { synonyms: ['поиск', 'глобальный'] }),
   C('findNext', 'Найти далее', 'search', 'window', ['⌘G']),
+  C('replace', 'Заменить…', 'search', 'window', ['⌥⌘F'], { synonyms: ['замена', 'найти и заменить'], note: 'Поиск в файле со строкой замены' }),
   C('findPrev', 'Найти ранее', 'search', 'window', ['⇧⌘G']),
   C('useSelection', 'Искать выделенное', 'search', 'window', ['⌘E']),
   C('searchNext', 'Следующий результат во всех файлах', 'search', 'window', ['⌥⌘G']),

@@ -55,11 +55,11 @@
   });
 
   // ---- ⌘F: this pane's fb (it stays across the tabs of the pane; the other pane has its own) -------------------
-  let fb = $state({ open: false, q: '', go: 0, dir: 1 as 1 | -1, at: null as number | null, global: false, focusN: 0 });
+  let fb = $state({ open: false, q: '', go: 0, dir: 1 as 1 | -1, at: null as number | null, global: false, focusN: 0, replacing: false, rep: null as { text: string; all: boolean; n: number } | null });
   let found = $state<{ total: number; cur: number; folded: number; wrapped: boolean } | null>(null);
   let api: { selection: () => string } | null = null;
   let lastReq = 0;
-  const findProp = $derived(fb.q ? { q: fb.q, cs: store.findCase, word: store.findWord, show: fb.open, at: fb.at, go: fb.go, dir: fb.dir } : null);
+  const findProp = $derived(fb.q ? { q: fb.q, cs: store.findCase, word: store.findWord, show: fb.open, at: fb.at, go: fb.go, dir: fb.dir, rep: fb.rep } : null);
   const oneLine = () => {
     const s = api?.selection() ?? '';
     return s && !s.includes('\n') ? s : '';
@@ -81,6 +81,7 @@
   }
   function closeBar() {
     fb.open = false;
+    fb.replacing = false;
     fb.global = false;
     focusText();
   }
@@ -89,6 +90,10 @@
     if (!r || r.pane !== pi || r.n === lastReq) return;
     lastReq = r.n;
     if (r.kind === 'open') openBar();
+    else if (r.kind === 'replace') {
+      openBar();
+      fb.replacing = true;
+    }
     else if (r.kind === 'next' || r.kind === 'prev') step(r.kind === 'next' ? 1 : -1);
     else if (r.kind === 'useSel') {
       const s = oneLine();
@@ -179,6 +184,7 @@
     </div>
     {#if fb.open}
       <FindBar bind:q={() => fb.q, (v) => { fb.q = v; fb.at = null; fb.global = false; }} info={found} global={fb.global} focusN={fb.focusN}
+        replacing={fb.replacing} onreplace={(text, all) => (fb.rep = { text, all, n: (fb.rep?.n ?? 0) + 1 })}
         onnext={() => step(1)} onprev={() => step(-1)} onclose={closeBar} />
     {/if}
     {#if narrowed}

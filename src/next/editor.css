@@ -133,3 +133,7 @@
 .next .cm-editor:not(.cm-rich) .cm-boxx { color: var(--done); font-weight: 600; }
 .next .cm-editor:not(.cm-rich) .cm-link { color: var(--lampink); text-decoration: underline 1px var(--lampline); text-underline-offset: 3px; }
 .next .cm-editor:not(.cm-rich) .cm-foldPlaceholder { height: 18px; margin-left: 6px; padding: 0 6px; border-radius: 5px; font: 11px/18px var(--ui); color: var(--ink3); background: var(--chip); }
+
+/* ⌘F (§5.7): the matches on `lampsoft`, the current one on the lamp */
+.next .cm-editor .cm-find { background: var(--lampsoft); border-radius: 2px; }
+.next .cm-editor .cm-find.cm-find-cur { background: var(--lamp); color: var(--onlamp); }

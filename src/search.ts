@@ -6,6 +6,7 @@ import { headingLines, type Heading } from './org';
 export interface FindOpts {
   cs: boolean; // «Aa»: case matters
   word: boolean; // «Слово»: whole words only
+  re?: boolean; // «.*»: the query is a regular expression (⌘F of the new interface, ТЗ 42 §5.7)
 }
 export type Scope = 'all' | 'headings' | 'text';
 
@@ -32,6 +33,36 @@ export function findAll(text: string, q: string, o: FindOpts, folded?: string): 
     out.push(i);
   }
   return out;
+}
+
+/** The matches as ranges: a regular expression's have their own lengths; a wrong one finds nothing. */
+export function findRanges(text: string, q: string, o: FindOpts): { from: number; to: number }[] {
+  if (!q) return [];
+  if (!o.re) return findAll(text, q, o).map((s) => ({ from: s, to: s + q.length }));
+  let re: RegExp;
+  try {
+    re = new RegExp(o.word ? `\\b(?:${q})\\b` : q, o.cs ? 'gu' : 'giu');
+  } catch {
+    return [];
+  }
+  const out: { from: number; to: number }[] = [];
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    if (!m[0].length) {
+      re.lastIndex++; // an empty match: no range, the search goes on
+      continue;
+    }
+    out.push({ from: m.index, to: m.index + m[0].length });
+  }
+  return out;
+}
+/** What a match becomes: the text, or — a regular expression — with its groups ($1). */
+export function replacementOf(match: string, q: string, o: FindOpts, text: string): string {
+  if (!o.re) return text;
+  try {
+    return match.replace(new RegExp(q, o.cs ? 'u' : 'iu'), text);
+  } catch {
+    return text;
+  }
 }
 
 /** The match that comes first at or after `pos`, round to the start (−1: none). */
