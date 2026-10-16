@@ -389,7 +389,8 @@ export interface Ctx {
     keyOf(id: string): string;
     /** A command of the plugin, or of the core: `file.open` {path, line?, beside?, focus?, neighbour?} (`neighbour`:
      *  in the other pane, made on the left when there is none, as from an agenda), `heading.reveal` {ref},
-     *  `agenda.open`, `settings.open` {section?}, `file.reveal` {path} (the file in Finder, 1.11), `heading.status` / `heading.schedule` / `heading.deadline` / `heading.tags` / `heading.priority`
+     *  `agenda.open`, `settings.open` {section?}, `file.reveal` {path} (the file in Finder, 1.11), `heading.note` {ref, x?, y?} (the popover «Добавить заметку…»
+     *  at this point of the window, else at its top; 1.12), `heading.status` / `heading.schedule` / `heading.deadline` / `heading.tags` / `heading.priority`
      *  {ref} (the palette's step for it; the heading's file is the one shown), `capture.open` (the quick entry),
      *  `inbox.pickFile`, `inbox.createFile`. */
     run(id: string, arg?: unknown): Promise<void>;

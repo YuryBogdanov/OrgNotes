@@ -78,7 +78,7 @@ test.describe('modes', () => {
     await expect(plate).toContainText('[#A] Подготовить бюджет 2027');
     await expect(plate.locator('.right')).toHaveText('work · строка 4');
     expect(await groups(page)).toEqual(['К ЗАГОЛОВКУ', 'ОБЩИЕ']);
-    expect(await titles(page)).toEqual(['Сменить статус…', 'Запланировать…', 'Поставить дедлайн…', 'Теги…', 'Копировать ссылку на заголовок', 'Перенести в другой файл…', 'Создать файл…', 'Создать папку…', 'Новая задача', 'Перейти к файлу…', 'Показать структуру файла', 'Оформленный текст', 'Навигатор: свернуть всё', 'Навигатор: развернуть всё', 'Мини-окно: открыть текущую заметку', 'Мини-окно: показать', 'Открыть «Сегодня»', 'Завершить день…', 'Настройки…', 'Календарь', 'Показать как доску / текст', 'Показать как доску', 'Добавить цели…']); // the plugins' commands after the core's
+    expect(await titles(page)).toEqual(['Сменить статус…', 'Запланировать…', 'Поставить дедлайн…', 'Теги…', 'Добавить заметку…', 'Копировать ссылку на заголовок', 'Перенести в другой файл…', 'Создать файл…', 'Создать папку…', 'Новая задача', 'Перейти к файлу…', 'Показать структуру файла', 'Оформленный текст', 'Навигатор: свернуть всё', 'Навигатор: развернуть всё', 'Мини-окно: открыть текущую заметку', 'Мини-окно: показать', 'Открыть «Сегодня»', 'Завершить день…', 'Настройки…', 'Календарь', 'Показать как доску / текст', 'Показать как доску', 'Добавить цели…']); // the plugins' commands after the core's
     await expect(selected(page)).toHaveText('Сменить статус…');
   });
 
@@ -225,7 +225,7 @@ test.describe('keyboard and mouse', () => {
     await expect(selected(page)).toHaveText('Добавить цели…'); // the goals' plugin's, after the core's
     await page.keyboard.press('ArrowDown');
     await expect(selected(page)).toHaveText('Сменить статус…');
-    for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowDown');
+    for (let i = 0; i < 7; i++) await page.keyboard.press('ArrowDown');
     await expect(selected(page)).toHaveText('Создать файл…'); // past «ОБЩИЕ»
     await rows(page).nth(2).hover();
     await expect(selected(page)).toHaveText('Поставить дедлайн…');

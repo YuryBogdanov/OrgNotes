@@ -114,7 +114,7 @@ describe('clashes', () => {
     expect(clash('⌃C', '⌃C S')).toBe(true);
     expect(clash('⌃C S', '⌃C')).toBe(true);
     expect(clash('⌃C S', '⌃C D')).toBe(false);
-    expect(conflictsOf(bindingsOf(emacs), 'find', '⌃C').map((c) => c.id)).toEqual(['insertLink', 'status', 'schedule', 'deadline', 'tags', 'tags', 'copyLink', 'refile']); // «Теги…»: ⌃C Q and ⌃C ⌃Q
+    expect(conflictsOf(bindingsOf(emacs), 'find', '⌃C').map((c) => c.id)).toEqual(['insertLink', 'status', 'schedule', 'deadline', 'tags', 'tags', 'addNote', 'copyLink', 'refile']); // «Теги…»: ⌃C Q and ⌃C ⌃Q
   });
   it('the review row says what its key does outside the review', () => {
     const b = bindingsOf(emacs);

@@ -60,6 +60,8 @@
   import { pluginUpdates } from './pluginUpdates.svelte';
   import PluginSheets from './PluginSheets.svelte';
   import TaskListHost from './TaskListHost.svelte';
+  import NotePop from './NotePop.svelte';
+  import { notePop } from './noteReq.svelte';
 
   // the quick entry from another program: a panel of its own with only the entry (the main window does the writing)
   const isCaptureWindow = location.hash === '#capture';
@@ -112,6 +114,11 @@
   });
 
   // ---- menu bar and shortcuts -------------------------------------------------------------------------------
+  function closeNote() {
+    const back = notePop.req?.back;
+    notePop.req = null;
+    back?.();
+  }
   let menu = $state<AppMenu | null>(null);
   const actions: Record<string, () => void> = {
     settings: () => store.openSettings(),
@@ -307,6 +314,7 @@
   {/if}
   {#if store.pickInbox}{#key store.pickInbox}<Picker onclose={() => (store.pickInbox = 0)} />{/key}{/if}
   {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
+  {#if notePop.req}{#key notePop.req.n}<NotePop req={notePop.req} onclose={closeNote} />{/key}{/if}
   <TaskListHost />
   {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
   <!-- a start screen comes instead of the window (no toolbar, no navigator) -->
