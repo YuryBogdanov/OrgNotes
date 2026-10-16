@@ -322,7 +322,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   shell); a folded drawer's placeholder counts its lines, «⋯ 3», in the new editor only (`preparePlaceholder`).
   42.9: `next/Structure.svelte` right of the editor (EditorArea, a file's tab): the headings of levels 1–3 (the
   current: the caret's, a deeper one counted as its ancestor of level ≤ 3), a click `store.open`; «Ссылаются» —
-  `links.backlinks` of the deepest heading under the caret, 6 and «ещё N». On by `next/prefs.svelte.ts`
+  `links.backlinks` of the deepest heading under the caret, 6 and «ещё N». On by `nextPrefs.svelte.ts`
   (`next:structure`, ⌥⌘0 = the old `insp` key) and only when the area is ≥ 900 px wide.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
@@ -331,6 +331,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   («.*» — a regular expression, `$1` in the replacement). Its link card (new shell only): `linkHooks.preview` in the
   store → `LinkPreview`, drawn by `cm/linkCard.ts` in a 500 ms hoverTooltip of `OrgEditor` instead of `linkTip`;
   «Исправить…» on a broken link opens «Ссылка на…» (`pickLink`). «⌘⌥-клик — рядом» is shown off: no such action yet.
+  42.11: `src/nextPrefs.svelte.ts` (outside `next/`: the shared «Основные → Экспериментальное» shows it, disabled
+  without the flag) — «Шрифт текста» `next:font` (serif / system / mono → `--text` and `data-font` on `.next`, the
+  sizes in editor.css), «Ширина текста» `next:width` (`--col`: 620 / 700 / 860 / 100%), «Структура справа»
+  `next:structure`. A change of font or width passes `look` to OrgEditor → `orgRich.refont` (tables measured again).
+  Keys: `rich` ⌃⌘E (both shells), `searchAll` ⌘K (an action of the new shell only; the toolbar shows its key),
+  the menu names `rich` «Оформление» and `insp` «Структура» in the new shell (`menu.ts` reads `nextOn`).
 - **Reordering by dragging (tech sprint 4.3):** `reorder.svelte.ts`, `new Reorder(onDrop, onStart?)` with `use:r.handle={{ id, image? }}` (what is dragged; `image`: the closest element drawn while dragging) and `use:r.zone={id}` (a row or a place: 'end', 'separator'); `r.dragId` / `r.overId` draw the line. Used by the agenda builder's blocks, the statuses and their sets (Settings), the blocks of «Сегодня» (TodaySettings), «Главное на завтра» (EndDay). The keys (⌥↑ ⌥↓) stay with each list. The lists' ↑↓ were not made one action: they differ (wrap or stop, with Esc, Tab, a field).
 - **Editor split (tech sprint 4.3):** `src/cm/` holds the editor's CodeMirror parts that do not hang on the component: `doc.ts` (heading lines, drawers, links per document version), `drawers.ts` (folding drawers and asked-for headings), `structure.ts` (applying an outline command, M-RET, S-Tab's cycle, `orgFold`), `decorate.ts` (the plain editor's marks), `narrow.ts` (narrowing to a subtree: `narrowing(n, onnarrow)` gives `{ field, ext }`), `lineLinks.ts`, `lineNote.ts`. Editor.svelte keeps the state, the commands table, the menus and the effects. Checked by screenshots (plain and rich, folded with S-Tab, light and dark): identical.
 - **Pane and App split (tech sprint 4.2):** `PaneTabs.svelte` (a pane's row of tabs: scrolling with faded edges, «⌵», a tab's menu, the path tooltip), `tabLabels.ts` (`tabLabel`, `isCore`, `isGone`, `isDirty`, `OFF_ICON`; Pane uses them too), `Toolbar.svelte` (the window's toolbar and title bar: our traffic lights in full screen, the path, «Открыть в панели»). Checked by screenshots (many tabs, a dirty one, the menus, the tooltip, two panes, the agenda pressed, full screen; light and dark): identical, but for a scrollbar thumb that differs between runs of the same code.

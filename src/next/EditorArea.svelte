@@ -11,7 +11,7 @@
   import Editor from './Editor.svelte';
   import Structure from './Structure.svelte';
   import FindPanel from './FindPanel.svelte';
-  import { nextPrefs } from './prefs.svelte';
+  import { nextPrefs } from '../nextPrefs.svelte';
   import { PluginFileView, RichMenu } from './bridges';
 
   // What the active tab shows in the new interface (ТЗ 42.5): a file — the editor (or a plugin's view of it, the

@@ -98,13 +98,19 @@ class TableRow extends WidgetType {
   }
 }
 let measureCtx: CanvasRenderingContext2D | null = null;
+/** The cells' font: the text's of the new interface («Шрифт текста», ТЗ 42 §10), its sizes as in editor.css. */
+let cellFont = "500 17px 'Cormorant Garamond', Georgia, serif";
+function readCellFont(view: EditorView) {
+  const fam = getComputedStyle(view.dom).getPropertyValue('--text').trim();
+  if (fam) cellFont = fam.includes('Cormorant') ? `500 17px ${fam}` : `400 13.5px ${fam}`;
+}
 /** The widths of a table's columns, measured in the fonts of its head and its cells; padding included. */
 function columnWidths(rows: { cells: string[]; head: boolean }[]): number[] {
   measureCtx ??= document.createElement('canvas').getContext('2d');
   const n = Math.max(0, ...rows.map((r) => r.cells.length));
   const out = Array.from({ length: n }, () => 0);
   for (const r of rows) {
-    if (measureCtx) measureCtx.font = r.head ? '600 14px -apple-system, system-ui, sans-serif' : "500 17px 'Cormorant Garamond', Georgia, serif";
+    if (measureCtx) measureCtx.font = r.head ? '600 14px -apple-system, system-ui, sans-serif' : cellFont;
     r.cells.forEach((c, k) => (out[k] = Math.max(out[k], Math.ceil(measureCtx ? measureCtx.measureText(c).width : c.length * 8))));
   }
   return out.map((w) => Math.min(360, w + 24));
@@ -135,6 +141,13 @@ function tableRowsOf(doc: Text) {
 /** The fonts came: the tables are measured again (the effect makes the drawing run again). */
 const remeasure = () => (tableDrawCache = new WeakMap());
 const fontsCame = StateEffect.define<null>();
+/** The new interface's font or width changed (ТЗ 42 §10): the tables measured again, the lines' heights too. */
+export function refont(view: EditorView) {
+  readCellFont(view);
+  remeasure();
+  view.dispatch({ effects: fontsCame.of(null) });
+  view.requestMeasure();
+}
 const blockCacheN = new WeakMap<Text, Map<number, { b: Block; role: 'begin' | 'end' | 'body'; first: boolean; last: boolean }>>();
 /** Each line of a block with its role (§5.3): the fences, the body's first and last line. */
 function blockRolesOf(doc: Text) {
@@ -612,10 +625,12 @@ export function orgRich(deps: RichDeps): Extension {
       day = today();
       timer: ReturnType<typeof setInterval>;
       constructor(readonly view: EditorView) {
+        if (deps.next) readCellFont(view);
         this.decorations = build(view, deps);
         // the new interface's tables are measured in its fonts: again once they are loaded
         if (deps.next)
           void document.fonts?.ready.then(() => {
+            readCellFont(view);
             remeasure();
             if (view.dom.isConnected) view.dispatch({ effects: fontsCame.of(null) });
           });

@@ -47,6 +47,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
 
   C('settings', 'Настройки…', 'app', 'window', ['⌘,'], { synonyms: ['параметры', 'preferences'] }),
   C('palette', 'Командная палитра', 'app', 'window', ['⇧⌘P'], { synonyms: ['команды'] }),
+  C('searchAll', 'Искать везде', 'app', 'window', ['⌘K'], { synonyms: ['поиск', 'палитра'], note: 'Только в новом интерфейсе: поле над редактором, открывает палитру' }),
   C('openFolder', 'Открыть другую папку…', 'app', 'window', [], { synonyms: ['рабочая папка'] }),
   C('closeWindow', 'Закрыть окно', 'app', 'window', ['⇧⌘W']),
 
@@ -76,7 +77,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
 
   C('jumpBar', 'Строка пути', 'view', 'window', ['⌃⌘J']),
   C('structure', 'Структурный вид', 'view', 'window'),
-  C('rich', 'Оформленный текст', 'view', 'window', [], { synonyms: ['оформление', 'org-modern'] }),
+  C('rich', 'Оформленный текст', 'view', 'window', ['⌃⌘E'], { synonyms: ['оформление', 'исходник', 'org-modern'], note: 'В новом интерфейсе — «Оформление / Исходник»' }),
   C('splitRight', 'Разделить вправо', 'view', 'window', ['⌘\\'], { synonyms: ['второй редактор', 'панель'] }),
   C('swap', 'Поменять панели местами', 'view', 'window', ['⌃⇧⌘→']),
   C('keepOne', 'Оставить одну панель', 'view', 'window', ['⇧⌘\\']),
@@ -85,7 +86,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('paneRight', 'Перейти в правую панель', 'view', 'window', ['⌥⌘→']),
   C('nav', 'Навигатор', 'view', 'window', ['⌘0'], { synonyms: ['боковая панель'] }),
   C('miniOpen', 'Открыть в мини-окне', 'view', 'window', ['⇧⌘M'], { synonyms: ['мини-окно', 'поверх', 'созвон'] }),
-  C('insp', 'Инспектор', 'view', 'window', ['⌥⌘0']),
+  C('insp', 'Инспектор', 'view', 'window', ['⌥⌘0'], { synonyms: ['структура'], note: 'В новом интерфейсе — колонка «Структура»' }),
   C('navFiles', 'Навигатор: файлы', 'view', 'window', ['⌃⌘1']),
   C('navAgendas', 'Навигатор: агенды', 'view', 'window', ['⌃⌘3']),
   C('navTags', 'Навигатор: теги', 'view', 'window', ['⌃⌘8'], { synonyms: ['теги', 'метки', 'tags'] }),

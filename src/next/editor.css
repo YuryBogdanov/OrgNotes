@@ -151,3 +151,22 @@
 .next .lc-k.off { opacity: 0.55; }
 .next .lc-ref { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--mono); }
 .next .lc-fix { margin-left: auto; height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--lamp); color: var(--onlamp); font: 600 12px var(--ui); }
+
+/* «Шрифт текста» (§10): «Системный» — SF Pro, the sizes of ТЗ 19 §8 (14, headings 21 / 18 / 15.5); «Моноширинный» —
+   IBM Plex Mono 14, headings 20 / 17 / 15. The family comes in `--text`; here only the sizes. */
+.next[data-font='system'] .cm-rich .cm-content, .next[data-font='mono'] .cm-rich .cm-content { font-size: 14px; font-weight: 400; }
+.next[data-font='system'] .cm-rich .cm-line, .next[data-font='mono'] .cm-rich .cm-line { line-height: 1.7; }
+.next[data-font='system'] .cm-rich .cm-r-title { font-size: 30px; }
+.next[data-font='system'] .cm-rich .cm-r-h1 { font-size: 21px; }
+.next[data-font='system'] .cm-rich .cm-r-h2 { font-size: 18px; }
+.next[data-font='system'] .cm-rich .cm-r-h3 { font-size: 15.5px; }
+.next[data-font='system'] .cm-rich .cm-r-h4 { font-size: 14.5px; }
+.next[data-font='mono'] .cm-rich .cm-r-title { font-size: 26px; }
+.next[data-font='mono'] .cm-rich .cm-r-h1 { font-size: 20px; }
+.next[data-font='mono'] .cm-rich .cm-r-h2 { font-size: 17px; }
+.next[data-font='mono'] .cm-rich .cm-r-h3 { font-size: 15px; }
+.next[data-font='mono'] .cm-rich .cm-r-h4 { font-size: 14px; }
+.next[data-font='system'] .cm-rich .cm-n-bline.quote, .next[data-font='mono'] .cm-rich .cm-n-bline.quote { font-size: 14px; font-weight: 400; }
+.next[data-font='system'] .cm-rich .cm-n-cell, .next[data-font='mono'] .cm-rich .cm-n-cell { font-size: 13.5px; font-weight: 400; }
+.next[data-font='system'] .lc-title, .next[data-font='mono'] .lc-title { font-size: 17px; }
+.next[data-font='system'] .lc-body, .next[data-font='mono'] .lc-body { font-size: 13.5px; font-weight: 400; }

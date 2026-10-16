@@ -14,7 +14,7 @@
   import Toolbar from './Toolbar.svelte';
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
-  import { nextPrefs } from './prefs.svelte';
+  import { nextPrefs } from '../nextPrefs.svelte';
   import { CloseSheet, ContextMenu, Dialogs, DiskSheet, Palette, PluginSheets, Refile, Settings, type MenuItem } from './bridges';
   import { untrack } from 'svelte';
 
@@ -29,6 +29,7 @@
     settings: () => store.openSettings(),
     quit: () => store.quit(),
     palette: () => store.togglePalette(),
+    searchAll: () => store.togglePalette(), // «Искать везде» ⌘K (§4.1)
     nav: () => (store.showNav = !store.showNav),
     newFile,
     // the tabs (ТЗ 42 §4.3): as in the old shell; one pane — the second's commands say «Скоро»
@@ -56,13 +57,8 @@
   $effect(() => {
     if (store.loaded) untrack(() => store.foldPanesForNext());
   });
-  // «Искать везде ⌘K» (§4.1): the palette, in the new shell only
-  const cmdK = (e: KeyboardEvent) => {
-    if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.code === 'KeyK' && !store.sheetOpen) {
-      e.preventDefault();
-      store.togglePalette();
-    }
-  };
+  // «Шрифт текста» (§10): Cormorant, the system's or IBM Plex Mono — the text of «Оформление»
+  const textFont = $derived(nextPrefs.font === 'system' ? FONTS.ui : nextPrefs.font === 'mono' ? FONTS.mono : FONTS.text);
   // the sidebar's width (§4.2), on this Mac
   const readWidth = () => {
     try {
@@ -100,7 +96,6 @@
     void plugins.start().then(() => pluginUpdates.check());
     const key = keyHandler(runWindow);
     window.addEventListener('keydown', key, true);
-    window.addEventListener('keydown', cmdK, true);
     let menu: AppMenu | null = null;
     let gone = false;
     void installMenu(actions, (id) => toAccelerator(store.bindings.get(id)?.[0] ?? '')).then((m) => (gone ? m?.close() : (menu = m)));
@@ -108,13 +103,12 @@
       mq.removeEventListener('change', sys);
       gone = true;
       window.removeEventListener('keydown', key, true);
-      window.removeEventListener('keydown', cmdK, true);
       menu?.close();
     };
   });
 </script>
 
-<div class="next" data-ui="next" style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--text:{FONTS.text};--title:{FONTS.title};--mono:{FONTS.mono}">
+<div class="next" data-ui="next" data-font={nextPrefs.font} style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--text:{textFont};--title:{FONTS.title};--mono:{FONTS.mono};--col:{nextPrefs.col}">
   <div class="win" inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
   {#if store.showNav}<Sidebar width={sideWidth} onwidth={setWidth} onmenu={(at, items) => (menu = { ...at, items })} />{/if}
   <div class="main">
