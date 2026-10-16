@@ -4,6 +4,7 @@ import {
   newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
+import { nextOn, setNext } from './uiFlag';
 import { displayName, isArchive, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags } from './edits';
 import { caretAfter } from './refile';
@@ -1894,6 +1895,17 @@ class Store {
     await this.flush();
     if (isTauri) await invoke('quit_app');
   }
+
+  /** «Новый интерфейс (бета)» on or off (ТЗ 42 §1): unsaved tabs asked about as on quitting, the files written, then
+   *  the window reloads with the other shell. */
+  async setInterface(next: boolean) {
+    if (next === nextOn()) return;
+    if (this.settingsOpen) this.closeSettings(); // the switch is there; the unsaved tabs are asked about over the window
+    if (!(await this.confirmClose(this.layout.panes.flatMap((p) => p.tabs)))) return;
+    await this.flush();
+    setNext(next);
+  }
+  readonly nextUi = nextOn();
 
   /** Not enough room for two panes: the second one becomes tabs of the first. */
   mergePanes() {

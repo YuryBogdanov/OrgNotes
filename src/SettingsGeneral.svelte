@@ -72,6 +72,14 @@
     </div>
   </div>
   <p class="help">{store.linkFormat === 'id' ? 'Ссылка не ломается при переименовании и переносе. К заголовку добавляется свойство :ID:.' : 'Файл не меняется, но ссылка ломается, если заголовок переименовать.'} «Копировать ссылку на заголовок» — ⌃C L; выделите текст и нажмите ⌘V, чтобы сделать его ссылкой. Настройка хранится на этом Mac.</p>
+  <div class="cap">ЭКСПЕРИМЕНТАЛЬНОЕ</div>
+  <div class="opts">
+    <div class="opt">
+      <label for="next-ui">Новый интерфейс (бета)</label>
+      <Switch id="next-ui" checked={store.nextUi} label="Новый интерфейс (бета)" onchange={() => void store.setInterface(!store.nextUi)} />
+    </div>
+  </div>
+  <p class="help">Окно перезапустится. Файлы, вкладки и настройки общие со старым интерфейсом.</p>
   <div class="cap">КЛАВИШИ</div>
   <div class="opt">
     <div class="folder">
