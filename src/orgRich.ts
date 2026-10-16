@@ -2,13 +2,13 @@
 // priorities and tags as capsules, dates as chips, emphasis without its marks, real checkboxes, tables as a grid.
 // Only looks: the file keeps every character. The lines the selection touches show their real text.
 
-import { Prec, StateField, type Extension, type Range, type Text } from '@codemirror/state';
+import { Prec, StateEffect, StateField, type Extension, type Range, type Text } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin, WidgetType, keymap, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { foldEffect, foldedRanges, unfoldEffect } from '@codemirror/language';
 import { toneFor, type DrawerRange, type Workflow } from './org';
 import { toneStyle } from './colors';
 import { levelAt, levelDown, outlineOf } from './orgIndent';
-import { cookieIn, deadlineState, drawerName, emphasisIn, listItem, planningIn, relLabel, stampLabel, stampsIn, tableRoles, toggleBox, type Span, type Stamp } from './rich';
+import { blocksIn, cookieIn, deadlineState, drawerName, emphasisIn, listItem, planningIn, relLabel, stampLabel, stampsIn, tableCells, tableRoles, toggleBox, type Block, type Span, type Stamp } from './rich';
 
 /** A click on a drawn element that asks for a choice (the editor's owner shows the menu). */
 export interface RichPick {
@@ -71,6 +71,87 @@ function clickable(el: HTMLElement, label: string, run: (el: HTMLElement) => voi
 }
 
 // ---- widgets ----------------------------------------------------------------------------------------------
+
+/** A row of a table in the new interface (§5.3): its cells in the widths of the table's columns, the head bolder. */
+class TableRow extends WidgetType {
+  constructor(readonly cells: string[], readonly widths: number[], readonly head: boolean) {
+    super();
+  }
+  eq(o: TableRow) {
+    return o.head === this.head && o.cells.join('\u0000') === this.cells.join('\u0000') && o.widths.join() === this.widths.join();
+  }
+  /** A click on a row puts the caret in it: the row shows its text (§5.3). */
+  ignoreEvent() {
+    return false;
+  }
+  toDOM() {
+    const s = document.createElement('span');
+    s.className = 'cm-n-trow' + (this.head ? ' head' : '');
+    this.widths.forEach((w, k) => {
+      const c = document.createElement('span');
+      c.className = 'cm-n-cell';
+      c.style.width = w + 'px';
+      c.textContent = this.cells[k] ?? '';
+      s.appendChild(c);
+    });
+    return s;
+  }
+}
+let measureCtx: CanvasRenderingContext2D | null = null;
+/** The widths of a table's columns, measured in the fonts of its head and its cells; padding included. */
+function columnWidths(rows: { cells: string[]; head: boolean }[]): number[] {
+  measureCtx ??= document.createElement('canvas').getContext('2d');
+  const n = Math.max(0, ...rows.map((r) => r.cells.length));
+  const out = Array.from({ length: n }, () => 0);
+  for (const r of rows) {
+    if (measureCtx) measureCtx.font = r.head ? '600 14px -apple-system, system-ui, sans-serif' : "500 17px 'Cormorant Garamond', Georgia, serif";
+    r.cells.forEach((c, k) => (out[k] = Math.max(out[k], Math.ceil(measureCtx ? measureCtx.measureText(c).width : c.length * 8))));
+  }
+  return out.map((w) => Math.min(360, w + 24));
+}
+/** The tables of a document as the new interface draws them: each line's row, the widths of its table. */
+let tableDrawCache = new WeakMap<Text, Map<number, { cells: string[]; widths: number[]; head: boolean; first: boolean; last: boolean }>>();
+function tableRowsOf(doc: Text) {
+  let m = tableDrawCache.get(doc);
+  if (m) return m;
+  m = new Map();
+  const roles = tablesOf(doc);
+  for (let i = 0; i < roles.length; ) {
+    if (!roles[i]) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < roles.length && roles[j]) j++;
+    const rows: { i: number; cells: string[]; head: boolean }[] = [];
+    for (let k = i; k < j; k++) if (roles[k] !== 'rule') rows.push({ i: k, cells: tableCells(doc.line(k + 1).text), head: roles[k] === 'head' });
+    const widths = columnWidths(rows);
+    rows.forEach((r, n) => m!.set(r.i, { cells: r.cells, widths, head: r.head, first: n === 0, last: n === rows.length - 1 }));
+    i = j;
+  }
+  tableDrawCache.set(doc, m);
+  return m;
+}
+/** The fonts came: the tables are measured again (the effect makes the drawing run again). */
+const remeasure = () => (tableDrawCache = new WeakMap());
+const fontsCame = StateEffect.define<null>();
+const blockCacheN = new WeakMap<Text, Map<number, { b: Block; role: 'begin' | 'end' | 'body'; first: boolean; last: boolean }>>();
+/** Each line of a block with its role (§5.3): the fences, the body's first and last line. */
+function blockRolesOf(doc: Text) {
+  let m = blockCacheN.get(doc);
+  if (m) return m;
+  m = new Map();
+  const lines: string[] = [];
+  for (let k = 1; k <= doc.lines; k++) lines.push(doc.line(k).text);
+  for (const b of blocksIn(lines)) {
+    m.set(b.begin, { b, role: 'begin', first: false, last: false });
+    for (let k = b.begin + 1; k < b.end; k++) m.set(k, { b, role: 'body', first: k === b.begin + 1, last: k === b.end - 1 });
+    if (b.end > b.begin) m.set(b.end, { b, role: 'end', first: false, last: false });
+  }
+  blockCacheN.set(doc, m);
+  return m;
+}
+
 
 class Dot extends WidgetType {
   constructor(readonly level: number) {
@@ -372,6 +453,20 @@ function build(view: EditorView, deps: RichDeps): DecorationSet {
       const level = levelAt(outline, i);
       const pad = ind(level);
       const inBlock = blocks.has(i);
+      // the new interface: a block on a chip (SRC, EXAMPLE monospaced, its language right; QUOTE italic with a bar);
+      // its fences thin lines, their text shown only on the caret's (§5.3)
+      if (inBlock && nx) {
+        const r = blockRolesOf(doc).get(i);
+        if (r) {
+          const kind = r.b.kind.toLowerCase();
+          const attrs: Record<string, string> = pad ? { style: `padding-left: calc(6px + ${pad}px)` } : {};
+          if (r.role === 'body' && r.first && r.b.lang && r.b.kind === 'SRC') attrs['data-lang'] = r.b.lang;
+          const cls = r.role === 'body' ? `cm-n-bline ${kind}${r.first ? ' first' : ''}${r.last ? ' last' : ''}` : `cm-n-bfence ${r.role} ${kind}${isRaw ? ' raw' : ''}`;
+          out.push(Decoration.line({ class: cls, attributes: attrs }).range(ln.from));
+          if (r.role !== 'body' && !isRaw) hide(ln.from, ln.to);
+          continue;
+        }
+      }
       if (inBlock) {
         if (pad) line(ln.from, 'cm-r-text', `padding-left: calc(6px + ${pad}px)`);
         continue;
@@ -415,6 +510,18 @@ function build(view: EditorView, deps: RichDeps): DecorationSet {
         continue;
       }
       const role = tables[i];
+      // the new interface: a table framed, its columns in one width, the head on a chip; the rule line gone (§5.3)
+      if (nx && role) {
+        if (role === 'rule') {
+          line(ln.from, 'cm-n-trule' + (isRaw ? ' raw' : ''), pad ? `padding-left: calc(6px + ${pad}px)` : '');
+          if (!isRaw) hide(ln.from, ln.to);
+          continue;
+        }
+        const r = tableRowsOf(doc).get(i);
+        line(ln.from, `cm-n-tline ${role}${r?.first ? ' first' : ''}${r?.last ? ' last' : ''}${isRaw ? ' raw' : ''}`, pad ? `padding-left: calc(6px + ${pad}px)` : '');
+        if (!isRaw && r) hide(ln.from, ln.to, new TableRow(r.cells, r.widths, r.head));
+        continue;
+      }
       if (role === 'rule') {
         line(ln.from, 'cm-r-trule');
         continue;
@@ -506,6 +613,12 @@ export function orgRich(deps: RichDeps): Extension {
       timer: ReturnType<typeof setInterval>;
       constructor(readonly view: EditorView) {
         this.decorations = build(view, deps);
+        // the new interface's tables are measured in its fonts: again once they are loaded
+        if (deps.next)
+          void document.fonts?.ready.then(() => {
+            remeasure();
+            if (view.dom.isConnected) view.dispatch({ effects: fontsCame.of(null) });
+          });
         // «завтра» becomes «сегодня» at midnight (and after a sleep)
         this.timer = setInterval(() => {
           if (this.day !== today()) view.dispatch({});
