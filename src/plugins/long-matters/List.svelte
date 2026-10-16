@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { long, type Filter, type Row } from './state.svelte';
+  import { reviewed, review, rowMenu, status, toggleWait } from './actions';
   import { GROUPS, ageWords, approxWords, dueWords, mattersWord, shortDay, tipOf, type Group } from './long';
 
   // The tab «Долгие дела» (ТЗ 40 §6): the header with its counts and the filter (kept with the tab), the bar of the
   // approximate dates, the list by groups — «Дело и последний статус», «Давность» with a bar to 160% of the norm,
-  // «Проверить». ↑↓ choose, ↩ opens the heading, ⌘↩ beside.
+  // «Проверить». ↑↓ choose, ↩ opens the heading, ⌘↩ beside; S R W O — the actions (actions.ts), the menu of a row.
   let { initial, setState }: { initial: Filter; setState: (f: Filter) => void } = $props();
   let filter = $state<Filter>((() => initial)());
   let list: HTMLDivElement | undefined = $state();
@@ -55,7 +56,28 @@
       e.preventDefault();
       if (e.metaKey) long.beside(visible[i].m);
       else long.reveal(visible[i].m);
+    } else if (i >= 0 && !e.metaKey && !e.ctrlKey && !e.altKey && ACTIONS[e.code]) {
+      // S R W O, by the key's place (a Russian layout too)
+      e.preventDefault();
+      ACTIONS[e.code](visible[i].m, under(visible[i].m.key));
     }
+  }
+  /** Under the row of the matter: where its popover and its menu go. */
+  function under(key: string) {
+    const el = [...(list?.querySelectorAll<HTMLElement>('.row') ?? [])].find((x) => x.dataset.key === key);
+    const r = el?.querySelector('.nm')?.getBoundingClientRect() ?? el?.getBoundingClientRect();
+    return r ? { x: Math.round(r.left), y: Math.round((el?.getBoundingClientRect().bottom ?? r.bottom) + 2) } : undefined;
+  }
+  const ACTIONS: Record<string, (m: Row['m'], at?: { x: number; y: number }) => void> = {
+    KeyS: (m, at) => status(m, at),
+    KeyR: (m, at) => void review(m, at),
+    KeyW: (m) => toggleWait(m),
+    KeyO: (m) => void reviewed(m),
+  };
+  function menu(e: MouseEvent, r: Row) {
+    e.preventDefault();
+    void select(r.m.key);
+    rowMenu(r.m, { x: e.clientX, y: e.clientY }, under(r.m.key));
   }
   function dismiss() {
     approxSeen = true;
@@ -71,6 +93,11 @@
   $effect(() => {
     const r = rows.find((x) => x.m.key === long.sel);
     if (r?.s.group === 'ok' && !okOpen) okOpen = true;
+  });
+  // an action from a menu or a sheet gave the focus away: the list takes it back once it is read again (S R W O go on)
+  $effect(() => {
+    void long.matters;
+    if (document.activeElement === document.body) list?.focus({ preventScroll: true });
   });
   /** The bar of «Давность»: to 160% of the norm. */
   const fill = (r: Row) => (r.s.age === null ? 0 : Math.min(100, (r.s.age / (long.settings.norm * 1.6)) * 100));
@@ -117,7 +144,7 @@
           {#each g.rows as r (r.m.key)}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div class="row" class:on={long.sel === r.m.key} class:dim={g.id === 'ok'} role="row" tabindex="-1" aria-selected={long.sel === r.m.key} title={tipOf(r.m, r.s)}
-              onclick={() => void select(r.m.key)} ondblclick={() => long.reveal(r.m)}>
+              data-key={r.m.key} onclick={() => void select(r.m.key)} ondblclick={() => long.reveal(r.m)} oncontextmenu={(e) => menu(e, r)}>
               <div class="what" role="gridcell">
                 <div class="l1">
                   {#if r.m.keyword}<span class="kw tone-chip" style={r.m.tone}>{r.m.keyword}</span>{/if}
@@ -171,6 +198,7 @@
   .row { min-height: 50px; padding: 6px 8px; border-radius: 8px; cursor: default; }
   .row:hover { background: color-mix(in srgb, var(--fg) 4%, transparent); }
   .row.on { background: var(--sel); }
+  .row:focus { outline: none; }
   .row.dim > * { opacity: 0.6; }
   .row.dim.on > * { opacity: 1; }
   .what { min-width: 0; display: flex; flex-direction: column; gap: 3px; }

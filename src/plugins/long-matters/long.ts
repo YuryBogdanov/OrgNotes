@@ -85,6 +85,9 @@ export interface Matter {
   note: { at: Date; text: string } | null;
   waiting: string | null;
   nextReview: Date | null;
+  /** Long by its own tag (taken away by «Убрать из долгих дел»); by its place in a file. */
+  byTag: string | null;
+  byPlace: boolean;
 }
 /** What the views show of it today. */
 export interface Shown {
@@ -99,7 +102,9 @@ export interface Shown {
 }
 export function shown(m: Matter, today: Date, norm: number): Shown {
   const age = m.touched ? Math.max(0, daysBetween(m.touched.at, today)) : null;
-  const due = m.nextReview ?? (m.touched ? new Date(day(m.touched.at).getTime() + norm * 86_400_000) : null);
+  // `:NEXT_REVIEW:` stands while it is after the last touch; touched on its day or later (looked at), the norm again
+  const byNorm = m.touched ? new Date(day(m.touched.at).getTime() + norm * 86_400_000) : null;
+  const due = m.nextReview && (!m.touched || +m.nextReview > +day(m.touched.at)) ? m.nextReview : byNorm;
   const left = due ? daysBetween(today, due) : null;
   const late = left !== null && left < 0;
   const group: Group = late ? 'due' : m.waiting ? 'waiting' : 'ok';
@@ -120,6 +125,38 @@ export function grouped<T extends { s: Shown; m: Matter }>(rows: T[]): Record<Gr
   for (const g of Object.values(out)) g.sort((a, b) => at(a) - at(b) || a.m.title.localeCompare(b.m.title, 'ru'));
   return out;
 }
+
+/** The source that makes the heading long: its own tag of a tag source (null: none), a file source. */
+export function sourceOf(path: string, h: Heading, sources: Source[]): { byTag: string | null; byPlace: boolean } {
+  const tag = sources.flatMap((s) => (s.kind === 'tag' ? h.tags.filter((t) => sameTag(t, s.tag)) : []))[0] ?? null;
+  return { byTag: tag, byPlace: sources.some((s) => s.kind === 'file' && s.file === path && h.level === s.level) };
+}
+
+/** An inactive date with the file's weekday names: `[2026-10-30 Пт]`. */
+export const stampOf = (d: Date, names: string[]) =>
+  `[${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${names[d.getDay()]}]`;
+
+/** «Больше не ждём»: the status before the waiting one, by the newest `- State "WAIT" from "NEXT"` of the heading's
+ *  own :LOGBOOK:; null — none there. */
+export function statusBefore(lines: readonly string[], h: Heading, wait: string): string | null {
+  let best: { at: number; from: string } | null = null;
+  for (let i = h.line + 1; i < lines.length && i < h.end; i++) {
+    if (/^\*+\s/.test(lines[i])) break;
+    const m = /^\s*-\s+State\s+"([^"]*)"\s+from\s+"([^"]*)"\s*\[(\d{4})-(\d{2})-(\d{2})[^\]]*?(?:(\d{1,2}):(\d{2}))?\]/.exec(lines[i]);
+    if (!m || m[1] !== wait || !m[2] || m[2] === wait) continue;
+    const at = +new Date(+m[3], +m[4] - 1, +m[5], m[6] ? +m[6] : 0, m[7] ? +m[7] : 0);
+    if (!best || at > best.at) best = { at, from: m[2] };
+  }
+  return best?.from ?? null;
+}
+
+/** The days «Проверить через…» offers. */
+export const REVIEW_IN = [
+  { label: 'Через неделю', days: 7 },
+  { label: 'Через 2 недели', days: 14 },
+  { label: 'Через месяц', days: 30 },
+];
+export const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 
 // ---- words ---------------------------------------------------------------------------------------------------
 const MONTHS = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];

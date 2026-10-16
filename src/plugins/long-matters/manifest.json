@@ -9,7 +9,9 @@
   "main": "main.js",
   "permissions": [
     "index.read",
-    "files.read"
+    "files.read",
+    "files.edit",
+    "index.touch"
   ],
   "contributes": {
     "commands": [
@@ -32,6 +34,41 @@
           "давно не трогал",
           "касания",
           "проекты"
+        ]
+      },
+      {
+        "id": "long-matters.review",
+        "title": "Проверить через…",
+        "synonyms": [
+          "долгие дела",
+          "срок проверки",
+          "next_review"
+        ]
+      },
+      {
+        "id": "long-matters.wait",
+        "title": "Ждём…",
+        "synonyms": [
+          "долгие дела",
+          "ожидание",
+          "waiting_on"
+        ]
+      },
+      {
+        "id": "long-matters.unwait",
+        "title": "Больше не ждём",
+        "synonyms": [
+          "долгие дела",
+          "ожидание"
+        ]
+      },
+      {
+        "id": "long-matters.seen",
+        "title": "Осмотрено",
+        "synonyms": [
+          "долгие дела",
+          "осмотрел",
+          "касание"
         ]
       }
     ],

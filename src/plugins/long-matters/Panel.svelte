@@ -1,6 +1,7 @@
 <script lang="ts">
   import { long, type Row } from './state.svelte';
   import { GROUPS, ageWords, tipOf, type Group } from './long';
+  import { rowMenu } from './actions';
 
   // The navigator in the mode «Долгие дела» (ТЗ 40 §5): «ДОЛГИЕ ДЕЛА · 14» and «⋯», the groups with their numbers
   // («В норме» folded), a row of 28 pt — the status, the title, the age by its tone. A click opens the heading in the
@@ -44,7 +45,12 @@
           </button>
           {#if open[g.id]}
             {#each rows as r (r.m.key)}
-              <button class="row" class:on={long.shownTab && long.sel === r.m.key} title={tipOf(r.m, r.s)} onclick={(e) => click(e, r)}>
+              <button class="row" class:on={long.shownTab && long.sel === r.m.key} title={tipOf(r.m, r.s)} onclick={(e) => click(e, r)}
+                oncontextmenu={(e) => {
+                  e.preventDefault();
+                  const b = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  rowMenu(r.m, { x: e.clientX, y: e.clientY }, { x: Math.round(b.left), y: Math.round(b.bottom + 2) });
+                }}>
                 {#if r.m.keyword}<span class="kw tone-chip" style={r.m.tone}>{r.m.keyword}</span>{/if}
                 <span class="nm">{r.m.title}</span>
                 <span class="age {r.s.tone}">{ageWords(r.s, r.m)}</span>

@@ -14,7 +14,7 @@ export function coreCommand(cmd: string, arg: unknown) {
     case 'file.open': {
       const i = store.files.findIndex((f) => f.name === a.path);
       if (i < 0) throw new Error(`нет файла «${a.path}»`);
-      const o = (arg ?? {}) as { line?: number; beside?: boolean; focus?: boolean; neighbour?: boolean };
+      const o = (arg ?? {}) as { line?: number; beside?: boolean; focus?: boolean; neighbour?: boolean; newTab?: boolean };
       const line = Math.max(0, Number(o.line) || 0);
       if (o.neighbour) {
         // as from an agenda: the other pane (made on the left when there is none), the focus stays here
@@ -22,6 +22,8 @@ export function coreCommand(cmd: string, arg: unknown) {
         t.fromAgenda = null;
         return;
       }
+      // a tab of its own here (the file's tab when it has one), the one shown stays (1.12)
+      if (o.newTab && !o.beside) return void openFile(store.layout, store.layout.active, store.files[i].path, line, { replace: false, focus: o.focus !== false });
       if (!o.beside) return store.open(i, line, o.focus !== false);
       // in the other editor (a new tab when there is one), what is shown here stays in front
       const L = store.layout;
