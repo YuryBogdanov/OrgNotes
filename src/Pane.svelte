@@ -12,7 +12,7 @@
   import FindBar from './FindBar.svelte';
   import PaneTabs from './PaneTabs.svelte';
   import { OFF_ICON, isCore as core, isGone as gone, tabLabel as label } from './tabLabels';
-  import { setPlanning, weekdayNames } from './edits';
+  import { pickDate } from './richPick';
   import type { RichPick } from './orgRich';
   import { parseHeadings } from './org';
   import { displayPath } from './names';
@@ -104,16 +104,7 @@
   let richPick = $state<{ pick: RichPick; path: string } | null>(null); // a click on a drawn status or priority
   /** A drawn date opens the palette's calendar for its heading; a status or a priority, a small menu. */
   function richChoice(pick: RichPick, path: string) {
-    if (pick.kind !== 'date') return void (richPick = { pick, path });
-    const f = store.files.find((x) => x.path === path);
-    const h = f?.headings.find((x) => x.line === pick.line);
-    if (!f || !h) return;
-    const kind = pick.date ?? 'SCHEDULED';
-    const old = new RegExp(`${kind}:\\s*(<[^>]*>)`).exec(f.text.split('\n')[h.line + 1] ?? '')?.[1];
-    store.openCalendar({
-      kind, initial: pick.value ?? new Date(), current: pick.value ?? null, old, names: weekdayNames(f.text), plate: { kind: 'heading', h, file: f },
-      pick: (d) => store.patchAt(path, pick.line, (t, hh) => setPlanning(t, hh, kind, d)),
-    });
+    if (!pickDate(pick, path)) richPick = { pick, path };
   }
 
 
