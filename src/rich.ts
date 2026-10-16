@@ -170,3 +170,30 @@ export function toggleBox(lines: string[], at: number, head: number | null, isHe
 
 /** The name drawn for a folded drawer. */
 export const drawerName = (name: string) => (/^properties$/i.test(name) ? 'Свойства' : /^logbook$/i.test(name) ? 'Журнал' : name);
+
+/** A block `#+BEGIN_<KIND> [lang]` … `#+END_<KIND>` (lines 0-based, both fences included). */
+export interface Block {
+  begin: number;
+  end: number;
+  kind: string; // upper case: SRC, QUOTE, EXAMPLE…
+  lang: string;
+}
+/** The blocks of a text; one not closed runs to the end. */
+export function blocksIn(lines: readonly string[]): Block[] {
+  const out: Block[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const b = /^\s*#\+BEGIN_(\w+)(?:\s+(\S+))?/i.exec(lines[i]);
+    if (!b) continue;
+    const end = new RegExp(`^\\s*#\\+END_${b[1]}\\b`, 'i');
+    let j = i + 1;
+    while (j < lines.length && !end.test(lines[j])) j++;
+    out.push({ begin: i, end: Math.min(j, lines.length - 1), kind: b[1].toUpperCase(), lang: b[2] ?? '' });
+    i = j;
+  }
+  return out;
+}
+/** The cells of a table's row: `| a | b |` → ['a', 'b']. */
+export function tableCells(line: string): string[] {
+  const t = line.trim().replace(/^\|/, '').replace(/\|\s*$/, '');
+  return t.split('|').map((c) => c.trim());
+}

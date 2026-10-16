@@ -76,3 +76,32 @@
 .next .cm-rich .cm-foldGutter .cm-gutterElement { opacity: 0; transition: opacity 0.15s; }
 .next .cm-rich .cm-gutters:hover .cm-foldGutter .cm-gutterElement { opacity: 0.6; }
 .next .cm-rich .cm-activeLineGutter { background: transparent; }
+
+/* tables (§5.3): framed in `rule`, 8 pt corners; the head SF Pro 14 bold on a chip; cells Cormorant 17; lines
+   between the cells; a row keeps its height when the caret shows its text */
+.next .cm-rich .cm-n-tline { line-height: 36px; height: 36px; box-sizing: border-box; }
+.next .cm-rich .cm-n-tline.raw { font: 13px/36px var(--mono); color: var(--ink2); }
+/* the frame as inner shadows: a row is 36 px drawn or not, the lines around never move */
+.next .cm-rich .cm-n-trow { display: inline-flex; vertical-align: top; height: 36px; box-shadow: inset 1px 0 var(--rule), inset -1px 0 var(--rule), inset 0 -1px var(--rule); }
+.next .cm-rich .cm-n-tline.first .cm-n-trow { box-shadow: inset 1px 0 var(--rule), inset -1px 0 var(--rule), inset 0 -1px var(--rule), inset 0 1px var(--rule); border-radius: 8px 8px 0 0; }
+.next .cm-rich .cm-n-tline.last .cm-n-trow { border-radius: 0 0 8px 8px; }
+.next .cm-rich .cm-n-tline.first.last .cm-n-trow { border-radius: 8px; }
+.next .cm-rich .cm-n-cell { box-sizing: border-box; padding: 0 12px; font: 500 17px/36px var(--text); color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.next .cm-rich .cm-n-cell + .cm-n-cell { box-shadow: inset 1px 0 var(--rule); }
+.next .cm-rich .cm-n-trow.head { background: var(--chip); }
+.next .cm-rich .cm-n-trow.head .cm-n-cell { font: 600 14px/36px var(--ui); color: var(--ink); }
+.next .cm-rich .cm-n-trule { height: 0; overflow: hidden; line-height: 0; }
+.next .cm-rich .cm-n-trule.raw { height: auto; font: 11px/18px var(--mono); color: var(--ink3); }
+
+/* blocks (§5.3): SRC and EXAMPLE on a chip, IBM Plex Mono 13, the language right; QUOTE italic with a bar; their
+   fences thin, their text shown on the caret's line only */
+.next .cm-rich .cm-n-bline { font: 13px/1.65 var(--mono); color: var(--ink2); background: var(--chip); padding-right: 14px; }
+.next .cm-rich .cm-n-bline.src, .next .cm-rich .cm-n-bline.example { padding-left: 14px; }
+.next .cm-rich .cm-n-bline.first { border-radius: 8px 8px 0 0; padding-top: 8px; position: relative; }
+.next .cm-rich .cm-n-bline.last { border-radius: 0 0 8px 8px; padding-bottom: 8px; }
+.next .cm-rich .cm-n-bline.first.last { border-radius: 8px; }
+.next .cm-rich .cm-n-bline[data-lang]::after { content: attr(data-lang); position: absolute; top: 6px; right: 12px; font: 11px var(--ui); color: var(--ink3); }
+.next .cm-rich .cm-n-bline.quote { font: italic 500 19px/1.55 var(--text); background: transparent; box-shadow: inset 3px 0 0 var(--lampline); padding-left: 18px; }
+.next .cm-rich .cm-n-bfence { font: 11px/16px var(--mono); color: var(--ink3); }
+.next .cm-rich .cm-n-bfence:not(.raw) { line-height: 8px; }
+.next .cm-rich .cm-n-bline.quote, .next .cm-rich .cm-n-bline.quote.first, .next .cm-rich .cm-n-bline.quote.last { border-radius: 0; padding-top: 0; padding-bottom: 0; }

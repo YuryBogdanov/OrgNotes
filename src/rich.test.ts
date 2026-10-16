@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cookieIn, deadlineState, drawerName, emphasisIn, listItem, parseStamp, planningIn, relLabel, stampLabel, stampsIn, tableRoles, toggleBox } from './rich';
+import { blocksIn, cookieIn, deadlineState, drawerName, emphasisIn, listItem, parseStamp, planningIn, relLabel, stampLabel, stampsIn, tableCells, tableRoles, toggleBox } from './rich';
 
 const NOW = new Date(2026, 9, 11, 14, 0);
 
@@ -58,5 +58,20 @@ describe('a line', () => {
     expect(drawerName('PROPERTIES')).toBe('Свойства');
     expect(drawerName('LOGBOOK')).toBe('Журнал');
     expect(drawerName('NOTES')).toBe('NOTES');
+  });
+});
+
+describe('blocks and table cells (ТЗ 42.7)', () => {
+  it('blocks with their kind and language; one not closed runs to the end', () => {
+    const t = ['text', '#+BEGIN_SRC python', 'print(1)', '#+END_SRC', '#+begin_quote', 'Цитата', '#+end_quote', '#+BEGIN_EXAMPLE', 'x'];
+    expect(blocksIn(t)).toEqual([
+      { begin: 1, end: 3, kind: 'SRC', lang: 'python' },
+      { begin: 4, end: 6, kind: 'QUOTE', lang: '' },
+      { begin: 7, end: 8, kind: 'EXAMPLE', lang: '' },
+    ]);
+  });
+  it('the cells of a row, trimmed; an empty one kept', () => {
+    expect(tableCells('| Срок | Кто |  |')).toEqual(['Срок', 'Кто', '']);
+    expect(tableCells('  |a|b')).toEqual(['a', 'b']);
   });
 });
