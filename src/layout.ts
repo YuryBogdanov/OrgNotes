@@ -181,6 +181,53 @@ export function closePane(L: Layout, pi: number) {
 }
 const sameContent = (a: Tab, b: Tab) => a.kind === b.kind && ((a.kind === 'agenda' && (a.agenda ?? '') === (b.agenda ?? '')) || (a.kind === 'file' && a.path === b.path) || a.id === b.id);
 
+/** The second pane folded into the first by the new interface (ТЗ 42 §4.3, it has one pane yet): what it held, to
+ *  bring it back when the old interface returns. A tab in both panes was folded into one: it is copied back. */
+export interface Folded {
+  right: { id: string; kind: string; path?: string; agenda?: string; both: boolean }[];
+  active: number;
+  ratio: number;
+  focus: number;
+}
+export function foldPanes(L: Layout): Folded | null {
+  if (L.panes.length < 2) return null;
+  const [a, b] = L.panes;
+  const rec: Folded = {
+    right: b.tabs.map((t) => ({ id: t.id, kind: t.kind, ...(t.path ? { path: t.path } : {}), ...(t.agenda ? { agenda: t.agenda } : {}), both: a.tabs.some((x) => sameContent(x, t)) })),
+    active: b.active,
+    ratio: L.ratio,
+    focus: L.active,
+  };
+  closePane(L, 1);
+  return rec;
+}
+/** The folded pane again, with the tabs of it still open (closed meanwhile: gone; all gone: one pane stays). */
+export function unfoldPanes(L: Layout, f: Folded): boolean {
+  if (L.panes.length !== 1) return false;
+  const a = L.panes[0];
+  const shown = a.tabs[a.active];
+  const tabs: Tab[] = [];
+  for (const r of f.right) {
+    const i = a.tabs.findIndex((x) => x.id === r.id || sameContent(x, { ...x, ...r, id: r.id } as Tab));
+    if (i < 0) continue;
+    if (r.both) tabs.push(copyTab(a.tabs[i]));
+    else tabs.push(...a.tabs.splice(i, 1));
+  }
+  if (!tabs.length) return false;
+  if (!a.tabs.length) {
+    a.tabs = tabs; // every tab was the right pane's: they stay in one
+    a.active = Math.min(f.active, tabs.length - 1);
+    return false;
+  }
+  a.active = Math.max(0, a.tabs.indexOf(shown));
+  const p = newPane(tabs);
+  p.active = Math.min(Math.max(0, f.active), tabs.length - 1);
+  L.panes.push(p);
+  L.ratio = f.ratio;
+  L.active = Math.min(f.focus, 1);
+  return true;
+}
+
 /** "Оставить одну панель": close the inactive pane. */
 export const keepOne = (L: Layout) => closePane(L, 1 - L.active);
 

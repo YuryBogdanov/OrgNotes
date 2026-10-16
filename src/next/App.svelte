@@ -10,13 +10,15 @@
   import { tokenVars, FONTS } from './tokens';
   import './fonts';
   import { parentOf } from '../navTree';
-  import type { FileMenu } from '../fileMenu';
   import Sidebar from './Sidebar.svelte';
   import Toolbar from './Toolbar.svelte';
-  import { CloseSheet, ContextMenu, Dialogs, DiskSheet, Palette, PluginSheets, Settings } from './bridges';
+  import Tabs from './Tabs.svelte';
+  import { tabLabel } from '../tabLabels';
+  import { CloseSheet, ContextMenu, Dialogs, DiskSheet, Palette, PluginSheets, Settings, type MenuItem } from './bridges';
+  import { untrack } from 'svelte';
 
   // The new shell (ТЗ 42): the store, the plugins, the window's keys and the menu, the old sheets through
-  // `bridges.ts` (42.1); the sidebar with the files and the toolbar (42.3). The tabs and the editor: 42.4–42.5.
+  // `bridges.ts` (42.1); the sidebar with the files and the toolbar (42.3); the tabs (42.4). The editor: 42.5.
   const newFile = () => {
     if (!store.canManageFiles) return;
     store.showNav = true;
@@ -28,7 +30,23 @@
     palette: () => store.togglePalette(),
     nav: () => (store.showNav = !store.showNav),
     newFile,
+    // the tabs (ТЗ 42 §4.3): as in the old shell; one pane — the second's commands say «Скоро»
+    newTab: () => store.newUntitled(0),
+    closeTab: () => store.closeActiveTab(),
+    closeOthers: () => {
+      const p = store.layout.panes[0];
+      if (p) void store.closeOthers(0, p.active);
+    },
+    save: () => store.saveActive(),
+    copyPath: () => store.copyPath(store.tab),
+    closeWindow: () => store.hideWindow(),
+    splitRight: () => store.splitRight(),
+    rich: () => store.setRich(!store.rich),
   };
+  // one pane in the new shell (§4.3): a second one of the old is folded in, and back with the old shell
+  $effect(() => {
+    if (store.loaded) untrack(() => store.foldPanesForNext());
+  });
   // «Искать везде ⌘K» (§4.1): the palette, in the new shell only
   const cmdK = (e: KeyboardEvent) => {
     if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.code === 'KeyK' && !store.sheetOpen) {
@@ -54,7 +72,7 @@
       /* no storage */
     }
   }
-  let menu = $state<{ x: number; y: number; items: FileMenu } | null>(null);
+  let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   const runWindow = (id: string) => {
     const run = actions[id];
     if (!run || (store.sheetOpen && id !== 'palette' && id !== 'settings' && id !== 'quit')) return false;
@@ -95,10 +113,11 @@
   {#if store.showNav}<Sidebar width={sideWidth} onwidth={setWidth} onmenu={(at, items) => (menu = { ...at, items })} />{/if}
   <div class="main">
   <Toolbar onnew={newFile} />
+  <Tabs onmenu={(at, items) => (menu = { ...at, items })} />
   <main class="frame">
     <div class="card">
       <h1 class="title">Новый интерфейс</h1>
-      <p>Окно готово: сайдбар с файлами и тулбар. Вкладки и редактор появятся в следующих частях.</p>
+      <p>{store.tab ? `Вкладка «${tabLabel(store.tab)}» — редактор появится в следующей части.` : 'Вкладок нет. Откройте файл в сайдбаре.'}</p>
       <p class="meta">{store.loaded ? `${word(store.files.length, ['файл', 'файла', 'файлов'])} · ${word(tabs, ['вкладка открыта', 'вкладки открыты', 'вкладок открыто'])}` : 'Читаем папку…'}</p>
       <div class="acts">
         <button onclick={() => store.togglePalette()}>Палитра команд</button>

@@ -8,3 +8,4 @@ export { default as DiskSheet } from '../DiskSheet.svelte'; // a file changed on
 export { default as PluginSheets } from '../PluginSheets.svelte'; // the plugins' forms and sheets → the same
 export { default as ContextMenu } from '../ContextMenu.svelte'; // the context menus → the new menu in the new tokens
 export { default as Dialogs } from '../Dialogs.svelte'; // rename, move, the Trash of the files' tree → the new sheets
+export type { MenuItem } from '../ContextMenu.svelte'; // the menus' items, the type of the bridge above

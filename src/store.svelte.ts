@@ -1,10 +1,10 @@
 import {
   activeTab, addPane, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
   openFile, openFromAgenda, pinFirst, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
-  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED,
+  newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, foldPanes, unfoldPanes, type Folded,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
-import { nextOn, setNext } from './uiFlag';
+import { isMainWindow, nextOn, setNext } from './uiFlag';
 import { displayName, isArchive, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags } from './edits';
 import { caretAfter } from './refile';
@@ -1600,6 +1600,8 @@ class Store {
     }));
   }
   splitRight() {
+    // the new interface has one pane yet (ТЗ 42 §4.3)
+    if (this.nextUi && isMainWindow()) return void this.note('Скоро в новом интерфейсе', undefined, 2500), false;
     return splitRight(this.layout);
   }
   swapPanes() {
@@ -1902,8 +1904,31 @@ class Store {
     if (next === nextOn()) return;
     if (this.settingsOpen) this.closeSettings(); // the switch is there; the unsaved tabs are asked about over the window
     if (!(await this.confirmClose(this.layout.panes.flatMap((p) => p.tabs)))) return;
+    if (!next) this.unfoldPanes();
     await this.flush();
     setNext(next);
+  }
+  private foldedKey() {
+    return 'next:folded:' + (this.dir ?? '');
+  }
+  /** The new interface has one pane (ТЗ 42 §4.3): a second one goes into the first, kept for the old interface. */
+  foldPanesForNext() {
+    const f = foldPanes(this.layout);
+    if (!f) return;
+    lsSet(this.foldedKey(), JSON.stringify(f));
+    this.persistLayout();
+  }
+  /** Back to the old interface: the pane folded by the new one comes back with the tabs of it still open. */
+  private unfoldPanes() {
+    const raw = lsGet(this.foldedKey());
+    if (!raw) return;
+    lsSet(this.foldedKey(), '');
+    try {
+      unfoldPanes(this.layout, JSON.parse(raw) as Folded);
+      this.persistLayout();
+    } catch {
+      /* a broken record: one pane stays */
+    }
   }
   readonly nextUi = nextOn();
 

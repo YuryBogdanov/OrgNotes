@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  foldPanes, unfoldPanes,
   activeTab, addPane, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
   openFile, openFromAgenda, restore, secondKind, serialize, splitRight, swap, toggleSecond, type Layout,
   newUntitled, moveTab, duplicateTab, othersOf, targetOf,
@@ -286,5 +287,40 @@ describe('tab commands', () => {
     newUntitled(L, 0);
     const back = restore(serialize(L), () => true)!;
     expect(kinds(back)).toEqual([['a.org']]);
+  });
+});
+
+describe('the new interface folds two panes into one (ТЗ 42 §4.3)', () => {
+  const two = () => {
+    const L = emptyLayout(newTab('file', 'a.org'));
+    openFile(L, 0, 'b.org', 0, { replace: false });
+    addPane(L, 'right', newTab('file', 'c.org'));
+    openFile(L, 1, 'a.org', 0, { replace: false }); // in both
+    L.ratio = 0.6;
+    L.active = 1;
+    return L;
+  };
+  const paths = (L: ReturnType<typeof emptyLayout>) => L.panes.map((p) => p.tabs.map((t) => t.path));
+  it('folded: one pane with every tab once; unfolded: the two as they were', () => {
+    const L = two();
+    const f = foldPanes(L)!;
+    expect(paths(L)).toEqual([['a.org', 'b.org', 'c.org']]);
+    expect(unfoldPanes(L, f)).toBe(true);
+    expect(paths(L)).toEqual([['a.org', 'b.org'], ['c.org', 'a.org']]);
+    expect(L.ratio).toBe(0.6);
+    expect(L.active).toBe(1);
+  });
+  it('a tab of the right pane closed meanwhile stays closed; all of them closed — one pane', () => {
+    const L = two();
+    const f = foldPanes(L)!;
+    closeTab(L, 0, 2); // c.org
+    unfoldPanes(L, f);
+    expect(paths(L)).toEqual([['a.org', 'b.org'], ['a.org']]);
+    const M = two();
+    const g = foldPanes(M)!;
+    M.panes[0].tabs = M.panes[0].tabs.filter((t) => t.path === 'b.org');
+    expect(unfoldPanes(M, g)).toBe(false);
+    expect(paths(M)).toEqual([['b.org']]);
+    expect(foldPanes(M)).toBeNull(); // one pane: nothing to fold
   });
 });
