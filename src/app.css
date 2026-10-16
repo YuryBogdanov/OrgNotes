@@ -51,9 +51,11 @@ body {
 }
 button, select, input { font: inherit; color: inherit; }
 button { cursor: default; }
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg) 22%, transparent); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-track { background: transparent; }
+/* the old shell's own scrollbars; the new one (ТЗ 42 §7.1) keeps macOS's overlay bars, which fade and follow
+   «Показывать полосы прокрутки» — any ::-webkit-scrollbar style would turn them into fixed ones */
+:not(.next, .next *)::-webkit-scrollbar { width: 10px; height: 10px; }
+:not(.next, .next *)::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg) 22%, transparent); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+:not(.next, .next *)::-webkit-scrollbar-track { background: transparent; }
 
 /* status and tag colours: a named colour of the editor theme, `var(--p-<name>)` in --tl (see colors.ts, themes.ts) */
 .tone { color: var(--tl); }

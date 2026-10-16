@@ -544,7 +544,15 @@ export class OrgEditor {
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         p.next ? this.linkCardTip : this.linkTip,
         // the card stays within the text's area: the column «Структура» to the right would cover it
-        p.next ? tooltips({ tooltipSpace: (v) => v.scrollDOM.getBoundingClientRect() }) : [],
+        p.next
+          ? tooltips({
+              tooltipSpace: (v) => {
+                // the scroller runs under «Структура» (§7.1): its right padding is the column's
+                const r = v.scrollDOM.getBoundingClientRect();
+                return { top: r.top, left: r.left, bottom: r.bottom, right: r.right - parseFloat(getComputedStyle(v.scrollDOM).paddingRight || '0') };
+              },
+            })
+          : [],
         // the tab keeps its folded headings (S-Tab, ⇥): shown again, it comes back folded as it was
         EditorView.updateListener.of((u) => {
           // a fold changed, or an edit moved the lines of the folds
