@@ -1,0 +1,54 @@
+{
+  "id": "long-matters",
+  "name": "Долгие дела",
+  "version": "1.0.0",
+  "description": "Дела, которые тянутся неделями: давность касания, последний статус, срок проверки, группы «Пора проверить», «Ждём», «В норме».",
+  "author": "Panopticon",
+  "api": "^1.12",
+  "minAppVersion": "1.11.0",
+  "main": "main.js",
+  "permissions": [
+    "index.read",
+    "files.read"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "id": "long-matters.nav",
+        "title": "Навигатор: долгие дела",
+        "keys": [
+          "⌃⌘9"
+        ],
+        "synonyms": [
+          "долгие дела",
+          "проекты"
+        ]
+      },
+      {
+        "id": "long-matters.open",
+        "title": "Долгие дела: открыть список",
+        "synonyms": [
+          "долгие дела",
+          "давно не трогал",
+          "касания",
+          "проекты"
+        ]
+      }
+    ],
+    "navSections": [
+      {
+        "id": "long-matters",
+        "title": "Долгие дела",
+        "icon": "M4 16.5V10M8 16.5V4M12 16.5V12M16 16.5V7",
+        "key": "long-matters.nav"
+      }
+    ],
+    "views": [
+      {
+        "id": "long-matters.list",
+        "title": "Долгие дела",
+        "icon": "M4 16.5V10M8 16.5V4M12 16.5V12M16 16.5V7"
+      }
+    ]
+  }
+}

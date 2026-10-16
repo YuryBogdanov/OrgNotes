@@ -32,7 +32,7 @@ async function open(page: Page, files: Record<string, string> = FILES) {
 test('the bar: no «Задачи»; «Теги» by ⌃⌘8 — the tags by count or A–Я, how often each is set; the search', async ({ page }) => {
   await open(page);
   const tabs = page.getByRole('tablist', { name: 'Режимы навигатора' }).getByRole('tab');
-  expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Агенда', 'Цели', 'Календарь', 'Теги', 'Поиск по заметкам']);
+  expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Файлы', 'Inbox', 'Агенда', 'Цели', 'Долгие дела', 'Календарь', 'Теги', 'Поиск по заметкам']);
   await page.keyboard.press('Control+Meta+8');
   await expect(page.getByRole('tab', { name: 'Теги' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.tp .head')).toContainText('ТЕГИ · 5');

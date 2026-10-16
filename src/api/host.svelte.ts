@@ -1013,6 +1013,6 @@ interface SlotPiece {
   render: (el: HTMLElement, data: unknown) => Dispose | void;
 }
 /** Where the built-in plugins' sections of the navigator stand (views.ts: Файлы 0 … Поиск 70). */
-const BUILTIN_NAV: Record<string, number> = { inbox: 10, 'quarter-goals': 40, calendar: 50 };
+const BUILTIN_NAV: Record<string, number> = { inbox: 10, 'quarter-goals': 40, 'long-matters': 45, calendar: 50 };
 
 plugins.declare();
