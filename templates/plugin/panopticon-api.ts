@@ -393,10 +393,14 @@ export interface Ctx {
     on(id: string, run: (arg?: unknown) => void | Promise<void>): Dispose;
     /** Not offered in the palette, its keys do nothing, while off. */
     setAvailable(id: string, on: boolean): void;
+    /** Offered in the palette only while `fn` says so (asked as the palette opens: «на заголовке долгого дела»).
+     *  Since 1.12. */
+    when(id: string, fn: () => boolean): Dispose;
     /** The first shortcut of a command as set now («⌘↩»), '' none: for the plugin's own hints. */
     keyOf(id: string): string;
-    /** A command of the plugin, or of the core: `file.open` {path, line?, beside?, focus?, neighbour?} (`neighbour`:
-     *  in the other pane, made on the left when there is none, as from an agenda), `heading.reveal` {ref},
+    /** A command of the plugin, or of the core: `file.open` {path, line?, beside?, focus?, neighbour?, newTab?}
+     *  (`neighbour`: in the other pane, made on the left when there is none, as from an agenda; `newTab`: a tab of its
+     *  own, the one shown stays, 1.12), `heading.reveal` {ref},
      *  `agenda.open`, `settings.open` {section?}, `file.reveal` {path} (the file in Finder, 1.11), `heading.note` {ref, x?, y?} (the popover «Добавить заметку…»
      *  at this point of the window, else at its top; 1.12), `heading.status` / `heading.schedule` / `heading.deadline` / `heading.tags` / `heading.priority`
      *  {ref} (the palette's step for it; the heading's file is the one shown), `capture.open` (the quick entry),

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { parseHeadings } from '@panopticon/api/org';
-import { DEFAULTS, grouped, longIn, readDay, readSettings, shown, dueWords, ageWords, approxWords, mattersWord, type Matter } from './long';
+import { DEFAULTS, grouped, longIn, readDay, readSettings, shown, dueWords, ageWords, approxWords, mattersWord, sourceOf, stampOf, statusBefore, type Matter } from './long';
 
 // ТЗ 40 §1, §4.1, §4.5: which headings are long matters, their day to look, their group and tone.
 
 const WF = { open: ['TODO', 'WAIT'], done: ['DONE'] };
 const hs = (t: string) => parseHeadings(t, WF);
 const TODAY = new Date(2026, 9, 16, 11, 0);
-const m = (o: Partial<Matter>): Matter => ({ key: 'k', path: 'Midterm.org', line: 0, title: 'Дело', keyword: null, note: null, waiting: null, nextReview: null, ...o });
+const m = (o: Partial<Matter>): Matter => ({ key: 'k', path: 'Midterm.org', line: 0, title: 'Дело', keyword: null, note: null, waiting: null, nextReview: null, byTag: null, byPlace: true, ...o });
 
 describe('long matters', () => {
   const MID = ['* WAIT Миграция', '** TODO Подзадача', '* DONE Закрытое', '* Без статуса', '* Старое :ARCHIVE:', '** В архиве :long:', ''].join('\n');
@@ -47,6 +47,10 @@ describe('the day to look and the groups', () => {
     expect(r).toMatchObject({ left: 5, group: 'ok', tone: 'calm' });
     expect(dueWords(r)).toBe('21 окт');
   });
+  it(':NEXT_REVIEW: before the last touch is old: the norm from the touch again («Осмотрено»)', () => {
+    const s = shown(m({ touched: { at: TODAY, approx: false }, nextReview: new Date(2026, 9, 10) }), TODAY, 14);
+    expect(s).toMatchObject({ left: 14, group: 'ok' });
+  });
   it('waiting until its day; past it — «Пора проверить»', () => {
     expect(shown(m({ touched: { at: TODAY, approx: false }, waiting: 'бизнес' }), TODAY, 14).group).toBe('waiting');
     expect(shown(m({ touched: { at: new Date(2026, 8, 1), approx: false }, waiting: 'бизнес' }), TODAY, 14).group).toBe('due');
@@ -73,5 +77,29 @@ describe('the day to look and the groups', () => {
     expect(mattersWord(14)).toBe('14 дел');
     expect(mattersWord(21)).toBe('21 дело');
     expect(mattersWord(3)).toBe('3 дела');
+  });
+});
+
+describe('the actions\' helpers', () => {
+  it('the source: its own tag, its place', () => {
+    const h = hs('* Миграция :Long:\n')[0];
+    expect(sourceOf('Midterm.org', h, DEFAULTS.sources)).toEqual({ byTag: 'Long', byPlace: true });
+    expect(sourceOf('work.org', h, DEFAULTS.sources)).toEqual({ byTag: 'Long', byPlace: false });
+  });
+  it('the stamp with the file\'s weekday names', () => {
+    expect(stampOf(new Date(2026, 9, 30), ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'])).toBe('[2026-10-30 Пт]');
+  });
+  it('the status before the waiting one: the newest change to it; none — null', () => {
+    const t = [
+      '* WAIT Миграция',
+      ':LOGBOOK:',
+      '- State "WAIT"       from "TODO"       [2026-09-01 Вт 10:00]',
+      '- State "WAIT"       from "NEXT"       [2026-10-02 Чт 11:20]',
+      '- State "NEXT"       from "WAIT"       [2026-09-20 Вс 09:00]',
+      ':END:',
+      '',
+    ].join('\n');
+    expect(statusBefore(t.split('\n'), hs(t)[0], 'WAIT')).toBe('NEXT');
+    expect(statusBefore(['* WAIT A'], hs('* WAIT A')[0], 'WAIT')).toBeNull();
   });
 });

@@ -3,8 +3,8 @@
 // note (`index.lastNote`). Read again, a moment after a file, a touch or the folder changes.
 
 import type { Ctx, HeadingRef } from '@panopticon/api';
-import { readOrg, toneVars } from '@panopticon/api/org';
-import { grouped, longIn, readDay, readSettings, shown, DEFAULTS, type Matter, type Settings, type Shown } from './long';
+import { readOrg, toneVars, type OrgFile } from '@panopticon/api/org';
+import { grouped, longIn, readDay, readSettings, shown, sourceOf, DEFAULTS, type Matter, type Settings, type Shown } from './long';
 
 export const VIEW = 'long-matters.list';
 export type Filter = 'all' | 'due' | 'waiting' | 'nostatus';
@@ -22,6 +22,8 @@ class LongMatters {
   ctx!: Ctx;
   settings = $state<Settings>(DEFAULTS);
   matters = $state.raw<(Matter & { tone: string })[]>([]);
+  /** The files of the matters as read (their text, statuses), for the actions. */
+  files = new Map<string, OrgFile>();
   /** The first reading: files read of all (null once done). */
   progress = $state<{ done: number; total: number } | null>({ done: 0, total: 0 });
   today = $state(startOfDay());
@@ -56,11 +58,13 @@ class LongMatters {
     const wanted = tagged ? files.map((f) => f.path) : files.map((f) => f.path).filter((p) => this.settings.sources.some((s) => s.kind === 'file' && s.file === p));
     if (this.progress) this.progress = { done: 0, total: wanted.length };
     const out: (Matter & { tone: string })[] = [];
+    const read = new Map<string, OrgFile>();
     let done = 0;
     await Promise.all(
       wanted.map(async (path) => {
         const f = await readOrg(ctx, path);
         if (f) {
+          read.set(path, f);
           for (const h of longIn(path, f.headings, f.info.done, this.settings.sources)) {
             const ref: HeadingRef = { path, line: h.line, title: h.title };
             const [info, note] = await Promise.all([ctx.index!.heading(ref), ctx.index!.lastNote(ref)]);
@@ -76,6 +80,7 @@ class LongMatters {
               note,
               waiting: info.properties.WAITING_ON?.trim() || null,
               nextReview: readDay(info.properties.NEXT_REVIEW),
+              ...sourceOf(path, h, this.settings.sources),
             });
           }
         }
@@ -84,6 +89,7 @@ class LongMatters {
       }),
     );
     if (n !== this.reading) return;
+    this.files = read;
     this.matters = out.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line);
     this.progress = null;
     this.today = startOfDay();
@@ -91,8 +97,22 @@ class LongMatters {
     if (this.counting) this.soon(1000);
   }
 
+  /** The matter at a heading (the editor's line, the palette's caret), if it is one. */
+  at(ref: HeadingRef | null) {
+    return ref ? this.matters.find((m) => m.path === ref.path && m.line === ref.line) : undefined;
+  }
+  /** Whom the matters wait for, the most used first (the sheet «Ждём…» offers them). */
+  get waitedFor(): string[] {
+    const n = new Map<string, number>();
+    for (const m of this.matters) if (m.waiting) n.set(m.waiting, (n.get(m.waiting) ?? 0) + 1);
+    return [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ru')).map(([w]) => w);
+  }
+
   // ---- what a row does ------------------------------------------------------------------------------------------
   refOf = (m: Matter): HeadingRef => ({ path: m.path, line: m.line, title: m.title });
+  newTab(m: Matter) {
+    void this.ctx.commands.run('file.open', { path: m.path, line: m.line, newTab: true });
+  }
   reveal(m: Matter) {
     void this.ctx.commands.run('heading.reveal', { ref: this.refOf(m) });
   }

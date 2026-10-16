@@ -7,7 +7,8 @@
       "keyOf": "function",
       "on": "function",
       "run": "function",
-      "setAvailable": "function"
+      "setAvailable": "function",
+      "when": "function"
     },
     "edit": {
       "ensureFile": "function",
@@ -102,7 +103,8 @@
       "keyOf": "function",
       "on": "function",
       "run": "function",
-      "setAvailable": "function"
+      "setAvailable": "function",
+      "when": "function"
     },
     "events": {
       "on": "function"

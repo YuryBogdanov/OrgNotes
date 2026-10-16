@@ -6,6 +6,9 @@ import { mount, unmount } from 'svelte';
 import { long, VIEW, type Filter } from './state.svelte';
 import Panel from './Panel.svelte';
 import List from './List.svelte';
+import { review, reviewed, stopWaiting, wait } from './actions';
+import type { HeadingRef } from '@panopticon/api';
+import './styles.css';
 
 const FILTERS: Filter[] = ['all', 'due', 'waiting', 'nostatus'];
 
@@ -41,5 +44,30 @@ export default definePlugin({
       },
     });
     ctx.commands.on('long-matters.open', () => long.openList());
+
+    // §9: «Проверить через…», «Ждём…», «Осмотрено» in the palette and the heading's menu, on a long matter only
+    const here = () => long.at(ctx.ui.currentHeading());
+    const ACTS: { id: string; label: string; ok?: (m: NonNullable<ReturnType<typeof here>>) => boolean; run: (m: NonNullable<ReturnType<typeof here>>) => unknown }[] = [
+      { id: 'long-matters.review', label: 'Проверить через…', run: (m) => review(m) },
+      { id: 'long-matters.wait', label: 'Ждём…', ok: (m) => !m.waiting, run: (m) => wait(m) },
+      { id: 'long-matters.unwait', label: 'Больше не ждём', ok: (m) => !!m.waiting, run: (m) => stopWaiting(m) },
+      { id: 'long-matters.seen', label: 'Осмотрено', run: (m) => reviewed(m) },
+    ];
+    for (const a of ACTS) {
+      const ok = (m: ReturnType<typeof here>) => !!m && (a.ok?.(m) ?? true);
+      ctx.commands.on(a.id, () => {
+        const m = here();
+        if (m && ok(m)) void a.run(m);
+      });
+      ctx.commands.when(a.id, () => ok(here()));
+      ctx.ui.headingAction({
+        label: a.label,
+        when: (h) => ok(long.at(h.ref)),
+        run: (r: HeadingRef) => {
+          const m = long.at(r);
+          if (m) void a.run(m);
+        },
+      });
+    }
   },
 });

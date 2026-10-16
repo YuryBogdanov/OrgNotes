@@ -74,6 +74,17 @@ class Host {
   private declared = new Set<string>();
   /** The palette keeps its commands; one that has no action now is not offered. */
   private inPalette = new Set<string>();
+  /** The plugins' conditions of their commands in the palette (`commands.when`). */
+  private whens = new Map<string, () => boolean>();
+  private whenOk(cmd: string) {
+    const fn = this.whens.get(cmd);
+    if (!fn) return true;
+    try {
+      return !!fn();
+    } catch {
+      return false; // a broken condition hides the command, the palette goes on
+    }
+  }
   /** A palette's row of a plugin is running: a `ui.choose` of it becomes the palette's next step. */
   private stepCapture: { step: import('../commands').Step | null } | null = null;
   /** What the declared plugins still read (their themes). */
@@ -302,7 +313,7 @@ class Host {
       this.inPalette.add(c.id);
       registerPalette({
         id: c.id, title: c.title, icon: 'plug', group: 'general', synonyms: c.synonyms, plugin: m.name, ...(iconOf(m) ? { iconPath: iconOf(m) } : {}),
-        when: () => !!actionOf(c.id) && (c.scope !== 'view' || viewShown()), // the palette has the focus itself
+        when: () => !!actionOf(c.id) && (c.scope !== 'view' || viewShown()) && this.whenOk(c.id), // the palette has the focus itself
         run: () => {
           // a command that asks in the palette: run now, its choice is the palette's next step (no gap to type into)
           if (c.step) {
@@ -629,6 +640,11 @@ class Host {
           });
         },
         keyOf: (cmd) => store.keyHint(cmd),
+        when: (cmd, fn) => {
+          declared('команды', m.contributes.commands.some((c) => c.id === cmd), cmd);
+          this.whens.set(cmd, fn);
+          return keep(() => void (this.whens.get(cmd) === fn && this.whens.delete(cmd)));
+        },
         setAvailable: (cmd, on) => {
           declared('команды', m.contributes.commands.some((c) => c.id === cmd), cmd);
           if (on === !off_.has(cmd)) return;

@@ -1,0 +1,8 @@
+/* «Долгие дела»: the field «Кого или что ждём» of the sheet «Ждём…» (drawn by the plugin in the core's form) */
+.lm-who { display: flex; flex-direction: column; gap: 6px; }
+.lm-who input { height: 28px; box-sizing: border-box; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; outline: none; -webkit-user-select: text; user-select: text; }
+.lm-who input:focus { border-color: var(--acc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 22%, transparent); }
+.lm-who-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.lm-who-list:empty { display: none; }
+.lm-who-list button { height: 22px; padding: 0 8px; border: 0; border-radius: 11px; background: color-mix(in srgb, var(--wait) 14%, transparent); color: var(--wait); font-size: 12px; }
+.lm-who-list button:hover { background: color-mix(in srgb, var(--wait) 24%, transparent); }
