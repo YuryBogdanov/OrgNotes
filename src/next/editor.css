@@ -105,3 +105,31 @@
 .next .cm-rich .cm-n-bfence { font: 11px/16px var(--mono); color: var(--ink3); }
 .next .cm-rich .cm-n-bfence:not(.raw) { line-height: 8px; }
 .next .cm-rich .cm-n-bline.quote, .next .cm-rich .cm-n-bline.quote.first, .next .cm-rich .cm-n-bline.quote.last { border-radius: 0; padding-top: 0; padding-bottom: 0; }
+
+/* «Исходник» of the new interface (§6): IBM Plex Mono 13.5 on the same grid, lines of 24 pt, the text `ink2` from
+   the left edge up to 880 pt; the marks of Org in the tokens' colours */
+.next .cm-editor:not(.cm-rich) .cm-scroller {
+  font: 13.5px/24px var(--mono);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px; background-position: -1px -1px;
+}
+.next .cm-editor:not(.cm-rich) .cm-content { max-width: 880px; padding: 16px 24px 120px 8px; color: var(--ink2); caret-color: var(--lamp); }
+.next .cm-editor:not(.cm-rich) .cm-line { line-height: 24px; }
+.next .cm-editor:not(.cm-rich) .cm-activeLine { background: var(--lampsoft); }
+.next .cm-editor:not(.cm-rich) .cm-gutters { background: transparent; border: 0; color: color-mix(in srgb, var(--ink3) 60%, transparent); }
+.next .cm-editor:not(.cm-rich) .cm-lineNumbers .cm-gutterElement { font: 11px/24px var(--mono); padding: 0 10px 0 14px; }
+.next .cm-editor:not(.cm-rich) .cm-activeLineGutter { background: transparent; color: var(--ink2); }
+.next .cm-editor:not(.cm-rich) .cm-foldGutter .cm-gutterElement { font-size: 9px; color: var(--ink3); }
+/* headings `ink` bold and half a point bigger; stars, #+ keys, drawers, CLOSED and a link's brackets `ink3` */
+.next .cm-editor:not(.cm-rich) .cm-h1, .next .cm-editor:not(.cm-rich) .cm-h2, .next .cm-editor:not(.cm-rich) .cm-h3, .next .cm-editor:not(.cm-rich) .cm-h4, .next .cm-editor:not(.cm-rich) .cm-h5, .next .cm-editor:not(.cm-rich) .cm-h6, .next .cm-editor:not(.cm-rich) .cm-h7, .next .cm-editor:not(.cm-rich) .cm-h8, .next .cm-editor:not(.cm-rich) .cm-h9 { color: var(--ink); font-weight: 600; font-size: 14px; }
+.next .cm-editor:not(.cm-rich) .cm-doneline { color: var(--ink3); }
+.next .cm-editor:not(.cm-rich) .cm-stars, .next .cm-editor:not(.cm-rich) .cm-org-marker, .next .cm-editor:not(.cm-rich) .cm-meta, .next .cm-editor:not(.cm-rich) .cm-drawer,
+.next .cm-editor:not(.cm-rich) .cm-plan-closed, .next .cm-editor:not(.cm-rich) .cm-linkmark, .next .cm-editor:not(.cm-rich) .cm-tags,
+.next .cm-editor:not(.cm-rich) .cm-cookie, .next .cm-editor:not(.cm-rich) .cm-tablesep { color: var(--ink3); font-weight: 400; }
+.next .cm-editor:not(.cm-rich) .cm-kw { color: var(--tl); font-weight: 700; }
+.next .cm-editor:not(.cm-rich) .cm-ts { color: var(--next); }
+.next .cm-editor:not(.cm-rich) .cm-plan-scheduled { color: var(--lampink); }
+.next .cm-editor:not(.cm-rich) .cm-plan-deadline { color: var(--todo); }
+.next .cm-editor:not(.cm-rich) .cm-boxx { color: var(--done); font-weight: 600; }
+.next .cm-editor:not(.cm-rich) .cm-link { color: var(--lampink); text-decoration: underline 1px var(--lampline); text-underline-offset: 3px; }
+.next .cm-editor:not(.cm-rich) .cm-foldPlaceholder { height: 18px; margin-left: 6px; padding: 0 6px; border-radius: 5px; font: 11px/18px var(--ui); color: var(--ink3); background: var(--chip); }

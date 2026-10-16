@@ -24,6 +24,7 @@ export function decorate(v: EditorView, words: Workflow): { all: DecorationSet; 
       if (hm) {
         const lvl = Math.min(hm[1].length, 9); // deeper than 9: as 9
         items.push(Decoration.line({ class: 'cm-h' + lvl }).range(line.from));
+        mark(line.from, line.from + hm[1].length, 'cm-stars'); // the new interface's «Исходник» greys them (ТЗ 42 §6)
         let i = hm[0].length;
         const w = /^(\S+)/.exec(t.slice(i));
         if (w && (open.has(w[1]) || done.has(w[1]))) {
@@ -42,7 +43,7 @@ export function decorate(v: EditorView, words: Workflow): { all: DecorationSet; 
       } else {
         const pl = /^\s*((?:SCHEDULED|DEADLINE|CLOSED):)/.exec(t);
         if (pl) {
-          for (const m of t.matchAll(/(SCHEDULED|DEADLINE|CLOSED):/g)) mark(line.from + m.index!, line.from + m.index! + m[0].length, 'cm-plan');
+          for (const m of t.matchAll(/(SCHEDULED|DEADLINE|CLOSED):/g)) mark(line.from + m.index!, line.from + m.index! + m[0].length, 'cm-plan cm-plan-' + m[1].toLowerCase());
         }
         if (/^\s*:[A-Za-z_]+:/.test(t)) {
           const m = /:[A-Za-z_]+:/.exec(t)!;
@@ -52,6 +53,9 @@ export function decorate(v: EditorView, words: Workflow): { all: DecorationSet; 
           const m = /^#\+\w+:/.exec(t);
           if (m) mark(line.from, line.from + m[0].length, 'cm-meta');
         }
+        // a ticked checkbox (the new interface's «Исходник» colours it, ТЗ 42 §6)
+        const box = /^\s*(?:[-+*]|\d+[.)])\s+(\[[Xx]\])/.exec(t);
+        if (box) mark(line.from + box[0].length - 3, line.from + box[0].length, 'cm-boxx');
         if (/^\s*\|/.test(t)) {
           if (/^\s*\|[-+]+\|?\s*$/.test(t)) mark(line.from, line.to, 'cm-tablesep');
         }

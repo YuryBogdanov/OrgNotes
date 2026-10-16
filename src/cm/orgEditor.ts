@@ -483,10 +483,17 @@ export class OrgEditor {
         ...(p.narrow ? this.narrowExt(p.narrow) : [scrollPastEnd()]), // the last line can be scrolled up to the top, as in Xcode (room below, not lines in the file)
         this.undo.of(history()), orgFold, foldNewDrawers(() => this.drawersOn), findExtension,
         codeFolding({
-          placeholderDOM: (_v, onclick) => {
+          // the new interface's «Исходник» (ТЗ 42 §6): a folded drawer says how many lines it holds, «⋯ 3»
+          preparePlaceholder: (st, range) => {
+            if (!p.next) return null;
+            const head = st.doc.lineAt(range.from);
+            if (!/^\s*:[A-Za-z0-9_-]+:\s*$/.test(head.text)) return null;
+            return Math.max(0, st.doc.lineAt(range.to).number - head.number - 1);
+          },
+          placeholderDOM: (_v, onclick, n: number | null) => {
             const el = document.createElement('span');
             el.className = 'cm-foldPlaceholder';
-            el.textContent = '…';
+            el.textContent = typeof n === 'number' ? `⋯ ${n}` : '…';
             el.title = 'Свёрнуто — Tab или клик, чтобы развернуть';
             el.setAttribute('aria-label', 'Свёрнуто');
             el.onclick = onclick;
