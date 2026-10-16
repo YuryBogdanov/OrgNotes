@@ -6,6 +6,8 @@ import { mount, unmount } from 'svelte';
 import { long, VIEW, type Filter } from './state.svelte';
 import Panel from './Panel.svelte';
 import List from './List.svelte';
+import Sources from './Sources.svelte';
+import Today from './Today.svelte';
 import { review, reviewed, stopWaiting, wait } from './actions';
 import type { HeadingRef } from '@panopticon/api';
 import './styles.css';
@@ -18,9 +20,19 @@ export default definePlugin({
     long.readStored();
     await long.load();
 
-    ctx.storage.folder.onChange(() => {
+    ctx.settings.onChange(() => {
       long.readStored();
       long.soon();
+    });
+    // «Настройки → Долгие дела» (§8): the sources drawn here, the statuses of the folder for the waiting one
+    ctx.settings.dynamic('sources', {
+      render: (el, ctrl) => {
+        const app = mount(Sources, { target: el, props: { ctrl } });
+        return () => void unmount(app);
+      },
+    });
+    ctx.settings.dynamic('wait', {
+      options: (v) => [...new Set([String(v.wait ?? 'WAIT'), ...long.openStates])].map((s) => ({ value: s, label: s })),
     });
     ctx.events.on('file.changed', () => long.soon());
     ctx.events.on('heading.touched', () => long.soon());
@@ -44,6 +56,11 @@ export default definePlugin({
       },
     });
     ctx.commands.on('long-matters.open', () => long.openList());
+    // «Сегодня» (§7): what is due, up to three
+    ctx.ui.todayBlock('long-matters.today', (el, block) => {
+      const app = mount(Today, { target: el, props: { hide: (h: boolean) => block.setHidden(h) } });
+      return () => void unmount(app);
+    });
 
     // §9: «Проверить через…», «Ждём…», «Осмотрено» in the palette and the heading's menu, on a long matter only
     const here = () => long.at(ctx.ui.currentHeading());

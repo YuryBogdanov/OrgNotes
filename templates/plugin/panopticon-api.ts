@@ -572,7 +572,17 @@ export interface Ctx {
     values(): Values;
     onChange(fn: (v: Values) => void): Dispose;
     /** What a declared field shows that depends on the values: its options (a `pair`: both lists), its hint; a `file`
-     *  shown (null: not chosen); a `text` tidied when left. */
-    dynamic(key: string, spec: { options?(v: Values): Opt[] | [Opt[], Opt[]]; hint?(v: Values): string; show?(path: string | null): string; clean?(text: string): string }): Dispose;
+     *  shown (null: not chosen); a `text` tidied when left; a `custom` field drawn by the plugin (`render`, 1.12: its
+     *  value through `ctrl.value()` / `ctrl.set()`, under the field's label across the section). */
+    dynamic(
+      key: string,
+      spec: {
+        options?(v: Values): Opt[] | [Opt[], Opt[]];
+        hint?(v: Values): string;
+        show?(path: string | null): string;
+        clean?(text: string): string;
+        render?(el: HTMLElement, ctrl: FieldCtrl): Dispose | void;
+      },
+    ): Dispose;
   };
 }

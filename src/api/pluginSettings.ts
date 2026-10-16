@@ -3,7 +3,7 @@
 // sheet draws, with what the plugin computes for it (`settings.dynamic`).
 
 import { store } from '../store.svelte';
-import type { Field, Group, Opt as CoreOpt, Schema, Values } from '../settingsSchema';
+import type { Field, FieldCtrl, Group, Opt as CoreOpt, Schema, Values } from '../settingsSchema';
 import type { Manifest, ManifestSettings } from './manifest';
 
 type Guard = <T>(id: string, fn: () => T, fallback: T) => T;
@@ -13,6 +13,7 @@ export interface Dynamic {
   hint?(v: Values): string;
   show?(path: string | null): string;
   clean?(text: string): string;
+  render?(el: HTMLElement, ctrl: FieldCtrl): (() => void) | void;
 }
 
 /** The plugin's own place of a storage: `{ data, settings }` in its file (or on this Mac). */
@@ -59,6 +60,8 @@ export function schemaOf(m: Manifest, s: ManifestSettings, i: number, guard: Gua
       const both = (f as unknown as { options?: [CoreOpt[], CoreOpt[]] }).options;
       return { ...f, hint, options: (v) => (guard(m.id, () => dyn(f.key)?.options?.(v), undefined) as [CoreOpt[], CoreOpt[]] | undefined) ?? (Array.isArray(both) ? both : [[], []]) };
     }
+    // drawn by the plugin (1.12); nothing until it gives its `render`
+    if (f.type === 'custom') return { ...f, hint, render: (el, ctrl) => guard(m.id, () => dyn(f.key)?.render?.(el, ctrl), undefined) };
     return { ...f, hint };
   };
   return {

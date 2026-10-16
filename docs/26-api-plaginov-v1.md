@@ -386,6 +386,7 @@ net?: { fetch(url: string, init?: { method?; headers?; body?: string }): Promise
 - `Tx.addNote(ref, text)`: заметка в `:LOGBOOK:`, как по `C-c C-z` в Emacs.
 - `edit.transaction(…, { touch: false })`: массовая правка не касается заголовков.
 - Событие `heading.touched {ref, at}`, пачками не чаще раза в секунду.
+- Поле настроек `custom` в манифесте; его рисует плагин: `settings.dynamic(key, { render(el, ctrl) })`.
 - `commands.when(id, fn)`: команда в палитре, только пока `fn()` истинно. `file.open {…, newTab}` — в своей вкладке.
 - Команда ядра `heading.note {ref, x?, y?}`: поповер «Добавить заметку…» (`⌃C ⌃Z` в редакторе) в точке окна `x, y`, без них — вверху окна. Заметку пишет ядро.
 
