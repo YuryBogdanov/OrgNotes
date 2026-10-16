@@ -7,6 +7,7 @@
   import { OrgEditor, type EditorProps } from '../cm/orgEditor';
   import { portal } from '../portal';
   import { ContextMenu, TagPop, type MenuItem } from './bridges';
+  import { nextPrefs } from '../nextPrefs.svelte';
   import './editor.css';
 
   // The new interface's editor (ТЗ 42 §2, 42.5): the same Org editor as the old one (cm/orgEditor.ts — the engine,
@@ -29,7 +30,7 @@
   let ed = $state.raw<OrgEditor | undefined>();
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   let tagPop = $state<{ tags: string[]; x: number; y: number } | null>(null);
-  const snapshot = (): EditorProps => ({ text, fileKey, path, wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint, resetOn, levels, drawers, rich, richNumbers, onrich, onchange, oncursor, onfollow, next: true, eyebrow, narrow, onnarrow, onnarrowTo, onwiden, find, onfound, onapi });
+  const snapshot = (): EditorProps => ({ text, fileKey, path, wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint, resetOn, levels, drawers, rich, richNumbers, onrich, onchange, oncursor, onfollow, next: true, look: nextPrefs.font + ' ' + nextPrefs.width, eyebrow, narrow, onnarrow, onnarrowTo, onwiden, find, onfound, onapi });
   onMount(() => {
     ed = new OrgEditor(host, snapshot(), { menu: (x, y, items) => (menu = { x, y, items }), tags: (p) => (tagPop = p) });
     return () => ed?.destroy();

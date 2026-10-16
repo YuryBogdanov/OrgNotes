@@ -1,6 +1,7 @@
 <script lang="ts">
   import Switch from './Switch.svelte';
   import { store } from './store.svelte';
+  import { nextPrefs, TEXT_FONTS, TEXT_WIDTHS, type TextFont, type TextWidth } from './nextPrefs.svelte';
 
   // «Настройки → Основные» (tech sprint 4.2, from Settings.svelte): the notes folder, the navigator, the levels of
   // headings, the rich text, the drawers, the links — the view preferences of this Mac.
@@ -78,8 +79,25 @@
       <label for="next-ui">Новый интерфейс (бета)</label>
       <Switch id="next-ui" checked={store.nextUi} label="Новый интерфейс (бета)" onchange={() => void store.setInterface(!store.nextUi)} />
     </div>
+    <!-- the new interface's own (ТЗ 42 §10): shown always, active with it only -->
+    <div class="opt" class:off={!store.nextUi}>
+      <label for="next-font">Шрифт текста</label>
+      <select id="next-font" class="sel" disabled={!store.nextUi} value={nextPrefs.font} onchange={(e) => nextPrefs.setFont(e.currentTarget.value as TextFont)}>
+        {#each TEXT_FONTS as f (f.id)}<option value={f.id}>{f.name}</option>{/each}
+      </select>
+    </div>
+    <div class="opt" class:off={!store.nextUi}>
+      <label for="next-width">Ширина текста</label>
+      <select id="next-width" class="sel" disabled={!store.nextUi} value={nextPrefs.width} onchange={(e) => nextPrefs.setWidth(e.currentTarget.value as TextWidth)}>
+        {#each TEXT_WIDTHS as w (w.id)}<option value={w.id}>{w.name}{w.px ? ` (${w.px})` : ''}</option>{/each}
+      </select>
+    </div>
+    <div class="opt" class:off={!store.nextUi}>
+      <label for="next-structure">Структура справа</label>
+      <Switch id="next-structure" disabled={!store.nextUi} checked={nextPrefs.structure} label="Структура справа" onchange={() => nextPrefs.setStructure(!nextPrefs.structure)} />
+    </div>
   </div>
-  <p class="help">Окно перезапустится. Файлы, вкладки и настройки общие со старым интерфейсом.</p>
+  <p class="help">Окно перезапустится. Файлы, вкладки и настройки общие со старым интерфейсом. Шрифт и ширина — для «Оформления»; «Структура справа» — то же, что ⌥⌘0. Эти три работают только в новом интерфейсе и хранятся на этом Mac.</p>
   <div class="cap">КЛАВИШИ</div>
   <div class="opt">
     <div class="folder">
@@ -97,6 +115,7 @@
   .stepper button:disabled { opacity: 0.35; }
   .stepper button:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
   .sv { min-width: 56px; text-align: center; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .opt.off label { opacity: 0.5; }
   .folder { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
   .fname { font-size: 13px; font-weight: 600; }
   .fpath { font-size: 12px; color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

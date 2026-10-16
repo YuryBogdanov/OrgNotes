@@ -13,7 +13,7 @@ import type { OrgLink } from '../links';
 import type { MenuItem } from '../ContextMenu.svelte';
 import { changeStatusAt, cyclePriority, moveSubtree, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree } from '../outline';
 import { DEFAULT_LEVELS, orgIndent, type LevelView } from '../orgIndent';
-import { orgRich, type RichPick } from '../orgRich';
+import { orgRich, refont, type RichPick } from '../orgRich';
 import { findExtension, findField, foundInfo, moveFind, replaceFound, setFind, type FindQuery } from '../findView';
 import { registerEditor } from '../editorKeys';
 import { clipTarget, linkHooks, linkPaste } from '../linkEdit';
@@ -56,7 +56,9 @@ export interface EditorProps {
   /** The new interface (ТЗ 42 §5): its «Оформление» (orgRich `next`, the current section's bar). */
   next?: boolean;
   /** Above the document's title in the new «Оформление»: «Midterm.org · изменён 2 мин назад». */
-  eyebrow?: () => string | null; // ⌘F: the query; a new `go` steps to the next / previous match
+  eyebrow?: () => string | null;
+  /** The new interface's font and width of the text (ТЗ 42 §10): a change measures the text again. */
+  look?: string; // ⌘F: the query; a new `go` steps to the next / previous match
   ontop?: (line: number) => void; // the first line in view, after a scroll
   onfolds?: (lines: number[]) => void; // the headings folded now, after a fold or an unfold
   onrich?: (p: RichPick) => void; // a click on a status, a priority or a date that asks for a choice
@@ -176,7 +178,14 @@ export class OrgEditor {
     });
     return this.p.next ? [rich, sectionBar] : rich;
   }
+  private lastLook: string | undefined;
   private syncLook() {
+    if (this.p.look !== this.lastLook) {
+      const first = this.lastLook === undefined;
+      this.lastLook = this.p.look;
+      // after the frame: the new CSS is on by then
+      if (!first) requestAnimationFrame(() => this.view.dom.isConnected && refont(this.view));
+    }
     const k = this.viewKey();
     if (k === this.lastLevels) return;
     this.lastLevels = k;

@@ -3,6 +3,8 @@
 // item's accelerator, none for a chord (macOS menus cannot show one). Built again when a shortcut changes.
 // Returns null when there is no native menu (a plain browser, tests): the app handles the same keys anyway.
 
+import { nextOn } from './uiFlag';
+
 export type MenuActions = Record<string, () => void>;
 export interface AppMenu {
   setEnabled(id: string, on: boolean): void;
@@ -30,7 +32,9 @@ export async function installMenu(actions: MenuActions, accel: (id: string) => s
     const it = (id: string, text: string, accelerator: string | undefined = accel(id), enabled = true) => ({ id: mid(id), text, accelerator, enabled, action: () => actions[id]?.() });
     const sep = { item: 'Separator' as const };
     // a check item: its tick follows the setting (setChecked)
-    const rich = await CheckMenuItem.new({ id: mid('rich'), accelerator: accel('rich'), text: 'Оформленный текст', checked: false, action: () => actions.rich?.() });
+    // the new interface (ТЗ 42 §8) names its two views and its column on the right its own way
+    const next = nextOn();
+    const rich = await CheckMenuItem.new({ id: mid('rich'), accelerator: accel('rich'), text: next ? 'Оформление' : 'Оформленный текст', checked: false, action: () => actions.rich?.() });
     const menu = await Menu.new({
       items: [
         {
@@ -112,7 +116,7 @@ export async function installMenu(actions: MenuActions, accel: (id: string) => s
             it('navAgendas', 'Навигатор: агенды'),
             it('navTags', 'Навигатор: теги'),
             it('navSearch', 'Навигатор: поиск'),
-            it('insp', 'Инспектор'),
+            it('insp', next ? 'Структура' : 'Инспектор'),
             sep,
             { item: 'Fullscreen' },
           ],

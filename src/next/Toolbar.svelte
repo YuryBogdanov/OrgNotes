@@ -21,7 +21,7 @@
   <span class="gap"></span>
   <button class="search" onclick={() => store.togglePalette()}>
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
-    <span>Искать везде</span><span class="k">⌘K</span>
+    <span>Искать везде</span>{#if key('searchAll')}<span class="k">{key('searchAll')}</span>{/if}
   </button>
   <button class="ib" aria-label="Новая заметка" title="Новая заметка ({key('newFile')})" onclick={onnew}>
     <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
