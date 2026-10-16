@@ -119,7 +119,7 @@
         <button onclick={() => store.widenTab(tab)}>Показать весь файл</button>
       </div>
     {/if}
-    <div class="with" bind:clientWidth={areaW}>
+    <div class="with grid" bind:clientWidth={areaW}>
     <div class="ed">
       {#if fb.open}
         <FindPanel bind:q={() => fb.q, (v) => { fb.q = v; fb.at = null; }} bind:re={() => fb.re, (v) => (fb.re = v)} replacing={fb.replacing} info={found} focusN={fb.focusN}
@@ -138,7 +138,7 @@
     {#if structure}<Structure range={narrowed} />{/if}
     </div>
   {:else if tab?.kind === 'untitled'}
-    <div class="ed">
+    <div class="ed grid">
       <Editor text={tab.text ?? ''} fileKey={tab.id} wf={store.untitledWf} reveal={tab.reveal} initial={tab.cursor} hint="Начните писать…" levels={store.levels} drawers={store.foldDrawers}
         rich={store.rich} onchange={(t) => (tab.text = t)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>
@@ -155,6 +155,11 @@
   .ed, .view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .ed { position: relative; min-width: 0; }
   .with { flex: 1; min-height: 0; display: flex; }
+  /* the grid of 24 pt under the text and «Структура» alike (the mockup's PEditor, PEditorSrc): one ground, no seam */
+  .grid {
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px; background-position: -1px -1px;
+  }
   /* the narrowing's strip (§5.8): 40 pt of the lamp over the column */
   .narrow { flex: 0 0 40px; display: flex; align-items: center; gap: 10px; padding: 0 20px; box-sizing: border-box; background: var(--lampsoft); border-bottom: 1px solid var(--lampline); font-size: 12.5px; color: var(--ink2); }
   .narrow b { color: var(--lampink); }

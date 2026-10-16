@@ -26,6 +26,14 @@ test('levels 1–3, the current one marked; a click goes to a heading', async ({
   await expect(page.locator('.cm-activeLine')).toContainText('Переезд');
 });
 
+test('one ground with the text: the grid under both, the editor has no ground of its own (the mockup)', async ({ page }) => {
+  await open(page);
+  const bgOf = (sel: string) => page.locator(sel).first().evaluate((e) => getComputedStyle(e).backgroundColor + '|' + getComputedStyle(e).backgroundImage);
+  for (const sel of ['[data-ui="next"] .cm-editor', '[data-ui="next"] .cm-scroller']) expect(await bgOf(sel)).toBe('rgba(0, 0, 0, 0)|none');
+  expect(await col(page).evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  expect(await col(page).evaluate((e) => getComputedStyle(e.parentElement!).backgroundImage)).toContain('linear-gradient');
+});
+
 test('«Ссылаются»: the links to the heading under the caret; a click opens their place; none — no block', async ({ page }) => {
   await open(page);
   await page.locator('.cm-line', { hasText: 'Текст.' }).click();

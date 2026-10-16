@@ -2,10 +2,9 @@
    text, the lamp for the caret and the current section; the elements of §5.2; the caret's line keeps its font and
    size, its markup small and monospaced (§5.4); an unfolded drawer a block (§5.5). Scoped to the new shell. */
 
-.next .cm-rich .cm-scroller {
-  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-  background-size: 24px 24px; background-position: -1px -1px;
-}
+/* the grid of 24 pt is the editor area's (EditorArea `.grid`): «Структура» lies on it too, as in the mockup */
+/* so the editor has no ground of its own: the theme's `--ed-bg` would cover the grid */
+.next .grid .cm-editor, .next .grid .cm-editor .cm-scroller, .next .grid .cm-editor .cm-gutters { background: transparent !important; }
 .next .cm-rich .cm-content {
   width: 100%; max-width: var(--col, 700px); margin: 0 auto; box-sizing: border-box; padding: 40px 48px 120px;
   font: 500 19px/1.55 var(--text); color: var(--ink2); caret-color: var(--lamp);
@@ -108,11 +107,7 @@
 
 /* «Исходник» of the new interface (§6): IBM Plex Mono 13.5 on the same grid, lines of 24 pt, the text `ink2` from
    the left edge up to 880 pt; the marks of Org in the tokens' colours */
-.next .cm-editor:not(.cm-rich) .cm-scroller {
-  font: 13.5px/24px var(--mono);
-  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-  background-size: 24px 24px; background-position: -1px -1px;
-}
+.next .cm-editor:not(.cm-rich) .cm-scroller { font: 13.5px/24px var(--mono); }
 .next .cm-editor:not(.cm-rich) .cm-content { max-width: 880px; padding: 16px 24px 120px 8px; color: var(--ink2); caret-color: var(--lamp); }
 .next .cm-editor:not(.cm-rich) .cm-line { line-height: 24px; }
 .next .cm-editor:not(.cm-rich) .cm-activeLine { background: var(--lampsoft); }
