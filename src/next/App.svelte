@@ -9,15 +9,52 @@
   import { applyAppearance } from '../appearance';
   import { tokenVars, FONTS } from './tokens';
   import './fonts';
-  import { CloseSheet, DiskSheet, Palette, PluginSheets, Settings } from './bridges';
+  import { parentOf } from '../navTree';
+  import type { FileMenu } from '../fileMenu';
+  import Sidebar from './Sidebar.svelte';
+  import Toolbar from './Toolbar.svelte';
+  import { CloseSheet, ContextMenu, Dialogs, DiskSheet, Palette, PluginSheets, Settings } from './bridges';
 
-  // The new shell (ТЗ 42), part 42.1: the frame — the store, the plugins, the window's keys and the menu, the old
-  // sheets through `bridges.ts`. The toolbar, the sidebar, the tabs and the editor come in 42.3–42.5.
+  // The new shell (ТЗ 42): the store, the plugins, the window's keys and the menu, the old sheets through
+  // `bridges.ts` (42.1); the sidebar with the files and the toolbar (42.3). The tabs and the editor: 42.4–42.5.
+  const newFile = () => {
+    if (!store.canManageFiles) return;
+    store.showNav = true;
+    store.creating = { dir: store.file ? parentOf(store.file.name) : '', kind: 'file' };
+  };
   const actions: Record<string, () => void> = {
     settings: () => store.openSettings(),
     quit: () => store.quit(),
     palette: () => store.togglePalette(),
+    nav: () => (store.showNav = !store.showNav),
+    newFile,
   };
+  // «Искать везде ⌘K» (§4.1): the palette, in the new shell only
+  const cmdK = (e: KeyboardEvent) => {
+    if (e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && e.code === 'KeyK' && !store.sheetOpen) {
+      e.preventDefault();
+      store.togglePalette();
+    }
+  };
+  // the sidebar's width (§4.2), on this Mac
+  const readWidth = () => {
+    try {
+      const n = Number(localStorage.getItem('next:sideWidth'));
+      return n >= 200 && n <= 360 ? n : 236;
+    } catch {
+      return 236;
+    }
+  };
+  let sideWidth = $state(readWidth());
+  function setWidth(w: number) {
+    sideWidth = w;
+    try {
+      localStorage.setItem('next:sideWidth', String(w));
+    } catch {
+      /* no storage */
+    }
+  }
+  let menu = $state<{ x: number; y: number; items: FileMenu } | null>(null);
   const runWindow = (id: string) => {
     const run = actions[id];
     if (!run || (store.sheetOpen && id !== 'palette' && id !== 'settings' && id !== 'quit')) return false;
@@ -36,6 +73,7 @@
     void plugins.start().then(() => pluginUpdates.check());
     const key = keyHandler(runWindow);
     window.addEventListener('keydown', key, true);
+    window.addEventListener('keydown', cmdK, true);
     let menu: AppMenu | null = null;
     let gone = false;
     void installMenu(actions, (id) => toAccelerator(store.bindings.get(id)?.[0] ?? '')).then((m) => (gone ? m?.close() : (menu = m)));
@@ -43,6 +81,7 @@
       mq.removeEventListener('change', sys);
       gone = true;
       window.removeEventListener('keydown', key, true);
+      window.removeEventListener('keydown', cmdK, true);
       menu?.close();
     };
   });
@@ -52,10 +91,14 @@
 </script>
 
 <div class="next" data-ui="next" style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--text:{FONTS.text};--title:{FONTS.title};--mono:{FONTS.mono}">
-  <main class="frame" inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
+  <div class="win" inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
+  {#if store.showNav}<Sidebar width={sideWidth} onwidth={setWidth} onmenu={(at, items) => (menu = { ...at, items })} />{/if}
+  <div class="main">
+  <Toolbar onnew={newFile} />
+  <main class="frame">
     <div class="card">
       <h1 class="title">Новый интерфейс</h1>
-      <p>Каркас готов: файлы, вкладки, плагины и настройки работают, окно и редактор собираются по частям.</p>
+      <p>Окно готово: сайдбар с файлами и тулбар. Вкладки и редактор появятся в следующих частях.</p>
       <p class="meta">{store.loaded ? `${word(store.files.length, ['файл', 'файла', 'файлов'])} · ${word(tabs, ['вкладка открыта', 'вкладки открыты', 'вкладок открыто'])}` : 'Читаем папку…'}</p>
       <div class="acts">
         <button onclick={() => store.togglePalette()}>Палитра команд</button>
@@ -63,6 +106,10 @@
       </div>
     </div>
   </main>
+  </div>
+  </div>
+  <Dialogs />
+  {#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
   {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
   {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
   {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
@@ -74,7 +121,9 @@
 <style>
   .next { position: fixed; inset: 0; display: flex; background: var(--bg); color: var(--ink); font: 13px/1.45 var(--ui); }
   /* the editor's ground: a grid of 24 pt (§5.1) */
-  .frame { flex: 1; display: flex; align-items: center; justify-content: center; padding: 52px 16px 16px; -webkit-app-region: drag;
+  .win { flex: 1; min-width: 0; display: flex; }
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .frame { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 16px;
     background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; background-position: -1px -1px; }
   .card { -webkit-app-region: no-drag; max-width: 460px; display: flex; flex-direction: column; gap: 10px; padding: 26px 30px; border: 1px solid var(--rule); border-radius: 12px; background: var(--card); box-shadow: var(--popshadow); }
   .title { margin: 0; font: 400 28px/1.15 var(--title); }

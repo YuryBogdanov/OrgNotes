@@ -6,3 +6,5 @@ export { default as Palette } from '../Palette.svelte'; // → the new palette (
 export { default as CloseSheet } from '../CloseSheet.svelte'; // the confirmation sheets → the new ones in the new tokens
 export { default as DiskSheet } from '../DiskSheet.svelte'; // a file changed on the disk → the same
 export { default as PluginSheets } from '../PluginSheets.svelte'; // the plugins' forms and sheets → the same
+export { default as ContextMenu } from '../ContextMenu.svelte'; // the context menus → the new menu in the new tokens
+export { default as Dialogs } from '../Dialogs.svelte'; // rename, move, the Trash of the files' tree → the new sheets
