@@ -4,6 +4,7 @@ import {
   newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, foldPanes, unfoldPanes, type Folded,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
+import { narrowTarget } from './narrowTab';
 import { isMainWindow, nextOn, setNext } from './uiFlag';
 import { displayName, isArchive, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags } from './edits';
@@ -1931,6 +1932,21 @@ class Store {
     }
   }
   readonly nextUi = nextOn();
+
+  /** ⌃X N S (ТЗ 42 §5.8): the tab shows only the subtree of the heading the caret is under; kept with the tab. */
+  narrowTab(tab: Tab | undefined, line: number) {
+    const f = this.fileOf(tab);
+    const n = f ? narrowTarget(f.headings, line) : null;
+    if (!tab || !n) return;
+    tab.narrow = n;
+    this.persistLayout();
+  }
+  /** ⌃X N W: the whole file again. */
+  widenTab(tab: Tab | undefined) {
+    if (!tab?.narrow) return;
+    tab.narrow = undefined;
+    this.persistLayout();
+  }
 
   /** Not enough room for two panes: the second one becomes tabs of the first. */
   mergePanes() {

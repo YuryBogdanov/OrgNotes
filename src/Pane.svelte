@@ -13,6 +13,7 @@
   import PaneTabs from './PaneTabs.svelte';
   import { OFF_ICON, isCore as core, isGone as gone, tabLabel as label } from './tabLabels';
   import { pickDate } from './richPick';
+  import { narrowRangeOf } from './narrowTab';
   import type { RichPick } from './orgRich';
   import { parseHeadings } from './org';
   import { displayPath } from './names';
@@ -28,6 +29,11 @@
   // a view of the file a plugin draws («Доска», ТЗ 33); '' — the text
   const fview = $derived(tab?.kind === 'file' ? store.viewOf(tab) : '');
   const fviewSpec = $derived(fileViewOf(fview));
+  // ⌃X N S (ТЗ 42 §5.8): the lines of the heading the tab is narrowed to; the heading gone, the narrowing goes
+  const narrowed = $derived(file && tab?.narrow ? narrowRangeOf(file.headings, tab.narrow) : null);
+  $effect(() => {
+    if (tab?.narrow && file && !narrowed) store.widenTab(tab);
+  });
   // the file's name while its view is shown: kept through a reread of the files (the view is not drawn anew)
   let fviewPath = $state('');
   $effect(() => {
@@ -175,8 +181,16 @@
       <FindBar bind:q={() => fb.q, (v) => { fb.q = v; fb.at = null; fb.global = false; }} info={found} global={fb.global} focusN={fb.focusN}
         onnext={() => step(1)} onprev={() => step(-1)} onclose={closeBar} />
     {/if}
+    {#if narrowed}
+      <div class="narrowbar" role="status">
+        <b>Сужено</b><span class="np">{narrowed.path.join(' › ')}</span>
+        <button onclick={() => store.widenTab(tab)}>Показать весь файл{store.keyHint('widen') ? ` · ${store.keyHint('widen')}` : ''}</button>
+      </div>
+    {/if}
     <div class="ed">
-      <Editor text={file.text} fileKey={tab.id + '|' + file.path} path={file.name} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} initialTop={tab.top} ontop={(l) => store.setTabTop(tab, l)} initialFolds={tab.folds} onfolds={(l) => store.setTabFolds(tab, l)} resetOn={store.diskGen[file.path] ?? 0} levels={store.levels} drawers={store.foldDrawers} rich={store.rich} richNumbers={store.richNumbers}
+      <Editor text={file.text} fileKey={tab.id + '|' + file.path + (narrowed ? '|n:' + narrowed.title : '')}
+        narrow={narrowed ? { line: narrowed.line, end: narrowed.end } : null} onnarrow={(l) => { if (tab.narrow) tab.narrow.line = l; }}
+        onnarrowTo={(l) => store.narrowTab(tab, l)} onwiden={() => store.widenTab(tab)} path={file.name} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} initialTop={tab.top} ontop={(l) => store.setTabTop(tab, l)} initialFolds={tab.folds} onfolds={(l) => store.setTabFolds(tab, l)} resetOn={store.diskGen[file.path] ?? 0} levels={store.levels} drawers={store.foldDrawers} rich={store.rich} richNumbers={store.richNumbers}
         onrich={(pick) => richChoice(pick, file.path)} find={findProp} onfound={(i) => (found = i)} onapi={(a) => (api = a)}
         onchange={(t) => store.setText(t, file.path)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>
@@ -250,4 +264,8 @@
   .off { align-items: center; justify-content: center; gap: 8px; color: var(--fg2); text-align: center; padding: 24px; }
   .off b { color: var(--fg); font-size: 15px; }
   .off .on { margin-top: 6px; height: 30px; padding: 0 14px; border: 0; border-radius: 7px; background: var(--acc); color: var(--onacc); font-weight: 600; }
+  .narrowbar { display: flex; align-items: center; gap: 8px; padding: 4px 12px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--acc) 8%, transparent); font-size: 12px; color: var(--fg2); }
+  .narrowbar b { color: var(--acc); }
+  .narrowbar .np { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .narrowbar button { border: 0; background: none; color: var(--acc); font: inherit; }
 </style>

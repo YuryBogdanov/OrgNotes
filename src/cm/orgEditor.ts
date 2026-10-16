@@ -64,6 +64,9 @@ export interface EditorProps {
   onchange: (t: string) => void;
   oncursor: (line: number, col: number) => void;
   onfollow: (link: OrgLink) => void;
+  /** ⌃X N S at this line, ⌃X N W (ТЗ 42 §5.8): the tab narrows or shows the whole file again; none — the keys go on. */
+  onnarrowTo?: (line: number) => void;
+  onwiden?: () => void;
 }
 /** What the editor asks its component to draw. */
 export interface EditorUi {
@@ -260,6 +263,16 @@ export class OrgEditor {
       this.pickLink(v, l);
       return true;
     },
+    narrow: (v, line?: number) => {
+      if (!this.p.onnarrowTo || (line === undefined && this.headingAbove(v) < 0)) return false;
+      this.p.onnarrowTo(line ?? v.state.doc.lineAt(v.state.selection.main.head).number - 1);
+      return true;
+    },
+    widen: () => {
+      if (!this.p.onwiden || !this.p.narrow) return false;
+      this.p.onwiden();
+      return true;
+    },
     followLink: (v) => {
       const l = linkAt(v.state.doc, v.state.selection.main.head);
       if (!l) return false;
@@ -346,6 +359,7 @@ export class OrgEditor {
     if (s.empty && headLine(hl.text)) {
       items.push({ label: 'Теги…', shortcut: key('tags'), action: () => this.openTagPop(v, hl.number) });
       items.push({ label: 'Добавить заметку…', shortcut: key('addNote'), action: () => this.noteAt(v, hl.number - 1) });
+      if (this.p.onnarrowTo && !this.p.narrow) items.push({ label: 'Сузить до заголовка', shortcut: key('narrow'), action: () => this.p.onnarrowTo!(hl.number - 1) });
       // the plugins' items on a heading (ТЗ 39)
       const more = headingActionsFor(path, hl.number - 1);
       if (more.length) items.push('sep', ...more.map((a): MenuItem => ({ label: a.label, action: () => a.run(path, hl.number - 1) })));

@@ -12,7 +12,7 @@
 
   // The old interface's editor: the Org editor of cm/orgEditor.ts (its state, keys, menu, links, the file followed)
   // with the old menu and the tags' popover.
-  let { text, fileKey, path = '', wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onchange, oncursor, onfollow }: {
+  let { text, fileKey, path = '', wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, narrow = null, folded = [], lineNote = null, rich = false, richNumbers = false, gutter = true, onrich, find = null, onfound, onapi, onnarrow, onnarrowTo, onwiden, onchange, oncursor, onfollow }: {
     path?: string; // the file's name in the folder: what a plugin's link at the end of a line is run with (ТЗ 33)
     levels?: LevelView; // «Структурный вид»: one star per level, text moved by level
     drawers?: boolean; // drawers folded when a file opens and when the app adds one (:PROPERTIES:, :LOGBOOK:)
@@ -40,6 +40,8 @@
     onchange: (t: string) => void;
     oncursor: (line: number, col: number) => void;
     onfollow: (link: OrgLink) => void;
+    onnarrowTo?: (line: number) => void; // ⌃X N S at this line (ТЗ 42 §5.8)
+    onwiden?: () => void; // ⌃X N W
   } = $props();
 
   let host: HTMLDivElement;
@@ -47,7 +49,7 @@
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   let tagPop = $state<{ tags: string[]; x: number; y: number } | null>(null);
   const snapshot = (): EditorProps => ({
-    text, fileKey, path, wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint, resetOn, levels, drawers, narrow, folded, lineNote, rich, richNumbers, gutter, onrich, find, onfound, onapi, onnarrow, onchange, oncursor, onfollow,
+    text, fileKey, path, wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint, resetOn, levels, drawers, narrow, folded, lineNote, rich, richNumbers, gutter, onrich, find, onfound, onapi, onnarrow, onnarrowTo, onwiden, onchange, oncursor, onfollow,
   });
   onMount(() => {
     ed = new OrgEditor(host, snapshot(), { menu: (x, y, items) => (menu = { x, y, items }), tags: (p) => (tagPop = p) });

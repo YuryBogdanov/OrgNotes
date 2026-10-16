@@ -218,6 +218,15 @@ register({
   // in a file's editor: under the heading's line; elsewhere (an agenda) at the top of the window
   when: onHeading, run: (c) => (store.tab?.kind === 'file' ? void inEditor('addNote', c.heading!.line) : void setTimeout(() => openNote(c.file!.name, c.heading!.line))),
 });
+// ⌃X N S / ⌃X N W (ТЗ 42 §5.8): a file's tab narrowed to the heading, and back
+register({
+  id: 'narrow', title: 'Сузить до заголовка', icon: 'head', group: 'heading', synonyms: ['сужение', 'narrow', 'только этот заголовок'],
+  when: (c) => onHeading(c) && store.tab?.kind === 'file' && !store.tab.narrow, run: (c) => void inEditor('narrow', c.heading!.line),
+});
+register({
+  id: 'widen', title: 'Показать весь файл', icon: 'file', group: 'general', synonyms: ['сужение', 'widen', 'весь файл'],
+  when: () => !!store.tab?.narrow, run: () => void setTimeout(() => store.widenTab(store.tab)),
+});
 register({
   id: 'copyLink', title: 'Копировать ссылку на заголовок', icon: 'goto', group: 'heading', synonyms: ['ссылка', 'link', 'id'],
   when: onHeading, hint: (c) => bare(c.heading!.title), run: (c) => void setTimeout(() => store.copyHeadingLink(c.file!.path, c.line)),

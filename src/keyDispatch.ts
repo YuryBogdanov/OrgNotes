@@ -72,7 +72,11 @@ export function keyHandler(window: (id: string) => boolean) {
       const seq = pending + ' ' + press;
       pending = null;
       clearTimeout(pendingTimer);
-      runSeq(seq, c);
+      // a chord of three presses (⌃X N S, ТЗ 42): the first two wait for the third
+      if (!runSeq(seq, c) && isPrefix(seq, c)) {
+        pending = seq;
+        pendingTimer = setTimeout(() => (pending = null), CHORD_WAIT);
+      }
       consume(); // a chord that means nothing here is not typed either
       return;
     }

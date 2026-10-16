@@ -7,10 +7,12 @@
   // The column «Структура» right of the editor (ТЗ 42 §7): the headings of levels 1–3 on a line, each with a dot of its
   // status's colour (none: grey; done: faded); the one the caret is under — the lamp's dot with a halo, its title bold;
   // a click goes to it; the current one kept in view. «Ссылаются»: the links to the heading under the caret, up to 6.
+  // A narrowed tab (§5.8): only the subtree it shows.
+  let { range = null }: { range?: { line: number; end: number } | null } = $props();
   const file = $derived(store.fileOf(store.tab));
   const fi = $derived(file ? store.files.indexOf(file) : -1);
   const line = $derived(store.tab?.cursor.line ?? 0);
-  const heads = $derived(file ? file.headings.map((h, i) => ({ h, i })).filter((x) => x.h.level <= 3) : []);
+  const heads = $derived(file ? file.headings.map((h, i) => ({ h, i })).filter((x) => x.h.level <= 3 && (!range || (x.h.line >= range.line && x.h.line < range.end))) : []);
   /** The heading of levels 1–3 the caret is under. */
   const current = $derived.by(() => {
     if (!file) return -1;
