@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WORKFLOW, parseHeadings } from './org';
-import { findAll, fold, fragment, nearest, searchFile, summary } from './search';
+import { findAll, findRanges, fold, fragment, nearest, replacementOf, searchFile, summary } from './search';
 
 const T = ['* Q4 2026', '** TODO Подготовить бюджет 2027 :budget:', '   Свести заявки: Бюджет на ёлку.', '*** Бюджетный план', '#+BEGIN_SRC', '* бюджет в блоке', '#+END_SRC', ''].join('\n');
 const hs = parseHeadings(T, DEFAULT_WORKFLOW);
@@ -45,5 +45,18 @@ describe('in every file', () => {
     expect(searchFile(T, hs, 'бюджет', o, 'all', 2)).toHaveLength(2);
     expect(summary(14, 4)).toBe('14 совпадений в 4 файлах');
     expect(summary(1, 1)).toBe('1 совпадение в 1 файле');
+  });
+});
+
+describe('regular expressions and replacing (ТЗ 42 §5.7)', () => {
+  it('the ranges: plain as before, a regular expression with its own lengths; a wrong one — none', () => {
+    expect(findRanges('Да, да и ДА', 'да', { cs: false, word: false })).toEqual([{ from: 0, to: 2 }, { from: 4, to: 6 }, { from: 9, to: 11 }]);
+    expect(findRanges('a1 b22 c333', '\\d+', { cs: true, word: false, re: true })).toEqual([{ from: 1, to: 2 }, { from: 4, to: 6 }, { from: 8, to: 11 }]);
+    expect(findRanges('abc', '(', { cs: true, word: false, re: true })).toEqual([]);
+    expect(findRanges('abc', 'x*', { cs: true, word: false, re: true })).toEqual([]);
+  });
+  it('the replacement: the text, or with the groups of the expression', () => {
+    expect(replacementOf('2026-10-16', '(\\d+)-(\\d+)-(\\d+)', { cs: true, word: false, re: true }, '$3.$2.$1')).toBe('16.10.2026');
+    expect(replacementOf('да', 'да', { cs: false, word: false }, 'нет')).toBe('нет');
   });
 });

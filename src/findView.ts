@@ -4,7 +4,8 @@
 import { StateEffect, StateField, type Extension, type Range, type Text } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin, WidgetType, type ViewUpdate } from '@codemirror/view';
 import { foldState, foldedRanges } from '@codemirror/language';
-import { findAll, nearest, type FindOpts } from './search';
+import { findRanges, nearest, replacementOf, type FindOpts } from './search';
+import { isolateHistory } from '@codemirror/commands';
 
 export interface FindQuery extends FindOpts {
   q: string;
@@ -14,6 +15,7 @@ export interface FindQuery extends FindOpts {
 export interface Found {
   q: string;
   starts: number[];
+  ends: number[]; // a regular expression's matches have their own lengths (ТЗ 42 §5.7)
   len: number;
   cur: number; // index into starts, −1: none
   show: boolean;
@@ -36,9 +38,10 @@ export const findField = StateField.define<(Found & FindOpts) | null>({
       if (e.is(setFind)) {
         const f = e.value;
         if (!f) return null;
-        const starts = findAll(textOf(tr.newDoc), f.q, f);
+        const rs = findRanges(textOf(tr.newDoc), f.q, f);
+        const starts = rs.map((r) => r.from);
         const cur = f.at != null && starts.includes(f.at) ? starts.indexOf(f.at) : nearest(starts, tr.state.selection.main.from);
-        v = { q: f.q, cs: f.cs, word: f.word, show: f.show, starts, len: f.q.length, cur, wrapped: false };
+        v = { q: f.q, cs: f.cs, word: f.word, re: f.re, show: f.show, starts, ends: rs.map((r) => r.to), len: f.q.length, cur, wrapped: false };
       } else if (e.is(moveFind) && v && v.starts.length) {
         const n = v.starts.length;
         const next = (v.cur + e.value + n) % n;
@@ -48,8 +51,9 @@ export const findField = StateField.define<(Found & FindOpts) | null>({
     if (v && tr.docChanged) {
       // the text changed: the matches again, the current one nearest to where it was
       const was = v.cur >= 0 ? tr.changes.mapPos(v.starts[v.cur]) : tr.state.selection.main.from;
-      const starts = findAll(textOf(tr.newDoc), v.q, v);
-      v = { ...v, starts, cur: nearest(starts, was), wrapped: false };
+      const rs = findRanges(textOf(tr.newDoc), v.q, v);
+      const starts = rs.map((r) => r.from);
+      v = { ...v, starts, ends: rs.map((r) => r.to), cur: nearest(starts, was), wrapped: false };
     }
     return v;
   },
@@ -77,8 +81,8 @@ const marks = EditorView.decorations.compute([findField, foldState, 'selection']
   // a match inside the selection is marked too: its yellow would hide the selection under it
   const inSel = (a: number, b: number) => state.selection.ranges.some((r) => !r.empty && r.from < b && r.to > a);
   f.starts.forEach((s, i) => {
-    const cls = (i === f.cur ? 'cm-find cm-find-cur' : 'cm-find') + (inSel(s, s + f.len) ? ' cm-find-sel' : '');
-    out.push(Decoration.mark({ class: cls }).range(s, s + f.len));
+    const cls = (i === f.cur ? 'cm-find cm-find-cur' : 'cm-find') + (inSel(s, f.ends[i]) ? ' cm-find-sel' : '');
+    out.push(Decoration.mark({ class: cls }).range(s, f.ends[i]));
   });
   // folded: how many matches each hides
   let outer = -1; // a fold inside a folded one is not shown: only the outer one gets a badge
@@ -143,4 +147,16 @@ export function foundInfo(view: EditorView) {
   });
   const folded = hidden.size;
   return { total: f.starts.length, cur: f.cur, folded, wrapped: f.wrapped };
+}
+
+/** «Заменить» / «Все» (ТЗ 42 §5.7): the current match, or every match of the file, by `text` — one edit, one step of
+ *  ⌘Z; inside folded drawers and hidden markup too (the text is the file's). The current one: the next becomes
+ *  current. How many were replaced. */
+export function replaceFound(view: EditorView, text: string, all: boolean): number {
+  const f = view.state.field(findField, false);
+  if (!f || !f.starts.length || (!all && f.cur < 0)) return 0;
+  const at = all ? f.starts.map((_, i) => i) : [f.cur];
+  const changes = at.map((i) => ({ from: f.starts[i], to: f.ends[i], insert: replacementOf(view.state.sliceDoc(f.starts[i], f.ends[i]), f.q, f, text) }));
+  view.dispatch({ changes, userEvent: 'input.replace', annotations: isolateHistory.of('full'), scrollIntoView: !all });
+  return changes.length;
 }

@@ -92,4 +92,13 @@ export const linkHooks = {
   key: (_id: string) => '',
   /** Where a link goes, in words: «billing.org › Ревью», an address; `missing` — not found. */
   describe: (_link: OrgLink, _path: string): { text: string; missing: boolean } => ({ text: _link.raw, missing: false }),
+  /** What a link goes to, for the new interface's card over it (ТЗ 42 §5.6). */
+  preview: (_link: OrgLink, _path: string): LinkPreview => ({ kind: 'url', url: _link.raw }),
 };
+/** The card over a link (ТЗ 42 §5.6): a heading — its path, status, title, two lines of its body; a file — its name and
+ *  #+TITLE; an address; a link that leads nowhere. `ref`: the link's ID or path, shown monospaced. */
+export type LinkPreview =
+  | { kind: 'heading'; crumb: string; keyword: string | null; tone: string; title: string; body: string[]; ref: string }
+  | { kind: 'file'; crumb: string; title: string; ref: string }
+  | { kind: 'url'; url: string }
+  | { kind: 'missing'; text: string };

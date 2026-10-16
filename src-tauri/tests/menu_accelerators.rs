@@ -12,6 +12,7 @@ fn every_default_accelerator_parses() {
         "Alt+CmdOrCtrl+Backslash",
         "Alt+CmdOrCtrl+Digit0",
         "Alt+CmdOrCtrl+KeyC",
+        "Alt+CmdOrCtrl+KeyF",
         "Alt+CmdOrCtrl+KeyG",
         "Alt+CmdOrCtrl+KeyW",
         "Alt+Shift+CmdOrCtrl+KeyG",

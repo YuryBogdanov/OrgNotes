@@ -4,7 +4,7 @@
 // next/Editor.svelte each wrap one: they give the props and draw the menu and the popover it asks for.
 
 import { Compartment, EditorState, StateField, Transaction } from '@codemirror/state';
-import { Decoration, EditorView, ViewPlugin, hoverTooltip, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+import { Decoration, EditorView, ViewPlugin, hoverTooltip, tooltips, placeholder as cmPlaceholder, drawSelection, scrollPastEnd, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, isolateHistory } from '@codemirror/commands';
 import { codeFolding, foldGutter, foldKeymap, foldedRanges, toggleFold } from '@codemirror/language';
 import { autocompletion, type CompletionContext } from '@codemirror/autocomplete';
@@ -14,7 +14,7 @@ import type { MenuItem } from '../ContextMenu.svelte';
 import { changeStatusAt, cyclePriority, moveSubtree, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree } from '../outline';
 import { DEFAULT_LEVELS, orgIndent, type LevelView } from '../orgIndent';
 import { orgRich, type RichPick } from '../orgRich';
-import { findExtension, findField, foundInfo, moveFind, setFind, type FindQuery } from '../findView';
+import { findExtension, findField, foundInfo, moveFind, replaceFound, setFind, type FindQuery } from '../findView';
 import { registerEditor } from '../editorKeys';
 import { clipTarget, linkHooks, linkPaste } from '../linkEdit';
 import { openNote } from '../noteReq.svelte';
@@ -29,6 +29,7 @@ import { cycleState, cycleVisibility, newHeading, onHeading, orgFold, run, sel }
 import { decorate } from './decorate';
 import { narrowRange, narrowing, setNarrow } from './narrow';
 import { sectionBar } from './section';
+import { linkCard } from './linkCard';
 
 /** What the wrapping component gives: the file and how it is shown, and what the editor tells back. */
 export interface EditorProps {
@@ -50,7 +51,8 @@ export interface EditorProps {
   rich?: boolean; // «Оформленный текст»: drawn like org-modern (implies the structural view)
   richNumbers?: boolean; // line numbers while drawn
   gutter?: boolean; // the line numbers and the fold markers on the left (none in the mini window, ТЗ 31)
-  find?: (FindQuery & { go: number; dir: 1 | -1 }) | null;
+  find?: (FindQuery & { go: number; dir: 1 | -1; rep?: { text: string; all: boolean; n: number } | null }) | null; // a new `rep.n` replaces (ТЗ 42 §5.7)
+  onreplaced?: (n: number) => void; // how many matches the last «Заменить» / «Все» replaced
   /** The new interface (ТЗ 42 §5): its «Оформление» (orgRich `next`, the current section's bar). */
   next?: boolean;
   /** Above the document's title in the new «Оформление»: «Midterm.org · изменён 2 мин назад». */
@@ -64,6 +66,9 @@ export interface EditorProps {
   onchange: (t: string) => void;
   oncursor: (line: number, col: number) => void;
   onfollow: (link: OrgLink) => void;
+  /** ⌃X N S at this line, ⌃X N W (ТЗ 42 §5.8): the tab narrows or shows the whole file again; none — the keys go on. */
+  onnarrowTo?: (line: number) => void;
+  onwiden?: () => void;
 }
 /** What the editor asks its component to draw. */
 export interface EditorUi {
@@ -94,6 +99,7 @@ export class OrgEditor {
   private lastNote: EditorProps['lineNote'] = null;
   private lastFind = '';
   private lastGo = 0;
+  private lastRep = 0;
   private topFrame = 0;
   private readonly undo = new Compartment();
   private readonly structure = new Compartment(); // switching the view is not an edit: no undo step, no unsaved mark
@@ -260,6 +266,16 @@ export class OrgEditor {
       this.pickLink(v, l);
       return true;
     },
+    narrow: (v, line?: number) => {
+      if (!this.p.onnarrowTo || (line === undefined && this.headingAbove(v) < 0)) return false;
+      this.p.onnarrowTo(line ?? v.state.doc.lineAt(v.state.selection.main.head).number - 1);
+      return true;
+    },
+    widen: () => {
+      if (!this.p.onwiden || !this.p.narrow) return false;
+      this.p.onwiden();
+      return true;
+    },
     followLink: (v) => {
       const l = linkAt(v.state.doc, v.state.selection.main.head);
       if (!l) return false;
@@ -346,6 +362,7 @@ export class OrgEditor {
     if (s.empty && headLine(hl.text)) {
       items.push({ label: 'Теги…', shortcut: key('tags'), action: () => this.openTagPop(v, hl.number) });
       items.push({ label: 'Добавить заметку…', shortcut: key('addNote'), action: () => this.noteAt(v, hl.number - 1) });
+      if (this.p.onnarrowTo && !this.p.narrow) items.push({ label: 'Сузить до заголовка', shortcut: key('narrow'), action: () => this.p.onnarrowTo!(hl.number - 1) });
       // the plugins' items on a heading (ТЗ 39)
       const more = headingActionsFor(path, hl.number - 1);
       if (more.length) items.push('sep', ...more.map((a): MenuItem => ({ label: a.label, action: () => a.run(path, hl.number - 1) })));
@@ -453,6 +470,19 @@ export class OrgEditor {
     { hoverTime: 400 },
   );
 
+  /** The new interface (ТЗ 42 §5.6): over a link for half a second, the card of what it goes to. */
+  private linkCardTip = hoverTooltip(
+    (v, pos) => {
+      const l = linkAt(v.state.doc, pos);
+      if (!l) return null;
+      return {
+        pos: l.from, end: l.to, above: false,
+        create: () => ({ dom: linkCard(linkHooks.preview(l, this.path), () => this.pickLink(v, l)) }),
+      };
+    },
+    { hoverTime: 500 },
+  );
+
   private makeState(doc: string, words: Workflow) {
     this.words = words;
     const p = this.p;
@@ -503,7 +533,9 @@ export class OrgEditor {
         ...(gutter ? [foldGutter()] : []), plugin, ...lineLinkExt(() => this.path), selectionClass, this.note.of(noteExt(p.lineNote ?? null)), this.structure.of(this.structureExt(words)),
         ...(p.hint ? [cmPlaceholder(p.hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
-        this.linkTip,
+        p.next ? this.linkCardTip : this.linkTip,
+        // the card stays within the text's area: the column «Структура» to the right would cover it
+        p.next ? tooltips({ tooltipSpace: (v) => v.scrollDOM.getBoundingClientRect() }) : [],
         // the tab keeps its folded headings (S-Tab, ⇥): shown again, it comes back folded as it was
         EditorView.updateListener.of((u) => {
           // a fold changed, or an edit moved the lines of the folds
@@ -629,7 +661,7 @@ export class OrgEditor {
     const s = f.starts[f.cur];
     const scroll = EditorView.scrollIntoView(s, { y: 'start', yMargin: Math.round(v.scrollDOM.clientHeight / 3) });
     // «select.search»: a user's caret, so a drawn line («Оформленный текст») shows its text; a fold over it opens
-    v.dispatch(select ? { selection: { anchor: s, head: s + f.len }, effects: scroll, userEvent: 'select.search' } : { effects: scroll });
+    v.dispatch(select ? { selection: { anchor: s, head: f.ends[f.cur] }, effects: scroll, userEvent: 'select.search' } : { effects: scroll });
   }
   private syncFind() {
     const f = this.p.find;
@@ -640,12 +672,12 @@ export class OrgEditor {
         const st = view.state.field(findField)!;
         const s = st.cur >= 0 && st.show ? st.starts[st.cur] : null;
         // closing: the caret stays on the current match
-        view.dispatch({ effects: setFind.of(null), ...(s !== null ? { selection: { anchor: s, head: s + st.len } } : {}) });
+        view.dispatch({ effects: setFind.of(null), ...(s !== null ? { selection: { anchor: s, head: st.ends[st.cur] } } : {}) });
       }
       this.lastFind = '';
       return;
     }
-    const key = JSON.stringify([k, f.q, f.cs, f.word, f.show, f.at ?? null]);
+    const key = JSON.stringify([k, f.q, f.cs, f.word, !!f.re, f.show, f.at ?? null]);
     if (key !== this.lastFind) {
       this.lastFind = key;
       // ↩ right after typing (before the pause ran out) comes with the new query: it selects the first match
@@ -657,6 +689,13 @@ export class OrgEditor {
       this.lastGo = f.go;
       view.dispatch({ effects: moveFind.of(f.dir) });
       this.toMatch(view, true);
+    }
+    // «Заменить»: the current match, then the next one is current; «Все»: every match, one step of ⌘Z
+    if (f.rep && f.rep.n !== this.lastRep) {
+      this.lastRep = f.rep.n;
+      const n = replaceFound(view, f.rep.text, f.rep.all);
+      if (n && !f.rep.all) this.toMatch(view, true);
+      this.p.onreplaced?.(n);
     }
   }
 

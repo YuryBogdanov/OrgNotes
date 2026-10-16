@@ -4,6 +4,7 @@ import {
   newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, foldPanes, unfoldPanes, type Folded,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
+import { narrowTarget } from './narrowTab';
 import { isMainWindow, nextOn, setNext } from './uiFlag';
 import { displayName, isArchive, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags } from './edits';
@@ -35,7 +36,9 @@ import { Journal, Tx, canUndo, type Step } from './journal';
 import { fileLink, headingLink, labelOf, linkHooks } from './linkEdit';
 import { newId } from './endDay';
 import { fileTypeOf, fileTypes, isOrgName, watchFileTypes, withExt } from './fileTypes.svelte';
-import { DEFAULT_SEQUENCE, EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, type Eol, type Heading, type ProjectConfig, type Workflow, type WorkflowDef } from './org';
+import { DEFAULT_SEQUENCE, EMPTY_CONFIG, headingAt, joinEol, parseHeadings, parseProjectConfig, resolveWorkflow, setKeyword, setPriority, sequenceFor, splitEol, startOf, toneFor, type Eol, type Heading, type ProjectConfig, type Workflow, type WorkflowDef } from './org';
+import { toneStyle } from './colors';
+import { bodyOf } from './orgOps';
 
 export interface NoteFile {
   name: string; // relative path inside the notes folder
@@ -1447,8 +1450,8 @@ class Store {
 
   // ---- search: ⌘F in a pane, ⇧⌘F in every file ------------------------------------------------------------
   /** What a pane's find bar is asked (the menu, the keys, a jump from the search in every file). */
-  findReq = $state<{ kind: 'open' | 'next' | 'prev' | 'useSel' | 'jump'; pane: number; n: number; q?: string; at?: { path: string; line: number; col: number } } | null>(null);
-  askFind(kind: 'open' | 'next' | 'prev' | 'useSel') {
+  findReq = $state<{ kind: 'open' | 'next' | 'prev' | 'useSel' | 'jump' | 'replace'; pane: number; n: number; q?: string; at?: { path: string; line: number; col: number } } | null>(null);
+  askFind(kind: 'open' | 'next' | 'prev' | 'useSel' | 'replace') {
     this.findReq = { kind, pane: this.layout.active, n: Date.now() + Math.random() };
   }
   /** ⇧⌘F: the section «Поиск», the field in focus (the editor's one-line selection in it, not searched yet). */
@@ -1932,6 +1935,21 @@ class Store {
   }
   readonly nextUi = nextOn();
 
+  /** ⌃X N S (ТЗ 42 §5.8): the tab shows only the subtree of the heading the caret is under; kept with the tab. */
+  narrowTab(tab: Tab | undefined, line: number) {
+    const f = this.fileOf(tab);
+    const n = f ? narrowTarget(f.headings, line) : null;
+    if (!tab || !n) return;
+    tab.narrow = n;
+    this.persistLayout();
+  }
+  /** ⌃X N W: the whole file again. */
+  widenTab(tab: Tab | undefined) {
+    if (!tab?.narrow) return;
+    tab.narrow = undefined;
+    this.persistLayout();
+  }
+
   /** Not enough room for two panes: the second one becomes tabs of the first. */
   mergePanes() {
     closePane(this.layout, 1);
@@ -2214,6 +2232,21 @@ linkHooks.describe = (link, p) => {
   if (t.missingSection) return { text: `${displayName(f.name)} › раздел «${t.missingSection.replace(/^[*#]/, '')}» не найден`, missing: true };
   return { text: [f.name, h ? labelOf(h) : ''].filter(Boolean).join(' › '), missing: false };
 };
+/** The new interface's card over a link (ТЗ 42 §5.6). */
+linkHooks.preview = (link, p) => {
+  const fi = store.files.findIndex((f) => f.name === p || f.path === p);
+  const t = fi < 0 ? ({ kind: 'url', url: link.raw } as const) : resolveLink(link, fi, store.files);
+  if (t.kind === 'url') return { kind: 'url', url: t.url };
+  if (t.kind === 'missing') return { kind: 'missing', text: link.type === 'id' || link.raw.includes('::') ? 'Заголовок не найден' : `Нет файла ${t.what}` };
+  const f = store.files[t.file];
+  const ref = link.type === 'id' ? 'id:' + link.path : link.raw;
+  const h = t.line != null ? f.headings.find((x) => x.line === t.line) : undefined;
+  if (t.missingSection) return { kind: 'missing', text: `Раздел «${t.missingSection.replace(/^[*#]/, '')}» не найден в ${displayName(f.name)}` };
+  if (!h) return { kind: 'file', crumb: f.name, title: /^#\+TITLE:\s*(.+)$/im.exec(f.text)?.[1]?.trim() || displayName(f.name), ref };
+  const body = bodyOf(f.text, h).split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 2);
+  return { kind: 'heading', crumb: [displayName(f.name), ...h.path.map(plainTitle)].join(' › '), keyword: h.keyword, tone: h.keyword ? toneStyle(toneFor(h.keyword, f.wf)) : '', title: plainTitle(h.title), body, ref };
+};
+const plainTitle = (t: string) => t.replace(/\[\[(?:[^\]]*\]\[)?([^\]]*)\]\]/g, '$1');
 linkHooks.headingAt = (p, line) => {
   const f = fileNamed(p);
   const hi = f ? headingAt(f.headings, line) : -1;

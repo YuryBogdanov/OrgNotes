@@ -68,6 +68,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('find', 'Найти…', 'search', 'window', ['⌘F'], { synonyms: ['поиск'] }),
   C('findAll', 'Найти во всех файлах…', 'search', 'window', ['⇧⌘F'], { synonyms: ['поиск', 'глобальный'] }),
   C('findNext', 'Найти далее', 'search', 'window', ['⌘G']),
+  C('replace', 'Заменить…', 'search', 'window', ['⌥⌘F'], { synonyms: ['замена', 'найти и заменить'], note: 'Поиск в файле со строкой замены' }),
   C('findPrev', 'Найти ранее', 'search', 'window', ['⇧⌘G']),
   C('useSelection', 'Искать выделенное', 'search', 'window', ['⌘E']),
   C('searchNext', 'Следующий результат во всех файлах', 'search', 'window', ['⌥⌘G']),
@@ -123,6 +124,8 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('deadline', 'Поставить дедлайн…', 'heading', 'heading', [], { emacs: ['⌃C D'], mac: [], synonyms: ['срок'] }),
   C('tags', 'Теги…', 'heading', 'editor', ['⌃C Q'], { emacs: ['⌃C Q', '⌃C ⌃Q'], synonyms: ['метки', 'изменить теги'], note: 'Поле тегов заголовка с подсказками из всех заметок' }),
   C('addNote', 'Добавить заметку…', 'heading', 'editor', ['⌃C ⌃Z'], { synonyms: ['заметка', 'статус', 'note', 'logbook', 'org-add-note'], note: 'Заметка с датой в :LOGBOOK: заголовка, как C-c C-z в Emacs' }),
+  C('narrow', 'Сузить до заголовка', 'heading', 'editor', ['⌃X N S'], { synonyms: ['сужение', 'narrow', 'только этот заголовок'], note: 'Редактор показывает только поддерево заголовка под курсором' }),
+  C('widen', 'Показать весь файл', 'heading', 'editor', ['⌃X N W'], { synonyms: ['сужение', 'widen', 'весь файл'] }),
   C('copyLink', 'Копировать ссылку на заголовок', 'heading', 'editor', ['⌃C L'], { synonyms: ['ссылка', 'link', 'org-store-link'] }),
   C('refile', 'Перенести в другой файл…', 'heading', 'heading', [], { emacs: ['⌃C ⌃W'], mac: [], synonyms: ['refile', 'переместить'] }),
 

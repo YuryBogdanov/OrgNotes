@@ -182,6 +182,7 @@
     find: () => store.askFind('open'),
     findAll: () => store.openSearch(window.getSelection()?.toString() ?? ''),
     findNext: () => store.askFind('next'),
+    replace: () => store.askFind('replace'),
     findPrev: () => store.askFind('prev'),
     useSelection: () => store.askFind('useSel'),
     searchNext: () => store.searchStep(1),

@@ -7,8 +7,10 @@
   import { pickDate } from '../richPick';
   import type { RichPick } from '../orgRich';
   import { touches } from '../touchIndex.svelte';
+  import { narrowRangeOf } from '../narrowTab';
   import Editor from './Editor.svelte';
   import Structure from './Structure.svelte';
+  import FindPanel from './FindPanel.svelte';
   import { nextPrefs } from './prefs.svelte';
   import { PluginFileView, RichMenu } from './bridges';
 
@@ -20,6 +22,53 @@
   const file = $derived(store.fileOf(tab));
   const fview = $derived(tab?.kind === 'file' ? store.viewOf(tab) : '');
   let richPick = $state<{ pick: RichPick; path: string } | null>(null);
+  // ⌃X N S (§5.8): the lines of the heading the tab is narrowed to; the heading gone, the narrowing goes
+  const narrowed = $derived(file && tab?.narrow ? narrowRangeOf(file.headings, tab.narrow) : null);
+  $effect(() => {
+    if (tab?.narrow && file && !narrowed) store.widenTab(tab);
+  });
+  // ⌘F (§5.7): the query, its steps, the replacements; ⌥⌘F opens it with «Заменить на…»
+  let fb = $state({ open: false, q: '', re: false, go: 0, dir: 1 as 1 | -1, at: null as number | null, focusN: 0, replacing: false, rep: null as { text: string; all: boolean; n: number } | null });
+  let found = $state<{ total: number; cur: number; folded: number; wrapped: boolean } | null>(null);
+  let api: { selection: () => string } | null = null;
+  let lastReq = 0;
+  const findProp = $derived(fb.q ? { q: fb.q, cs: store.findCase, word: store.findWord, re: fb.re, show: fb.open, at: fb.at, go: fb.go, dir: fb.dir, rep: fb.rep } : null);
+  const oneLine = () => {
+    const s = api?.selection() ?? '';
+    return s && !s.includes('\n') ? s : '';
+  };
+  function openFind(replacing = false) {
+    const s = oneLine();
+    if (s) fb.q = s;
+    fb.at = null;
+    fb.open = true;
+    fb.replacing = fb.replacing || replacing;
+    fb.focusN++;
+  }
+  function step(dir: 1 | -1) {
+    if (!fb.q) return void openFind();
+    fb.at = null;
+    fb.dir = dir;
+    fb.go++;
+  }
+  function closeFind() {
+    fb.open = false;
+    fb.replacing = false;
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-ui="next"] .cm-content')?.focus({ preventScroll: true }));
+  }
+  $effect(() => {
+    const r = store.findReq;
+    if (!r || r.n === lastReq) return;
+    lastReq = r.n;
+    if (r.kind === 'open') openFind();
+    else if (r.kind === 'replace') openFind(true);
+    else if (r.kind === 'next' || r.kind === 'prev') step(r.kind === 'next' ? 1 : -1);
+    else if (r.kind === 'useSel') {
+      const s = oneLine();
+      if (s) fb.q = s;
+    }
+  });
+  const crumb = $derived(narrowed && file ? [file.name.replace(/\.org$/, '').split('/').pop()!, ...narrowed.path].join(' › ') : '');
   // «Структура» right of the editor (§7): on by the preference, and when the area is 900 pt wide or more
   let areaW = $state(0);
   const structure = $derived(nextPrefs.structure && areaW >= 900);
@@ -63,16 +112,30 @@
   {:else if tab && file && (fileViewOf(fview) || fileTypeOf(tab.path))}
     <div class="view"><PluginFileView id={fview} path={file.name} {tab} pane={0} /></div>
   {:else if file && tab}
+    {#if narrowed}
+      <div class="narrow" role="status" aria-label="Сужено">
+        <b>Сужено</b><span class="np" title={crumb}>{crumb}</span>
+        <span class="k">{store.keyHint('widen')}</span>
+        <button onclick={() => store.widenTab(tab)}>Показать весь файл</button>
+      </div>
+    {/if}
     <div class="with" bind:clientWidth={areaW}>
     <div class="ed">
-      <Editor text={file.text} fileKey={tab.id + '|' + file.path} path={file.name} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} initialTop={tab.top}
+      {#if fb.open}
+        <FindPanel bind:q={() => fb.q, (v) => { fb.q = v; fb.at = null; }} bind:re={() => fb.re, (v) => (fb.re = v)} replacing={fb.replacing} info={found} focusN={fb.focusN}
+          onnext={() => step(1)} onprev={() => step(-1)} onreplace={(text, all) => (fb.rep = { text, all, n: (fb.rep?.n ?? 0) + 1 })} onclose={closeFind} />
+      {/if}
+      <Editor text={file.text} fileKey={tab.id + '|' + file.path + (narrowed ? '|n:' + narrowed.title : '')}
+        narrow={narrowed ? { line: narrowed.line, end: narrowed.end } : null} onnarrow={(l) => { if (tab.narrow) tab.narrow.line = l; }}
+        onnarrowTo={(l) => store.narrowTab(tab, l)} onwiden={() => store.widenTab(tab)}
+        find={findProp} onfound={(i) => (found = i)} onapi={(a) => (api = a)} path={file.name} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} initialTop={tab.top}
         ontop={(l) => store.setTabTop(tab, l)} initialFolds={tab.folds} onfolds={(l) => store.setTabFolds(tab, l)} resetOn={store.diskGen[file.path] ?? 0}
         levels={store.levels} drawers={store.foldDrawers} rich={store.rich} richNumbers={store.richNumbers} onrich={(p) => rich(p, file.path)} {eyebrow}
         onchange={(t) => store.setText(t, file.path)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
       <!-- an empty file in «Оформление» (§5.4): the word over the column, the caret still in it -->
       {#if store.rich && !file.text.trim()}<div class="empty" aria-hidden="true"><span class="et">Пустой файл</span><span>Начните с <code>* </code> — это заголовок</span></div>{/if}
     </div>
-    {#if structure}<Structure />{/if}
+    {#if structure}<Structure range={narrowed} />{/if}
     </div>
   {:else if tab?.kind === 'untitled'}
     <div class="ed">
@@ -92,6 +155,12 @@
   .ed, .view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .ed { position: relative; min-width: 0; }
   .with { flex: 1; min-height: 0; display: flex; }
+  /* the narrowing's strip (§5.8): 40 pt of the lamp over the column */
+  .narrow { flex: 0 0 40px; display: flex; align-items: center; gap: 10px; padding: 0 20px; box-sizing: border-box; background: var(--lampsoft); border-bottom: 1px solid var(--lampline); font-size: 12.5px; color: var(--ink2); }
+  .narrow b { color: var(--lampink); }
+  .narrow .np { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .narrow .k { font: 11px var(--mono); color: var(--ink3); }
+  .narrow button { height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--card); color: var(--ink); font: 12.5px var(--ui); }
   .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; pointer-events: none; color: var(--ink3); font: 500 17px var(--text); }
   .empty .et { font: 400 28px/1.2 var(--title); color: var(--ink2); }
   .empty code { padding: 0 4px; border-radius: 4px; font: 0.85em var(--mono); background: var(--chip); }

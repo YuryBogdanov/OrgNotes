@@ -29,6 +29,7 @@ export interface Tab {
   label?: string; // a tab of a kind nobody registers: the name it had
   view?: string; // a file tab: how it is shown — '' text, else a view of a plugin («Доска», ТЗ 33); unset: as the file was last
   scope?: { line: number; title: string }; // a file tab of a plugin's view on one heading and its subtree (a mindmap of a branch, ТЗ 39)
+  narrow?: { line: number; title: string }; // a file tab narrowed to a heading's subtree (⌃X N S, ТЗ 42 §5.8)
 }
 export interface Pane {
   id: string;
@@ -437,7 +438,7 @@ export function serialize(L: Layout): string {
         active: Math.max(0, tabs.indexOf(act)),
         tabs: tabs.map((t) => {
           const label = core(t.kind) ? undefined : (viewOf(t.kind)?.label(t) ?? t.label);
-          return { kind: t.kind, path: t.path, cursor: t.cursor, ...(t.top ? { top: t.top } : {}), ...(t.folds?.length ? { folds: t.folds } : {}), ...(t.view !== undefined ? { view: t.view } : {}), ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.data !== undefined ? { data: t.data } : {}), ...(label ? { label } : {}) };
+          return { kind: t.kind, path: t.path, cursor: t.cursor, ...(t.top ? { top: t.top } : {}), ...(t.folds?.length ? { folds: t.folds } : {}), ...(t.view !== undefined ? { view: t.view } : {}), ...(t.narrow ? { narrow: t.narrow } : {}), ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.data !== undefined ? { data: t.data } : {}), ...(label ? { label } : {}) };
         }),
       };
     }),
@@ -470,6 +471,7 @@ export function restore(raw: string | null, exists: (path: string) => boolean): 
           if (Array.isArray(st.folds)) t.folds = st.folds.filter((x: unknown): x is number => typeof x === 'number' && x >= 0);
           t.reveal = null; // the editor restores the caret, column included
           if (typeof st.view === 'string') t.view = st.view;
+          if (typeof st.narrow?.line === 'number' && typeof st.narrow?.title === 'string') t.narrow = { line: st.narrow.line, title: st.narrow.title };
           tabs.push(t);
         } else return;
         if (i === sp.active) active = tabs.length - 1;
