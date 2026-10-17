@@ -13,7 +13,7 @@ const head = (page: Page) => page.locator('[data-ui="next"] .side .grp.head');
 async function open(page: Page) {
   await page.addInitScript(() => localStorage.setItem('ui:next', '1'));
   await openApp(page, { files: F, ready: false, viewport: { width: 1440, height: 820 } });
-  await expect(page.locator('[data-ui="next"]')).toBeVisible();
+  await expect(page.locator('.next[data-ui="next"]')).toBeVisible();
 }
 
 test('the sections: the core\'s, «Входящие» with the Inbox plugin, the plugins\' group; «Файлы» by default', async ({ page }) => {

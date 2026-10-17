@@ -338,6 +338,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   (the tree, moved out of the sidebar), the bridges AgendaList / TagsPanel / SearchPanel, a plugin's `NavSpec.component`.
   The new App runs `today`, `navFiles/Agendas/Tags/Search`, `findAll`, `searchNext/Prev` and `actionOf(id)` (the
   plugins' commands and section keys).
+  ТЗ 43.2, the compatibility layer: `next/compat.ts` `COMPAT` — each variable app.css defines → the new tokens (null:
+  the same name, inherited), `compatPalette` (the «Синька» `--p-*`), `compatVars`; `compat.test.ts` fails on a variable
+  of app.css with no line there. `next/Compat.svelte` (`display: contents`, `data-ui="next"`) sets the tokens and the
+  layer — so a menu moved to <body> keeps them. Wrapped so far: the App's sheets, palette, settings, menus, refile,
+  plugin sheets; the editor's menu and tags popover; RichMenu; PluginFileView. The root's small `BRIDGE` of tokens.ts
+  stays till the old screens and the plugins' tabs get the layer (43.3–43.4). e2e locate the window by
+  `.next[data-ui="next"]` (the layer has the attribute too).
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

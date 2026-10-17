@@ -13,6 +13,7 @@
   import FindPanel from './FindPanel.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
   import { PluginFileView, RichMenu } from './bridges';
+  import Compat from './Compat.svelte';
 
   // What the active tab shows in the new interface (ТЗ 42.5): a file — the editor (or a plugin's view of it, the
   // board, the canvas); an untitled tab — the editor on its text; a plugin's tab — its view; none — a word.
@@ -110,7 +111,7 @@
       </div>
     {/if}
   {:else if tab && file && (fileViewOf(fview) || fileTypeOf(tab.path))}
-    <div class="view"><PluginFileView id={fview} path={file.name} {tab} pane={0} /></div>
+    <div class="view"><Compat><PluginFileView id={fview} path={file.name} {tab} pane={0} /></Compat></div>
   {:else if file && tab}
     {#if narrowed}
       <div class="narrow" role="status" aria-label="Сужено">
@@ -148,7 +149,7 @@
     <div class="word" role="status"><b class="title">Нет открытых вкладок</b><span>Откройте файл в сайдбаре или создайте новый.</span></div>
   {/if}
 </div>
-{#if richPick}<RichMenu pick={richPick.pick} path={richPick.path} onclose={() => (richPick = null)} />{/if}
+{#if richPick}<Compat><RichMenu pick={richPick.pick} path={richPick.path} onclose={() => (richPick = null)} /></Compat>{/if}
 
 <style>
   .area { flex: 1; min-height: 0; display: flex; flex-direction: column; }

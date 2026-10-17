@@ -16,7 +16,7 @@ async function open(page: Page, flagOnce = false) {
     localStorage.setItem('ui:next', '1');
   }, flagOnce);
   await openApp(page, { files: FILES, ready: false });
-  await expect(page.locator('[data-ui="next"]')).toBeVisible();
+  await expect(page.locator('.next[data-ui="next"]')).toBeVisible();
 }
 
 test('a tab per file, the path with its extension; a click activates; «×» closes; «+» an untitled one', async ({ page }) => {
@@ -66,7 +66,7 @@ test('two panes of the old interface: one in the new, both again in the old; «�
   await store(page, "store.splitRight(); layout.openFile(store.layout, 1, '/mock/weeks.org', 0, { replace: true }); store.persistLayout();");
   expect(await store(page, 'return store.layout.panes.length;')).toBe(2);
   await store(page, 'await store.setInterface(true);');
-  await expect(page.locator('[data-ui="next"]')).toBeVisible();
+  await expect(page.locator('.next[data-ui="next"]')).toBeVisible();
   expect(await store(page, 'return store.layout.panes.length;')).toBe(1);
   await expect(strip(page).getByRole('tab', { name: 'weeks.org' })).toBeVisible();
   await store(page, 'store.splitRight();');
@@ -74,6 +74,6 @@ test('two panes of the old interface: one in the new, both again in the old; «�
   expect(await store(page, 'return store.layout.panes.length;')).toBe(1);
   // back: two panes, weeks.org on the right
   await store(page, 'await store.setInterface(false);');
-  await expect(page.locator('[data-ui="next"]')).toHaveCount(0);
+  await expect(page.locator('.next[data-ui="next"]')).toHaveCount(0);
   await expect.poll(() => store(page, 'return store.loaded && store.layout.panes.map((p) => p.tabs.map((t) => t.path?.split("/").pop()));')).toEqual([['Midterm.org'], ['weeks.org']]);
 });

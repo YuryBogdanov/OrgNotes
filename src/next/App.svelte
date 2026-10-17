@@ -16,6 +16,7 @@
   import EditorArea from './EditorArea.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
   import { CloseSheet, ContextMenu, Dialogs, DiskSheet, Palette, PluginSheets, Refile, Settings, type MenuItem } from './bridges';
+  import Compat from './Compat.svelte';
   import { untrack } from 'svelte';
   import { actionOf } from '../views';
   import { today } from '../todayState.svelte';
@@ -128,15 +129,20 @@
   <EditorArea />
   </div>
   </div>
-  <Dialogs />
-  {#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
-  {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
-  {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
-  {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
-  {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
+  <!-- the bridged sheets and menus in the compatibility layer (ТЗ 43 §5) -->
+  <Compat>
+    <Dialogs />
+    {#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
+    {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
+    {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
+    {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
+    {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
+  </Compat>
   {#if store.toast}<div class="toast" role="status">{store.toast.text}{#each store.toast.actions ?? [] as a (a.label)}<button onclick={() => { store.toast = null; a.run(); }}>{a.label}</button>{/each}</div>{/if}
-  {#if store.settingsOpen && store.loaded}<Settings />{/if}
-  <PluginSheets />
+  <Compat>
+    {#if store.settingsOpen && store.loaded}<Settings />{/if}
+    <PluginSheets />
+  </Compat>
 </div>
 
 <style>

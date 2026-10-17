@@ -6,7 +6,7 @@ import { openApp } from './helpers';
 // old one and a word why, the flag staying on.
 
 const FILES = { '/mock/work.org': '* TODO Задача\nТекст.\n', '/mock/plan.org': '* План\n' };
-const nextShell = (page: Page) => page.locator('[data-ui="next"]');
+const nextShell = (page: Page) => page.locator('.next[data-ui="next"]');
 
 test('off by default: the old shell; on in the settings — the new one after a reload, the tabs kept; back by the palette', async ({ page }) => {
   await openApp(page, { files: FILES });

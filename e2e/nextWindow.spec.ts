@@ -13,7 +13,7 @@ const tabs = (page: Page) => page.evaluate(async () => (await import('/src/store
 async function open(page: Page) {
   await page.addInitScript(() => localStorage.setItem('ui:next', '1'));
   await openApp(page, { files: FILES, ready: false });
-  await expect(page.locator('[data-ui="next"]')).toBeVisible();
+  await expect(page.locator('.next[data-ui="next"]')).toBeVisible();
   await expect(tree(page)).toBeVisible();
 }
 

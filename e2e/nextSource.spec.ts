@@ -9,7 +9,7 @@ const DOC = ['* TODO Роадмап :работа:', 'SCHEDULED: <2026-10-16 П�
 const view = (page: Page) => page.locator('[data-ui="next"] .cm-editor');
 const color = (page: Page, sel: string) => view(page).locator(sel).first().evaluate((el) => getComputedStyle(el).color);
 const token = (page: Page, name: string) =>
-  page.locator('[data-ui="next"]').evaluate((el, n) => {
+  page.locator('.next[data-ui="next"]').evaluate((el, n) => {
     const p = document.createElement('span');
     p.style.color = `var(--${n})`;
     el.appendChild(p);
