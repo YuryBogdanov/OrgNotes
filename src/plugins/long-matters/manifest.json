@@ -39,6 +39,7 @@
       {
         "id": "long-matters.review",
         "title": "Проверить через…",
+        "cardKey": "R",
         "synonyms": [
           "долгие дела",
           "срок проверки",
@@ -48,6 +49,7 @@
       {
         "id": "long-matters.wait",
         "title": "Ждём…",
+        "cardKey": "W",
         "synonyms": [
           "долгие дела",
           "ожидание",
@@ -65,6 +67,7 @@
       {
         "id": "long-matters.seen",
         "title": "Осмотрено",
+        "cardKey": "O",
         "synonyms": [
           "долгие дела",
           "осмотрел",

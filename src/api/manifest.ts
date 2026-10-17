@@ -20,6 +20,8 @@ export interface ManifestCommand {
   step?: boolean;
   /** A grey line under it in «Клавиши» (1.6). */
   note?: string;
+  /** The letter of a card's action (ТЗ 44 §9, 1.14): with no `keys` of its own the core gives it «⌃C K <letter>». */
+  cardKey?: string;
 }
 export interface ManifestNav {
   id: string;
@@ -186,7 +188,8 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
     const ok = keys.filter((k) => !RESERVED_KEYS.includes(k));
     for (const k of keys) if (!ok.includes(k)) warnings.push(`${k} у «${String(x.title)}» занято приложением`);
     if (x.scope !== undefined && x.scope !== 'review' && x.scope !== 'view') problems.push(`команда «${x.id}»: scope — review или view`);
-    commands.push({ id: x.id as string, title: String(x.title ?? ''), keys: ok, synonyms: arr(x.synonyms).filter(isStr), ...(x.scope === 'review' || x.scope === 'view' ? { scope: x.scope } : {}), ...(x.step === true ? { step: true } : {}), ...(isStr(x.note) && x.note ? { note: x.note } : {}) });
+    if (x.cardKey !== undefined && !(typeof x.cardKey === 'string' && /^[A-Za-z0-9]$/.test(x.cardKey))) problems.push(`команда «${x.id}»: cardKey — одна латинская буква или цифра`);
+    commands.push({ id: x.id as string, title: String(x.title ?? ''), keys: ok, ...(typeof x.cardKey === 'string' && /^[A-Za-z0-9]$/.test(x.cardKey) ? { cardKey: x.cardKey.toUpperCase() } : {}), synonyms: arr(x.synonyms).filter(isStr), ...(x.scope === 'review' || x.scope === 'view' ? { scope: x.scope } : {}), ...(x.step === true ? { step: true } : {}), ...(isStr(x.note) && x.note ? { note: x.note } : {}) });
   }
   const navSections: ManifestNav[] = [];
   for (const x of arr(c.navSections).map(obj)) {

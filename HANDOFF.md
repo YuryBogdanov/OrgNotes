@@ -432,6 +432,10 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   under the caret, up to 260 pt with the fade; classes `fc-stats`, `fc-stat`, `fc-under`, `fc-btns`, `fc-btn` for
   the plugins). Structure takes `cards` and `width` (268 with a card, else 220). «Привет» has a card (open tasks).
   Nothing in the old interface.
+  44.6, the cards' keys: a manifest command's `cardKey` (one letter or digit, upper-cased) with no `keys` gets
+  «⌃C K <letter>» (`declare.ts` `cardChord`); a chord another command declared first has — none, and its note in
+  «Клавиши» says whose. The dispatch's three-press chords take it from the text; the plugin's handler checks the
+  heading under the caret. «Долгие дела»: R «Проверить через…», W «Ждём…», O «Осмотрено».
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
