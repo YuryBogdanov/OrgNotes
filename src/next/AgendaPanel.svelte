@@ -10,6 +10,13 @@
   // (its first block's colour), its name. A click opens it in the agenda's tab (or switches the one open); the one
   // shown is marked. A right click on one of mine: «Редактировать…», «Удалить агенду…»; a double click edits it.
   // «Новая агенда…» at the bottom: the builder (a bridge).
+  // the built-in ones (ТЗ 45 §3.1): «Агенда» the day and its 30 days, then «Неделя», «Сегодня», «Все задачи»
+  const BUILTIN = [
+    { id: '', name: 'Агенда', dot: 'var(--lampink)', sub: '30 дней' },
+    { id: 'builtin:week', name: 'Неделя', dot: 'var(--next)' },
+    { id: 'builtin:today', name: 'Сегодня', dot: 'var(--wait)' },
+    { id: 'builtin:all', name: 'Все задачи', dot: 'var(--ink3)' },
+  ];
   const shown = $derived(store.tab?.kind === 'agenda' ? (store.agenda?.id ?? '') : null);
   const dot = (color: string | undefined) => (asNamed(color) ? `var(--p-${asNamed(color)})` : (color ?? 'var(--ink3)'));
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
@@ -27,9 +34,11 @@
 
 <nav class="ap" aria-label="Список агенд">
   <div class="cap">Встроенные</div>
-  <button class="row" class:on={shown === ''} aria-current={shown === '' ? 'true' : undefined} onclick={() => store.openAgendaHere('')}>
-    <i style:background="var(--lamp)"></i><span class="nm">Агенда</span>
-  </button>
+  {#each BUILTIN as b (b.id)}
+    <button class="row" class:on={shown === b.id} aria-current={shown === b.id ? 'true' : undefined} onclick={() => store.openAgendaHere(b.id)}>
+      <i style:background={b.dot}></i><span class="nm">{b.name}</span>{#if b.sub}<span class="sub">{b.sub}</span>{/if}
+    </button>
+  {/each}
   <div class="cap">Мои агенды</div>
   {#each store.agendas as a (a.id)}
     <button class="row" class:on={shown === a.id} aria-current={shown === a.id ? 'true' : undefined}
@@ -62,6 +71,7 @@
   .row.on { background: var(--lampsoft); color: var(--ink); }
   .row i { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 4px; }
   .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .sub { margin-left: auto; font-size: 11.5px; color: var(--ink3); }
   .none { margin: 0; padding: 4px 10px; font-size: 12px; color: var(--ink3); }
   .new { flex: 0 0 28px; display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--lampink); font: 12.5px var(--ui); text-align: left; }
   .new:hover { background: var(--chip); }

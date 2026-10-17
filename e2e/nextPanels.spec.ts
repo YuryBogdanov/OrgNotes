@@ -23,9 +23,11 @@ test('«Агенда»: the built-in opens the agenda\'s tab, marked; «Нова
   const list = page.getByRole('navigation', { name: 'Список агенд' });
   await expect(list).toContainText('Встроенные');
   await expect(list).toContainText('Своих агенд пока нет');
-  await list.getByRole('button', { name: 'Агенда', exact: true }).click();
+  // the built-in ones (ТЗ 45 §3.1): «Агенда» with its «30 дней», «Неделя», «Сегодня», «Все задачи»
+  await expect(list.getByRole('button').filter({ has: page.locator('.nm') }).locator('.nm')).toHaveText(['Агенда', 'Неделя', 'Сегодня', 'Все задачи']);
+  await list.getByRole('button', { name: /^Агенда/ }).click();
   await expect(page.locator('header.bar .name')).toHaveText('Агенда');
-  await expect(list.getByRole('button', { name: 'Агенда', exact: true })).toHaveAttribute('aria-current', 'true');
+  await expect(list.getByRole('button', { name: /^Агенда/ })).toHaveAttribute('aria-current', 'true');
   await list.getByRole('button', { name: 'Новая агенда…' }).click();
   await expect(page.getByRole('dialog', { name: 'Конструктор агенды' })).toBeVisible();
 });

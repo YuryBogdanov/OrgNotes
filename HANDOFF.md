@@ -477,7 +477,16 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   overdue from today.ts `overdue` on today only; the rows a list of tasks, `lists.register` id `agendaDay:<pane>`;
   ← → «.» ↑↓ ↩, ⌘↩ opens the task behind the agenda, ⌘↓ «Неделя»; «Неделя» / «Месяц» put a `calendar.view` tab with
   `{ view, date }` in the agenda's place, the switch only while the calendar plugin is live). The way back from the
-  calendar to «День» is the calendar's own keys: not there yet.
+  calendar to «День» is the calendar's own keys: not there yet. Decided with the user (2026-10-17): left as it is
+  till the calendar's own ТЗ in the new style — that ТЗ must give its view switch a «День» (back to the agenda's day
+  on the same date, in the same tab) and ⌘↑; else the jump from «Агенда» is one-way and jarring.
+  45.4, the agendas of blocks: an agenda tab's workings out of Agenda.svelte into `src/agendaListCtl.svelte.ts`
+  (`AgendaListCtl`: the built-in 30 days, a custom agenda's blocks — `Section.cond` its `query()` line, `.total` —
+  the frozen rows, the choice, the keys, `lists.register` id `agenda:<pane>`, `menu`), the old screen on it.
+  `next/AgendaBlocks.svelte` draws a custom agenda and the presets; `src/builtinAgendas.ts` `PRESETS` — «Неделя»
+  `builtin:week`, «Сегодня» `builtin:today`, «Все задачи» `builtin:all`: plain agendas run by `runAgenda`, not in
+  config.json, no «Редактировать…»; `AgendaStore.of` resolves them. The sidebar's panel lists them under «Встроенные»
+  after «Агенда · 30 дней». The bridge `Agenda` is gone.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

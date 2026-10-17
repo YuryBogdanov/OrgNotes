@@ -1,6 +1,7 @@
 // Custom agendas («Мои агенды», `agendas` in config.json; tech sprint 2.4, from the store): the list, and the builder
 // that edits a copy of one. The store owns one: it reads the list with the config and opens a saved agenda.
 
+import { presetOf } from './builtinAgendas';
 import { cloneAgenda, newAgenda, readAgendas, sameAgenda, withAgendas, type Agenda } from './agendas';
 import type { Tab } from './layout';
 
@@ -19,7 +20,8 @@ export class AgendaStore {
   list = $state.raw<Agenda[]>([]);
   /** The agenda a tab shows (undefined: a file, or the built-in agenda). */
   of(t: Tab | undefined): Agenda | undefined {
-    return t?.kind === 'agenda' && t.agenda ? this.list.find((a) => a.id === t.agenda) : undefined;
+    // the new interface's built-in ones («Неделя», «Сегодня», «Все задачи», ТЗ 45 §3.1) too: read-only
+    return t?.kind === 'agenda' && t.agenda ? (this.list.find((a) => a.id === t.agenda) ?? presetOf(t.agenda)) : undefined;
   }
   /** The builder: an editable copy of the agenda; `orig` is null for a new one. */
   builder = $state<{ draft: Agenda; orig: Agenda | null; n: number } | null>(null);

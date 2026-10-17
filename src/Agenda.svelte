@@ -1,208 +1,31 @@
 <script lang="ts">
-  import { builtinItemsOf, builtinSectionsOf, type AgendaItem as Item, type AgendaSection as Section } from './builtinAgenda';
   import { draggedHeading, setDragged } from './dragData';
-  import { untrack } from 'svelte';
   import { store } from './store.svelte';
-  import { dayDiff, fmtDay, titleIndex, toJs, toneFor, type OrgDate } from './org';
-  import { toneOf, toneStyle } from './colors';
-  import { displayName } from './names';
-  import { runAgenda, tasksCount } from './agendas';
-  import { lists } from './taskLists.svelte';
+  import { tasksCount } from './agendas';
   import ListToast from './ListToast.svelte';
+  import { AgendaListCtl } from './agendaListCtl.svelte';
 
-  // the pane the agenda lives in: a task opens in the neighbour pane (↩, double click) or here (⌥↩)
+  // An agenda's tab (ТЗ 05, 34): the built-in list of the next 30 days, or a custom agenda's blocks. The pane the
+  // agenda lives in: a task opens in the neighbour pane (↩, double click) or here (⌥↩). Its workings are
+  // agendaListCtl.svelte.ts (the new interface draws them too, ТЗ 45 §3.3).
   let { pane = 0 }: { pane?: number } = $props();
-
-
   // the colours of the priorities, as the board's (ТЗ 33): A — TODO's, B — WAIT's, C — the secondary
   const PRIO: Record<string, string> = { A: 'var(--todo)', B: 'var(--wait)', C: 'var(--fg2)' };
-
-  // each agenda tab shows its own agenda
-  const tab = $derived.by(() => {
-    const p = store.layout.panes[pane];
-    return p?.tabs[p.active];
-  });
-  const custom = $derived(store.agendaOf(tab));
-  const midnight = $derived(new Date(store.today.getFullYear(), store.today.getMonth(), store.today.getDate()));
-
-  // ---- the built-in agenda: open tasks and events of the next 30 days, by day (builtinAgenda.ts) ------------------
-  const builtinItems = $derived(builtinItemsOf(store.agendaFiles, midnight));
-  const builtinSections = $derived(builtinSectionsOf(builtinItems, midnight));
-
-
-
-  // ---- a custom agenda: its blocks in order, each with its own heading -------------------------------------------
-  const customRun = $derived(custom ? runAgenda(custom, store.agendaFiles, midnight) : []);
-  const mark = (d: OrgDate | undefined, word: string) => (d ? `${word} ${fmtDay(toJs(d))}` : '');
-  const customSections = $derived.by(() => {
-    const out: Section[] = [];
-    customRun.forEach((r) => {
-      const dot = toneStyle(toneOf(r.block.color) ?? toneOf('blue')!);
-      const rows = (tasks: (typeof r.groups)[number]['tasks'], at: string) =>
-        tasks.map((t): Item => {
-          const f = store.files[t.file];
-          const h = f.headings.find((x) => x.line === t.line);
-          const n = h ? titleIndex(f.headings, h.line, h.title) : 0;
-          const d = t.scheduled ?? t.deadline;
-          return {
-            day: d ? dayDiff(toJs(d), midnight) : 0, time: t.scheduled?.time ?? '', kw: t.kw, tone: toneStyle(toneFor(t.kw, f.wf)), ev: false,
-            prio: t.prio, title: t.title, src: t.src, tags: t.tags.filter((x) => !f.filetags.includes(x)).join(' '),
-            mark: t.scheduled ? mark(t.scheduled, 'Запланировано') : mark(t.deadline, 'Дедлайн'),
-            late: !!d && !t.done && dayDiff(toJs(d), midnight) < 0, file: t.file, line: t.line, order: t.order,
-            path: f.path, n, dk: t.scheduled ? 'SCHEDULED' : t.deadline ? 'DEADLINE' : null, key: `${at}|${f.path}|${t.title}|${n}`,
-          };
-        });
-      const grouped = r.groups.length && r.groups[0].title !== '';
-      out.push({
-        key: r.block.id, title: r.block.name, sub: tasksCount(r.total), tone: '', dot, level: 1,
-        items: grouped ? [] : rows(r.groups[0]?.tasks ?? [], r.block.id), empty: r.total === 0, more: grouped ? 0 : r.more,
-      });
-      if (grouped) {
-        r.groups.forEach((g, gi) =>
-          out.push({ key: `${r.block.id}:${g.key}`, title: g.title, sub: String(g.tasks.length), tone: '--fg2', level: 2, items: rows(g.tasks, `${r.block.id}:${g.key}`), more: gi === r.groups.length - 1 ? r.more : 0 }),
-        );
-      }
-    });
-    return out;
-  });
-
-  const live = $derived<Section[]>(custom ? customSections : builtinSections);
-
-  // ---- rows changed from the list stay where they were until it is refreshed (ТЗ 34) ------------------------------
-  // `frozen`: the rows as they were before the first change; drawn with the values of now, a row that no longer fits
-  // dimmed; new rows wait. ⌘R, another agenda or day, a change of a file not made from the lists, a new tab: refresh.
-  let frozen = $state.raw<{ sections: Section[]; texts: Map<string, string> } | null>(null);
-  function freeze() {
-    if (!frozen) frozen = { sections: live, texts: new Map(store.files.map((f) => [f.path, f.text])) };
-  }
-  function refresh() {
-    frozen = null;
-  }
-  /** A row whose task no longer fits: its values now, or null when the task is gone. */
-  function staleOf(it: Item): Item | null {
-    const fi = store.files.findIndex((f) => f.path === it.path);
-    const f = store.files[fi];
-    const h = f?.headings.filter((x) => x.title === it.title)[it.n];
-    if (!f || !h) return null;
-    const done = !!h.keyword && f.wf.done.includes(h.keyword);
-    const date = it.dk === 'event' ? h.event : it.dk === 'DEADLINE' ? h.deadline : h.scheduled;
-    const word = it.dk === 'event' ? 'Событие' : it.dk === 'DEADLINE' ? 'Дедлайн' : 'Запланировано';
-    const closed = h.closed && dayDiff(toJs(h.closed), midnight) === 0 ? `Закрыто сегодня${h.closed.time ? ' ' + h.closed.time : ''}` : h.closed ? `Закрыто ${fmtDay(toJs(h.closed))}` : 'Выполнено';
-    return {
-      ...it, kw: h.keyword, tone: h.keyword ? toneStyle(toneFor(h.keyword, f.wf)) : '', ev: !h.keyword && !!h.event, prio: h.priority,
-      tags: (custom ? h.tags.filter((x) => !f.filetags.includes(x)) : h.tags).join(' '), file: fi, line: h.line, late: false,
-      mark: done ? closed : date ? `${word} ${fmtDay(toJs(date))}` : 'Без даты', stale: true, done,
-    };
-  }
-  const sections = $derived.by<Section[]>(() => {
-    if (!frozen) return live;
-    const now = new Map(live.flatMap((s) => s.items.map((it) => [it.key, it] as const)));
-    return frozen.sections.map((s) => ({ ...s, items: s.items.flatMap((it) => now.get(it.key) ?? staleOf(it) ?? []) }));
-  });
-  // a change not made from the lists (typed in the editor, from disk): the list is computed again, as before
-  $effect(() => {
-    const fz = frozen;
-    if (!fz) return;
-    if (lists.changedOutside(store.files, fz.texts)) untrack(refresh);
-  });
-  // another agenda, another day
-  $effect(() => {
-    void custom?.id;
-    void midnight.getTime();
-    untrack(refresh);
-  });
-
-  const items = $derived(sections.flatMap((s) => s.items));
-  const total = $derived(custom ? customRun.reduce((n, r) => n + r.total, 0) : items.length);
-  const sourcesWord = $derived(custom ? (custom.sources.length ? custom.sources.map((s) => displayName(s)).join(', ') : 'все файлы') : '');
-
-  // ---- choosing a task: a click chooses, a double click or ↩ opens (ТЗ 34) -----------------------------------------
-  // `items` is in display order, so an index into it is the row order
-  let sel = $state(-1);
   let list: HTMLDivElement | undefined = $state();
-  let selKey = $state('');
-  // the selection follows its row when the list is computed again; a task gone takes it away
-  $effect(() => {
-    if (!selKey) return;
-    const i = items.findIndex((it) => it.key === selKey);
-    if (i < 0) {
-      sel = -1;
-      selKey = '';
-    } else if (i !== sel) sel = i;
-  });
-  function choose(i: number) {
-    if (!items.length) return;
-    sel = Math.max(0, Math.min(items.length - 1, i));
-    selKey = items[sel]?.key ?? '';
-    queueMicrotask(() => list?.querySelector<HTMLElement>(`[data-i="${sel}"]`)?.scrollIntoView({ block: 'nearest' }));
-  }
-  function clear() {
-    sel = -1;
-    selKey = '';
-  }
-  function openItem(i: number, mode: 'neighbor' | 'neighbor-focus' | 'here') {
-    const it = items[i];
-    if (!it) return;
-    choose(i);
-    store.openFromAgenda(pane, it.file, it.line, mode);
-    if (mode === 'neighbor') queueMicrotask(() => list?.focus()); // the focus stays in the agenda
-  }
-  function keydown(e: KeyboardEvent) {
-    if (e.key === 'ArrowDown' && !e.shiftKey && !e.altKey && !e.metaKey) {
-      e.preventDefault();
-      choose(sel + 1);
-    } else if (e.key === 'ArrowUp' && !e.shiftKey && !e.altKey && !e.metaKey) {
-      e.preventDefault();
-      choose(sel < 0 ? 0 : sel - 1);
-    } else if (e.code === 'KeyZ' && e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && lists.canUndo) {
-      // ⌘Z: the lists' own steps first (the window's ⌘Z takes the rest)
-      e.preventDefault();
-      void lists.undo();
-    }
-  }
-  // another agenda picked in the list: the selection starts over
-  $effect(() => {
-    void custom?.id;
-    untrack(clear);
-  });
-  // a click on no row takes the selection away
-  function clickEmpty(e: MouseEvent) {
-    if (!(e.target as HTMLElement).closest('.item')) clear();
-  }
-
-  // the lists' part: the keys, the menu, the palette and the inspector act on the chosen task
-  $effect(() => {
-    const id = 'agenda:' + pane;
-    return untrack(() =>
-      lists.register({
-        id,
-        el: () => list,
-        tab: () => tab,
-        selected: () => {
-          const it = items[sel];
-          return it ? { path: it.path, line: it.line, title: it.title, dk: it.dk } : null;
-        },
-        open: (other) => openItem(sel, other ? 'here' : 'neighbor'),
-        otherLabel: 'Открыть здесь',
-        clear,
-        refresh,
-        freeze,
-      }),
-    );
-  });
-  const listId = $derived('agenda:' + pane);
-
-  // the hint bar: the keys as set now
-  const pair = (a: string, b: string) => (a && b && a.slice(0, -1) === b.slice(0, -1) ? `${a} ${b.slice(-1)}` : [a, b].filter(Boolean).join(' '));
-  const hints = $derived(
-    [
-      [store.keyHint('taskOpen'), 'открыть'],
-      [pair(store.keyHint('taskStatusPrev'), store.keyHint('taskStatusNext')), 'статус'],
-      [pair(store.keyHint('taskDatePrev'), store.keyHint('taskDateNext')), 'дата ±1 день'],
-      [pair(store.keyHint('taskPrioUp'), store.keyHint('taskPrioDown')), 'приоритет'],
-      [store.keyHint('taskSchedule'), 'запланировать'],
-    ].filter(([k]) => k),
-  );
+  const c = new AgendaListCtl(() => pane, () => list);
+  c.effects();
+  const custom = $derived(c.custom);
+  const sections = $derived(c.sections);
+  const items = $derived(c.items);
+  const total = $derived(c.total);
+  const sourcesWord = $derived(c.sourcesWord);
+  const sel = $derived(c.sel);
+  const listId = $derived(c.listId);
+  const hints = $derived(c.hints);
+  const choose = (i: number) => c.choose(i);
+  const openItem = (i: number, mode: 'neighbor' | 'neighbor-focus' | 'here') => c.openItem(i, mode);
+  const keydown = (e: KeyboardEvent) => c.keydown(e);
+  const clickEmpty = (e: MouseEvent) => c.clickEmpty(e);
 </script>
 
 <div class="agenda">
@@ -233,7 +56,7 @@
           <div class="item" class:sel={i === sel} class:stale={it.stale} class:done={it.done} id="ag-{pane}-{i}" data-i={i} role="option" aria-selected={i === sel}
             onclick={() => choose(i)} ondblclick={() => openItem(i, 'neighbor-focus')}
             draggable="true" ondragstart={(e) => { const d = draggedHeading(it.path, it.line); if (d) setDragged(e.dataTransfer, d); }}
-            oncontextmenu={(e) => { choose(i); list?.focus({ preventScroll: true }); const sp = lists.spec(listId); if (sp) lists.openMenu(e, sp); }}>
+            oncontextmenu={(e) => c.menu(e, i)}>
             <span class="time">{it.time}</span>
             {#if it.kw}
               <span class="kw tone-chip" style={it.tone}>{it.kw}</span>
