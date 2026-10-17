@@ -345,6 +345,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   plugin sheets; the editor's menu and tags popover; RichMenu; PluginFileView. The root's small `BRIDGE` of tokens.ts
   stays till the old screens and the plugins' tabs get the layer (43.3–43.4). e2e locate the window by
   `.next[data-ui="next"]` (the layer has the attribute too).
+  ТЗ 43.3: a plugin's section is `next/PluginPanel.svelte` (its own host of `plugins.navs`' render, in Compat);
+  a feature's own `NavSpec.component` otherwise. A panel failing turns the plugin off as before (`plugins.guard`);
+  the sidebar remembers the plugin of the panel shown (`$effect.pre`, before the panel draws) and, it being in
+  `plugins.failed`, says «Раздел плагина не загрузился» with the reason and «Подробнее» (settings → «Плагины») till
+  another section is picked. Shots of the sidebar: clip a page screenshot — WebKit's element screenshot misses a
+  plugin's panel mounted just before.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
