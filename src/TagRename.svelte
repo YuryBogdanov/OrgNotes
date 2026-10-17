@@ -1,47 +1,22 @@
 <script lang="ts">
-  import { tagsState as ts } from './tagsState.svelte';
-  import { bareTag, tagOk } from './tags';
+  import { TagRenameCtl, pl } from './tagRenameCtl.svelte';
   import { portal } from './portal';
 
   // «Переименовать во всех файлах…» and «Объединить с…» (ТЗ 38 §5): `:from:` → a new name (or, to merge, one of the
   // tags there are), what changes and where, a warning when the name is taken (they merge); one edit, one ⌘Z.
   let { from, merge = false, onclose }: { from: string; merge?: boolean; onclose: () => void } = $props();
-  let text = $state('');
-  let cur = $state(0);
-  const to = $derived(bareTag(text));
-  const others = $derived(ts.list.filter((t) => t.tag.toLowerCase() !== from.toLowerCase()));
-  const sugg = $derived.by(() => {
-    if (!merge) return [];
-    const q = to.toLowerCase();
-    return others.filter((t) => !q || t.tag.toLowerCase().includes(q)).slice(0, 6);
-  });
-  const exists = $derived(others.some((t) => t.tag.toLowerCase() === to.toLowerCase()));
-  const bad = $derived(!!to && !tagOk(to) ? 'Только буквы, цифры, _ @ # % — без пробелов и двоеточий' : merge && to && !exists ? 'Выберите тег из списка' : '');
-  const ok = $derived(!!to && !bad && to.toLowerCase() !== from.toLowerCase());
-  const p = $derived(ok ? ts.preview(from, to) : ts.preview(from, from));
-  const pl = (n: number, one: string, few: string, many: string) => (n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many);
-  let busy = $state(false);
-  async function go() {
-    if (!ok || busy) return;
-    busy = true;
-    await ts.rename(from, others.find((t) => t.tag.toLowerCase() === to.toLowerCase())?.tag ?? to);
-    busy = false;
-    onclose();
-  }
-  function key(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      onclose();
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (merge && sugg[cur] && sugg[cur].tag.toLowerCase() !== to.toLowerCase()) text = sugg[cur].tag;
-      else void go();
-    } else if (merge && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-      e.preventDefault();
-      cur = Math.max(0, Math.min(sugg.length - 1, cur + (e.key === 'ArrowDown' ? 1 : -1)));
-    }
-  }
+  // svelte-ignore state_referenced_locally
+  const c = new TagRenameCtl(from, merge, onclose); // the tag of the dialog as it opened
+  const sugg = $derived(c.sugg);
+  const exists = $derived(c.exists);
+  const bad = $derived(c.bad);
+  const ok = $derived(c.ok);
+  const p = $derived(c.preview);
+  const to = $derived(c.to);
+  const cur = $derived(c.cur);
+  const busy = $derived(c.busy);
+  const go = c.go;
+  const key = c.key;
 </script>
 
 <div class="layer" use:portal>
@@ -54,7 +29,7 @@
       <span class="new" class:badf={!!bad}>
         <i>:</i>
         <!-- svelte-ignore a11y_autofocus -->
-        <input bind:value={text} autofocus placeholder={merge ? 'тег' : 'новое имя'} aria-label={merge ? 'С каким тегом объединить' : 'Новое имя тега'} spellcheck="false" oninput={() => (cur = 0)} />
+        <input bind:value={c.text} autofocus placeholder={merge ? 'тег' : 'новое имя'} aria-label={merge ? 'С каким тегом объединить' : 'Новое имя тега'} spellcheck="false" oninput={() => (c.cur = 0)} />
         <i>:</i>
       </span>
     </div>
@@ -62,7 +37,7 @@
       <div class="sug" role="listbox" aria-label="Теги">
         {#each sugg as s, i (s.tag)}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <div role="option" aria-selected={i === cur} class:on={i === cur} onclick={() => (text = s.tag)}><span>:{s.tag}:</span><em>{s.n}</em></div>
+          <div role="option" aria-selected={i === cur} class:on={i === cur} onclick={() => (c.text = s.tag)}><span>:{s.tag}:</span><em>{s.n}</em></div>
         {/each}
       </div>
     {/if}

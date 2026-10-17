@@ -1,142 +1,65 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { store } from './store.svelte';
-  import { noOrg, noteName } from './names';
   import type { Tab } from './layout';
+  import { SaveAsCtl } from './saveAsCtl.svelte';
 
-  // "Сохранить как…" for a tab that has no file yet: a sheet attached under the toolbar.
+  // "Сохранить как…" for a tab that has no file yet: a sheet attached under the toolbar. Its workings: saveAsCtl.
   let { tab }: { tab: Tab } = $props();
-
-  const lsGet = (k: string) => {
-    try {
-      return localStorage.getItem(k);
-    } catch {
-      return null;
-    }
-  };
-  const rootName = $derived(store.dir?.split('/').pop() ?? 'Заметки');
-  const dirOf = (rel: string) => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
-
-  // a file gone from disk keeps its name and, if it is still there, its folder
-  const orphan = tab.kind === 'file' ? store.orphans[tab.path ?? ''] : undefined;
-  // the name: the note's first non-empty line without stars, as the close sheet calls it
-  let name = $state(orphan ? noOrg(orphan.name.split('/').pop()!) : noteName(tab.text ?? '').replace(/[/:\\]/g, '-').replace(/^\.+/, ''));
-
-  // the folder: the one of the file in the neighbour pane, else the last one used, else the root
-  const folders = $derived(['', ...[...store.folders].sort((a, b) => a.localeCompare(b, 'ru'))]);
-  function initialDir() {
-    if (orphan) {
-      const d = dirOf(orphan.name);
-      return d === '' || store.folders.includes(d) ? d : '';
-    }
-    const L = store.layout;
-    for (let i = 0; i < L.panes.length; i++) {
-      if (L.panes[i].tabs.includes(tab) || L.panes[i].tabs.some((t) => t.id === tab.id)) continue;
-      const t = L.panes[i].tabs[L.panes[i].active];
-      const f = store.fileOf(t);
-      if (f) return dirOf(f.name);
-    }
-    const last = lsGet('saveAsDir:' + (store.dir ?? ''));
-    return last !== null && (last === '' || store.folders.includes(last)) ? last : '';
-  }
-  let dir = $state(initialDir());
-  const pathLine = $derived([rootName, ...dir.split('/').filter(Boolean)].join(' › '));
-
+  // svelte-ignore state_referenced_locally
+  const c = new SaveAsCtl(tab); // the tab the sheet opened for
   let input: HTMLInputElement | undefined = $state();
+  c.onfocusEditor = () => document.querySelector<HTMLElement>('section.pane.active .cm-content')?.focus({ preventScroll: true });
+  c.onfocusName = () => input?.focus();
   onMount(() => {
     input?.focus();
-    input?.setSelectionRange(0, name.length);
+    input?.setSelectionRange(0, c.name.length);
   });
-
-  let newFolder = $state<string | null>(null);
-  async function makeFolder() {
-    const n = (newFolder ?? '').trim();
-    newFolder = null;
-    if (!n) return;
-    const rel = await store.createFolder(dir, n);
-    if (rel !== null) dir = rel;
-  }
-
-  let replace = $state(false);
-  let busy = $state(false);
-  async function save(overwrite = false) {
-    if (busy || !name.trim()) return;
-    busy = true;
-    const r = await store.commitSaveAs(tab, dir, name.trim(), overwrite);
-    busy = false;
-    if (r === 'exists') {
-      replace = true;
-      return;
-    }
-    replace = false;
-    if (r !== 'ok') store.sayDraft(r); // the sheet closes, the tab stays unsaved
-    done(r === 'ok');
-  }
-  // the sheet hands the focus back to the editor, the caret where it was
-  function done(saved: boolean) {
-    store.finishSaveAs(saved);
-    requestAnimationFrame(() => document.querySelector<HTMLElement>('section.pane.active .cm-content')?.focus({ preventScroll: true }));
-  }
-  // back to the name field, so Return saves again
-  function closeAsk() {
-    replace = false;
-    queueMicrotask(() => input?.focus());
-  }
-  function key(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      if (replace) closeAsk();
-      else if (newFolder !== null) newFolder = null;
-      else done(false);
-    }
-  }
-  const fileName = $derived(noOrg(name.trim())); // as the app shows it
 </script>
 
-<svelte:window onkeydown={key} />
+<svelte:window onkeydown={c.key} />
 
 <div class="dim">
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Сохранить как">
-    <form onsubmit={(e) => { e.preventDefault(); if (newFolder !== null) makeFolder(); else save(); }}>
+    <form onsubmit={(e) => { e.preventDefault(); void c.submit(); }}>
       <div class="row">
         <label for="sa-name">Сохранить как:</label>
         <div class="namebox">
-          <input id="sa-name" bind:this={input} bind:value={name} autocomplete="off" spellcheck="false" />
+          <input id="sa-name" bind:this={input} bind:value={c.name} autocomplete="off" spellcheck="false" />
         </div>
       </div>
       <div class="row">
         <label for="sa-dir">Где:</label>
-        <select id="sa-dir" bind:value={dir}>
-          {#each folders as f}
-            <option value={f}>{'  '.repeat(f ? f.split('/').length : 0)}{f ? f.split('/').pop() : rootName}</option>
+        <select id="sa-dir" bind:value={c.dir}>
+          {#each c.folders as f}
+            <option value={f}>{'  '.repeat(f ? f.split('/').length : 0)}{f ? f.split('/').pop() : c.rootName}</option>
           {/each}
         </select>
       </div>
-      <div class="path" aria-label="Путь">{pathLine}</div>
-      {#if newFolder !== null}
+      <div class="path" aria-label="Путь">{c.pathLine}</div>
+      {#if c.newFolder !== null}
         <div class="row">
           <label for="sa-folder">Новая папка:</label>
           <!-- svelte-ignore a11y_autofocus -->
-          <input id="sa-folder" class="nf" bind:value={newFolder} autofocus placeholder="Имя папки" />
+          <input id="sa-folder" class="nf" bind:value={c.newFolder} autofocus placeholder="Имя папки" />
         </div>
       {/if}
       <div class="btns">
-        <button type="button" onclick={() => (newFolder = newFolder === null ? '' : null)}>Новая папка</button>
+        <button type="button" onclick={() => (c.newFolder = c.newFolder === null ? '' : null)}>Новая папка</button>
         <span class="grow"></span>
-        <button type="button" onclick={() => done(false)}>Отмена</button>
-        <button type="submit" class="primary" disabled={busy || !name.trim()}>Сохранить</button>
+        <button type="button" onclick={() => c.done(false)}>Отмена</button>
+        <button type="submit" class="primary" disabled={c.busy || !c.name.trim()}>Сохранить</button>
       </div>
     </form>
   </div>
 
-  {#if replace}
+  {#if c.replace}
     <div class="ask" role="alertdialog" aria-modal="true" aria-label="Заменить файл">
-      <h2>«{fileName}» уже существует. Заменить его?</h2>
-      <p>Файл с таким именем уже есть в папке «{dir ? dir.split('/').pop() : rootName}». При замене его содержимое будет перезаписано.</p>
+      <h2>«{c.fileName}» уже существует. Заменить его?</h2>
+      <p>Файл с таким именем уже есть в папке «{c.dir ? c.dir.split('/').pop() : c.rootName}». При замене его содержимое будет перезаписано.</p>
       <div class="btns">
         <!-- svelte-ignore a11y_autofocus -->
-        <button autofocus onclick={closeAsk}>Отмена</button>
-        <button class="danger" onclick={() => save(true)}>Заменить</button>
+        <button autofocus onclick={c.closeAsk}>Отмена</button>
+        <button class="danger" onclick={() => c.save(true)}>Заменить</button>
       </div>
     </div>
   {/if}

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Unsaved } from './store.svelte';
-  import { inTabs } from './names';
+  import { closeWords } from './closeSheet';
   import appIcon from '../src-tauri/icons/128x128@2x.png';
 
   // The sheet before tabs close with unsaved text: one file, one new note, or several tabs. With `error` set it is
@@ -9,20 +9,10 @@
   type Answer = 'save' | 'discard' | 'cancel';
   let { items = [], error, onanswer }: { items?: Unsaved[]; error?: { title: string; text: string }; onanswer: (a: Answer) => void } = $props();
 
-  const one = $derived(items.length === 1 ? items[0] : null);
-  const hasNote = $derived(items.some((it) => it.kind === 'note'));
-  const title = $derived(
-    error ? error.title
-    : one?.kind === 'file' ? `Сохранить изменения в «${one.name}»?`
-    : one ? `Сохранить заметку «${one.name}»?`
-    : `Сохранить изменения в ${inTabs(items.length)}?`,
-  );
-  const text = $derived(
-    error ? error.text
-    : one?.kind === 'note' ? 'Текст пока не записан в файл. Нажмите «Сохранить…», чтобы выбрать, куда его сохранить.'
-    : 'Если не сохранить, изменения будут потеряны.' + (!one && hasNote ? ' Для новой заметки откроется «Сохранить как».' : ''),
-  );
-  const primary = $derived(error ? 'ОК' : one?.kind === 'file' ? 'Сохранить' : one ? 'Сохранить…' : 'Сохранить всё');
+  const words = $derived(closeWords(items, error));
+  const title = $derived(words.title);
+  const text = $derived(words.text);
+  const primary = $derived(words.primary);
 
   let sheet: HTMLDivElement | undefined = $state();
   let main: HTMLButtonElement | undefined = $state();

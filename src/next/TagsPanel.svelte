@@ -1,10 +1,10 @@
 <script lang="ts">
   import { tagsState as ts } from '../tagsState.svelte';
   import { PALETTE, toneOf, toneStyle } from '../colors';
-  import Compat from './Compat.svelte';
-  import { ConfirmDialog, TagRename } from './bridges';
+  import TagRename from './TagRename.svelte';
   import type { MenuItem } from '../menuItems';
   import Menu from './ui/Menu.svelte';
+  import ConfirmDialog from './ConfirmSheet.svelte';
 
   // «Теги» of the new sidebar (ТЗ 43 §2.3, ТЗ 38): «Найти тег», «по частоте / А–Я»; 28 pt rows — the tag's colour, its
   // name in IBM Plex Mono 12.5, how many headings have it. A click shows its headings in the tab «Тег», ⌘-click adds it
@@ -99,7 +99,6 @@
 </div>
 
 {#if menu}<Menu x={menu.x} y={menu.y} items={menu.items} width={290} onclose={() => (menu = null)} />{/if}
-<Compat>
   {#if renaming}<TagRename from={renaming.tag} merge={renaming.merge} onclose={() => (renaming = null)} />{/if}
   {#if removing && removeInfo}
     {@const tag = removing}
@@ -108,7 +107,6 @@
       Сами заголовки останутся. Одна правка во всех файлах — ⌘Z вернёт тег.
     </ConfirmDialog>
   {/if}
-</Compat>
 
 <style>
   .tp { flex: 1; min-height: 0; display: flex; flex-direction: column; }

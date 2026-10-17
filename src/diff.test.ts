@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compare, diffLines } from './diff';
+import { compare, diffLines, diffSummary } from './diff';
 
 const sig = (a: string, b: string) => diffLines(a.split('\n'), b.split('\n')).map((o) => o.kind + o.text).join('|');
 
@@ -32,5 +32,24 @@ describe('the comparison', () => {
     const { rows, fragments } = compare('a\nb', 'a\nc');
     expect(fragments).toBe(1);
     expect(rows.some((r) => r.kind === 'gap')).toBe(false);
+  });
+});
+
+describe('diffSummary (ТЗ 44 §4)', () => {
+  it('lines added on one side, by the heading they are under', () => {
+    const disk = '* Роадмап\nтекст\n* Переезд хранилища\nодин\n';
+    const mine = '* Роадмап\nтекст\n* Переезд хранилища\nодин\nдва\nтри\nчетыре\n';
+    expect(diffSummary(disk, mine)).toEqual({ mine: ['+3 строки в «Переезд хранилища»'], disk: [] });
+    expect(diffSummary(mine, disk)).toEqual({ mine: [], disk: ['+3 строки в «Переезд хранилища»'] });
+  });
+  it('only a status changed: «статус «…» → KW» on each side', () => {
+    const disk = '* TODO Миграция биллинга :work:\nтекст\n';
+    const mine = '* NEXT Миграция биллинга :work:\nтекст\n';
+    expect(diffSummary(disk, mine)).toEqual({ mine: ['статус «Миграция биллинга» → NEXT'], disk: ['статус «Миграция биллинга» → TODO'] });
+  });
+  it('before the first heading: «в начале файла»; several places — each', () => {
+    const disk = 'a\n* Б\nb\n';
+    const mine = 'a\nновое\n* Б\nb\nещё\n';
+    expect(diffSummary(disk, mine).mine).toEqual(['+1 строка в начале файла', '+1 строка в «Б»']);
   });
 });
