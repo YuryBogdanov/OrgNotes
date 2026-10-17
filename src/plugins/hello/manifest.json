@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Пример плагина: команды, раздел навигатора, вкладка, настройки, форма, выбор места и даты, разбор — только через API.",
   "author": "Panopticon",
-  "api": "^1.0",
+  "api": "^1.14",
   "minAppVersion": "0.9.0",
   "main": "main.js",
   "defaultEnabled": false,
@@ -175,6 +175,12 @@
         "title": "Доска",
         "icon": "M3.5 3.5h13v13h-13zM3.5 8h13M8 8v8.5",
         "toolbar": true
+      }
+    ],
+    "fileCards": [
+      {
+        "id": "hello.card",
+        "title": "Привет"
       }
     ],
     "settings": [

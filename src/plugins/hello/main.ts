@@ -262,6 +262,33 @@ export default definePlugin({
       ctx.ui.notify(r === 'ok' ? 'Заметка добавлена' : 'Не получилось: ' + r);
     });
 
+    // a card of a file (1.14): over «Структура» in the new interface, when the file has open tasks
+    const counts = new Map<string, { open: number; done: number }>();
+    const countOf = async (path: string) => {
+      const hs = await ctx.index!.outline(path);
+      const c = { open: hs.filter((h) => h.keyword && !h.done).length, done: hs.filter((h) => h.done).length };
+      counts.set(path, c);
+      return c;
+    };
+    ctx.ui.fileCard('hello.card', {
+      match: async (path) => (await countOf(path)).open > 0,
+      count: (path) => counts.get(path)?.open ?? null,
+      render: (root, { path, heading }) => {
+        void countOf(path).then((c) => {
+          const stat = (n: number, label: string) => el('div', { className: 'fc-stat' }, el('b', {}, String(n)), el('span', {}, label));
+          const btn = (label: string, run: () => void, main = false, disabled = false) => el('button', { type: 'button', className: 'fc-btn' + (main ? ' main' : ''), disabled, onclick: run }, label);
+          root.replaceChildren(
+            el('div', { className: 'fc-stats' }, stat(c.open, 'открыто'), stat(c.done, 'сделано')),
+            el('div', { className: 'fc-under' }, 'Под курсором'),
+            el('div', { className: 'hello-under' }, heading ? heading.title : 'Курсор не на заголовке'),
+            el('div', { className: 'fc-btns' },
+              btn('Поздороваться', () => ctx.ui.notify(`${greeting(ctx)}, ${heading?.title ?? path}!`), true),
+              btn('Статус', () => heading && void ctx.commands.run('heading.status', { ref: heading }), false, !heading)),
+          );
+        });
+      },
+    });
+
     // a sheet with the plugin's content
     ctx.commands.on('hello.about', async () => {
       const b = await ctx.ui.sheet({
