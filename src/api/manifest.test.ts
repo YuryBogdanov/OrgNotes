@@ -67,6 +67,9 @@ describe('parseManifest', () => {
     if (!bare.ok) throw new Error();
     expect(bare.manifest.contributes.fileCards[0].icon).toBe('M1 1');
     expect(bare.manifest.contributes.settings).toMatchObject([{ section: 'Привет', groups: [{ caption: 'Редактор' }] }]);
+    const block = parseManifest({ ...base, contributes: { fileCards: [{ id: 'hello.card', title: 'Привет' }], settings: [{ block: 'Агенды', groups: [] }] } });
+    if (!block.ok) throw new Error();
+    expect(block.manifest.contributes.settings).toMatchObject([{ block: 'Агенды', groups: [{ caption: 'Редактор' }] }]);
     expect(parseManifest({ ...base, contributes: { fileCards: [{ id: 'other.card' }] } }).ok).toBe(false);
   });
   it('the ids of the contributions start with the plugin\'s', () => {

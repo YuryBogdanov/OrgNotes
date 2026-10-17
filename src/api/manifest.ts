@@ -262,10 +262,11 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
       }
     settings.push({ section: isStr(x.section) ? x.section : undefined, block: isStr(x.block) ? x.block : undefined, icon: isStr(x.icon) ? x.icon : undefined, groups: groups as unknown as Group[] });
   }
-  // the core's setting of the cards, in the plugin's own section (one made under its name if it has none)
+  // the core's setting of the cards: in the plugin's own section, else in its block of another one (the Inbox's in
+  // «Inbox», the goals' in «Агенды»), else in a section made under its name
   if (fileCards.length) {
     const group = { caption: 'Редактор', fields: [{ type: 'switch', key: CARDS_KEY, label: 'Показывать карточку в редакторе, если есть что сказать по файлу', where: 'local', default: true }] } as unknown as Group;
-    const mine = settings.find((x) => x.section);
+    const mine = settings.find((x) => x.section) ?? settings.find((x) => x.block);
     if (mine) mine.groups = [...mine.groups, group];
     else settings.push({ section: String(j.name ?? id), groups: [group] });
   }

@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Цели на квартал своих и команды: обзор, «Мои цели», новая цель, отметки, разбор на 1-1, отчёт и перенос квартала.",
   "author": "Panopticon",
-  "api": "^1.13",
+  "api": "^1.14",
   "exports": ["myActiveGoals"],
   "minAppVersion": "0.9.0",
   "main": "main.js",
@@ -116,6 +116,12 @@
         "id": "quarter-goals.overview",
         "title": "Цели",
         "icon": "M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"
+      }
+    ],
+    "fileCards": [
+      {
+        "id": "quarter-goals.card",
+        "title": "Цели квартала"
       }
     ],
     "settings": [
