@@ -314,6 +314,19 @@ export interface ReviewAction {
   disabled?(h: HeadingInfo): boolean;
   /** What it does to the heading: then the next card, or this one again. */
   run(h: HeadingInfo): 'next' | 'stay' | Promise<'next' | 'stay'>;
+  /** What became of a card it moved on from («next»), for the progress and the queue of a review in the file: the
+   *  colour and the words («DONE», «→ home»). Since 1.14. */
+  mark?: { tone: ReviewTone; text?(h: HeadingInfo): string };
+  /** Only its keys, no button in a review in the file (⌘↩ «Далее», ⌘K). Since 1.14. */
+  hidden?: boolean;
+}
+/** The colour of a card's outcome (1.14): done, cancelled, moved away, put off till a day, skipped, waiting, looked at,
+ *  archived. */
+export type ReviewTone = 'done' | 'cancel' | 'moved' | 'later' | 'skip' | 'wait' | 'seen' | 'arch';
+/** A card's outcome: its colour, its words. */
+export interface ReviewMark {
+  tone: ReviewTone;
+  text?: string;
 }
 /** What a part of the card is drawn for: the heading now, and the card's place in the queue. */
 export interface ReviewCard {
@@ -369,6 +382,15 @@ export interface ReviewSpec {
   next?(cur: number, d: 1 | -1): number;
   /** The review left the window (its tab closed, «Закончить», another review started). */
   onClose?(): void;
+  // ---- ТЗ 41 §1, ТЗ 46 §8: a review in the file (1.14) ----
+  /** `'file'`: in the new interface the review is a mode of a file's tab — narrowed to the card's heading (the files
+   *  of the queue in turn), the core's card of the review in the column with the actions, the queue in place of
+   *  «Структура»; `head`, `quick`, `aside`, `bar`, `barEnd`, `summary` are not drawn there (`below` is, in the card).
+   *  The old interface shows it in a tab. */
+  place?: 'tab' | 'file';
+  /** What became of the card `index` as the plugin knows it (a review of its own order); null: nothing yet. Over the
+   *  actions' `mark`. */
+  mark?(index: number): ReviewMark | null;
 }
 /** The review shown (from `ui.review`): move it, draw the card again. */
 export interface ReviewHandle {
@@ -383,6 +405,8 @@ export interface ReviewHandle {
   setItems(items: HeadingRef[], cur?: number): void;
   /** The review closed, as «Закончить». */
   end(): void;
+  /** Where it is shown (1.14): a tab, or the file's tab (`place: 'file'` in the new interface). */
+  readonly place: 'tab' | 'file';
 }
 export interface ReviewResult {
   total: number;
@@ -445,7 +469,8 @@ export interface Ctx {
       names?: string[];
       current?: Date | null;
     }): Promise<Date | null>;
-    /** A review by cards in a tab: one heading at a time, narrowed; it ends when the queue is through or closed. */
+    /** A review by cards in a tab (or in the file, `place`): one heading at a time, narrowed; it ends when the queue
+     *  is through or closed. */
     review(spec: ReviewSpec): Promise<ReviewResult>;
     /** The core's sheet with the plugin's content; the button pressed (null: ⎋). */
     sheet(spec: SheetSpec): Promise<string | null>;

@@ -33,7 +33,10 @@
   import { untrack } from 'svelte';
   import { actionOf, allViews } from '../views';
   import { today } from '../todayState.svelte';
+  import { fileReview } from './fileReview.svelte';
 
+  // a review in the file (ТЗ 41 §1): the tab follows its cards
+  fileReview.effects();
   // The new shell (ТЗ 42): the store, the plugins, the window's keys and the menu, the old sheets through
   // `bridges.ts` (42.1); the sidebar with the files and the toolbar (42.3); the tabs (42.4); the editor (42.5).
   const newFile = () => {

@@ -507,6 +507,29 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   the step's other files back when the editor's text is what the step made of it, then CodeMirror undoes its own file
   (before, the copy stayed in the target). The editor's `path` is the file's name, not its `path`: hooks go through
   `fileNamed`. e2e `archive.spec.ts`.
+- **A review in the file (ТЗ 41.1a, on ТЗ 46 §1–§4, §7, §8):** `ui.review({ place: 'file' })` in the new interface
+  (`store.nextUi`) is a mode of a file's tab; the old interface keeps the tab. The host marks the run `inFile` and
+  opens no tab (`onGone` of `REVIEW_KIND` skips such a run — the view's watch would end it at once); the controller
+  calls `file.front()` / `file.end()` (`FileReviewHooks`) instead of activating / closing the tab. `next/fileReview.svelte.ts`
+  (`fileReview`, effects in next/App): the tab (`openFile` replace in pane 0 — the file's own tab if open, else the
+  active file tab, else a new one) narrowed to the card's heading, the caret at `spec.narrow().reveal`; follows the
+  card while its tab is on the card's file (`on`: the tab active and on that file; away — no strip, no keys, it
+  follows on return); the tab closed — the review ends; ⎋ (not in a field / dialog / menu) ends it; the review's
+  scope keys (⌘1…, ⌘[, ⌘↩) while `on`; «другой файл» in the strip 2 s after a file change. EditorArea: the strip
+  (icon, the title's first word, the path, «⌘↩ дальше» from the action keyed ⌘↩, «Закончить ⎋»); `SessionCard`
+  first in the column (counter, segments by `reviewMark`, the non-`hidden` actions in a column — `kind: 'ok'` green,
+  `'primary'` lamp —, «← Назад», «Закончить», `below` in Compat; after the queue «… окончен» with the outcome counts
+  and «Готово»); the session plugin's own file card hidden; `Structure`'s `queue` snippet → `ReviewQueue` («Очередь
+  N», groups by file when more than one, the dot by tone, `mark.text` or `header(h)`, faded/struck, a click →
+  `reviewShow`); `onnarrow` → `reviewEdited`. API 1.14: `ReviewAction.mark {tone, text?}` (the core records it on
+  «next»), `hidden`; `ReviewSpec.place`, `mark(i)` (the plugin's own record, over the actions'); `ReviewTone`
+  (done, cancel, moved, later, skip, wait, seen, arch; colours and words in `next/reviewTones.ts`); `ReviewHandle.place`.
+  Inbox: `place: 'file'`, `mark` = `markOf(item)`, `header` = `createdShort`, «Выполнено» `ok` with the closing
+  status as `sub`, «Перенести…» primary, «Далее» / «Календарь» hidden; in the file «Отложить…» is `ui.pickDate`
+  (no popover of ours), `below` (the month) not drawn, `narrow` does `sync` (no head there); a second ⇧⌘R goes to
+  the review going on. Its sidebar panel during it: the plain list, the task on the card `.row.now`, no progress.
+  Still to come (41.1b): the calendar's card in the review (ТЗ 46 §6), «Разобрать пропущенные» in the summary, «2
+  из 5» / «Действия ▾» in the strip when the column is hidden. e2e `nextFileReview.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

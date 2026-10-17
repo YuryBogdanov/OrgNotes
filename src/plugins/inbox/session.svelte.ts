@@ -3,9 +3,9 @@
 // The card's parts — the header, the quick buttons, the bar, the summary — are the plugin's components.
 
 import { mount, unmount, type Component } from 'svelte';
-import type { CardRender, HeadingInfo, HeadingRef } from '@panopticon/api';
+import type { CardRender, HeadingInfo, HeadingRef, ReviewMark } from '@panopticon/api';
 import { data } from './state.svelte';
-import { nextOpen, short, type Result, type ReviewItem } from './review';
+import { ageShort, nextOpen, short, type Result, type ReviewItem } from './review';
 import Head from './Head.svelte';
 import Quick from './Quick.svelte';
 import Bar from './Bar.svelte';
@@ -55,10 +55,23 @@ class Session {
   private get handle() {
     return data.ctx.ui.currentReview();
   }
+  /** The review is a mode of the file's tab (the new interface): the core draws the card; no bar of ours. */
+  get inFile() {
+    return this.handle?.place === 'file';
+  }
+  /** «Отложить…» in the file: the core's date picker (its quick days), then the same write as «Отложить до». */
+  private async pickDefer() {
+    const it = this.item;
+    if (!it) return;
+    const d = await data.ctx.ui.pickDate({ title: 'Отложить до…', kind: 'SCHEDULED' });
+    if (d && this.item === it) await this.deferNow(d);
+  }
 
   // ---- start, show, end ---------------------------------------------------------------------------------------
   /** «Разобрать»: a review of `items` (by default what is in the Inbox now) in the tab «Разбор Inbox». */
   start(items: ReviewItem[] = data.pending) {
+    // one review in the window: a second start in the file goes to the one going on (ТЗ 46 §1)
+    if (this.run && this.inFile && items === data.pending) return this.show(this.run.cur);
     if (!items.length) return;
     this.run = { items, cur: 0, known: data.pending.map(keyOf) };
     const run = this.run; // the state's own (its changes are seen), not the object it was made of
@@ -66,8 +79,16 @@ class Session {
     this.defer = null;
     this.confirmDel = false;
     const ctx = data.ctx;
+    const first = items[0];
     void ctx.ui.review({
       title: 'Разбор Inbox',
+      // the new interface: a mode of the inbox file's tab (ТЗ 46), the core's card and queue; the old one: the tab
+      place: 'file',
+      mark: (i) => markOf(run.items[i]),
+      header: (h) => {
+        const it = run.items.find((x) => x.path === h.ref.path && x.title === h.ref.title);
+        return it ? createdShort(it.created) : '';
+      },
       cls: 'review',
       width: 820,
       items: items.map((it) => ({ path: it.path, line: it.line, title: it.title })),
@@ -92,13 +113,13 @@ class Session {
         if (this.run === run) this.run = null;
       },
       actions: [
-        { id: 'done', label: 'Выполнено', command: 'inbox.done', run: () => this.act(() => this.close('done')) },
-        { id: 'cancel', label: 'Отменить', command: 'inbox.cancel', run: () => this.act(() => this.close('cancel')) },
-        { id: 'move', label: 'Перенести…', command: 'inbox.move', run: () => this.act(() => this.move()) },
-        { id: 'defer', label: 'Отложить…', command: 'inbox.defer', run: () => this.act(() => void (this.defer = this.defer ? null : { sel: 0 })) },
+        { id: 'done', label: 'Выполнено', sub: data.closingOf(first, 'done') ?? undefined, kind: 'ok', command: 'inbox.done', run: () => this.act(() => this.close('done')) },
+        { id: 'cancel', label: 'Отменить', sub: data.closingOf(first, 'cancel') ?? undefined, command: 'inbox.cancel', run: () => this.act(() => this.close('cancel')) },
+        { id: 'move', label: 'Перенести…', kind: 'primary', command: 'inbox.move', run: () => this.act(() => this.move()) },
+        { id: 'defer', label: 'Отложить…', command: 'inbox.defer', run: () => this.act(() => (this.inFile ? this.pickDefer() : void (this.defer = this.defer ? null : { sel: 0 }))) },
         { id: 'skip', label: 'Пропустить', command: 'inbox.skip', run: () => this.act(() => this.skip()) },
-        { id: 'next', label: 'Далее', command: 'inbox.next', run: () => this.act(() => this.pass()) },
-        { id: 'calendar', label: 'Календарь', command: 'inbox.calendar', run: () => this.act(() => this.toggleCal()) },
+        { id: 'next', label: 'Далее', hidden: true, command: 'inbox.next', run: () => this.act(() => this.pass()) },
+        { id: 'calendar', label: 'Календарь', hidden: true, command: 'inbox.calendar', run: () => this.act(() => this.toggleCal()) },
       ],
     });
   }
@@ -175,10 +196,11 @@ class Session {
   }
   deferTo(date: Date) {
     this.defer = null;
-    return this.act(() => {
-      const it = this.item;
-      if (it) return this.write(it, `Отложена до ${short(date)}: ${it.title}`, (ref) => (tx) => tx.setPlanning(ref, 'SCHEDULED', date), { result: 'defer', note: `Отложена до ${short(date)} · в Inbox` });
-    });
+    return this.act(() => this.deferNow(date));
+  }
+  private deferNow(date: Date) {
+    const it = this.item;
+    if (it) return this.write(it, `Отложена до ${short(date)}: ${it.title}`, (ref) => (tx) => tx.setPlanning(ref, 'SCHEDULED', date), { result: 'defer', note: `Отложена до ${short(date)} · в Inbox` });
   }
   remove() {
     this.confirmDel = false;
@@ -261,6 +283,7 @@ class Session {
     return { path: it?.path ?? '', line: r?.h.line ?? it?.line ?? 0, date: iso, open: this.cal };
   }
   private below(el: HTMLElement) {
+    if (this.inFile) return; // the calendar's own card there (ТЗ 46 §6)
     const w = data.ctx.ui.widget(el, { type: 'month', key: 'cal', label: 'Календарь', keyId: 'inbox.calendar' }, this.monthValue(), (v) => {
       const open = !!(v as { open?: boolean }).open;
       if (open !== this.cal) this.toggleCal();
@@ -288,7 +311,8 @@ class Session {
     if (!it || !r) return {};
     const key = it.id + '|' + it.path;
     if (key !== this.revealed.key) this.revealed = { key, n: this.revealed.n + 1 };
-    void h; // the card's heading: ours is found by its :CREATED: (its line may be behind the core's for a moment)
+    if (this.inFile) this.sync(h); // no header of ours there to do it
+    else void h; // the card's heading: ours is found by its :CREATED: (its line may be behind the core's for a moment)
     return { reveal: { line: lastLine(r.f.text, r.h), n: this.revealed.n, col: 1e9 } };
   }
   /** The card's task edited in it: its line and title follow — found by its :CREATED:, or (none) retitled in place.
@@ -337,3 +361,32 @@ export function lastLine(text: string, h: { line: number; end: number }) {
 }
 
 export const session = new Session();
+
+/** A task's outcome for the core's progress and queue (a review in the file): its colour, its words — «DONE»,
+ *  «→ home», «отложено до 19 окт», «пропущена»; null: not handled yet. */
+export function markOf(it: ReviewItem | undefined): ReviewMark | null {
+  if (!it?.result) return null;
+  switch (it.result) {
+    case 'done':
+      return { tone: 'done', text: it.keyword ?? 'выполнено' };
+    case 'cancel':
+      return { tone: 'cancel', text: it.keyword ?? 'отменено' };
+    case 'move':
+      return { tone: 'moved', text: it.note?.split(' › ')[0] ?? 'перенесена' };
+    case 'defer':
+      return { tone: 'later', text: it.note?.replace(/^Отложена до (.+?) · .*$/, 'отложено до $1') ?? 'отложена' };
+    case 'skip':
+      return { tone: 'skip', text: 'пропущена' };
+    case 'delete':
+      return { tone: 'cancel', text: 'удалена' };
+    case 'next':
+      return { tone: 'seen', text: 'разобрана' };
+  }
+}
+/** «15 окт»: the day a task was put in the Inbox («вчера», «4 ч» when lately), for the queue. */
+export function createdShort(created: string | null, now = new Date()): string {
+  const m = created && /(\d{4})-(\d{2})-(\d{2})/.exec(created);
+  if (!m) return '';
+  const age = ageShort(created, now);
+  return age === 'вчера' || age.endsWith(' ч') || age === 'только что' || age === 'сегодня' ? age : short(new Date(+m[1], +m[2] - 1, +m[3]));
+}

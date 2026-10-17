@@ -34,7 +34,7 @@ import { lists } from '../taskLists.svelte';
 import { RIGHTS, rightsText, trust, trusted } from './trust';
 import { apiRef, coreRef, fileOf, findHeading, infoOf } from './refs';
 import { coreCommand } from './coreCommands';
-import { REVIEW_KIND, ReviewController, type ReviewRun } from './review.svelte';
+import { REVIEW_KIND, ReviewController, type FileReviewHooks, type ReviewRun } from './review.svelte';
 export { REVIEW_KIND, type ReviewRun };
 import { listen } from './events.svelte';
 import { clone, watch } from './watch.svelte';
@@ -245,6 +245,11 @@ class Host {
   readonly reviewStep = this.reviews.step.bind(this.reviews);
   readonly reviewShow = this.reviews.show.bind(this.reviews);
   readonly endReview = this.reviews.end.bind(this.reviews);
+  readonly reviewMark = this.reviews.markOf.bind(this.reviews);
+  /** The new interface's side of a review in the file (next/fileReview). */
+  set reviewFile(h: FileReviewHooks | null) {
+    this.reviews.file = h;
+  }
 
   // ---- what the manifests declare, before any code ---------------------------------------------------------------
   declare() {
@@ -255,7 +260,7 @@ class Host {
       kind: REVIEW_KIND, icon: 'M4 4h12v12H4zM7 8h6M7 11h4', component: PluginReview, transient: true, single: true,
       label: () => this.review?.spec.title ?? 'Разбор', crumbs: () => this.review?.spec.crumbs ?? [this.review?.spec.title ?? 'Разбор'],
       fileOf: () => this.reviewHeading()?.file.path,
-      onGone: () => this.endReview(false, true),
+      onGone: () => void (this.review?.inFile || this.endReview(false, true)), // a review in the file has no tab of its own
     });
     store.addSheet(() => !!(this.form || this.place || this.sheetReq));
   }
@@ -817,7 +822,9 @@ class Host {
           new Promise((resolve) => {
             this.endReview(false, true); // the earlier review answers; its tab is reused (closing it would race the new one)
             if (!spec.items.length) return resolve({ total: 0, done: 0, finished: true });
-            this.review = { plugin: id, spec, refs: spec.items.map((r) => ({ ...r })), cur: Math.min(Math.max(0, spec.start ?? 0), spec.items.length - 1), done: 0, doneAt: new Set<number>(), gen: 0, resolved: false, resolve };
+            const inFile = spec.place === 'file' && store.nextUi; // the old interface: in a tab
+            this.review = { plugin: id, spec, refs: spec.items.map((r) => ({ ...r })), cur: Math.min(Math.max(0, spec.start ?? 0), spec.items.length - 1), done: 0, doneAt: new Set<number>(), gen: 0, resolved: false, resolve, inFile, marks: {} };
+            if (inFile) return void this.reviews.file?.front();
             openView(store.layout, store.layout.active, REVIEW_KIND, () => ({}), (t) => this.redraw.set(t.id, (this.redraw.get(t.id) ?? 0) + 1));
           }),
         sheet: (spec) =>
@@ -920,6 +927,7 @@ class Host {
                   if (now && (!was || was.path !== now.path || was.title !== now.title)) r.gen++;
                 },
                 end: () => void (this.review === r && this.endReview(true)),
+                place: r.inFile ? ('file' as const) : ('tab' as const),
               }))(this.review)
             : null,
         setMonthFilter: (f) => {

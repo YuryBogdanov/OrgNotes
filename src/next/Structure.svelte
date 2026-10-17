@@ -12,8 +12,9 @@
   // up to 6, their number by the title. Each folds on a click on its head (⌄ / ›), kept on this Mac for every file;
   // «Связи» folded is its head with the number.
   // A narrowed tab (§5.8): only the subtree it shows.
-  // `cards`: the plugins' cards over it (ТЗ 44 §6), the column then `width` wide
-  let { range = null, width = 220, cards }: { range?: { line: number; end: number } | null; width?: number; cards?: Snippet } = $props();
+  // `cards`: the plugins' cards over it (ТЗ 44 §6), the column then `width` wide; `queue`: a review's queue in its
+  // place, «Связи» not shown (ТЗ 41 §1.2)
+  let { range = null, width = 220, cards, queue }: { range?: { line: number; end: number } | null; width?: number; cards?: Snippet; queue?: Snippet } = $props();
   const file = $derived(store.fileOf(store.tab));
   const fi = $derived(file ? store.files.indexOf(file) : -1);
   const line = $derived(store.tab?.cursor.line ?? 0);
@@ -66,6 +67,7 @@
 
 <aside class="struct" aria-label="Структура" style:width="{width}px">
   {#if cards}<div class="cards">{@render cards()}</div>{/if}
+  {#if queue}{@render queue()}{:else}
   <button class="lbl head" aria-expanded={!nextPrefs.structFolded} onclick={() => nextPrefs.toggleStructFolded()}>Структура<span class="chev" aria-hidden="true">{nextPrefs.structFolded ? '›' : '⌄'}</span></button>
   {#if !nextPrefs.structFolded}
   <div class="list" class:ft={fadeTop} class:fb={fadeBot} bind:this={list} onscroll={edges}>
@@ -90,6 +92,7 @@
       {#if back.length > 6 && !showAll}<button class="more" onclick={() => (showAll = true)}>ещё {back.length - 6}</button>{/if}
       {/if}
     </div>
+  {/if}
   {/if}
 </aside>
 
