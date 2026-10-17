@@ -1,8 +1,3 @@
-<script module lang="ts">
-  // what is open in each file's tree, kept until the app quits
-  const openMemo = new Map<string, Set<string>>();
-</script>
-
 <script lang="ts">
   import { portal } from './portal';
   import { moved } from './pointer';
@@ -10,16 +5,16 @@
   import { store, type NoteFile } from './store.svelte';
   import { ICONS } from './commands';
   import { better, fuzzy, runs } from './fuzzy';
-  import { displayName } from './names';
   import { toneFor, type Heading } from './org';
   import { toneStyle } from './colors';
-  import { bareTitle, fileRows, initialOpen, keyOf, plural, treeRows, type FileRow, type TreeRow } from './refile';
+  import { bareTitle, plural } from './refile';
+  import { PlacePaletteCtl } from './placePalette.svelte';
 
   // The choice of a place (roadmap 0.5), one component of the core for every «file + heading» of the app, in two
   // looks. «palette»: two steps in one window — a file (recent ones first), then a heading of it in a tree or the
   // file's 1st level; or the file alone (`kind: 'file'`). «columns»: inside a sheet, the files and the headings of
   // some levels side by side. Used by «Перенести», the files of the Inbox and the calendar, «Добавить ещё цели».
-  type Pick = { path: string; heading: Heading | null };
+  import type { Pick } from './placePalette.svelte';
   let {
     variant = 'palette', kind = 'heading', title = 'Выбор места', token = 'Выбрать', placeholder = 'Файл…', plate, palette = false,
     full = true, self, exclude, recent = [], top = null, will, blocked = null, lastKey, onback, onpick, onclose,
@@ -57,159 +52,25 @@
     onhead?: (id: string) => void;
   } = $props();
 
-  // ---- the palette ---------------------------------------------------------------------------------------------
+  // ---- the palette: its workings are placePalette.svelte.ts (the new interface draws them too) ---------------------
   const TOP = 'M4 3.5h12M10 17V8M6.5 11.5L10 8l3.5 3.5';
-  let step = $state<1 | 2>(1);
-  let q = $state('');
-  let path = $state(''); // the file of step 2
-  let sel = $state(''); // 'f:<path>' | 'top' | 'h:<index>'
-  let err = $state('');
-  let busy = $state(false);
-  let openSet = $state<Set<string>>(new Set());
+  const ctl = new PlacePaletteCtl(() => ({ kind, self, exclude, recent, top, blocked, lastKey, onback, onpick, onclose }));
   let input: HTMLInputElement | undefined = $state();
   let list: HTMLDivElement | undefined = $state();
-  const rootName = $derived(store.dir ? store.dir.split('/').pop()! : 'заметки');
-
-  const files = $derived<FileRow[]>(variant === 'palette' && step === 1 ? fileRows(store.files, { q, root: rootName, recent, self, exclude }) : []);
-  const target = $derived(store.files.find((f) => f.path === path));
-  const tree = $derived(
-    step === 2 && target
-      ? treeRows(target.headings, openSet, q, blocked && target.path === blocked.path ? { line: blocked.line, end: blocked.end } : undefined)
-      : { rows: [] as TreeRow[], matches: 0 },
-  );
-  const fileName = $derived(target ? displayName(target.name) : '');
-  const pickable = $derived(step === 1 ? files.map((f) => 'f:' + f.path) : [...(top ? ['top'] : []), ...tree.rows.filter((r) => !r.blocked).map((r) => 'h:' + r.i)]);
-
+  ctl.onscroll = () => list?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+  ctl.onfocus = () => input?.focus();
   onMount(() => {
     if (variant !== 'palette') return;
-    sel = pickable[0] ?? '';
+    ctl.start();
     input?.focus();
     // the command palette that opened this gives the focus back as it goes: take it again
     requestAnimationFrame(() => input?.focus());
   });
-  const close = () => onclose?.();
-  async function scroll() {
-    await tick();
-    list?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
-  }
-  function typed() {
-    err = '';
-    if (step === 1) sel = pickable[0] ?? '';
-    else {
-      const first = q.trim() ? tree.rows.find((r) => !r.dim && !r.blocked) : undefined;
-      sel = first ? 'h:' + first.i : (pickable[0] ?? '');
-    }
-  }
-  async function toStep2(p: string) {
-    const f = store.files.find((x) => x.path === p);
-    if (!f) {
-      err = `Не удалось прочитать ${displayName(p.split('/').pop() ?? p)}`;
-      return;
-    }
-    openSet = openMemo.get(p) ?? initialOpen(f.headings, lastKey?.(p));
-    path = p;
-    step = 2;
-    q = '';
-    err = '';
-    await tick();
-    sel = pickable[0] ?? '';
-    void scroll();
-  }
-  function toStep1() {
-    step = 1;
-    q = '';
-    err = '';
-    sel = 'f:' + path;
-    void scroll();
-  }
-  async function choose(p: string, underIdx: number | null) {
-    if (busy) return;
-    const f = store.files.find((x) => x.path === p);
-    const h = underIdx === null ? null : f?.headings[underIdx];
-    if (!f || (underIdx !== null && !h)) return;
-    busy = true;
-    const r = await onpick?.({ path: p, heading: h ?? null });
-    busy = false;
-    if (typeof r === 'string') {
-      err = r;
-      if (kind === 'heading' && step !== 2) await toStep2(p);
-      input?.focus();
-    }
-  }
-  function act(id: string, meta = false) {
-    if (step === 1) {
-      if (!id.startsWith('f:')) return;
-      const p = id.slice(2);
-      if (kind === 'file' || (meta && top)) void choose(p, null);
-      else void toStep2(p);
-    } else if ((meta && top) || id === 'top') void choose(path, null);
-    else if (id.startsWith('h:')) void choose(path, +id.slice(2));
-  }
-  function setOpen(key: string, on: boolean) {
-    const next = new Set(openSet);
-    if (on) next.add(key);
-    else next.delete(key);
-    openSet = next;
-    openMemo.set(path, next);
-  }
-  function toggle(r: TreeRow) {
-    if (target && r.hasKids && !q.trim()) setOpen(keyOf(target.headings[r.i]), !r.open);
-  }
-  /** → opens a branch, or goes into an open one; ← closes it, or goes to the parent. */
-  function side(right: boolean) {
-    if (!target || !sel.startsWith('h:')) return;
-    const i = +sel.slice(2);
-    const at = tree.rows.findIndex((r) => r.i === i);
-    const r = tree.rows[at];
-    if (!r) return;
-    if (right) {
-      if (r.hasKids && !r.open) setOpen(keyOf(target.headings[i]), true);
-      else if (r.open) {
-        const child = tree.rows[at + 1];
-        if (child && !child.blocked) sel = 'h:' + child.i;
-      }
-    } else if (r.open) setOpen(keyOf(target.headings[i]), false);
-    else {
-      const up = target.headings[i].parent;
-      if (up >= 0 && !tree.rows.find((x) => x.i === up)?.blocked) sel = 'h:' + up;
-    }
-    void scroll();
-  }
-  function key(e: KeyboardEvent) {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (!pickable.length) return;
-      const k = pickable.indexOf(sel);
-      const d = e.key === 'ArrowDown' ? 1 : -1;
-      sel = pickable[k < 0 ? 0 : (k + d + pickable.length) % pickable.length];
-      void scroll();
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (step === 2 && e.metaKey && top) act('top', true);
-      else if (sel) act(sel, e.metaKey);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      close();
-    } else if (e.key === 'Backspace' && !q) {
-      e.preventDefault();
-      if (step === 2) toStep1();
-      else onback?.();
-    } else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && step === 2 && !q) {
-      e.preventDefault();
-      side(e.key === 'ArrowRight');
-    } else if (e.key === 'Tab') e.preventDefault();
-  }
+  const close = ctl.close;
   const keepFocus = (e: MouseEvent) => {
     if (e.target !== input) e.preventDefault();
   };
   const lvColor = (level: number) => (level <= 3 ? `var(--h${level})` : 'var(--fg2)');
-  const FOOT1 = $derived(
-    kind === 'file'
-      ? [['↑ ↓', 'выбрать'], ['↩', 'выбрать файл'], ['⎋', 'закрыть']]
-      : [['↑ ↓', 'выбрать'], ['↩', 'к заголовкам файла'], ...(top ? [['⌘↩', 'сразу на 1-й уровень']] : []), ...(onback ? [['⌫', 'к командам']] : []), ['⎋', 'закрыть']],
-  );
-  const FOOT2 = $derived([['↑ ↓', 'выбрать'], ['← →', 'свернуть / развернуть'], ['↩', top ? 'перенести сюда' : 'выбрать'], ...(top ? [['⌘↩', 'на 1-й уровень']] : []), ['⌫', 'к файлам'], ['⎋', 'закрыть']]);
 
   // ---- the columns ---------------------------------------------------------------------------------------------
   let cq = $state('');
@@ -258,23 +119,23 @@
       <div class="field">
         {#if palette}<svg class="lens" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5" /><path d="M13.5 13.5L17 17" /></svg>{/if}
         <span class="tok">
-          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={step === 1 ? (kind === 'file' ? ICONS.file : ICONS.refile) : ICONS.file} /></svg>
-          {step === 1 ? token : fileName}
+          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ctl.step === 1 ? (kind === 'file' ? ICONS.file : ICONS.refile) : ICONS.file} /></svg>
+          {ctl.step === 1 ? token : ctl.fileName}
         </span>
-        <input bind:this={input} bind:value={q} oninput={typed} onkeydown={key} spellcheck="false" autocomplete="off"
-          placeholder={step === 1 ? placeholder : `Заголовок в ${fileName}…`} aria-label={step === 1 ? 'Файл' : 'Заголовок'}
-          role="combobox" aria-expanded="true" aria-controls="rf-list" aria-activedescendant={sel ? 'rf-' + sel : undefined} />
+        <input bind:this={input} bind:value={ctl.q} oninput={ctl.typed} onkeydown={ctl.key} spellcheck="false" autocomplete="off"
+          placeholder={ctl.step === 1 ? placeholder : `Заголовок в ${ctl.fileName}…`} aria-label={ctl.step === 1 ? 'Файл' : 'Заголовок'}
+          role="combobox" aria-expanded="true" aria-controls="rf-list" aria-activedescendant={ctl.sel ? 'rf-' + ctl.sel : undefined} />
         {#if palette && store.keyHint('palette')}<kbd>{store.keyHint('palette')}</kbd>{/if}
       </div>
-      {#if err}<div class="err" role="alert">{err}</div>{/if}
+      {#if ctl.err}<div class="err" role="alert">{ctl.err}</div>{/if}
 
-      <div class="list" id="rf-list" role="listbox" aria-label={step === 1 ? 'Файлы' : 'Место в файле'} bind:this={list}>
-        {#if step === 1}
-          {#each files as f, i (f.path)}
-            {#if f.group !== files[i - 1]?.group}<div class="gh" role="presentation">{f.group}</div>{/if}
+      <div class="list" id="rf-list" role="listbox" aria-label={ctl.step === 1 ? 'Файлы' : 'Место в файле'} bind:this={list}>
+        {#if ctl.step === 1}
+          {#each ctl.files as f, i (f.path)}
+            {#if f.group !== ctl.files[i - 1]?.group}<div class="gh" role="presentation">{f.group}</div>{/if}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <div class="row" id={'rf-f:' + f.path} role="option" aria-selected={sel === 'f:' + f.path} class:on={sel === 'f:' + f.path}
-              onmousemove={(e) => moved(e) && (sel = 'f:' + f.path)} onclick={() => act('f:' + f.path)}>
+            <div class="row" id={'rf-f:' + f.path} role="option" aria-selected={ctl.sel === 'f:' + f.path} class:on={ctl.sel === 'f:' + f.path}
+              onmousemove={(e) => moved(e) && (ctl.sel = 'f:' + f.path)} onclick={() => ctl.act('f:' + f.path)}>
               <svg class="ic" width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICONS.file} /></svg>
               <span class="t">{#each runs(f.label, f.at) as part}{#if part.hit}<b>{part.s}</b>{:else}{part.s}{/if}{/each}</span>
               <span class="hint">{f.sub}{f.self ? ' · этот файл' : ''}</span>
@@ -282,41 +143,41 @@
           {:else}
             <div class="row empty" role="option" aria-selected="false" aria-disabled="true">Ничего не найдено</div>
           {/each}
-        {:else if target}
+        {:else if ctl.target}
           {#if top}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <div class="row" id="rf-top" role="option" aria-selected={sel === 'top'} class:on={sel === 'top'} onmousemove={(e) => moved(e) && (sel = 'top')} onclick={() => act('top')}>
+            <div class="row" id="rf-top" role="option" aria-selected={ctl.sel === 'top'} class:on={ctl.sel === 'top'} onmousemove={(e) => moved(e) && (ctl.sel = 'top')} onclick={() => ctl.act('top')}>
               <svg class="ic" width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={TOP} /></svg>
               <span class="t">{top}</span>
-              <span class="hint">в конец {fileName}</span>
+              <span class="hint">в конец {ctl.fileName}</span>
               <span class="key">⌘↩</span>
             </div>
           {/if}
-          <div class="gh" role="presentation">ЗАГОЛОВКИ · {fileName}{q.trim() ? ` — ${tree.matches} ${plural(tree.matches, 'совпадение', 'совпадения', 'совпадений')}` : ''}</div>
-          {#each tree.rows as r (r.i)}
-            {@const h = target.headings[r.i]}
-            {@const on = sel === 'h:' + r.i}
+          <div class="gh" role="presentation">ЗАГОЛОВКИ · {ctl.fileName}{ctl.q.trim() ? ` — ${ctl.tree.matches} ${plural(ctl.tree.matches, 'совпадение', 'совпадения', 'совпадений')}` : ''}</div>
+          {#each ctl.tree.rows as r (r.i)}
+            {@const h = ctl.target.headings[r.i]}
+            {@const on = ctl.sel === 'h:' + r.i}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div class="node" id={'rf-h:' + r.i} role="option" aria-selected={on} aria-disabled={r.blocked} class:on class:dim={r.dim} class:blocked={r.blocked}
-              onmousemove={(e) => { if (moved(e) && !r.blocked) sel = 'h:' + r.i; }} onclick={() => { if (!r.blocked) act('h:' + r.i); }}>
+              onmousemove={(e) => { if (moved(e) && !r.blocked) ctl.sel = 'h:' + r.i; }} onclick={() => { if (!r.blocked) ctl.act('h:' + r.i); }}>
               {#each { length: r.depth } as _}<span class="guide" aria-hidden="true"><span></span></span>{/each}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
               <svg class="chev" class:open={r.open} class:none={!r.hasKids} width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
-                role="button" aria-label={r.open ? 'Свернуть' : 'Развернуть'} tabindex="-1" onclick={(e) => { e.stopPropagation(); toggle(r); }}><path d="M4.5 2.5l3.5 3.5-3.5 3.5" /></svg>
+                role="button" aria-label={r.open ? 'Свернуть' : 'Развернуть'} tabindex="-1" onclick={(e) => { e.stopPropagation(); ctl.toggle(r); }}><path d="M4.5 2.5l3.5 3.5-3.5 3.5" /></svg>
               <span class="lv" aria-hidden="true" style:background={r.dim ? 'var(--fg3)' : lvColor(h.level)}></span>
-              {#if h.keyword}<span class="kw tone-chip" style={toneStyle(toneFor(h.keyword, target.wf))}>{h.keyword}</span>{/if}
-              <span class="nt" class:l1={h.level === 1 && (!q.trim() || r.dim)}>{#each runs(bareTitle(h.title), r.at) as part}{#if part.hit}<b>{part.s}</b>{:else}{part.s}{/if}{/each}</span>
+              {#if h.keyword}<span class="kw tone-chip" style={toneStyle(toneFor(h.keyword, ctl.target.wf))}>{h.keyword}</span>{/if}
+              <span class="nt" class:l1={h.level === 1 && (!ctl.q.trim() || r.dim)}>{#each runs(bareTitle(h.title), r.at) as part}{#if part.hit}<b>{part.s}</b>{:else}{part.s}{/if}{/each}</span>
               {#if r.hasKids && !r.open}<span class="cnt">{r.kids}</span>{/if}
               {#if h.tags.length}<span class="tags">:{h.tags.join(':')}:</span>{/if}
               {#if on && will}<span class="will">{will(h)}</span>{/if}
             </div>
           {/each}
-          {#if q.trim() && !tree.matches}<div class="row empty" role="option" aria-selected="false" aria-disabled="true">Ничего не найдено</div>{/if}
+          {#if ctl.q.trim() && !ctl.tree.matches}<div class="row empty" role="option" aria-selected="false" aria-disabled="true">Ничего не найдено</div>{/if}
         {/if}
       </div>
 
       <div class="foot">
-        {#each step === 1 ? FOOT1 : FOOT2 as [k, t]}<span><kbd>{k}</kbd>{t}</span>{/each}
+        {#each ctl.foot() as [k, t]}<span><kbd>{k}</kbd>{t}</span>{/each}
       </div>
     </div>
   </div>
