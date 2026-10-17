@@ -331,6 +331,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   (FindPanel, the empty file's word and the link card's `tooltipSpace` read the same). No `::-webkit-scrollbar` in
   `.next` (app.css scopes them `:not(.next, .next *)`): macOS's overlay bars. The column's list has no bar and fades
   24 pt at the edge it goes on past (`.ft`/`.fb` masks).
+  ТЗ 43.1 (`docs/43-novyy-interfeys-sajdbar-i-razdely.md`): the sidebar's sections — `next/sections.ts` (`sectionsOf`:
+  the core's «Сегодня» (no panel: `today.open()`), «Файлы», «Входящие» while the Inbox plugin's nav is there, «Агенда»,
+  «Теги», «Поиск»; the plugins' navs (`views.allNavs`) in their order; `shownSection`: the picked `store.navMode`, else
+  «Файлы»). `next/Sidebar.svelte` draws them, a line, the head of the panel and the panel: `next/FilesPanel.svelte`
+  (the tree, moved out of the sidebar), the bridges AgendaList / TagsPanel / SearchPanel, a plugin's `NavSpec.component`.
+  The new App runs `today`, `navFiles/Agendas/Tags/Search`, `findAll`, `searchNext/Prev` and `actionOf(id)` (the
+  plugins' commands and section keys).
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

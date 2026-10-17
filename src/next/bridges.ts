@@ -13,3 +13,6 @@ export { default as RichMenu } from '../RichMenu.svelte'; // a drawn status or p
 export { default as PluginFileView } from '../PluginFileView.svelte'; // a plugin's view of a file (the board, the canvas) → the new host
 export { default as Refile } from '../Refile.svelte'; // the choice of a place (refile)
 export type { MenuItem } from '../ContextMenu.svelte'; // the menus' items, the type of the bridge above
+export { default as AgendaList } from '../AgendaList.svelte'; // the sidebar's «Агенда» → its own panel (ТЗ 43 §2.2)
+export { default as TagsPanel } from '../TagsPanel.svelte'; // the sidebar's «Теги» → its own panel (ТЗ 43 §2.3)
+export { default as SearchPanel } from '../SearchPanel.svelte'; // the sidebar's «Поиск» → its own panel (ТЗ 43 §2.4)

@@ -17,6 +17,8 @@
   import { nextPrefs } from '../nextPrefs.svelte';
   import { CloseSheet, ContextMenu, Dialogs, DiskSheet, Palette, PluginSheets, Refile, Settings, type MenuItem } from './bridges';
   import { untrack } from 'svelte';
+  import { actionOf } from '../views';
+  import { today } from '../todayState.svelte';
 
   // The new shell (ТЗ 42): the store, the plugins, the window's keys and the menu, the old sheets through
   // `bridges.ts` (42.1); the sidebar with the files and the toolbar (42.3); the tabs (42.4); the editor (42.5).
@@ -31,6 +33,15 @@
     palette: () => store.togglePalette(),
     searchAll: () => store.togglePalette(), // «Искать везде» ⌘K (§4.1)
     nav: () => (store.showNav = !store.showNav),
+    // the sidebar's sections (ТЗ 43 §1, §6): the old navigator's keys; the plugins' come as their actions (actionOf)
+    today: () => today.open(),
+    navFiles: () => store.setNavMode('files'),
+    navAgendas: () => store.setNavMode('agendas'),
+    navTags: () => store.setNavMode('tags'),
+    navSearch: () => store.openSearch(),
+    findAll: () => store.openSearch(window.getSelection()?.toString() ?? ''),
+    searchNext: () => store.searchStep(1),
+    searchPrev: () => store.searchStep(-1),
     newFile,
     // the tabs (ТЗ 42 §4.3): as in the old shell; one pane — the second's commands say «Скоро»
     newTab: () => store.newUntitled(0),
@@ -79,7 +90,7 @@
   }
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   const runWindow = (id: string) => {
-    const run = actions[id];
+    const run = actions[id] ?? actionOf(id); // a plugin's command, a section's key (roadmap 1.1)
     if (!run || (store.sheetOpen && id !== 'palette' && id !== 'settings' && id !== 'quit')) return false;
     run();
     return true;

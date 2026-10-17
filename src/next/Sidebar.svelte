@@ -1,62 +1,31 @@
 <script lang="ts">
-  import { SvelteSet } from 'svelte/reactivity';
   import { store } from '../store.svelte';
-  import { folderKey, readOpen, writeOpen } from '../navTree';
-  import { visibleRows, type NavRow } from '../navRows';
-  import { openFile } from '../layout';
-  import { createItems, entryItems, type FileMenu } from '../fileMenu';
+  import type { FileMenu } from '../fileMenu';
+  import { allNavs, navOf } from '../views';
+  import { today, TODAY } from '../todayState.svelte';
+  import { sectionsOf, shownSection, TODAY_ID, type Section } from './sections';
+  import FilesPanel from './FilesPanel.svelte';
+  import { AgendaList, SearchPanel, TagsPanel } from './bridges';
 
-  // The sidebar of the new interface (ТЗ 42 §4.2): the window's lights on top, «Файлы» — the tree of the notes folder
-  // (the same rows as the old navigator, files and folders only), the line of the folder with its gear. 236 pt, from
-  // 200 to 360 by dragging its edge (kept on this Mac). The sections (Сегодня, Входящие…) come with later parts.
+  // The sidebar of the new interface (ТЗ 43 §1): the window's lights; the core's sections and the plugins' («Плагины»),
+  // 28 pt rows with an icon, a name and a number; a line; the panel of the section picked, under the head of its
+  // group, scrolling on its own; the line of the folder with its gear. 236 pt, from 200 to 360 by dragging its edge
+  // (kept on this Mac). «Сегодня» is a screen: it opens its tab and keeps the panel.
   let { width, onwidth, onmenu }: { width: number; onwidth: (w: number) => void; onmenu: (at: { x: number; y: number }, items: FileMenu) => void } = $props();
 
-  // the open folders, kept per notes folder (the same store as the old navigator's)
-  const open = new SvelteSet<string>();
-  let openDir: string | null = null;
-  $effect.pre(() => {
-    const dir = store.dir;
-    if (dir === openDir) return;
-    open.clear();
-    for (const k of readOpen(dir) ?? []) open.add(k);
-    openDir = dir;
-  });
-  $effect(() => {
-    const keys = [...open];
-    if (openDir && openDir === store.dir) writeOpen(openDir, new Set(keys));
-  });
-  const rows = $derived(visibleRows(store.folders, store.files, open, { headings: false, creating: store.creating?.dir ?? null, cur: store.cur, selected: -1 }));
-  const fileCount = $derived(store.files.length);
+  const groups = $derived(sectionsOf(allNavs(), store.files.length));
+  const shown = $derived(shownSection(store.navMode, groups));
+  const feature = $derived(navOf(shown.id));
+  const todayOn = $derived(store.tab?.kind === TODAY);
 
-  function click(e: MouseEvent, r: NavRow) {
-    if (r.kind === 'folder') return void (r.hasKids && (open.has(r.key) ? open.delete(r.key) : open.add(r.key)));
-    if (r.kind !== 'file' || r.file === undefined) return;
-    // ⌥-click: a tab of its own; a click: in the tab shown (as the old navigator)
-    if (e.altKey) openFile(store.layout, store.layout.active, store.files[r.file].path, 0, { replace: false });
-    else store.open(r.file, 0);
+  function pick(s: Section) {
+    if (s.id === TODAY_ID) return today.open();
+    if (s.id === 'search') return store.openSearch();
+    store.setNavMode(s.id);
   }
-  const startCreate = (dir: string, kind: 'file' | 'folder', type?: string) => {
-    if (dir) open.add(folderKey(dir));
-    store.creating = { dir, kind, ...(type ? { type } : {}) };
-  };
-  function menu(e: MouseEvent, r: NavRow | null) {
-    if (!store.canManageFiles || r?.kind === 'new') return;
-    e.preventDefault();
-    e.stopPropagation();
-    onmenu({ x: e.clientX, y: e.clientY }, r ? entryItems(r.rel, r.kind === 'folder', startCreate) : createItems('', startCreate));
-  }
-  function focusSelect(el: HTMLInputElement) {
-    el.focus();
-    el.select();
-  }
-  function keyNew(e: KeyboardEvent, r: NavRow) {
-    if (e.key === 'Enter') store.createEntry(r.rel, (e.currentTarget as HTMLInputElement).value, store.creating?.kind ?? 'file', store.creating?.type);
-    else if (e.key === 'Escape') store.creating = null;
-  }
-  function keyRename(e: KeyboardEvent, r: NavRow) {
-    if (e.key === 'Enter') store.renameEntry(r.rel, (e.currentTarget as HTMLInputElement).value);
-    else if (e.key === 'Escape') store.renaming = null;
-  }
+  const hint = (s: Section) => (s.key ? store.keyHint(s.key) : '');
+  const count = (s: Section) => s.badge?.() ?? 0;
+  const shownCount = (n: number) => (n > 999 ? '999+' : String(n));
 
   // the folder's line: ~ for the home folder
   const folderShown = $derived((store.dir ?? '').replace(/^\/Users\/[^/]+/, '~'));
@@ -75,37 +44,37 @@
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   }
-  const FILE = 'M3.5 2h6l3 3v9h-9z';
-  const FOLDER = 'M1.8 4.2c0-.7.5-1.2 1.2-1.2h3l1.5 1.6H13c.7 0 1.2.5 1.2 1.2V12c0 .7-.5 1.2-1.2 1.2H3c-.7 0-1.2-.5-1.2-1.2z';
 </script>
+
+{#snippet row(s: Section)}
+  {@const n = count(s)}
+  {@const on = s.id === TODAY_ID ? todayOn : s.id === shown.id}
+  <button class="si" class:on aria-current={on ? 'true' : undefined} title={hint(s) ? `${s.label} (${hint(s)})` : s.label} onclick={() => pick(s)}>
+    <svg width="16" height="16" viewBox="0 0 {s.vb} {s.vb}" fill="none" stroke="currentColor" stroke-width={s.vb === 20 ? 1.5 : 1.4} stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={s.icon} /></svg>
+    <span class="sn">{s.label}</span>
+    {#if n}<span class="c" aria-label="{s.label}: {n}">{shownCount(n)}</span>{/if}
+  </button>
+{/snippet}
 
 <aside class="side" style:width="{width}px" aria-label="Боковая панель">
   <div class="lights" aria-hidden="true"></div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="files" oncontextmenu={(e) => menu(e, null)}>
-    <div class="grp"><span>Файлы</span><span class="n">{fileCount}</span></div>
-    <div class="tree" role="tree" aria-label="Файлы">
-      {#each rows as r (r.key)}
-        {#if r.kind === 'new'}
-          <div class="row" style:padding-left="{6 + r.depth * 16 + 16}px">
-            <input class="name" use:focusSelect aria-label={store.creating?.kind === 'folder' ? 'Имя папки' : 'Имя файла'} placeholder={store.creating?.kind === 'folder' ? 'папка' : 'файл'}
-              onkeydown={(e) => keyNew(e, r)} onblur={() => (store.creating = null)} />
-          </div>
-        {:else if store.renaming === r.rel}
-          <div class="row" style:padding-left="{6 + r.depth * 16 + 16}px">
-            <input class="name" use:focusSelect aria-label="Новое имя" value={r.label} onkeydown={(e) => keyRename(e, r)} onblur={() => (store.renaming = null)} />
-          </div>
-        {:else}
-          <button class="row" class:on={r.kind === 'file' && r.file === store.cur} role="treeitem" aria-selected={r.kind === 'file' && r.file === store.cur}
-            aria-expanded={r.kind === 'folder' && r.hasKids ? r.open : undefined} style:padding-left="{6 + r.depth * 16}px"
-            onclick={(e) => click(e, r)} oncontextmenu={(e) => menu(e, r)}>
-            <span class="chev" class:open={r.open}>{#if r.kind === 'folder' && r.hasKids}<svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><path d="M2.5 1.2 5.8 4 2.5 6.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>{/if}</span>
-            <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d={r.kind === 'folder' ? FOLDER : FILE} /></svg>
-            <span class="nm">{r.label}</span>
-          </button>
-        {/if}
-      {/each}
-    </div>
+  <nav class="secs" aria-label="Разделы">
+    {#each groups.core as s (s.id)}{@render row(s)}{/each}
+  </nav>
+  {#if groups.plugins.length}
+    <div class="grp">Плагины</div>
+    <nav class="secs" aria-label="Разделы плагинов">
+      {#each groups.plugins as s (s.id)}{@render row(s)}{/each}
+    </nav>
+  {/if}
+  <div class="rule"></div>
+  <div class="grp head"><span>{shown.label}</span>{#if count(shown)}<span class="n">{shownCount(count(shown))}</span>{/if}</div>
+  <div class="panel" role="region" aria-label="Панель: {shown.label}">
+    {#if shown.id === 'files'}<FilesPanel {onmenu} />
+    {:else if shown.id === 'agendas'}<AgendaList />
+    {:else if shown.id === 'tags'}<TagsPanel />
+    {:else if shown.id === 'search'}<SearchPanel />
+    {:else if feature}{#key feature.id}<feature.component id={feature.id} />{/key}{/if}
   </div>
   <div class="folder">
     <span class="dot" class:off={!folderOk} title={folderOk ? 'Папка доступна' : 'Папка недоступна'}></span>
@@ -122,20 +91,20 @@
   .side { position: relative; flex: 0 0 auto; display: flex; flex-direction: column; box-sizing: border-box; padding: 0 10px; background: var(--side); border-right: 1px solid var(--rule); }
   /* the window's lights are drawn by macOS over this strip; it drags the window */
   .lights { flex: 0 0 52px; -webkit-app-region: drag; }
-  .files { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .grp { display: flex; align-items: center; padding: 14px 10px 6px; font-size: 11px; font-weight: 600; color: var(--ink3); }
+  .secs { flex: 0 0 auto; display: flex; flex-direction: column; gap: 1px; }
+  .si { height: 28px; display: flex; align-items: center; gap: 9px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink2); font: 13px var(--ui); text-align: left; white-space: nowrap; }
+  .si:hover:not(.on) { background: var(--chip); }
+  .si.on { background: var(--lampsoft); color: var(--ink); }
+  .si svg { flex: 0 0 16px; }
+  .sn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .c { margin-left: auto; font-size: 11.5px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+  .si.on .c { color: var(--lampink); }
+  .si:focus-visible, .gear:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; }
+  .grp { flex: 0 0 auto; display: flex; align-items: center; padding: 14px 10px 6px; font-size: 11px; font-weight: 600; color: var(--ink3); }
+  .grp.head { padding-top: 12px; }
   .grp .n { margin-left: auto; font-weight: 400; }
-  .tree { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 1px; }
-  .row { flex: 0 0 26px; display: flex; align-items: center; gap: 6px; padding-right: 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink2); font: 13px var(--ui); text-align: left; white-space: nowrap; }
-  .row:hover { background: var(--chip); }
-  .row.on { background: var(--lampsoft); color: var(--ink); }
-  .row.on .ic { color: var(--lampink); }
-  .row:focus-visible, .gear:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; }
-  .chev { flex: 0 0 10px; display: flex; align-items: center; justify-content: center; color: var(--ink3); transition: transform 0.12s; }
-  .chev.open { transform: rotate(90deg); }
-  .ic { flex: 0 0 15px; color: var(--ink3); }
-  .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .name { flex: 1; min-width: 0; height: 22px; padding: 0 6px; border: 1px solid var(--lamp); border-radius: 5px; background: var(--field); color: var(--ink); font: 13px var(--ui); outline: none; }
+  .rule { flex: 0 0 1px; margin: 12px 4px 0; background: var(--rule); }
+  .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
   .folder { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 12px 10px; border-top: 1px solid var(--rule); color: var(--ink3); font-size: 11.5px; }
   .dot { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 4px; background: var(--done); }
   .dot.off { background: var(--todo); }
