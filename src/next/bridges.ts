@@ -2,7 +2,6 @@
 // of `src/next/` allowed to import them (eslint.config.js); one line each, with what takes its place.
 
 export { default as Settings } from '../Settings.svelte'; // the settings stay old (ТЗ 42 §1, §11)
-export { default as PluginSheets } from '../PluginSheets.svelte'; // the plugins' forms and sheets → the same
 export { default as PluginFileView } from '../PluginFileView.svelte'; // a plugin's view of a file (the board, the canvas) → the new host
 export { default as Agenda } from '../Agenda.svelte'; // the agenda's tab → the screen in the new style, a ТЗ of its own
 export { default as AgendaBuilder } from '../AgendaBuilder.svelte'; // the agenda builder's sheet → the same

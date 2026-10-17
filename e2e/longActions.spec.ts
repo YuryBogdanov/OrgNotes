@@ -70,7 +70,7 @@ test('W «Ждём…» with the status: one transaction, ⌘Z takes it all back
   await expect(sheet.getByRole('switch', { name: 'Поставить статус WAIT' })).toBeChecked();
   // the earlier ones are offered
   await sheet.getByRole('textbox', { name: 'Кого или что ждём' }).fill('би');
-  await sheet.locator('.lm-who-list button', { hasText: 'бизнес' }).click();
+  await sheet.getByRole('button', { name: 'бизнес', exact: true }).click();
   await sheet.getByRole('button', { name: 'Ждём', exact: true }).click();
   await expect.poll(() => disk(page, MIDTERM)).toMatch(/^#\+TODO: .*\n\* WAIT Миграция биллинга\n:PROPERTIES:\n:WAITING_ON: бизнес\n:END:\n/);
   await expect.poll(() => row(page, 'Миграция биллинга').textContent()).toContain('ждём: бизнес');
