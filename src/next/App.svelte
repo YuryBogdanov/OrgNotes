@@ -18,6 +18,7 @@
   import { nextPrefs } from '../nextPrefs.svelte';
   import { AgendaBuilder, Capture, InboxPicker, NotePop, Settings, StartScreen, TaskListHost } from './bridges';
   import PluginSheets from './PluginSheets.svelte';
+  import EndDay from './EndDay.svelte';
   import CloseSheet from './CloseSheet.svelte';
   import DiskSheet from './DiskSheet.svelte';
   import Dialogs from './Dialogs.svelte';
@@ -185,6 +186,15 @@
     void plugins.start().then(() => pluginUpdates.check());
     const key = keyHandler(runWindow);
     window.addEventListener('keydown', key, true);
+    // one ⌘Z (roadmap 0.1), as in the old window: in a text field it is the field's own; anywhere else it takes back
+    // the last edit a feature made — «Сегодня», «Завершить день», a review card, the calendar, the goals
+    const undo = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || !e.metaKey || e.shiftKey || e.altKey || e.ctrlKey || e.code !== 'KeyZ') return;
+      if ((e.target as Element | null)?.closest?.('.cm-editor, input, textarea, select, [contenteditable]') || store.sheetOpen) return;
+      e.preventDefault();
+      void store.undoLast();
+    };
+    window.addEventListener('keydown', undo);
     let menu: AppMenu | null = null;
     let gone = false;
     void installMenu(actions, (id) => toAccelerator(store.bindings.get(id)?.[0] ?? '')).then((m) => (gone ? m?.close() : (menu = m)));
@@ -192,6 +202,7 @@
       mq.removeEventListener('change', sys);
       gone = true;
       window.removeEventListener('keydown', key, true);
+      window.removeEventListener('keydown', undo);
       menu?.close();
     };
   });
@@ -212,6 +223,8 @@
   {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
   {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
   {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
+  <!-- «Завершить день» (ТЗ 45 §2.5) -->
+  {#if today.ending}<EndDay />{/if}
   <!-- the plugins' forms, sheets, menus, «Включить плагин?», the choice of a place (ТЗ 44 §4) -->
   <PluginSheets />
   <!-- the palette and its «Перенести» (ТЗ 44 §2) -->

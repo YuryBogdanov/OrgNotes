@@ -1,146 +1,23 @@
 <script lang="ts">
-  import { Reorder } from './reorder.svelte';
   import { moved } from './pointer';
-  import { onMount, tick } from 'svelte';
+  import { onMount } from 'svelte';
   import Editor from './Editor.svelte';
   import { store } from './store.svelte';
-  import { toneFor } from './org';
-  import { toneStyle } from './colors';
-  import { fuzzy } from './fuzzy';
-  import { weekdayNames } from './edits';
-  import { dayTitle, doneOn, leftOn, nextWorkday, openTasks, type DayTask } from './endDay';
-  import { focusRows, journalDays, lastDay } from './today';
-  import { today, type EndTask } from './todayState.svelte';
+  import { dayTitle } from './endDay';
+  import { DONE_CAP, EndDayCtl, isDate, shortDay } from './endDayCtl.svelte';
 
   // «Завершить день» (ТЗ 32 §3): what was done, what is left (moved or kept), the three tasks for tomorrow, a note to
-  // tomorrow; ⌘↩ writes it all into the journal at once, ⎋ leaves.
-  const day = today.day;
-  const files = store.agendaFiles;
-  const cfg = today.folder;
-  const WD = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
-  const MON = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-  const SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-  const when = `${WD[day.getDay()]}, ${day.getDate()} ${MON[day.getMonth()]}`;
-  const tone = (kw: string, path: string) => {
-    const f = files.find((x) => x.path === path);
-    return f && kw ? toneStyle(toneFor(kw, f.wf)) : '';
-  };
+  // tomorrow; ⌘↩ writes it all into the journal at once, ⎋ leaves. Its workings are endDayCtl.svelte.ts (the new
+  // interface draws them too, ТЗ 45 §2.5).
+  const c = new EndDayCtl();
+  const { day, cfg, when, done, left, nextWord, tone, drag } = c;
   const base = (p: string) => p.split('/').pop() ?? p;
-
-  // ---- what the sheet starts with ----
-  const done = doneOn(files, day);
-  const left = leftOn(files, day);
-  const next = nextWorkday(day);
-  const nextWord = next.getDay() === 1 && day.getDay() >= 5 ? 'На понедельник' : 'На завтра';
-  const journal = files.find((f) => f.name === cfg.journal);
-  const days = journal ? journalDays(journal) : [];
-  const mine = days.find((d) => +d.date === +day); // the day was ended already: what it wrote
-  const morning = lastDay(days, day);
-  type Item = EndTask & { kw: string; file: string };
-  const item = (t: DayTask): Item => ({ key: t.key, path: t.path, line: t.line, title: t.title, id: t.id, kw: t.kw, file: t.file });
-  const fromLinks = (links: { id: string; title: string }[], keepDone: boolean): Item[] =>
-    focusRows(links, files, day).flatMap((r) => (r.task && (keepDone || !r.task.done) ? [{ key: r.task.key, path: r.task.path, line: r.task.line, title: r.task.title, id: r.id, kw: r.task.kw, file: r.task.file }] : []));
-  let focus = $state<Item[]>(mine?.focus.length ? fromLinks(mine.focus, true) : fromLinks(morning?.focus ?? [], false));
-  let note = $state(mine?.note?.text ?? '- ');
-
-  // «Не успел»: kept (default), tomorrow, or a date
-  let choice = $state<Record<string, 'keep' | 'next' | Date>>(Object.fromEntries(left.map((t) => [t.key, 'keep'])));
-  function pickDate(t: DayTask) {
-    const f = files.find((x) => x.path === t.path);
-    store.openCalendar({ kind: 'SCHEDULED', initial: next, current: day, names: weekdayNames(f?.text ?? ''), pick: (d) => (choice[t.key] = d) });
-  }
-  const isDate = (v: unknown): v is Date => v instanceof Date;
-
-  // ---- «Главное на завтра»: up to three, found as in the palette ----
-  let q = $state('');
-  let sel = $state(0);
-  let input: HTMLInputElement | undefined = $state();
-  const candidates = $derived.by(() => {
-    if (!q.trim()) return [] as DayTask[];
-    const taken = new Set(focus.map((f) => f.key));
-    return openTasks(files)
-      .filter((t) => !taken.has(t.key))
-      .map((t) => ({ t, m: fuzzy(q, t.title) }))
-      .filter((x) => x.m)
-      .sort((a, b) => Number(b.m!.wordStart) - Number(a.m!.wordStart) || a.m!.span - b.m!.span || a.t.title.length - b.t.title.length)
-      .slice(0, 6)
-      .map((x) => x.t);
-  });
-  $effect(() => {
-    void q;
-    sel = 0;
-  });
-  function add(t: DayTask | undefined) {
-    if (!t || focus.length >= 3) return;
-    focus = [...focus, item(t)];
-    q = '';
-    void tick().then(() => input?.focus());
-  }
-  function searchKey(e: KeyboardEvent) {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      sel = Math.max(0, Math.min(candidates.length - 1, sel + (e.key === 'ArrowDown' ? 1 : -1)));
-    } else if (e.key === 'Enter' && !e.metaKey) {
-      e.preventDefault();
-      add(candidates[sel]);
-    } else if (e.key === 'Escape' && q) {
-      e.preventDefault();
-      e.stopPropagation();
-      q = '';
-    }
-  }
-  // a row dragged onto another: it goes there (after it when dragged down)
-  const drag = new Reorder((key, target) => {
-    if (key === target) return;
-    const list = [...focus];
-    const from = list.findIndex((x) => x.key === key);
-    const [it] = list.splice(from, 1);
-    list.splice(list.findIndex((x) => x.key === target) + (from <= list.findIndex((x) => x.key === target) ? 1 : 0), 0, it);
-    focus = list;
-  });
-  function stepKey(e: KeyboardEvent, i: number) {
-    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
-    e.preventDefault();
-    const j = i + (e.key === 'ArrowUp' ? -1 : 1);
-    if (j < 0 || j >= focus.length) return;
-    const list = [...focus];
-    [list[i], list[j]] = [list[j], list[i]];
-    focus = list;
-  }
-
-  // ---- the end ----
-  let busy = $state(false);
-  async function finish() {
-    if (busy) return;
-    busy = true;
-    const moves = left.flatMap((t) => {
-      const c = choice[t.key];
-      return c === 'keep' ? [] : [{ task: item(t), date: c === 'next' ? next : c }];
-    });
-    const ok = await today.finishDay({ moves, focus, done: done.map(item), note: note.trim() === '-' ? '' : note });
-    busy = false;
-    void ok;
-  }
-  const close = () => (today.ending = false);
-  function keys(e: KeyboardEvent) {
-    if (store.palette) return; // the calendar of «Дата…» answers first
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      close();
-    } else if (e.key === 'Enter' && e.metaKey) {
-      e.preventDefault();
-      e.stopPropagation();
-      void finish();
-    }
-  }
-  const DONE_CAP = 8;
   onMount(() => {
-    if (!focus.length) input?.focus();
+    if (!c.focus.length) c.input?.focus();
   });
 </script>
 
-<svelte:window onkeydowncapture={keys} />
+<svelte:window onkeydowncapture={(e) => c.keys(e)} />
 
 <div class="scrim" aria-hidden="true"></div>
 <div class="sheet" role="dialog" aria-label="Завершить день" aria-modal="true">
@@ -165,13 +42,13 @@
       <section aria-label="Не успел">
         <div class="cap">НЕ УСПЕЛ<span>было запланировано на сегодня</span></div>
         {#each left as t (t.key)}
-          {@const c = choice[t.key]}
+          {@const ch = c.choice[t.key]}
           <div class="lrow">
             <span class="kw tone" style={tone(t.kw, t.path)}>{t.kw}</span><span class="t">{t.title}</span>
             <span class="seg" role="radiogroup" aria-label="Что с задачей «{t.title}»">
-              <button role="radio" aria-checked={c === 'next'} class:on={c === 'next'} onclick={() => (choice[t.key] = 'next')}>{nextWord}</button>
-              <button role="radio" aria-checked={isDate(c)} class:on={isDate(c)} onclick={() => pickDate(t)}>{isDate(c) ? `${c.getDate()} ${SHORT[c.getMonth()]}` : 'Дата…'}</button>
-              <button role="radio" aria-checked={c === 'keep'} class:on={c === 'keep'} onclick={() => (choice[t.key] = 'keep')}>Оставить</button>
+              <button role="radio" aria-checked={ch === 'next'} class:on={ch === 'next'} onclick={() => (c.choice[t.key] = 'next')}>{nextWord}</button>
+              <button role="radio" aria-checked={isDate(ch)} class:on={isDate(ch)} onclick={() => c.pickDate(t)}>{isDate(ch) ? shortDay(ch) : 'Дата…'}</button>
+              <button role="radio" aria-checked={ch === 'keep'} class:on={ch === 'keep'} onclick={() => (c.choice[t.key] = 'keep')}>Оставить</button>
             </span>
           </div>
         {/each}
@@ -181,26 +58,26 @@
     <section aria-label="Главное на завтра">
       <div class="cap">ГЛАВНОЕ НА ЗАВТРА<span>до трёх задач</span></div>
       <div class="focus" role="list">
-        {#each focus as f, i (f.key)}
+        {#each c.focus as f, i (f.key)}
           <div class="frow" class:over={drag.overId === f.key && drag.dragId !== f.key} role="listitem" tabindex="0" aria-label="{i + 1}. {f.title}"
             use:drag.handle={{ id: f.key }} use:drag.zone={f.key}
-            onkeydown={(e) => stepKey(e, i)}>
+            onkeydown={(e) => c.stepKey(e, i)}>
             <span class="n">{i + 1}</span>
             <span class="kw tone" style={tone(f.kw, f.path)}>{f.kw}</span>
             <span class="t">{f.title}</span>
             <span class="file">{base(f.file)}</span>
-            <button class="x" aria-label="Убрать «{f.title}»" onclick={() => (focus = focus.filter((x) => x.key !== f.key))}>×</button>
+            <button class="x" aria-label="Убрать «{f.title}»" onclick={() => c.remove(f.key)}>×</button>
           </div>
         {/each}
-        <div class="find" class:full={focus.length >= 3}>
+        <div class="find" class:full={c.focus.length >= 3}>
           <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5" /><path d="M13.2 13.2L17 17" /></svg>
-          <input bind:this={input} bind:value={q} onkeydown={searchKey} placeholder="Найти задачу…" aria-label="Найти задачу" disabled={focus.length >= 3} spellcheck="false" autocomplete="off" />
-          <span class="cnt">{focus.length} из 3</span>
-          {#if candidates.length}
+          <input bind:this={c.input} bind:value={() => c.q, (v) => c.setQuery(v)} onkeydown={(e) => c.searchKey(e)} placeholder="Найти задачу…" aria-label="Найти задачу" disabled={c.focus.length >= 3} spellcheck="false" autocomplete="off" />
+          <span class="cnt">{c.focus.length} из 3</span>
+          {#if c.candidates.length}
             <div class="drop" role="listbox" aria-label="Задачи">
-              {#each candidates as t, i (t.key)}
+              {#each c.candidates as t, i (t.key)}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <div class="opt" class:on={i === sel} role="option" aria-selected={i === sel} tabindex="-1" onmousemove={(e) => moved(e) && (sel = i)} onclick={() => add(t)}>
+                <div class="opt" class:on={i === c.sel} role="option" aria-selected={i === c.sel} tabindex="-1" onmousemove={(e) => moved(e) && (c.sel = i)} onclick={() => c.add(t)}>
                   <span class="kw tone" style={tone(t.kw, t.path)}>{t.kw}</span><span class="t">{t.title}</span><span class="file">{base(t.file)}</span>
                 </div>
               {/each}
@@ -213,15 +90,15 @@
     <section aria-label="Заметка на завтра">
       <div class="cap">ЗАМЕТКА НА ЗАВТРА</div>
       <div class="note">
-        <Editor text={note} fileKey="end-day-note" wf={store.untitledWf} gutter={false} drawers={false} levels={store.levels} initial={{ line: note.split('\n').length - 1, col: note.split('\n').at(-1)!.length }}
-          reveal={null} onchange={(t) => (note = t)} oncursor={() => {}} onfollow={(l) => store.follow(l)} />
+        <Editor text={c.note} fileKey="end-day-note" wf={store.untitledWf} gutter={false} drawers={false} levels={store.levels} initial={{ line: c.note.split('\n').length - 1, col: c.note.split('\n').at(-1)!.length }}
+          reveal={null} onchange={(t) => (c.note = t)} oncursor={() => {}} onfollow={(l) => store.follow(l)} />
       </div>
     </section>
   </div>
   <footer>
     <span class="where">Запишется в <code>{cfg.journal} › {dayTitle(day)}</code></span>
-    <button class="btn" onclick={close}>Отмена</button>
-    <button class="btn primary" disabled={busy} onclick={() => void finish()}>Завершить день ⌘↩</button>
+    <button class="btn" onclick={c.close}>Отмена</button>
+    <button class="btn primary" disabled={c.busy} onclick={() => void c.finish()}>Завершить день ⌘↩</button>
   </footer>
 </div>
 
