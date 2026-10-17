@@ -1,11 +1,13 @@
 // The plugin «quarter-goals» (ТЗ 27): what it adds — the section «Цели», the tab of the overview and of a person, the
 // commands, the set of statuses «Цели на квартал» — and how it follows the notes.
 
+import type { HeadingRef } from '@panopticon/api';
 import { definePlugin, type Ctx } from '@panopticon/api';
 import { mount, unmount } from 'svelte';
 import { core } from './core.svelte';
 import { goals, OVERVIEW } from './state.svelte';
-import { GOALS_WORKFLOW, oneOnOneLine, quarterOf, todayPerson } from './goals';
+import { GOALS_WORKFLOW, GOAL_STATES, goalsIn, isDone, oneOnOneLine, quarterOf, todayPerson } from './goals';
+import Card from './Card.svelte';
 import { openAdd, openForm, startReview } from './actions';
 import Overview from './Overview.svelte';
 import Panel from './Panel.svelte';
@@ -95,6 +97,27 @@ export default definePlugin({
         return p ? oneOnOneLine(todayPerson(p.data, quarterOf(new Date()), new Date(), goals.goalSettings.silent), goals.goalSettings.silent) : null;
       },
       action: { label: 'Разбор целей', available: (path) => !!personOf(path), run: (path) => void (personOf(path) && startReview(personOf(path)!.key)) },
+    });
+    // the card of a file of goals (ТЗ 44 §5): the person's goals of the quarter, the silent one, the 1-1's review
+    const sourceOf = (path: string) => goals.goalPeople.find((x) => x.found && x.src.file === path);
+    const cards = new WeakMap<HTMLElement, { path: string; heading: HeadingRef | null }>();
+    ctx.ui.fileCard('quarter-goals.card', {
+      match: (path) => !!sourceOf(path),
+      count: (path) => {
+        const p = sourceOf(path);
+        return p ? goalsIn(p.data, quarterOf(new Date())).filter((g) => !isDone(g, [GOAL_STATES.done])).length || null : null;
+      },
+      render: (el, c) => {
+        const at = cards.get(el);
+        if (at) return void Object.assign(at, c);
+        const fresh = $state({ path: c.path, heading: c.heading });
+        cards.set(el, fresh);
+        const app = mount(Card, { target: el, props: { at: fresh, person: () => sourceOf(fresh.path) } });
+        return () => {
+          void unmount(app);
+          cards.delete(el);
+        };
+      },
     });
     // «действия с задачей» (ТЗ 34): a goal chosen in a list — the agenda, «Сегодня», the board
     ctx.ui.taskAction({ label: 'Добавить отметку…', when: (h) => !!goals.goalAt(h.ref), run: (ref) => void goals.markFromList(ref) });

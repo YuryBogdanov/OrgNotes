@@ -6,6 +6,8 @@ import { mount, unmount } from 'svelte';
 import { data } from './state.svelte';
 import { session } from './session.svelte';
 import Panel from './Panel.svelte';
+import Card from './Card.svelte';
+import type { HeadingRef } from '@panopticon/api';
 import './styles.css';
 
 let stop: (() => void) | null = null;
@@ -35,6 +37,23 @@ export default definePlugin({
       return () => void unmount(app);
     });
     ctx.commands.on('inbox.review', () => session.start());
+    // the card of the Inbox file (ТЗ 44 §5): its tasks, the one under the caret and the actions on it
+    const cards = new WeakMap<HTMLElement, { path: string; heading: HeadingRef | null }>();
+    ctx.ui.fileCard('inbox.card', {
+      match: (path) => path === data.path,
+      count: (path) => (path === data.path ? data.list.length || null : null),
+      render: (el, c) => {
+        const at = cards.get(el);
+        if (at) return void Object.assign(at, c);
+        const fresh = $state({ path: c.path, heading: c.heading });
+        cards.set(el, fresh);
+        const app = mount(Card, { target: el, props: { at: fresh } });
+        return () => {
+          void unmount(app);
+          cards.delete(el);
+        };
+      },
+    });
     stop = $effect.root(() => {
       $effect(() => ctx.ui.setBadge('inbox', data.settings.counter ? data.list.length : 0));
       $effect(() => ctx.commands.setAvailable('inbox.review', data.pending.length > 0));

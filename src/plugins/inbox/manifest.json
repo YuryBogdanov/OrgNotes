@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Раздел Inbox: задачи файла Inbox — открыть, перенести, дата, готово, удалить — и «Разбор Inbox» по карточкам. Быстрый ввод (⇧⌘I) и файл Inbox — настройки приложения.",
   "author": "Panopticon",
-  "api": "^1.2",
+  "api": "^1.14",
   "minAppVersion": "1.1.0",
   "main": "main.js",
   "permissions": ["index.read", "files.edit"],
@@ -23,6 +23,12 @@
     ],
     "navSections": [
       { "id": "inbox", "title": "Inbox", "icon": "M3 11l2-7h10l2 7v5H3zM3 11h4l1 2h4l1-2h4", "key": "inbox.nav" }
+    ],
+    "fileCards": [
+      {
+        "id": "inbox.card",
+        "title": "Inbox"
+      }
     ],
     "settings": [
       {

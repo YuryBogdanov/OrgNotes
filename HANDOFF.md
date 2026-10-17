@@ -442,8 +442,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   the groups, «Открыть список»; under the caret the capsule and title, untouched, the day to look, the last status;
   «Статус», «Ждём…» / «Больше не ждём», «Проверить через…», «Осмотрено» with `keyOf`, off on no matter. «Канбан»: a
   file whose level-1 headings have statuses — «Колонки — статусы файла» (or «#+BOARD»'s), «Открыть доской ⌥⌘B»
-  (`.kb-fcard`). The cards' container is 4 pt off the editor and 18 off the edge, as the mockup. Inbox and «Цели
-  квартала» come next.
+  (`.kb-fcard`). The cards' container is 4 pt off the editor and 18 off the edge, as the mockup.
+  44.7 (the second half): the Inbox's card (`inbox/Card.svelte`, on its file: how many, the oldest's days, «Разобрать»;
+  under the caret «Перенести» `ui.refile`, «Запланировать» / «Теги» the core's `heading.schedule` / `heading.tags`,
+  «Удалить» one transaction) and «Цели квартала»'s (`quarter-goals/Card.svelte`, on a found source's file: the open
+  goals of this quarter with weeks since a mark, the silent in `todo` and the longest said in words; «Разбор целей
+  на 1-1» = `startReview` — not on «Мои цели»; «Отметить прогресс…» = `markFromList` on the goal under the caret,
+  else the most silent). The core's switch of the cards goes into the plugin's section, else its block (the Inbox's
+  in «Inbox», the goals' in «Агенды»): a section under its name only when it has neither.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
