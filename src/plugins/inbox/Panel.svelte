@@ -57,7 +57,10 @@
   const openItem = (it: InboxItem) => void ctx.commands.run('file.open', { path: data.path, line: it.line });
 
   // ---- «Разбор» ---------------------------------------------------------------------------------------------
-  const review = $derived(session.run);
+  // a review in the file (the new interface, ТЗ 46 §7): the plain list here, the task on the card lit; the progress
+  // and the queue are the core's
+  const review = $derived(session.run && !session.inFile ? session.run : null);
+  const onCard = $derived(session.run && session.inFile ? session.item : undefined);
   const pending = $derived(file ? data.pending : []);
   const oldest = $derived(Math.max(0, ...pending.map((x) => ageDays(x.created) ?? 0)));
   const handled = $derived(review ? review.items.filter((x) => x.result && x.result !== 'skip').length : 0);
@@ -183,7 +186,7 @@
     <div class="list" bind:this={list} role="listbox" tabindex="0" aria-label="Задачи Inbox" aria-activedescendant="ib-{sel}" onkeydown={key}>
       {#each items as it, i (it.line + ':' + it.title)}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="row" class:sel={i === sel} class:leaving={leaving === it.line} id="ib-{i}" role="option" aria-selected={i === sel} data-line={it.line}
+        <div class="row" class:sel={i === sel} class:now={!!onCard && onCard.title === it.title} class:leaving={leaving === it.line} id="ib-{i}" role="option" aria-selected={i === sel} data-line={it.line}
           onclick={() => { sel = i; list?.focus(); }} ondblclick={() => openItem(it)} oncontextmenu={(e) => context(e, it, i)}>
           <button class="check" aria-label="Готово: {it.title}" title="Готово" onclick={(e) => { e.stopPropagation(); void done(it); }}></button>
           <div class="main">
@@ -281,6 +284,7 @@
   .row { position: relative; display: flex; align-items: flex-start; gap: 9px; padding: 7px 8px; border-radius: 7px; transition: opacity 0.18s, transform 0.18s; }
   .row:hover { background: color-mix(in srgb, var(--sel) 55%, transparent); }
   .row.sel { background: var(--sel); }
+  .row.now { background: var(--cur); }
   .list:focus-visible .row.sel { box-shadow: inset 0 0 0 1.5px var(--acc); }
   .row.leaving { opacity: 0; transform: translateX(12px); }
   @media (prefers-reduced-motion: reduce) { .row { transition: none; } }

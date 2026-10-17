@@ -2,7 +2,7 @@
 // the actions on it, the steps, the end. PluginReview.svelte draws it; the host owns one and forwards to it.
 
 import { store } from '../store.svelte';
-import type { HeadingRef, ReviewResult, ReviewSpec } from './index';
+import type { HeadingRef, ReviewMark, ReviewResult, ReviewSpec } from './index';
 import { fileOf, findHeading, infoOf } from './refs';
 
 /** The core's tab of a plugin's review. */
@@ -20,6 +20,15 @@ export interface ReviewRun {
   gen: number;
   resolved: boolean;
   resolve: (r: ReviewResult) => void;
+  /** In the file (ТЗ 41 §1): a mode of a file's tab in the new interface, not the review's tab. */
+  inFile?: boolean;
+  /** What became of each card an action with a `mark` moved on from. */
+  marks?: Record<number, ReviewMark>;
+}
+/** The core's side of a review in the file (next/fileReview): its tab to the front, the narrowing taken off. */
+export interface FileReviewHooks {
+  front(): void;
+  end(): void;
 }
 /** What the host gives: the guard around a plugin's code, its failure. */
 export interface ReviewHost {
@@ -35,6 +44,21 @@ export class ReviewController {
   }
   /** The review running (one at a time). */
   run = $state<ReviewRun | null>(null);
+  /** Set by the new interface: a review in the file is shown there. */
+  file: FileReviewHooks | null = null;
+  /** What became of a card: the plugin's word, else the action's that moved on from it. */
+  markOf(i: number): ReviewMark | null {
+    const r = this.run;
+    if (!r) return null;
+    void this.redraw;
+    void r.done;
+    if (r.spec.mark) {
+      const m = this.host.guard(r.plugin, () => r.spec.mark!(i), null);
+      if (m && typeof m === 'object' && typeof m.tone === 'string') return { tone: m.tone, ...(typeof m.text === 'string' ? { text: m.text } : {}) };
+      if (m === null) return r.marks?.[i] ?? null;
+    }
+    return r.marks?.[i] ?? null;
+  }
   /** The card's heading now: found by its title near its line (an action may have moved it). */
   heading() {
     const r = this.run;
@@ -61,6 +85,10 @@ export class ReviewController {
     const now = this.heading();
     if (now) r.refs[r.cur] = now.info.ref; // it may have moved: the card keeps it
     if (res === 'next') {
+      if (a.mark) {
+        const text = a.mark.text ? this.host.guard(r.plugin, () => a.mark!.text!(now?.info ?? c.info), '') : '';
+        r.marks = { ...r.marks, [r.cur]: { tone: a.mark.tone, ...(text ? { text: String(text) } : {}) } };
+      }
       r.doneAt.add(r.cur);
       r.done = r.doneAt.size;
       await this.step(1);
@@ -114,7 +142,8 @@ export class ReviewController {
   /** The plugin shows a card (-1: the summary): the review's tab in front. */
   show(r: ReviewRun, i: number) {
     if (this.run !== r || i < -1 || i >= r.refs.length) return;
-    for (const [pi, p] of store.layout.panes.entries()) {
+    if (r.inFile) this.file?.front();
+    else for (const [pi, p] of store.layout.panes.entries()) {
       const ti = p.tabs.findIndex((t) => t.kind === REVIEW_KIND);
       if (ti >= 0 && (store.layout.active !== pi || p.active !== ti)) store.activateTab(pi, ti);
     }
@@ -129,11 +158,12 @@ export class ReviewController {
       r.resolved = true;
       r.resolve({ total: r.refs.length, done: r.done, finished });
     }
+    if (r.inFile && (!keep || r.cur < 0)) this.file?.end(); // the narrowing goes; the summary shows the whole file
     if (!keep) {
       this.run = null;
       if (r.spec.onClose) this.host.guard(r.plugin, () => r.spec.onClose!(), undefined);
     }
-    if (!gone && !keep) for (const [pi, p] of store.layout.panes.entries()) {
+    if (!gone && !keep && !r.inFile) for (const [pi, p] of store.layout.panes.entries()) {
       const ti = p.tabs.findIndex((t) => t.kind === REVIEW_KIND);
       if (ti >= 0) store.closeTab(pi, ti);
     }

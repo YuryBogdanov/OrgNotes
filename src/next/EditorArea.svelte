@@ -23,6 +23,10 @@
   import { PluginFileView } from './bridges';
   import StatusMenu from './StatusMenu.svelte';
   import Compat from './Compat.svelte';
+  import { fileReview } from './fileReview.svelte';
+  import { iconOf } from '../api/manifest';
+  import SessionCard from './SessionCard.svelte';
+  import ReviewQueue from './ReviewQueue.svelte';
 
   // What the active tab shows in the new interface (ТЗ 42.5): a file — the editor (or a plugin's view of it, the
   // board, the canvas); an untitled tab — the editor on its text; a plugin's tab — its view; none — a word.
@@ -102,7 +106,13 @@
     void file?.headings;
     return caretHeading();
   });
-  const colW = $derived(cardsCtl.cards.length ? 268 : 220);
+  // a review in the file in this tab (ТЗ 41 §1): its strip, its card first, its queue for «Структура»; the plugin's
+  // own card of the file not shown meanwhile (ТЗ 46 §3)
+  const session = $derived(fileReview.on && tab?.id === fileReview.tabId ? fileReview.run : null);
+  const shownCards = $derived(session ? cardsCtl.cards.filter((c) => c.plugin !== session.plugin) : cardsCtl.cards);
+  const sessionIcon = $derived(session ? (iconOf(plugins.manifest(session.plugin) ?? ({ contributes: { navSections: [], views: [], fileViews: [] } } as never)) ?? '') : '');
+  const sessionNext = $derived(session?.spec.actions.find((a) => a.command && store.keyHint(a.command) === '⌘↩'));
+  const colW = $derived(cardsCtl.cards.length || session ? 268 : 220);
   // «Midterm.org · изменён 2 мин назад» (§5.2): the file's last change, as the index of touches knows it
   function eyebrow(): string | null {
     if (!file) return null;
@@ -149,10 +159,19 @@
   {:else if file && tab}
     {#if narrowed}
       <!-- it comes out from the top in 180 ms, goes in 150; the column and the text move down and up with it (ТЗ 46 §2) -->
-      <div class="narrow" role="status" aria-label="Сужено" in:slide={stripIn} out:slide={stripOut}>
-        <b>Сужено</b><span class="np" title={crumb}>{crumb}</span>
-        <span class="k">{store.keyHint('widen')}</span>
-        <button onclick={() => store.widenTab(tab)}>Показать весь файл</button>
+      <div class="narrow" role="status" aria-label={session ? session.spec.title : 'Сужено'} in:slide={stripIn} out:slide={stripOut}>
+        {#if session}
+          <!-- a review's: the plugin's icon, its word, the path; «⌘↩ дальше», «Закончить ⎋» (ТЗ 46 §2, ТЗ 41 §1.1) -->
+          {#if sessionIcon}<svg class="si" width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={sessionIcon} /></svg>{/if}
+          <b>{session.spec.title.split(' ')[0]}</b><span class="np" title={crumb}>{crumb}</span>
+          {#if fileReview.otherFile}<span class="chipf">другой файл</span>{/if}
+          {#if sessionNext}<span class="k">{store.keyHint(sessionNext.command!)} дальше</span>{/if}
+          <button onclick={() => fileReview.finish()}>Закончить <span class="kk">⎋</span></button>
+        {:else}
+          <b>Сужено</b><span class="np" title={crumb}>{crumb}</span>
+          <span class="k">{store.keyHint('widen')}</span>
+          <button onclick={() => store.widenTab(tab)}>Показать весь файл</button>
+        {/if}
       </div>
     {/if}
     <div class="with grid" bind:clientWidth={areaW} style:--sw={structure ? `${colW}px` : '0px'}>
@@ -162,7 +181,7 @@
           onnext={() => step(1)} onprev={() => step(-1)} onreplace={(text, all) => (fb.rep = { text, all, n: (fb.rep?.n ?? 0) + 1 })} onclose={closeFind} />
       {/if}
       <Editor text={file.text} fileKey={tab.id + '|' + file.path + (narrowed ? '|n:' + narrowed.title : '')}
-        narrow={narrowed ? { line: narrowed.line, end: narrowed.end } : null} onnarrow={(l) => { if (tab.narrow) tab.narrow.line = l; }}
+        narrow={narrowed ? { line: narrowed.line, end: narrowed.end } : null} onnarrow={(l) => { if (tab.narrow) tab.narrow.line = l; if (session) plugins.reviewEdited(l); }}
         onnarrowTo={(l) => store.narrowTab(tab, l)} onwiden={() => store.widenTab(tab)}
         find={findProp} onfound={(i) => (found = i)} onapi={(a) => (api = a)} path={file.name} wf={file.wf} reveal={tab.reveal} initial={tab.cursor} initialTop={tab.top}
         ontop={(l) => store.setTabTop(tab, l)} initialFolds={tab.folds} onfolds={(l) => store.setTabFolds(tab, l)} resetOn={store.diskGen[file.path] ?? 0}
@@ -172,9 +191,10 @@
       {#if store.rich && !file.text.trim()}<div class="empty" aria-hidden="true"><span class="et">Пустой файл</span><span>Начните с <code>* </code> — это заголовок</span></div>{/if}
     </div>
     {#if structure}
-      <Structure range={narrowed} width={colW}>
+      <Structure range={narrowed} width={colW} queue={session ? queue : undefined}>
         {#snippet cards()}
-          {#each cardsCtl.cards as c (c.id)}
+          {#if session}<SessionCard />{/if}
+          {#each shownCards as c (c.id)}
             <FileCard card={c} path={file.name} heading={caret} folded={cardsCtl.folded.has(c.id)} ontoggle={() => cardsCtl.toggle(c.id)} />
           {/each}
         {/snippet}
@@ -196,6 +216,7 @@
     <div class="word" role="status"><b class="title">Нет открытых вкладок</b><span>Откройте файл в сайдбаре или создайте новый.</span></div>
   {/if}
 </div>
+{#snippet queue()}<ReviewQueue />{/snippet}
 {#if richPick}<StatusMenu pick={richPick.pick} path={richPick.path} onclose={() => (richPick = null)} />{/if}
 
 <style>
@@ -216,6 +237,9 @@
   .narrow b { color: var(--lampink); }
   .narrow .np { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .narrow .k { font: 11px var(--mono); color: var(--ink3); }
+  .narrow .si { flex: 0 0 15px; color: var(--lampink); }
+  .narrow .chipf { height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: 5px; background: var(--chip2); color: var(--ink2); font-size: 11px; }
+  .narrow .kk { font-size: 11px; opacity: 0.65; }
   .narrow button { height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--card); color: var(--ink); font: 12.5px var(--ui); }
   .empty { position: absolute; inset: 0 var(--sw, 0px) 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; pointer-events: none; color: var(--ink3); font: 500 17px var(--text); }
   .empty .et { font: 400 28px/1.2 var(--title); color: var(--ink2); }
