@@ -5,10 +5,10 @@
   import { DEFAULT_LEVELS, type LevelView } from '../orgIndent';
   import type { RichPick } from '../orgRich';
   import { OrgEditor, type EditorProps } from '../cm/orgEditor';
-  import { portal } from '../portal';
-  import { ContextMenu, TagPop } from './bridges';
+  import Menu from './ui/Menu.svelte';
+  import TagsPop from './TagsPop.svelte';
+  import { headingMenu } from './headingMenu';
   import type { MenuItem } from '../menuItems';
-  import Compat from './Compat.svelte';
   import { editorCompatVars } from './compat';
   import { nextPrefs } from '../nextPrefs.svelte';
   import './editor.css';
@@ -33,7 +33,7 @@
   let ed = $state.raw<OrgEditor | undefined>();
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   let tagPop = $state<{ tags: string[]; x: number; y: number } | null>(null);
-  const snapshot = (): EditorProps => ({ text, fileKey, path, wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint, resetOn, levels, drawers, rich, richNumbers, onrich, onchange, oncursor, onfollow, next: true, look: nextPrefs.font + ' ' + nextPrefs.width, eyebrow, narrow, onnarrow, onnarrowTo, onwiden, find, onfound, onapi });
+  const snapshot = (): EditorProps => ({ text, fileKey, path, wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint, resetOn, levels, drawers, rich, richNumbers, onrich, onchange, oncursor, onfollow, next: true, headingMenu, look: nextPrefs.font + ' ' + nextPrefs.width, eyebrow, narrow, onnarrow, onnarrowTo, onwiden, find, onfound, onapi });
   onMount(() => {
     ed = new OrgEditor(host, snapshot(), { menu: (x, y, items) => (menu = { x, y, items }), tags: (p) => (tagPop = p) });
     return () => ed?.destroy();
@@ -46,9 +46,8 @@
 
 <!-- app.css draws the editor's tooltips with the old names: given by the new tokens here (ТЗ 43 §5) -->
 <div class="host" bind:this={host} style={editorCompatVars()}></div>
-{#if tagPop && ed}<Compat><TagPop tags={tagPop.tags} x={tagPop.x} y={tagPop.y} onchange={ed.tagsChanged} onclose={ed.closeTagPop} /></Compat>{/if}
-<!-- moved to <body>: out of the window's frame, the layer gives it the tokens too (ТЗ 43 §5) -->
-{#if menu}<div use:portal><Compat><ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} width={300} tall /></Compat></div>{/if}
+{#if tagPop && ed}<TagsPop tags={tagPop.tags} x={tagPop.x} y={tagPop.y} onchange={ed.tagsChanged} onclose={ed.closeTagPop} />{/if}
+{#if menu}<Menu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} width={300} />{/if}
 
 <style>
   .host { height: 100%; min-height: 0; overflow: hidden; }

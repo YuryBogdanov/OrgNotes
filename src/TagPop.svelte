@@ -2,7 +2,7 @@
   import { moved } from './pointer';
   import { onMount } from 'svelte';
   import { tagsState as ts } from './tagsState.svelte';
-  import { bareTag, tagOk } from './tags';
+  import { tagOk, tagRows } from './tags';
   import { portal } from './portal';
 
   // «Теги заголовка» (ТЗ 38 §6), ⌃C Q in the editor: its tags as capsules with ×, a field; the folder's tags by
@@ -16,13 +16,7 @@
   let box: HTMLDivElement | undefined = $state();
   const key = (t: string) => t.toLowerCase();
   const have = $derived(new Set(tags.map(key)));
-  const name = $derived(bareTag(q));
-  const found = $derived.by(() => {
-    const s = key(name);
-    return ts.list.filter((t) => !have.has(key(t.tag)) && (!s || key(t.tag).includes(s))).slice(0, 7);
-  });
-  const create = $derived(!!name && tagOk(name) && !have.has(key(name)) && !ts.list.some((t) => key(t.tag) === key(name)));
-  const rows = $derived([...found.map((t) => ({ tag: t.tag, n: t.n, create: false })), ...(create ? [{ tag: name, n: 0, create: true }] : [])]);
+  const rows = $derived(tagRows(ts.list, tags, q));
   $effect(() => {
     if (cur >= rows.length) cur = Math.max(0, rows.length - 1);
   });

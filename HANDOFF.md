@@ -394,6 +394,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   `next/PlacePalette.svelte` (680 pt, the label «Перенести › файл», the pinned «на 1-й уровень» in a dashed frame,
   the tree with guides, level marks, capsules, the children's pill, «станет N-м уровнем») and `next/Refile.svelte`
   (the plate «Переносим»). `Refile` is gone from the bridges; the columns' look (forms, sheets) stays old till 44.4.
+  44.3, the menus: `MenuItem` (menuItems.ts) has `{ head }` (a section's head, a plugin's name) and `soft` (its
+  submenu chosen on `lampsoft`). The new editor passes `headingMenu` (EditorProps) — `next/headingMenu.ts` builds the
+  §3.1 heading part (status submenu as capsules, palette steps, refile, narrow, note, link, mini window, each plugin's
+  section via `headingActionsByPlugin`, «Удалить заголовок» — `OrgEditor.removeHeading`, one step of ⌘Z); the editing
+  items follow. `next/StatusMenu.svelte` (a drawn capsule, 30 pt rows, soft) and `next/TagsPop.svelte` (⌃C Q) replace
+  RichMenu and TagPop; their data shared with the old ones: `headingChoices.ts` (`statusChoices`), `headingWrite.ts`
+  (`setStatusAt`, `setPriorityAt`), `tags.ts` `tagRows`. ContextMenu, RichMenu, TagPop gone from the bridges.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
