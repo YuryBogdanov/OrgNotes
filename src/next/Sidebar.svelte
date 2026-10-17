@@ -76,7 +76,7 @@
   <button class="si" class:on aria-current={on ? 'true' : undefined} title={hint(s) ? `${s.label} (${hint(s)})` : s.label} onclick={() => pick(s)}>
     <svg width="16" height="16" viewBox="0 0 {s.vb} {s.vb}" fill="none" stroke="currentColor" stroke-width={s.vb === 20 ? 1.5 : 1.4} stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={s.icon} /></svg>
     <span class="sn">{s.label}</span>
-    {#if n}<span class="c" aria-label="{s.label}: {n}">{shownCount(n)}</span>{/if}
+    {#if n}<span class="c" class:alert={s.alert?.()} aria-label="{s.label}: {n}{s.alert?.() ? ', пора посмотреть' : ''}">{shownCount(n)}</span>{/if}
   </button>
 {/snippet}
 
@@ -130,6 +130,8 @@
   .sn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .c { margin-left: auto; font-size: 11.5px; color: var(--ink3); font-variant-numeric: tabular-nums; }
   .si.on .c { color: var(--lampink); }
+  /* an alarm (§1): red, the selected one too */
+  .si .c.alert { color: var(--todo); font-weight: 600; }
   .si:focus-visible, .gear:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; }
   .grp { flex: 0 0 auto; display: flex; align-items: center; padding: 14px 10px 6px; font-size: 11px; font-weight: 600; color: var(--ink3); }
   .grp.head { padding-top: 12px; }

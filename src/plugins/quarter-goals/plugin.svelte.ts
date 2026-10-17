@@ -81,6 +81,7 @@ export default definePlugin({
       if (key) await startReview(key);
     });
     goals.watchAvailable();
+    goals.watchBadge();
 
     // «Сегодня» (ТЗ 32): the block of goals; the goals' line and «Разбор целей» on a card of 1-1
     ctx.ui.todayBlock('quarter-goals.today', (el, block) => {

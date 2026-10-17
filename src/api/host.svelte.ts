@@ -110,6 +110,8 @@ class Host {
   redraw = new SvelteMap<string, number>();
   /** The numbers on the plugins' buttons of the navigator (`ui.setBadge`). */
   badges = new SvelteMap<string, number>();
+  /** The badges given as an alarm (`{ tone: 'alert' }`, API 1.13): red in the new interface's sidebar. */
+  badgeAlerts = new SvelteMap<string, boolean>();
   /** What the core's month (under a review's card) shows, as a plugin set it (`ui.setMonthFilter`: the calendar's
    *  layers and hidden files, #99); null — every dated entry. */
   monthFilter = $state.raw<{ plugin: string; layers: string[]; hidden: string[] } | null>(null);
@@ -333,7 +335,7 @@ class Host {
       // the built-in plugins' sections in their places among the core's (ТЗ 38: Файлы, Inbox, Агенда, Цели, Календарь,
       // Теги, Поиск); an installed plugin's after them
       const place = this.entry(id)?.builtin ? BUILTIN_NAV[n.id] : undefined;
-      this.keep(id, registerNav({ id: n.id, label: n.title, icon: n.icon, key: n.key, order: place ?? 100 + i, component: PluginNav as unknown as Component, badge: () => this.badges.get(n.id) ?? 0 }));
+      this.keep(id, registerNav({ id: n.id, label: n.title, icon: n.icon, key: n.key, order: place ?? 100 + i, component: PluginNav as unknown as Component, badge: () => this.badges.get(n.id) ?? 0, alert: () => !!this.badgeAlerts.get(n.id) }));
       if (n.key) this.keep(id, registerAction(n.key, () => this.showNav(n.id)));
     });
     for (const v of m.contributes.fileViews) {
@@ -927,9 +929,10 @@ class Host {
           if (!this.monthFilter || this.monthFilter.plugin !== id) keep(() => void (this.monthFilter?.plugin === id && (this.monthFilter = null)));
           this.monthFilter = { plugin: id, layers: strs(f.layers), hidden: strs(f.hidden) };
         },
-        setBadge: (nav, n) => {
+        setBadge: (nav, n, o) => {
           declared('раздела', m.contributes.navSections.some((x) => x.id === nav), nav);
           this.badges.set(nav, Math.max(0, Math.floor(Number(n) || 0)));
+          this.badgeAlerts.set(nav, o?.tone === 'alert');
         },
         refile: (ref, o = {}) =>
           new Promise((resolve) => {

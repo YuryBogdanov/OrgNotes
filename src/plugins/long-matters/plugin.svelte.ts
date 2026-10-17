@@ -4,6 +4,7 @@
 import { definePlugin } from '@panopticon/api';
 import { mount, unmount } from 'svelte';
 import { long, VIEW, type Filter } from './state.svelte';
+import { badgeOf } from './long';
 import Panel from './Panel.svelte';
 import List from './List.svelte';
 import Sources from './Sources.svelte';
@@ -13,6 +14,7 @@ import type { HeadingRef } from '@panopticon/api';
 import './styles.css';
 
 const FILTERS: Filter[] = ['all', 'due', 'waiting', 'nostatus'];
+let stop: (() => void) | null = null;
 
 export default definePlugin({
   async activate(ctx) {
@@ -42,6 +44,13 @@ export default definePlugin({
     });
     ctx.events.on('day.changed', () => long.soon(0));
 
+    // the section's number: «Пора проверить», red (API 1.13); none due — how many, as any
+    stop = $effect.root(() => {
+      $effect(() => {
+        const b = badgeOf(long.groups);
+        ctx.ui.setBadge('long-matters', b.n, b.alert ? { tone: 'alert' } : {});
+      });
+    });
     ctx.ui.navSection('long-matters', (el) => {
       const app = mount(Panel, { target: el });
       return () => void unmount(app);
@@ -86,5 +95,9 @@ export default definePlugin({
         },
       });
     }
+  },
+  deactivate() {
+    stop?.();
+    stop = null;
   },
 });

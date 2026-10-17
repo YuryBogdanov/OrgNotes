@@ -9,7 +9,7 @@ import { weekdayNames } from '@panopticon/api/org';
 import { core, type PFile } from './core.svelte';
 import {
   readGoals, readGoalSettings, sourcesJson, avatarColor, initials, quarterOf, readSource, sourceKey, findSource, cmpQuarter,
-  shiftQuarter, goalsIn, shortDay, GOAL_STATES, quarterLabel, isSilent, deadlineSoon,
+  shiftQuarter, goalsIn, shortDay, GOAL_STATES, quarterLabel, isSilent, deadlineSoon, silentCount,
   isDone, type GoalSettings, type Goal, type GoalSource, type NewGoal, type Quarter, type SourceGoals,
 } from './goals';
 import { addGoal, addMark, carryOver, moveGoal } from './ops';
@@ -97,6 +97,15 @@ class Goals {
     return t ? `--tl:var(--p-${t});--td:var(--p-${t})` : '';
   }
 
+  /** The section's number (ТЗ 43 §1): the goals silent too long this quarter, red (API 1.13); none — no number. */
+  watchBadge() {
+    $effect.root(() => {
+      $effect(() => {
+        const n = silentCount(this.goalPeople.filter((p) => p.found).map((p) => p.data), quarterOf(new Date()), new Date(), this.goalSettings.silent);
+        this.ctx.ui.setBadge('quarter-goals', n, { tone: 'alert' });
+      });
+    });
+  }
   /** «Новая цель…», «Разобрать цели…» only with a goal file found; «Цели: обзор квартала» with any source. */
   watchAvailable() {
     $effect.root(() => {

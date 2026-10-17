@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.12.0';
+export const API_VERSION = '1.13.0';
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;
@@ -453,8 +453,9 @@ export interface Ctx {
       move(d: 1 | -1): void;
       focusList(which: 'file' | 'head'): void;
     };
-    /** The number on the plugin's button of the navigator (0: none). */
-    setBadge(navId: string, n: number): void;
+    /** The number on the plugin's button of the navigator (0: none). `tone: 'alert'` (since 1.13): red in the new
+     *  interface's sidebar — something is due; the old navigator draws it as any. */
+    setBadge(navId: string, n: number, o?: { tone?: 'alert' }): void;
     /** What the core's month under a review's card (the widget `month`) shows: the layers of entries ('task',
      *  'deadline', 'event', 'wait', 'done') and the files left out — the calendar's choice; null: every dated entry. */
     setMonthFilter(f: { layers: string[]; hidden: string[] } | null): void;

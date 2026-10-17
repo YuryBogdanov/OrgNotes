@@ -236,6 +236,9 @@ export function isSilent(g: Goal, now = new Date(), threshold = SILENT_DAYS): bo
   const d = quietDays(g, now);
   return g.keyword === GOAL_STATES.active && d !== null && d > threshold;
 }
+/** The section's badge (ТЗ 43 §1): the active goals of the quarter silent for longer than the threshold. */
+export const silentCount = (sources: SourceGoals[], q: Quarter, now = new Date(), threshold = SILENT_DAYS) =>
+  sources.reduce((n, s) => n + goalsIn(s, q).filter((g) => isSilent(g, now, threshold)).length, 0);
 export const deadlineSoon = (g: Goal, done: string[], now = new Date(), weeks = SOON_WEEKS) =>
   !isDone(g, done) && !!g.deadline && daysBetween(now, g.deadline) < weeks * 7;
 /** The note on the right of a row: «закрыта 8 окт», «20 дней без отметок», «отметка 3 дня назад», «нет отметок». */

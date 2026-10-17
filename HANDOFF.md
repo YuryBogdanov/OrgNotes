@@ -364,6 +364,10 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   lampsoft, the heading under it grey; the recent queries). The global search takes `re` (`search.ts` `searchFile` by
   `findRanges`, `SearchState.re` / `ranRe`, `findReq.re`); the new EditorArea handles `findReq` `jump` (the match the
   current one, as Pane does).
+  ТЗ 43.6, API 1.13: `ui.setBadge(nav, n, { tone: 'alert' })` → `plugins.badgeAlerts`, `NavSpec.alert`, `Section.alert`;
+  the new sidebar draws it red (`todo`), the old navigator as any. «Долгие дела»: `long.ts` `badgeOf` — «Пора
+  проверить» as an alarm, else how many (so the old navigator now shows a number on its button too); «Цели»:
+  `goals.ts` `silentCount` — the quarter's goals silent past the threshold, an alarm (none — no number).
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SEQUENCE, fromSequences, parseHeadings } from '../../org'; // the test may use the core (the boundary is for the plugin's code)
 import {
-  GOALS_WORKFLOW, avatarColor, defaultQuarter, goalNote, initials, isSilent, parseQuarter, quarterSub,
+  GOALS_WORKFLOW, avatarColor, defaultQuarter, goalNote, initials, isSilent, silentCount, parseQuarter, quarterSub,
   readGoals, readSource, resultLine, sourcesJson, shiftQuarter, sourceSummary, withGoals, deadlineSoon, reviewQueue, markLines, markDayLabel, dayLabel,
   readGoalSettings, withGoalSettings, reportText,
 } from './goals';
@@ -109,6 +109,12 @@ describe('reading a source', () => {
 describe('how a goal stands', () => {
   const s = readSource(FILE, hs(FILE), 'Квартальные задачи');
   const [ci, mentor, design] = s.quarters[0].goals;
+  it('the section\'s badge (ТЗ 43 §1): the silent goals of the quarter, by the threshold', () => {
+    expect(silentCount([s], s.quarters[0].q, NOW)).toBe(1); // «ci»: 20 days
+    expect(silentCount([s, s], s.quarters[0].q, NOW)).toBe(2);
+    expect(silentCount([s], s.quarters[0].q, NOW, 30)).toBe(0);
+    expect(silentCount([], s.quarters[0].q, NOW)).toBe(0);
+  });
   it('«молчит»: active, no mark for more than 14 days', () => {
     expect(isSilent(ci, NOW)).toBe(true); // 20 days since 22 sep
     expect(goalNote(ci, ['COMPLETED'], NOW)).toBe('20 дней без отметок');
