@@ -6,6 +6,7 @@ import type { Dispose, EventName, HeadingRef } from './index';
 import type { Change } from './refs';
 import { clone, watch } from './watch.svelte';
 import { touches } from '../touchIndex.svelte';
+import { headingAt } from '../org';
 
 const headingListeners = new Set<(p: unknown) => void>();
 /** After a plugin's transaction: what it changed in which heading. */
@@ -49,6 +50,28 @@ export function listen(e: EventName, send: (p: unknown) => void, ownsView: (kind
       };
       queueMicrotask(now); // the tab shown now, then each change
       return watch(() => [store.tab?.id, store.tab?.data, store.viewOf(store.tab)], now);
+    }
+    case 'editor.heading': {
+      // the deepest heading under the caret of the file shown; a change sent at most once in 100 ms
+      let last = '';
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const now = () => {
+        timer = undefined;
+        const f = store.tab?.kind === 'file' ? store.file : undefined;
+        const k = f ? headingAt(f.headings, store.tab!.cursor.line) : -1;
+        const h = f && k >= 0 ? f.headings[k] : null;
+        const key = `${f?.name ?? ''}|${h ? h.line + ':' + h.title : ''}`;
+        if (key === last) return;
+        last = key;
+        send({ path: f?.name ?? null, heading: f && h ? { path: f.name, line: h.line, title: h.title } : null });
+      };
+      const stop = watch(() => [store.tab?.id, store.file?.name, store.tab?.cursor.line, store.file?.headings], () => {
+        timer ??= setTimeout(now, 100);
+      });
+      return () => {
+        stop();
+        clearTimeout(timer);
+      };
     }
     case 'inbox.changed':
       return watch(() => store.inboxFile?.name ?? null, (p) => send({ path: p }));

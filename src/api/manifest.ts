@@ -27,6 +27,15 @@ export interface ManifestNav {
   icon: string; // an SVG path, viewBox 0 0 20 20
   key?: string; // a command of the manifest that shows it
 }
+/** A card of a file (ТЗ 44 §5, API 1.14): over «Структура» in the new interface, when the plugin has something to say
+ *  about the file open. */
+export interface ManifestFileCard {
+  id: string;
+  title: string;
+  icon: string;
+}
+/** The setting the core gives each plugin with cards (ТЗ 44 §8): on this Mac, on by default. */
+export const CARDS_KEY = 'core.fileCards';
 export interface ManifestView {
   id: string;
   title: string;
@@ -102,6 +111,7 @@ export interface Manifest {
     views: ManifestView[];
     todayBlocks: ManifestTodayBlock[];
     fileViews: ManifestFileView[];
+    fileCards: ManifestFileCard[];
     fileTypes: ManifestFileType[];
     settings: ManifestSettings[];
     statusSets: ManifestStatusSet[];
@@ -214,6 +224,12 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
     if (x.key !== undefined && !commands.some((k) => k.id === x.key)) problems.push(`вид файла «${x.id}»: key — не команда этого плагина`);
     fileViews.push({ id: x.id as string, title: String(x.title ?? ''), icon: isStr(x.icon) ? x.icon : 'M4 4h12v12H4z', ...(isStr(x.key) ? { key: x.key } : {}) });
   }
+  const fileCards: ManifestFileCard[] = [];
+  for (const x of arr(c.fileCards).map(obj)) {
+    if (!own('карточка', x.id)) continue;
+    if (!isStr(x.title)) problems.push(`карточка «${x.id}»: нет title`);
+    fileCards.push({ id: x.id as string, title: String(x.title ?? ''), icon: isStr(x.icon) ? x.icon : isStr(j.icon) ? j.icon : (navSections[0]?.icon ?? views[0]?.icon ?? 'M4 4h12v12H4z') });
+  }
   const fileTypes: ManifestFileType[] = [];
   for (const x of arr(c.fileTypes).map(obj)) {
     const ext = isStr(x.ext) ? x.ext.replace(/^\./, '').toLowerCase() : '';
@@ -243,6 +259,13 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
       }
     settings.push({ section: isStr(x.section) ? x.section : undefined, block: isStr(x.block) ? x.block : undefined, icon: isStr(x.icon) ? x.icon : undefined, groups: groups as unknown as Group[] });
   }
+  // the core's setting of the cards, in the plugin's own section (one made under its name if it has none)
+  if (fileCards.length) {
+    const group = { caption: 'Редактор', fields: [{ type: 'switch', key: CARDS_KEY, label: 'Показывать карточку в редакторе, если есть что сказать по файлу', where: 'local', default: true }] } as unknown as Group;
+    const mine = settings.find((x) => x.section);
+    if (mine) mine.groups = [...mine.groups, group];
+    else settings.push({ section: String(j.name ?? id), groups: [group] });
+  }
   const statusSets: ManifestStatusSet[] = [];
   for (const x of arr(c.statusSets).map(obj)) {
     if (!isStr(x.name) || !isStr(x.states) || !/\|/.test(x.states)) problems.push('набор статусов: name и states вида «A B | C»');
@@ -260,7 +283,7 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
       defaultEnabled: typeof j.defaultEnabled === 'boolean' ? j.defaultEnabled : undefined,
       icon: isStr(j.icon) && /^[MmLlHhVvCcSsQqTtAaZz0-9.,\s-]+$/.test(j.icon) ? j.icon : undefined,
       permissions: permissions as Permission[], net,
-      contributes: { commands, navSections, views, todayBlocks, fileViews, fileTypes, settings, statusSets, themes: arr(c.themes).filter(isStr) as string[], slots },
+      contributes: { commands, navSections, views, todayBlocks, fileViews, fileCards, fileTypes, settings, statusSets, themes: arr(c.themes).filter(isStr) as string[], slots },
       exports,
       warnings,
     },

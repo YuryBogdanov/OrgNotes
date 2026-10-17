@@ -10,6 +10,8 @@
   import { narrowRangeOf } from '../narrowTab';
   import Editor from './Editor.svelte';
   import Structure from './Structure.svelte';
+  import FileCard from './FileCard.svelte';
+  import { FileCardsCtl, caretHeading } from './fileCards.svelte';
   import FindPanel from './FindPanel.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
   import { Agenda, PluginFileView } from './bridges';
@@ -82,6 +84,15 @@
   // «Структура» right of the editor (§7): on by the preference, and when the area is 900 pt wide or more
   let areaW = $state(0);
   const structure = $derived(nextPrefs.structure && areaW >= 900);
+  // the plugins' cards of the file over «Структура» (ТЗ 44 §5–§7): the column 268 pt with one at least, else 220
+  const cardsCtl = new FileCardsCtl(() => (structure && file && tab?.kind === 'file' && !fileViewOf(fview) && !fileTypeOf(tab.path) ? file.name : null));
+  cardsCtl.effects();
+  const caret = $derived.by(() => {
+    void tab?.cursor.line;
+    void file?.headings;
+    return caretHeading();
+  });
+  const colW = $derived(cardsCtl.cards.length ? 268 : 220);
   // «Midterm.org · изменён 2 мин назад» (§5.2): the file's last change, as the index of touches knows it
   function eyebrow(): string | null {
     if (!file) return null;
@@ -130,7 +141,7 @@
         <button onclick={() => store.widenTab(tab)}>Показать весь файл</button>
       </div>
     {/if}
-    <div class="with grid" bind:clientWidth={areaW} style:--sw={structure ? '220px' : '0px'}>
+    <div class="with grid" bind:clientWidth={areaW} style:--sw={structure ? `${colW}px` : '0px'}>
     <div class="ed">
       {#if fb.open}
         <FindPanel bind:q={() => fb.q, (v) => { fb.q = v; fb.at = null; }} bind:re={() => fb.re, (v) => (fb.re = v)} replacing={fb.replacing} info={found} focusN={fb.focusN}
@@ -146,7 +157,15 @@
       <!-- an empty file in «Оформление» (§5.4): the word over the column, the caret still in it -->
       {#if store.rich && !file.text.trim()}<div class="empty" aria-hidden="true"><span class="et">Пустой файл</span><span>Начните с <code>* </code> — это заголовок</span></div>{/if}
     </div>
-    {#if structure}<Structure range={narrowed} />{/if}
+    {#if structure}
+      <Structure range={narrowed} width={colW}>
+        {#snippet cards()}
+          {#each cardsCtl.cards as c (c.id)}
+            <FileCard card={c} path={file.name} heading={caret} folded={cardsCtl.folded.has(c.id)} ontoggle={() => cardsCtl.toggle(c.id)} />
+          {/each}
+        {/snippet}
+      </Structure>
+    {/if}
     </div>
   {:else if tab?.kind === 'untitled'}
     <div class="ed grid">

@@ -3,12 +3,14 @@
   import { headingAt, toneFor } from '../org';
   import { toneStyle } from '../colors';
   import { backlinks } from '../links';
+  import type { Snippet } from 'svelte';
 
   // The column «Структура» right of the editor (ТЗ 42 §7): the headings of levels 1–3 on a line, each with a dot of its
   // status's colour (none: grey; done: faded); the one the caret is under — the lamp's dot with a halo, its title bold;
   // a click goes to it; the current one kept in view. «Ссылаются»: the links to the heading under the caret, up to 6.
   // A narrowed tab (§5.8): only the subtree it shows.
-  let { range = null }: { range?: { line: number; end: number } | null } = $props();
+  // `cards`: the plugins' cards over it (ТЗ 44 §6), the column then `width` wide
+  let { range = null, width = 220, cards }: { range?: { line: number; end: number } | null; width?: number; cards?: Snippet } = $props();
   const file = $derived(store.fileOf(store.tab));
   const fi = $derived(file ? store.files.indexOf(file) : -1);
   const line = $derived(store.tab?.cursor.line ?? 0);
@@ -59,7 +61,8 @@
   });
 </script>
 
-<aside class="struct" aria-label="Структура">
+<aside class="struct" aria-label="Структура" style:width="{width}px">
+  {#if cards}<div class="cards">{@render cards()}</div>{/if}
   <div class="lbl">Структура</div>
   <div class="list" class:ft={fadeTop} class:fb={fadeBot} bind:this={list} onscroll={edges}>
     {#each heads as { h, i } (i)}
@@ -89,6 +92,8 @@
      scrolls the text. */
   .struct { position: absolute; top: 0; right: 0; bottom: 0; z-index: 2; width: 220px; min-height: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 46px 22px 16px 0; overflow: hidden; pointer-events: none; }
   .struct > * { pointer-events: auto; }
+  .cards { flex: 0 1 auto; min-height: 0; overflow: auto; margin: 0 0 8px 22px; scrollbar-width: none; }
+  .cards::-webkit-scrollbar { display: none; }
   .lbl { padding-left: 22px; margin-bottom: 12px; font-size: 11px; font-weight: 600; color: var(--ink3); }
   .list { position: relative; min-height: 0; overflow: auto; padding-left: 22px; scrollbar-width: none; }
   .list::-webkit-scrollbar { display: none; }

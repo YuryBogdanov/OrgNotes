@@ -179,8 +179,21 @@ export interface Store {
   set<T>(value: T): Promise<void>;
   onChange(fn: () => void): Dispose;
 }
-/** `heading.touched` {ref, at} (1.12): a heading changed or marked «Осмотрено»; in batches, at most once a second. */
-export type EventName = 'file.changed' | 'heading.changed' | 'heading.touched' | 'tab.active' | 'day.changed' | 'theme.changed' | 'folder.changed' | 'inbox.changed';
+/** `heading.touched` {ref, at} (1.12): a heading changed or marked «Осмотрено»; in batches, at most once a second.
+ *  `editor.heading` {path, heading} (1.14): the heading under the caret of the file shown changed (null: none), at
+ *  most once in 100 ms. */
+export type EventName = 'file.changed' | 'heading.changed' | 'heading.touched' | 'tab.active' | 'day.changed' | 'theme.changed' | 'folder.changed' | 'inbox.changed' | 'editor.heading';
+/** A card of a file (`ui.fileCard`, 1.14): over «Структура» in the new interface, when the plugin has something to
+ *  say about the file open; nothing in the old one. */
+export interface FileCardSpec {
+  /** Whether there is something to say about the file (asked when its tab is shown and on its «file.changed»). */
+  match(path: string): boolean | Promise<boolean>;
+  /** The card's body; called again with the same element when the heading under the caret changes (the plugin may
+   *  redraw its block «Под курсором» only). Every Dispose it gave is called when the card goes. */
+  render(el: HTMLElement, ctx: { path: string; heading: HeadingRef | null }): Dispose | void;
+  /** The number in the card's head (null: none). */
+  count?(path: string): string | number | null;
+}
 export interface Opt {
   value: string | number | boolean | null;
   label: string;
@@ -458,6 +471,9 @@ export interface Ctx {
     /** The number on the plugin's button of the navigator (0: none). `tone: 'alert'` (since 1.13): red in the new
      *  interface's sidebar — something is due; the old navigator draws it as any. */
     setBadge(navId: string, n: number, o?: { tone?: 'alert' }): void;
+    /** A card the manifest declares (`contributes.fileCards`, 1.14): the core gives its place over «Структура», its
+     *  head (the icon, the title, the count, folding), the plugin's setting «Показывать карточку…». */
+    fileCard(id: string, spec: FileCardSpec): Dispose;
     /** What the core's month under a review's card (the widget `month`) shows: the layers of entries ('task',
      *  'deadline', 'event', 'wait', 'done') and the files left out — the calendar's choice; null: every dated entry. */
     setMonthFilter(f: { layers: string[]; hidden: string[] } | null): void;

@@ -24,7 +24,7 @@ import type { Values } from '../settingsSchema';
 import { builtinEntries, declareKeys, entries, viewScope, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, type Entry, type Listed } from './declare';
 import PluginsSettings from '../PluginsSettings.svelte';
 import { iconOf, type Manifest } from './manifest';
-import type { MenuItem as ApiMenuItem, Ctx, Dispose, SheetSpec, FormSpec, HeadingRef, Place, Plugin, Render, Store, ViewSpec } from './index';
+import type { MenuItem as ApiMenuItem, Ctx, Dispose, FileCardSpec, SheetSpec, FormSpec, HeadingRef, Place, Plugin, Render, Store, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
 import PluginInspector from '../PluginInspector.svelte';
 import PluginNav from '../PluginNav.svelte';
@@ -95,6 +95,8 @@ class Host {
   active = new SvelteMap<string, true>();
   /** What a plugin's code gave: the drawings of its sections and kinds of tabs. */
   navs = new SvelteMap<string, { plugin: string; render: Render }>();
+  /** The cards of a file the plugins drew (`ui.fileCard`, ТЗ 44 §8): by the card's id. */
+  fileCards = new SvelteMap<string, { plugin: string; spec: FileCardSpec }>();
   views = new SvelteMap<string, ViewEntry>();
   /** The blocks of «Сегодня» (ТЗ 32): their drawings, the ones left out now; what the plugins add to a card of 1-1. */
   todayRenders = new SvelteMap<string, { plugin: string; render: (el: HTMLElement, block: { setHidden(hidden: boolean): void }) => Dispose | void }>();
@@ -928,6 +930,11 @@ class Host {
           const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
           if (!this.monthFilter || this.monthFilter.plugin !== id) keep(() => void (this.monthFilter?.plugin === id && (this.monthFilter = null)));
           this.monthFilter = { plugin: id, layers: strs(f.layers), hidden: strs(f.hidden) };
+        },
+        fileCard: (card, spec) => {
+          declared('карточки', m.contributes.fileCards.some((x) => x.id === card), card);
+          this.fileCards.set(card, { plugin: id, spec });
+          return keep(() => void (this.fileCards.get(card)?.spec === spec && this.fileCards.delete(card)));
         },
         setBadge: (nav, n, o) => {
           declared('раздела', m.contributes.navSections.some((x) => x.id === nav), nav);

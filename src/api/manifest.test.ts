@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hostAllowed, hostOf, incompatible, parseManifest, satisfies } from './manifest';
+import { CARDS_KEY, hostAllowed, hostOf, incompatible, parseManifest, satisfies } from './manifest';
 
 const base = { id: 'hello', name: 'Привет', version: '1.0.0', api: '^1.0' };
 
@@ -55,6 +55,19 @@ describe('parseManifest', () => {
       expect.stringContaining('id —'), 'нет name', expect.stringContaining('version'), expect.stringContaining('нет api'),
       'неизвестное право «root»', 'net — хосты без права net', expect.stringContaining('повторяется'),
     ]));
+  });
+  it('the cards of a file (1.14): read; the core\'s setting «Показывать карточку…» in the plugin\'s section, or one of its own', () => {
+    const r = parseManifest({ ...base, contributes: { fileCards: [{ id: 'hello.card', title: 'Привет' }], settings: [{ section: 'Привет', groups: [{ caption: 'Общее', fields: [{ type: 'switch', key: 'x', label: 'X', where: 'local' }] }] }] } });
+    if (!r.ok) throw new Error(r.problems.join());
+    expect(r.manifest.contributes.fileCards).toEqual([{ id: 'hello.card', title: 'Привет', icon: 'M4 4h12v12H4z' }]);
+    const g = r.manifest.contributes.settings[0].groups;
+    expect(g.map((x) => x.caption)).toEqual(['Общее', 'Редактор']);
+    expect(g[1].fields[0]).toMatchObject({ type: 'switch', key: CARDS_KEY, where: 'local', default: true });
+    const bare = parseManifest({ ...base, icon: 'M1 1', contributes: { fileCards: [{ id: 'hello.card', title: 'Привет' }] } });
+    if (!bare.ok) throw new Error();
+    expect(bare.manifest.contributes.fileCards[0].icon).toBe('M1 1');
+    expect(bare.manifest.contributes.settings).toMatchObject([{ section: 'Привет', groups: [{ caption: 'Редактор' }] }]);
+    expect(parseManifest({ ...base, contributes: { fileCards: [{ id: 'other.card' }] } }).ok).toBe(false);
   });
   it('the ids of the contributions start with the plugin\'s', () => {
     const r = parseManifest({ ...base, contributes: { commands: [{ id: 'goals.open', title: 'X' }] } });

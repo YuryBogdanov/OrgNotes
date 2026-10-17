@@ -422,6 +422,16 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   text field's `suggest(q, v)` → `{ value, hint? }[]` — a popover under it in the new interface (the typed text first
   as «новое», ↓↑, ↩ takes one, ⎋ closes it), chips under it in the old; «Ждём…» of «Долгие дела» uses it (its own
   field and styles.css gone). `PluginSheets` gone from the bridges.
+  44.5, the cards of a file (API 1.14): the manifest's `contributes.fileCards` {id, title, icon — else the plugin's,
+  its section's, its view's}; a plugin with cards gets the core's switch `core.fileCards` (CARDS_KEY, on this Mac, on
+  by default) in its own settings section, a group «Редактор» (a section under its name if it has none).
+  `ui.fileCard(id, { match, render, count? })` → `plugins.fileCards`; the event `editor.heading` {path, heading} (100
+  ms). `next/fileCards.svelte.ts` (`FileCardsCtl`: the cards that said yes for the file shown, in the sidebar's
+  order of the plugins, the folded ones by card in `next:cardsFolded`, a failed plugin's card kept with its reason
+  until another file) and `next/FileCard.svelte` (the head folds; the body in Compat, drawn again on a new heading
+  under the caret, up to 260 pt with the fade; classes `fc-stats`, `fc-stat`, `fc-under`, `fc-btns`, `fc-btn` for
+  the plugins). Structure takes `cards` and `width` (268 with a card, else 220). «Привет» has a card (open tasks).
+  Nothing in the old interface.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
