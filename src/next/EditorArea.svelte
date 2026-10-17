@@ -11,6 +11,7 @@
   import Editor from './Editor.svelte';
   import Structure from './Structure.svelte';
   import Today from './Today.svelte';
+  import AgendaDay from './AgendaDay.svelte';
   import { TODAY } from '../todayState.svelte';
   import FileCard from './FileCard.svelte';
   import { FileCardsCtl, caretHeading } from './fileCards.svelte';
@@ -177,6 +178,9 @@
       <Editor text={tab.text ?? ''} fileKey={tab.id} wf={store.untitledWf} reveal={tab.reveal} initial={tab.cursor} hint="Начните писать…" levels={store.levels} drawers={store.foldDrawers}
         rich={store.rich} onchange={(t) => (tab.text = t)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>
+  {:else if tab?.kind === 'agenda' && !store.agendaOf(tab)}
+    <!-- the built-in «Агенда» in the mode «День» (ТЗ 45 §3.2) -->
+    <div class="view"><AgendaDay pane={0} /></div>
   {:else if tab?.kind === 'agenda'}
     <div class="view"><Compat><Agenda pane={0} /></Compat></div>
   {:else}
