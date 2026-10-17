@@ -7,7 +7,8 @@
   // The walk's part of the core's card (ТЗ 41 §3.2, §3.3, §3.5), under its decisions: the line of the matter — «23 дн.
   // без касания · проверить надо было 6 окт» (≈ by the file's date); «Новый статус» — a field of one to three lines,
   // ↩ writes the note into its :LOGBOOK: and the focus stays, ⇧↩ a new line, the focus there at each matter; «Проверить
-  // снова через» — the chips, the one chosen on `lamp`, kept till the walk ends.
+  // снова через» — the chips, the one chosen on `lamp`, kept till the walk ends (in the file only: the old interface's
+  // tab goes by the norm).
   let { at }: { at: HeadingRef } = $props();
   const m = $derived(walk.matterOf(at));
   const s = $derived(m ? shown(m, long.today, long.settings.norm) : null);
@@ -45,6 +46,7 @@
   <label class="lbl" for="wk-status">Новый статус</label>
   <textarea id="wk-status" bind:this={field} bind:value={walk.draft} {rows} placeholder="что сейчас с делом…" onkeydown={key}></textarea>
   <div class="hint">{saved ? 'Записано в журнал' : '↩ — записать в журнал'}</div>
+  {#if walk.inFile}
   <div class="lbl">Проверить снова через</div>
   <div class="chips" role="radiogroup" aria-label="Проверить снова через">
     {#each AGAIN as a (a.id)}
@@ -52,6 +54,7 @@
     {/each}
     <button role="radio" aria-checked={'day' in walk.again} class:on={'day' in walk.again} onclick={() => void pickDay()}>{'day' in walk.again ? walk.againWords : 'дата…'}</button>
   </div>
+  {/if}
 </div>
 
 <style>

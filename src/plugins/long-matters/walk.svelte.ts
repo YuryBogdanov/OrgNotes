@@ -1,7 +1,8 @@
 // «Обход долгих дел» (ТЗ 41 §2–§4): the matters of «Пора проверить», one by one, on the core's review in the file
 // (`ui.review`, `place: 'file'`): the editor narrowed to the matter, the files in turn. On each — what is with it now
 // (the field of the card: ↩ writes a note into its :LOGBOOK:) and a decision: «Продолжаем», «Ждём…», «Осмотрено»,
-// «В архив», «Закрыть»; the status typed and not written yet goes in the same step as the decision (one ⌘Z).
+// «В архив», «Закрыть»; the status typed and not written yet goes in the same step as the decision (one ⌘Z). The old
+// interface shows it in the review's tab (ТЗ 41.5), with no «Проверить снова через» — the norm.
 
 import { mount, unmount } from 'svelte';
 import type { HeadingInfo, HeadingRef, ReviewMark, Tx } from '@panopticon/api';
@@ -36,6 +37,10 @@ class Walk {
   /** «Проверить снова через»: the days, or a day; kept till the walk ends (the norm by default). */
   again = $state<{ days: number } | { day: Date }>({ days: 14 });
 
+  /** The walk is in the file (the new interface): «Проверить снова через» is offered there only. */
+  get inFile() {
+    return long.ctx.ui.currentReview()?.place === 'file';
+  }
   /** The days «Продолжаем» and «Ждём…» without a date look again in. */
   get days() {
     const a = this.again;
@@ -79,6 +84,7 @@ class Walk {
         const app = mount(WalkCard, { target: el, props: { at: ref } });
         return () => void unmount(app);
       },
+      endOrder: ['продолжаем', 'ждём', 'осмотрено', 'в архив', 'закрыто', 'пропущено'],
       endNote: () => `Пора проверить: ${long.groups.due.length}.${this.nearest() ? ' ' + this.nearest() : ''}`,
       onClose: () => {
         if (this.run === run) this.run = null;

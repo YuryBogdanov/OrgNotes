@@ -3,9 +3,9 @@
   import { plugins } from '../api/host.svelte';
   import { iconOf } from '../api/manifest';
   import { store } from '../store.svelte';
-  import type { ReviewTone } from '../api/index';
   import { fileReview } from './fileReview.svelte';
-  import { TONE, TONE_WORD } from './reviewTones';
+  import { TONE } from './reviewTones';
+  import { sumsOf } from '../reviewSums';
   import Compat from './Compat.svelte';
 
   // The card of a review in the file (ТЗ 46 §3, ТЗ 41 §1), first in the column: the plugin's icon and the review's
@@ -38,16 +38,7 @@
     return r.spec.endActions.filter((e) => e && typeof e.label === 'string' && (!e.when || plugins.guard(r.plugin, () => e.when!(), false)));
   });
   // the summary's figures: by the mark's group (the plugin's word), else by its tone; in the order they came
-  const counts = $derived.by(() => {
-    const n = new Map<string, { tone: ReviewTone; n: number }>();
-    for (const m of marks) {
-      if (!m) continue;
-      const k = m.group ?? TONE_WORD[m.tone];
-      const was = n.get(k);
-      n.set(k, { tone: was?.tone ?? m.tone, n: (was?.n ?? 0) + 1 });
-    }
-    return [...n].map(([word, v]) => ({ word, ...v }));
-  });
+  const counts = $derived(sumsOf(marks, Array.isArray(r?.spec.endOrder) ? r.spec.endOrder : undefined));
   const endNote = $derived(r && r.cur < 0 && r.spec.endNote ? String(plugins.guard(r.plugin, () => r.spec.endNote!(), '') ?? '') : '');
 
   // the plugin's part under the actions: drawn for each card

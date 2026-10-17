@@ -54,7 +54,7 @@ export class ReviewController {
     void r.done;
     if (r.spec.mark) {
       const m = this.host.guard(r.plugin, () => r.spec.mark!(i), null);
-      if (m && typeof m === 'object' && typeof m.tone === 'string') return { tone: m.tone, ...(typeof m.text === 'string' ? { text: m.text } : {}) };
+      if (m && typeof m === 'object' && typeof m.tone === 'string') return { tone: m.tone, ...(typeof m.text === 'string' ? { text: m.text } : {}), ...(typeof m.group === 'string' ? { group: m.group } : {}) };
       if (m === null) return r.marks?.[i] ?? null;
     }
     return r.marks?.[i] ?? null;

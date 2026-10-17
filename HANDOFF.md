@@ -559,8 +559,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   action: `reviewActing`; not for a review of its own order); one review in the window — another plugin's going on
   asks «Закончить «…» и начать «…»?» (`host.openReview`). Fixed on the way: the tab did not follow a card into another
   file (the follow effect checked the new file, not the one the tab was on); the queue's rows took no clicks (the
-  column's `pointer-events` rule is scoped to Structure). e2e `nextWalk.spec.ts`. Still to come: 41.4 (the summary
-  as ТЗ 41 §4 — the figures in Yeseva, «Готово» back to «Долгие дела»), 41.5 (the old interface).
+  column's `pointer-events` rule is scoped to Structure). e2e `nextWalk.spec.ts`.
+  41.4–41.5: the summary's figures (`src/reviewSums.ts` `sumsOf` — by `group`, the nil ones left out, in
+  `spec.endOrder`, else the tones' order) in both shells; the walk's order продолжаем, ждём, осмотрено, в архив,
+  закрыто, пропущено. The controller's `markOf` had dropped the plugin's `group` (the walk's «продолжаем» counted as
+  «выполнено»). The old interface: the walk is the review's tab (`place: 'file'` there is a tab); PluginReview leaves
+  out `hidden` actions, draws `subOf`, and with no summary of the plugin's shows the figures and `endNote`;
+  `WalkCard` offers «Проверить снова через» in the file only (`walk.inFile` = `currentReview().place`), the tab goes
+  by the norm. e2e `walkOld.spec.ts`. ТЗ 41 is done.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

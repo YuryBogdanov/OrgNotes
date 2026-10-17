@@ -6,7 +6,8 @@
   import { reviewScope } from './api/declare';
   import { store } from './store.svelte';
   import type { Tab } from './layout';
-  import type { CardRender, ReviewCard } from './api/index';
+  import type { CardRender, ReviewAction, ReviewCard } from './api/index';
+  import { sumsOf } from './reviewSums';
 
   // A plugin's review (ТЗ 26 §5.2, `ui.review`): the core's review by cards — one heading at a time, narrowed, the
   // plugin's actions in the bar and on their keys (its commands in «"scope": "review"»), «Назад», the summary. ТЗ 27
@@ -19,6 +20,15 @@
   const total = $derived(r?.refs.length ?? 0);
   const kbd = (cmd?: string) => (cmd ? store.keyHint(cmd) : '');
   const header = $derived(r && c && r.spec.header ? plugins.guard(r.plugin, () => r.spec.header!(c.info), '') : '');
+  // the word after an action's label for this card (`subOf`, 1.14), else its `sub`
+  const subOf = (a: ReviewAction) => (r && c && a.subOf ? plugins.guard(r.plugin, () => a.subOf!(c.info), null) : null) ?? a.sub ?? '';
+  // the summary's figures when the plugin keeps the outcomes (`mark`, 1.14) and draws no summary of its own
+  const sums = $derived.by(() => {
+    void plugins.reviewRedraw;
+    if (!r || r.cur >= 0 || r.spec.summary) return [];
+    return sumsOf(r.refs.map((_, i) => plugins.reviewMark(i)), Array.isArray(r.spec.endOrder) ? r.spec.endOrder : undefined);
+  });
+  const endNote = $derived(r && r.cur < 0 && !r.spec.summary && r.spec.endNote ? String(plugins.guard(r.plugin, () => r.spec.endNote!(), '') ?? '') : '');
   const narrow = $derived(r && c && r.spec.narrow ? plugins.guard(r.plugin, () => r.spec.narrow!(c.info), {}) : {});
   const off = (dis: ((h: never) => boolean) | undefined) => {
     void plugins.reviewBar;
@@ -135,8 +145,9 @@
     {#if r && c && r.spec.bar}
       <div class="pbar" use:part={() => r.spec.bar}></div>
     {:else if r && c}
-      {#each r.spec.actions as a (a.id)}
-        <button class="a" class:pri={a.kind === 'primary'} class:ok={a.kind === 'ok'} disabled={off(a.disabled as never)} onclick={() => void plugins.reviewAct(a.id)}>{a.label}{#if a.sub}<span class="h">{a.sub}</span>{/if}{#if kbd(a.command)}<kbd>{kbd(a.command)}</kbd>{/if}</button>
+      {#each r.spec.actions.filter((x) => !x.hidden) as a (a.id)}
+        {@const sub = subOf(a)}
+        <button class="a" class:pri={a.kind === 'primary'} class:ok={a.kind === 'ok'} disabled={off(a.disabled as never)} onclick={() => void plugins.reviewAct(a.id)}>{a.label}{#if sub}<span class="h">{sub}</span>{/if}{#if kbd(a.command)}<kbd>{kbd(a.command)}</kbd>{/if}</button>
       {/each}
       {#if !r.spec.noSkip}<button class="a" onclick={() => void plugins.reviewStep(1)}>Пропустить</button>{/if}
     {/if}
@@ -149,7 +160,12 @@
       {#if r.spec.summary}
         <div class="psum" bind:this={sumEl}></div>
       {:else}
-        <p class="sum">Разобрано {r.done} из {total}. Всё уже записано в файлы.</p>
+        {#if sums.length}
+          <div class="sums">{#each sums as x (x.word)}<div><b>{x.n}</b><span>{x.word}</span></div>{/each}</div>
+        {:else}
+          <p class="sum">Разобрано {r.done} из {total}. Всё уже записано в файлы.</p>
+        {/if}
+        {#if endNote}<p class="sum">{endNote}</p>{/if}
         <button class="pri" onclick={() => plugins.endReview(true)}>Закончить</button>
       {/if}
     {/if}
@@ -173,6 +189,10 @@
   .ed { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
   .pa { flex: 0 0 340px; min-width: 0; border-left: 1px solid var(--line); display: flex; flex-direction: column; }
   .sum { margin: 0; color: var(--fg2); }
+  .sums { display: flex; flex-wrap: wrap; gap: 6px 22px; }
+  .sums div { display: flex; flex-direction: column; }
+  .sums b { font-size: 22px; font-weight: 600; color: var(--fg); }
+  .sums span { font-size: 12px; color: var(--fg2); }
   .pri { height: 32px; padding: 0 16px; border: 0; border-radius: 7px; background: var(--acc); color: var(--onacc); font-weight: 600; }
   .none { margin-top: 40px; color: var(--fg2); }
   .none button { margin-left: 8px; }
@@ -182,4 +202,5 @@
   :global(.preview .acts .a.pri) { background: var(--acc); color: var(--onacc); border-color: transparent; }
   :global(.preview .acts .a.ok) { color: var(--done); }
   :global(.preview .acts .a .h) { font-weight: 400; color: var(--fg2); font-size: 11.5px; }
+  :global(.preview .acts .a.pri .h) { color: inherit; opacity: 0.8; }
 </style>
