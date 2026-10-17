@@ -25,7 +25,7 @@ test('the tree: folders first and folded, a click opens a file (the toolbar says
   await expect(item(page, '1on1')).toHaveAttribute('aria-expanded', 'true');
   await expect(tree(page).getByRole('treeitem')).toHaveText(['1on1', 'boris', 'vera', 'inbox', 'Midterm']);
   await item(page, 'inbox').click();
-  await expect(page.locator('.bar .name')).toHaveText('inbox.org');
+  await expect(page.locator('.bar .name')).toHaveText('inbox');
   await expect(page.locator('.bar .path')).toHaveText('/mock/inbox.org');
   await expect(item(page, 'inbox')).toHaveAttribute('aria-selected', 'true');
   const before = (await tabs(page)).length;

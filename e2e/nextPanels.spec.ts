@@ -68,7 +68,7 @@ test('«Поиск»: ↩ in every file, by file; «.*» and «только за
   await q.press('ArrowDown');
   await res.press('ArrowDown');
   await res.press('Enter');
-  await expect(page.locator('header.bar .name')).toHaveText('a.org');
+  await expect(page.locator('header.bar .name')).toHaveText('a');
   const panel = page.getByRole('search', { name: 'Поиск в файле' });
   await expect(panel).toBeVisible();
   await expect(panel).toContainText('2 из 2');

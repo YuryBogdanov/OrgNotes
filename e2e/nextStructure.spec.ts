@@ -42,7 +42,7 @@ test('«Ссылаются»: the links to the heading under the caret; a click 
   await expect(col(page).locator('.back')).toHaveCount(0);
   await page.locator('.cm-line', { hasText: 'Текст.' }).click();
   await col(page).locator('.bl').click();
-  await expect(page.locator('.bar .name')).toHaveText('weeks.org');
+  await expect(page.locator('.bar .name')).toHaveText('weeks');
 });
 
 test('⌥⌘0 hides and shows it, kept after a reload; a narrow window has no room for it', async ({ page }) => {
