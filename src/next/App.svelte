@@ -10,19 +10,26 @@
   import { tokenVars, FONTS } from './tokens';
   import './fonts';
   import { parentOf } from '../navTree';
+  import { focusedEditor } from '../editorKeys';
   import Sidebar from './Sidebar.svelte';
   import Toolbar from './Toolbar.svelte';
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { AgendaBuilder, CloseSheet, Dialogs, DiskSheet, PluginSheets, Settings } from './bridges';
+  import { AgendaBuilder, Capture, InboxPicker, NotePop, PluginSheets, Settings, StartScreen, TaskListHost } from './bridges';
+  import CloseSheet from './CloseSheet.svelte';
+  import DiskSheet from './DiskSheet.svelte';
+  import Dialogs from './Dialogs.svelte';
+  import SaveAsSheet from './SaveAsSheet.svelte';
+  import { notePop } from '../noteReq.svelte';
+  import { displayName as nameOf } from '../names';
   import Refile from './Refile.svelte';
   import Palette from './Palette.svelte';
   import type { MenuItem } from '../menuItems';
   import Compat from './Compat.svelte';
   import Menu from './ui/Menu.svelte';
   import { untrack } from 'svelte';
-  import { actionOf } from '../views';
+  import { actionOf, allViews } from '../views';
   import { today } from '../todayState.svelte';
 
   // The new shell (ТЗ 42): the store, the plugins, the window's keys and the menu, the old sheets through
@@ -68,11 +75,57 @@
     findPrev: () => store.askFind('prev'),
     useSelection: () => store.askFind('useSel'),
     replace: () => store.askFind('replace'),
+    // the old shell's keys the window lacked (ТЗ 44.4): the quick entry, «Правка», files, history, the mini window
+    capture: () => store.openCapture(),
+    captureHere: () => store.openCapture(),
+    pasteText: () => void focusedEditor()?.run('pasteText'),
+    copyLink: () => {
+      if (focusedEditor()?.run('copyLink')) return;
+      if (store.curPath) void store.copyHeadingLink(store.curPath, store.cursor.line);
+    },
+    newFolder: () => store.canManageFiles && store.openPalette('newFolder'),
+    paletteNewFile: () => store.openPalette('newFile'),
+    paletteGoto: () => store.openPalette('goto'),
+    openFolder: () => store.changeFolder(),
+    revealInNav: () => store.revealInNavigator(store.tab),
+    back: () => store.back(),
+    miniOpen: () => store.openInMini(),
+    miniShow: () => store.toggleMini(),
+    endDay: () => today.openEndDay(),
   };
   // one pane in the new shell (§4.3): a second one of the old is folded in, and back with the old shell
   $effect(() => {
     if (store.loaded) untrack(() => store.foldPanesForNext());
   });
+  // as in the old shell (ТЗ 44.4): the layout survives a restart; a file changed or vanished on disk under edits is
+  // asked about when the window is in front, no sheet is up and its tab is shown; closing the last tab of a kind
+  // tells its feature; the quick entry's panel knows the Inbox file's name from here
+  $effect(() => {
+    if (store.loaded) store.persistLayout();
+  });
+  $effect(() => {
+    void [store.conflicts, store.orphans, store.sheetOpen, store.appActive, store.layout.active];
+    for (const p of store.layout.panes) void p.tabs[p.active]?.path;
+    untrack(() => store.pumpDisk());
+  });
+  $effect(() => {
+    for (const v of allViews()) if (v.onGone && !store.layout.panes.some((p) => p.tabs.some((t) => t.kind === v.kind))) v.onGone();
+  });
+  $effect(() => {
+    const f = store.inboxFile;
+    try {
+      if (f) localStorage.setItem('capture:file', nameOf(f.name) + '.org');
+      else localStorage.removeItem('capture:file');
+    } catch {
+      /* no storage */
+    }
+  });
+  // ⌃C ⌃Z's popover closed: the focus back where it came from
+  function closeNote() {
+    const back = notePop.req?.back;
+    notePop.req = null;
+    back?.();
+  }
   // «Шрифт текста» (§10): Cormorant, the system's or IBM Plex Mono — the text of «Оформление»
   const textFont = $derived(nextPrefs.font === 'system' ? FONTS.ui : nextPrefs.font === 'mono' ? FONTS.mono : FONTS.text);
   // half the cap height of that font (ТЗ 44 §12): the capsules beside a heading centre on its capitals; measured, not
@@ -148,6 +201,12 @@
   <EditorArea />
   </div>
   </div>
+  <!-- the sheets of the files (ТЗ 44 §4) -->
+  <Dialogs />
+  {#if store.saveAsReq}{#key store.saveAsReq}<SaveAsSheet tab={store.saveAsReq.tab} />{/key}{/if}
+  {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
+  {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
+  {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
   <!-- the palette and its «Перенести» (ТЗ 44 §2) -->
   {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
   {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
@@ -155,9 +214,21 @@
   {#if menu}<Menu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
   <!-- the bridged sheets and menus in the compatibility layer (ТЗ 43 §5) -->
   <Compat>
-    <Dialogs />
-    {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
-    {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
+    <!-- the quick entry, the Inbox's file, a note, the task lists' sheets, the start: bridges yet -->
+    {#if store.capture}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="capscrim" onmousedown={(e) => { if (e.target === e.currentTarget) store.capture = null; }}>
+        {#key store.capture.n}
+          <Capture file={store.inboxFile ? nameOf(store.inboxFile.name) + '.org' : null} onsubmit={(t, d) => store.addToInbox(t, d)}
+            onpick={() => { store.capture = null; store.pickInbox = Date.now(); }}
+            onclose={(added) => { store.capture = null; if (added && store.inboxCfg.confirm) store.note('Добавлено в Inbox', undefined, 1600); }} />
+        {/key}
+      </div>
+    {/if}
+    {#if store.pickInbox}{#key store.pickInbox}<InboxPicker onclose={() => (store.pickInbox = 0)} />{/key}{/if}
+    {#if notePop.req}{#key notePop.req.n}<NotePop req={notePop.req} onclose={closeNote} />{/key}{/if}
+    <TaskListHost />
+    {#if store.start}<StartScreen />{/if}
   </Compat>
   {#if store.toast}<div class="toast" role="status">{store.toast.text}{#each store.toast.actions ?? [] as a (a.label)}<button onclick={() => { store.toast = null; a.run(); }}>{a.label}</button>{/each}</div>{/if}
   <Compat>
@@ -170,6 +241,7 @@
 
 <style>
   .next { position: fixed; inset: 0; display: flex; background: var(--bg); color: var(--ink); font: 13px/1.45 var(--ui); }
+  .capscrim { position: fixed; inset: 0; z-index: 96; background: var(--dim); display: flex; align-items: flex-start; justify-content: center; padding-top: 110px; }
   .win { flex: 1; min-width: 0; display: flex; }
   .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 8px 14px; border-radius: 8px; background: var(--card); border: 1px solid var(--rule); box-shadow: var(--popshadow); }

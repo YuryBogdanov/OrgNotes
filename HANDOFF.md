@@ -401,6 +401,16 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   items follow. `next/StatusMenu.svelte` (a drawn capsule, 30 pt rows, soft) and `next/TagsPop.svelte` (⌃C Q) replace
   RichMenu and TagPop; their data shared with the old ones: `headingChoices.ts` (`statusChoices`), `headingWrite.ts`
   (`setStatusAt`, `setPriorityAt`), `tags.ts` `tagRows`. ContextMenu, RichMenu, TagPop gone from the bridges.
+  44.4, the sheets (the plugins' forms and sheets come next): `next/CloseSheet.svelte` («Сохранить изменения?», the
+  tabs by `tabNames`, ⌘D; its words `closeSheet.ts` `closeWords`, shared with the old), `next/DiskSheet.svelte`
+  (520 pt, the plates «Моя версия» / «На диске» with `diff.ts` `diffSummary`; «Сравнить…» 720 pt; the vanished
+  file), `next/ConfirmSheet.svelte`, `next/Dialogs.svelte` (the tree's delete and move), `next/TagRename.svelte`
+  (workings `tagRenameCtl.svelte.ts`), `next/SaveAsSheet.svelte` (`saveAsCtl.svelte.ts`); `next/sheetKeys.ts` —
+  the sheets' keys. The new shell had lacked, now as in the old: the «Сохранить как» and error sheets, the quick
+  entry, ⌃C ⌃Z's note popover, TaskListHost, StartScreen (bridged), the disk pump, the layout's persisting, the
+  views' `onGone`, `capture:file`, and the keys capture, captureHere, pasteText, copyLink, newFolder,
+  paletteNewFile, paletteGoto, openFolder, revealInNav, back, miniOpen, miniShow, endDay. Bridges left: Settings,
+  PluginSheets, PluginFileView, Agenda, AgendaBuilder, Capture, InboxPicker, NotePop, TaskListHost, StartScreen.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

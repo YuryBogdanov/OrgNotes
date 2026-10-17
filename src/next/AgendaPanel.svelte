@@ -1,10 +1,10 @@
 <script lang="ts">
   import { store } from '../store.svelte';
   import { asNamed } from '../themes';
-  import Compat from './Compat.svelte';
-  import { ConfirmDialog } from './bridges';
+  
   import type { MenuItem } from '../menuItems';
   import Menu from './ui/Menu.svelte';
+  import ConfirmDialog from './ConfirmSheet.svelte';
 
   // «Агенда» of the new sidebar (ТЗ 43 §2.2): the built-in agenda, then «Мои агенды»; 28 pt rows — the agenda's dot
   // (its first block's colour), its name. A click opens it in the agenda's tab (or switches the one open); the one
@@ -46,14 +46,12 @@
 </nav>
 
 {#if menu}<Menu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
-<Compat>
   {#if confirmDel}
     {@const id = confirmDel.id}
     <ConfirmDialog label="Удаление агенды" title="Удалить агенду «{confirmDel.name}»?" onclose={() => (confirmDel = null)} actions={[{ label: 'Удалить', kind: 'danger', run: () => void store.deleteAgenda(id) }]}>
       Задачи и файлы не изменятся: удаляется только сама агенда.
     </ConfirmDialog>
   {/if}
-</Compat>
 
 <style>
   .ap { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 1px; }

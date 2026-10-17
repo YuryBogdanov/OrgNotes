@@ -4,8 +4,8 @@
   // A sheet of the new interface (ТЗ 44 §1, §4): it comes out from under the toolbar (52 pt) in 180 ms, 440 pt wide
   // (a form 460, the disk's 520), its lower corners 14 pt, the window under it dimmed by `dim`. A title in SF Pro 15
   // semibold (no Yeseva One in sheets); the body; the buttons at the foot. ⎋ — `oncancel`.
-  let { title, label, width = 440, top = 52, eyebrow, oncancel, children, foot }: {
-    title?: string; label?: string; width?: number; top?: number; eyebrow?: Snippet; oncancel: () => void; children: Snippet; foot?: Snippet;
+  let { title, label, width = 440, top = 52, role = 'dialog', eyebrow, oncancel, children, foot }: {
+    title?: string; label?: string; width?: number; top?: number; role?: 'dialog' | 'alertdialog'; eyebrow?: Snippet; oncancel: () => void; children: Snippet; foot?: Snippet;
   } = $props();
   let el: HTMLDivElement | undefined = $state();
   $effect(() => {
@@ -23,7 +23,7 @@
 </script>
 
 <div class="dim" aria-hidden="true"></div>
-<div class="sheet" role="dialog" aria-modal="true" aria-label={label ?? title} tabindex="-1" bind:this={el} onkeydown={key} style="width:{width}px;top:{top}px">
+<div class="sheet" {role} aria-modal="true" aria-label={label ?? title} tabindex="-1" bind:this={el} onkeydown={key} style="width:{width}px;top:{top}px">
   {#if eyebrow}<div class="eyebrow">{@render eyebrow()}</div>{/if}
   {#if title}<h2>{title}</h2>{/if}
   <div class="body">{@render children()}</div>
