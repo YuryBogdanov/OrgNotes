@@ -372,6 +372,10 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   tab's name without `.org`; the same name open twice — the nearest folder that tells them apart («корень» past the
   top), grey after « — », the tab 280 pt then (it gives way first). Narrowed: «имя › заголовок». The toolbar: the name
   by `displayName`, the path under it. To use in the new palette's «Вкладки» and the save sheet (44.2, 44.4).
+  44.10: the capsules by a heading (status, priority, tags, cookie; the link card's status) centred on its capitals'
+  middle: boxes with `overflow: hidden` (their baseline the bottom edge) raised by `calc(var(--hfs) * var(--capc) -
+  half the box)`; `--hfs` is each level's size in editor.css (19 on the text), `--capc` half the cap height of «Шрифт
+  текста», measured by a canvas in App («H»'s ascent). e2e `nextCapsule` measures the offset (≤ 1 pt) in all fonts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

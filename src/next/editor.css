@@ -8,6 +8,7 @@
 .next .cm-rich .cm-content {
   width: 100%; max-width: var(--col, 700px); margin: 0 auto; box-sizing: border-box; padding: 40px 48px 120px;
   font: 500 19px/1.55 var(--text); color: var(--ink2); caret-color: var(--lamp);
+  --hfs: 19px; /* the text's size: a status in a list's item centres on it */
 }
 .next .cm-rich .cm-line { line-height: 1.55; }
 .next .cm-editor .cm-cursor { border-left: 2px solid var(--lamp); }
@@ -25,14 +26,21 @@
 
 /* headings: no stars, no dots; the level by size and indent */
 .next .cm-rich .cm-r-h { font-family: var(--text); color: var(--ink); }
-.next .cm-rich .cm-r-h1 { font-size: 27px; font-weight: 700; line-height: 1.2; padding-top: 22px; }
-.next .cm-rich .cm-r-h2 { font-size: 22px; font-weight: 600; line-height: 1.25; padding-top: 12px; }
-.next .cm-rich .cm-r-h3 { font-size: 19px; font-weight: 600; line-height: 1.3; padding-top: 6px; }
-.next .cm-rich .cm-r-h4 { font-size: 17px; font-weight: 600; line-height: 1.35; padding-top: 4px; }
+.next .cm-rich .cm-r-h1 { --hfs: 27px; font-size: 27px; font-weight: 700; line-height: 1.2; padding-top: 22px; }
+.next .cm-rich .cm-r-h2 { --hfs: 22px; font-size: 22px; font-weight: 600; line-height: 1.25; padding-top: 12px; }
+.next .cm-rich .cm-r-h3 { --hfs: 19px; font-size: 19px; font-weight: 600; line-height: 1.3; padding-top: 6px; }
+.next .cm-rich .cm-r-h4 { --hfs: 17px; font-size: 17px; font-weight: 600; line-height: 1.35; padding-top: 4px; }
 .next .cm-rich .cm-r-hdone { color: var(--ink3) !important; }
-.next .cm-rich .cm-r-status { display: inline-block; height: 18px; margin-right: 4px; padding: 0 6px; border-radius: 4px; font: 700 10.5px/18px var(--ui); letter-spacing: 0.02em; vertical-align: 0.35em; color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); }
-.next .cm-rich .cm-r-cap.prio { vertical-align: 0.35em; }
-.next .cm-rich .cm-r-tags.colons { display: inline; margin-left: 8px; font: 400 12px var(--ui); color: var(--ink3); vertical-align: 0.3em; }
+.next .cm-rich .cm-r-status { display: inline-block; height: 18px; margin-right: 4px; padding: 0 6px; border-radius: 4px; font: 700 10.5px/18px var(--ui); letter-spacing: 0.02em; color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); }
+.next .cm-rich .cm-r-tags.colons { display: inline-block; height: 16px; margin-left: 8px; font: 400 12px/16px var(--ui); color: var(--ink3); white-space: nowrap; }
+/* a status, a priority, the tags, the cookie centred on the middle of the heading's capitals (ТЗ 44 §12): a box with
+   `overflow: hidden` sits on the baseline by its bottom edge, so it is raised by the heading's size × half its font's
+   cap height (`--capc`, measured from «Шрифт текста», App) less half the box. The line's height does not change. */
+.next .cm-rich .cm-r-status, .next .cm-rich .cm-r-cap.prio, .next .cm-rich .cm-r-tags.colons, .next .cm-rich .cm-r-h .cm-r-chip.cookie { overflow: hidden; }
+.next .cm-rich .cm-r-status { vertical-align: calc(var(--hfs) * var(--capc, 0.315) - 9px); }
+.next .cm-rich .cm-r-cap.prio { height: 20px; vertical-align: calc(var(--hfs) * var(--capc, 0.315) - 10px); }
+.next .cm-rich .cm-r-tags.colons { vertical-align: calc(var(--hfs) * var(--capc, 0.315) - 8px); }
+.next .cm-rich .cm-r-h .cm-r-chip.cookie { display: inline-block; vertical-align: calc(var(--hfs) * var(--capc, 0.315) - 10px); }
 .next .cm-rich .cm-r-tagn:hover { color: var(--ink); text-decoration: underline; }
 
 /* dates, drawers, a cookie: chips of 20 pt */
@@ -137,8 +145,8 @@
 .next .cm-tooltip.cm-tooltip-hover:has(.cm-lcard) { border: 0; background: transparent; box-shadow: none; }
 .next .cm-lcard { width: 400px; max-width: 80vw; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px 12px; border: 1px solid var(--rule); border-radius: 12px; background: var(--card); box-shadow: var(--popshadow); font: 12px var(--ui); color: var(--ink2); }
 .next .lc-path { font: 11px var(--mono); letter-spacing: 0.02em; color: var(--ink3); }
-.next .lc-title { display: flex; align-items: baseline; gap: 8px; font: 700 22px/1.2 var(--text); color: var(--ink); }
-.next .lc-kw { flex: 0 0 auto; padding: 0 6px; border-radius: 4px; font: 700 10.5px/18px var(--ui); color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); vertical-align: 0.25em; }
+.next .lc-title { --hfs: 22px; font: 700 22px/1.2 var(--text); color: var(--ink); }
+.next .lc-kw { display: inline-block; height: 18px; overflow: hidden; margin-right: 8px; padding: 0 6px; border-radius: 4px; font: 700 10.5px/18px var(--ui); color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); vertical-align: calc(var(--hfs) * var(--capc, 0.315) - 9px); } /* on the capitals' middle (§12) */
 .next .lc-body { font: 500 17px/1.45 var(--text); color: var(--ink2); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .next .lc-url { font: 12.5px var(--mono); color: var(--lampink); overflow-wrap: anywhere; }
 .next .lc-miss { font: 700 15px var(--ui); color: var(--todo); }
@@ -152,16 +160,16 @@
 .next[data-font='system'] .cm-rich .cm-content, .next[data-font='mono'] .cm-rich .cm-content { font-size: 14px; font-weight: 400; }
 .next[data-font='system'] .cm-rich .cm-line, .next[data-font='mono'] .cm-rich .cm-line { line-height: 1.7; }
 .next[data-font='system'] .cm-rich .cm-r-title { font-size: 30px; }
-.next[data-font='system'] .cm-rich .cm-r-h1 { font-size: 21px; }
-.next[data-font='system'] .cm-rich .cm-r-h2 { font-size: 18px; }
-.next[data-font='system'] .cm-rich .cm-r-h3 { font-size: 15.5px; }
-.next[data-font='system'] .cm-rich .cm-r-h4 { font-size: 14.5px; }
+.next[data-font='system'] .cm-rich .cm-r-h1 { --hfs: 21px; font-size: 21px; }
+.next[data-font='system'] .cm-rich .cm-r-h2 { --hfs: 18px; font-size: 18px; }
+.next[data-font='system'] .cm-rich .cm-r-h3 { --hfs: 15.5px; font-size: 15.5px; }
+.next[data-font='system'] .cm-rich .cm-r-h4 { --hfs: 14.5px; font-size: 14.5px; }
 .next[data-font='mono'] .cm-rich .cm-r-title { font-size: 26px; }
-.next[data-font='mono'] .cm-rich .cm-r-h1 { font-size: 20px; }
-.next[data-font='mono'] .cm-rich .cm-r-h2 { font-size: 17px; }
-.next[data-font='mono'] .cm-rich .cm-r-h3 { font-size: 15px; }
-.next[data-font='mono'] .cm-rich .cm-r-h4 { font-size: 14px; }
+.next[data-font='mono'] .cm-rich .cm-r-h1 { --hfs: 20px; font-size: 20px; }
+.next[data-font='mono'] .cm-rich .cm-r-h2 { --hfs: 17px; font-size: 17px; }
+.next[data-font='mono'] .cm-rich .cm-r-h3 { --hfs: 15px; font-size: 15px; }
+.next[data-font='mono'] .cm-rich .cm-r-h4 { --hfs: 14px; font-size: 14px; }
 .next[data-font='system'] .cm-rich .cm-n-bline.quote, .next[data-font='mono'] .cm-rich .cm-n-bline.quote { font-size: 14px; font-weight: 400; }
 .next[data-font='system'] .cm-rich .cm-n-cell, .next[data-font='mono'] .cm-rich .cm-n-cell { font-size: 13.5px; font-weight: 400; }
-.next[data-font='system'] .lc-title, .next[data-font='mono'] .lc-title { font-size: 17px; }
+.next[data-font='system'] .lc-title, .next[data-font='mono'] .lc-title { --hfs: 17px; font-size: 17px; }
 .next[data-font='system'] .lc-body, .next[data-font='mono'] .lc-body { font-size: 13.5px; font-weight: 400; }
