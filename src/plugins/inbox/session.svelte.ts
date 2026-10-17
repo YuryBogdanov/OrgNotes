@@ -91,6 +91,8 @@ class Session {
       onClose: () => {
         if (this.run === run) this.run = null;
       },
+      // the queue of the new interface (API 1.14): what became of each card, short — «DONE», «→ home», «отложено до 19 окт»
+      note: (i) => queueNote(run.items[i]),
       actions: [
         { id: 'done', label: 'Выполнено', command: 'inbox.done', run: () => this.act(() => this.close('done')) },
         { id: 'cancel', label: 'Отменить', command: 'inbox.cancel', run: () => this.act(() => this.close('cancel')) },
@@ -337,3 +339,13 @@ export function lastLine(text: string, h: { line: number; end: number }) {
 }
 
 export const session = new Session();
+
+/** A handled card as the new interface's queue says it, short; null: not handled (or skipped, waiting its turn). */
+export function queueNote(it: ReviewItem | undefined): string | null {
+  if (!it?.result || it.result === 'skip') return null;
+  if (it.result === 'done' || it.result === 'cancel') return it.keyword ?? null;
+  if (it.result === 'move') return it.note?.split(' › ')[0] ?? null;
+  if (it.result === 'defer') return it.note?.replace(/^Отложена до (.+?) · .*$/, 'отложено до $1') ?? null;
+  if (it.result === 'delete') return 'удалена';
+  return null;
+}

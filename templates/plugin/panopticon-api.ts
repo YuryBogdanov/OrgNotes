@@ -369,6 +369,9 @@ export interface ReviewSpec {
   next?(cur: number, d: 1 | -1): number;
   /** The review left the window (its tab closed, «Закончить», another review started). */
   onClose?(): void;
+  /** The note of a card in the queue left of it in the new interface («→ home», «DONE», «отложено до 19 окт»); null:
+   *  none. Since 1.14. */
+  note?(index: number): string | null;
 }
 /** The review shown (from `ui.review`): move it, draw the card again. */
 export interface ReviewHandle {

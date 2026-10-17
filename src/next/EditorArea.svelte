@@ -1,6 +1,6 @@
 <script lang="ts">
   import { store } from '../store.svelte';
-  import { plugins } from '../api/host.svelte';
+  import { plugins, REVIEW_KIND } from '../api/host.svelte';
   import { fileViewOf, viewOf } from '../views';
   import { fileTypeOf } from '../fileTypes.svelte';
   import { OFF_ICON, isCore, tabLabel } from '../tabLabels';
@@ -13,6 +13,7 @@
   import Today from './Today.svelte';
   import AgendaDay from './AgendaDay.svelte';
   import AgendaBlocks from './AgendaBlocks.svelte';
+  import Review from './Review.svelte';
   import { TODAY } from '../todayState.svelte';
   import FileCard from './FileCard.svelte';
   import { FileCardsCtl, caretHeading } from './fileCards.svelte';
@@ -124,6 +125,10 @@
   {#if tab?.kind === TODAY}
     <!-- «Сегодня» in the new style (ТЗ 45 §2) -->
     <div class="view"><Today pane={0} /></div>
+  {:else if tab?.kind === REVIEW_KIND && !plugins.review?.spec.aside}
+    <!-- a review by cards (the Inbox's): the core's frame in the new style (ТЗ 45 §4); one with a panel by its editor
+         (the goals' 1-1) stays the old frame in the layer till its own ТЗ -->
+    <div class="view"><Review {tab} pane={0} /></div>
   {:else if tab && !isCore(tab.kind)}
     {@const v = viewOf(tab.kind)}
     {#if v}

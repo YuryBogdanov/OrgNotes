@@ -487,6 +487,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   `builtin:week`, «Сегодня» `builtin:today`, «Все задачи» `builtin:all`: plain agendas run by `runAgenda`, not in
   config.json, no «Редактировать…»; `AgendaStore.of` resolves them. The sidebar's panel lists them under «Встроенные»
   after «Агенда · 30 дней». The bridge `Agenda` is gone.
+  45.5, the Inbox's review: the core's frame of `ui.review` in the new style, `next/Review.svelte` (EditorArea draws it
+  for a review with no `aside`; the goals' 1-1 with its panel stays the old PluginReview in the layer till its own
+  ТЗ): the queue on the left (270 pt; handled = the core's `doneAt` or a `note` of the plugin — API 1.14
+  `ReviewSpec.note(i)`), the card (the plugin's head and quick parts in Compat, the narrowed `next/Editor` — its
+  heading the title, `.ed.grid` for the ground, Cormorant in «Оформление»), «← Назад» and the plugin's bar on a grid of
+  equal columns, `below`, the summary `.fin`. The frame's class is the spec's `cls` (`rv review`): the Inbox's styles
+  go `:is(.creview, .rv).review`, its new look `.rv.review` (Bar's `.l` / `.s` spans: the action, then the status and
+  the key; «Далее» only once edited; the status line off under 640 pt). Inbox `queueNote`: «DONE», «→ home»,
+  «отложено до 19 окт», «удалена». A local `state` makes `$state` a store's: never name a variable so.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

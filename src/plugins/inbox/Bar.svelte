@@ -53,17 +53,17 @@
 </script>
 
 <button class="a done-b" disabled={!doneKw} title={already(doneShown) ? `Уже ${doneShown}` : ''} onclick={() => session.act(() => session.close('done'))}>
-  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg>Выполнено<span class="hint">{doneShown ?? ''}</span>{#if kbd('inbox.done')}<kbd>{kbd('inbox.done')}</kbd>{/if}
+  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8" /></svg><span class="l">Выполнено</span><span class="s"><span class="hint">{doneShown ?? ''}</span>{#if kbd('inbox.done')}<kbd>{kbd('inbox.done')}</kbd>{/if}</span>
 </button>
 <button class="a" disabled={!cancelKw} title={cancelKw ? '' : already(cancelShown) ? `Уже ${cancelShown}` : 'В наборе нет статуса для отмены'} onclick={() => session.act(() => session.close('cancel'))}>
-  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" /></svg>Отменить<span class="hint">{cancelShown ?? ''}</span>{#if kbd('inbox.cancel')}<kbd>{kbd('inbox.cancel')}</kbd>{/if}
+  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" /></svg><span class="l">Отменить</span><span class="s"><span class="hint">{cancelShown ?? ''}</span>{#if kbd('inbox.cancel')}<kbd>{kbd('inbox.cancel')}</kbd>{/if}</span>
 </button>
 <button class="a move-b" onclick={() => session.act(() => session.move())}>
-  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={REFILE} /></svg>Перенести…{#if kbd('inbox.move')}<kbd>{kbd('inbox.move')}</kbd>{/if}
+  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={REFILE} /></svg><span class="l">Перенести…</span><span class="s">{#if kbd('inbox.move')}<kbd>{kbd('inbox.move')}</kbd>{/if}</span>
 </button>
 <div class="dwrap">
   <button class="a" class:on={!!session.defer} aria-haspopup="dialog" onclick={() => (session.defer = session.defer ? null : { sel: 0 })}>
-    <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5V10l2.5 1.5" /></svg>Отложить…{#if kbd('inbox.defer')}<kbd>{kbd('inbox.defer')}</kbd>{/if}
+    <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM10 6.5V10l2.5 1.5" /></svg><span class="l">Отложить…</span><span class="s">{#if kbd('inbox.defer')}<kbd>{kbd('inbox.defer')}</kbd>{/if}</span>
   </button>
   {#if session.defer}
     {@const d = session.defer}
@@ -86,11 +86,11 @@
   {/if}
 </div>
 <button class="a" onclick={() => session.act(() => session.skip())}>
-  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5l6 5-6 5M13 5v10" /></svg>Пропустить{#if kbd('inbox.skip')}<kbd>{kbd('inbox.skip')}</kbd>{/if}
+  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5l6 5-6 5M13 5v10" /></svg><span class="l">Пропустить</span><span class="s">{#if kbd('inbox.skip')}<kbd>{kbd('inbox.skip')}</kbd>{/if}</span>
 </button>
 <!-- «Далее»: outlined in the accent; once the card was edited — filled, the main action -->
 <button class="a next-b" class:edited={session.edited} onclick={() => session.act(() => session.pass())}>
-  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h11M11 5l5 5-5 5" /></svg>Далее{#if kbd('inbox.next')}<kbd>{kbd('inbox.next')}</kbd>{/if}
+  <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h11M11 5l5 5-5 5" /></svg><span class="l">Далее</span><span class="s">{#if kbd('inbox.next')}<kbd>{kbd('inbox.next')}</kbd>{/if}</span>
 </button>
 
 {#if session.defer}
