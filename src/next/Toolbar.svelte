@@ -4,6 +4,7 @@
   import { tabLabel } from '../tabLabels';
   import { TODAY } from '../todayState.svelte';
   import { fmtLong } from '../org';
+  import { displayName } from '../names';
 
   // The toolbar of the new interface (ТЗ 42 §4.1), 52 pt: the sidebar's button (⌘0), the file's name and its path in
   // the notes folder, «Искать везде» (the palette, ⌘K) and «+» — a new note (⌘N). It drags the window.
@@ -21,7 +22,8 @@
     const name = cs[0] ?? label;
     return { name, sub: cs.slice(1).join(' › ') || (label !== name ? label : '') };
   });
-  const name = $derived(screen?.name ?? (store.file ? store.file.name.split('/').pop()! : 'Panopticon'));
+  // a file: its name without `.org` (ТЗ 44 §11), under it its path
+  const name = $derived(screen?.name ?? (store.file ? displayName(store.file.name) : 'Panopticon'));
   const path = $derived(screen ? screen.sub : store.file ? `${folder}/${store.file.name}` : folder);
   const key = (id: string) => store.keyHint(id);
 </script>

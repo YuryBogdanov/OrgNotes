@@ -4,6 +4,7 @@
   import { isPinned, type Tab } from '../layout';
   import { OFF_ICON, isCore, isDirty, isGone, tabLabel } from '../tabLabels';
   import { tabMenuItems } from '../tabMenu';
+  import { tabNames } from './tabNames';
   import type { MenuItem } from './bridges';
 
   // The tabs of the new interface (ТЗ 42 §4.3), 36 pt under the toolbar: a pinned tab — its icon alone; a tab — its
@@ -24,8 +25,24 @@
     const fv = t.kind === 'file' ? fileViewOf(store.viewOf(t)) : undefined;
     return fv ? { d: fv.icon, box: 20 } : { d: FILE, box: 16 };
   }
-  /** A file's tab: its path in the notes folder with the extension, «1on1 / boris.org» (the mockups); others as before. */
-  const label = (t: Tab) => (t.kind === 'file' && !t.scope ? (store.fileOf(t)?.name ?? tabLabel(t)).split('/').join(' / ') : tabLabel(t));
+  /** A file's tab (ТЗ 44 §11): its name without `.org`; the same name open twice — the folder that tells them apart, in
+   *  grey; narrowed — «Ольга Петрова › 1-1». Others as before. */
+  const relOf = (t: Tab) => store.fileOf(t)?.name ?? t.path ?? '';
+  const plain = (t: Tab) => t.kind === 'file' && !t.scope;
+  const names = $derived.by(() => {
+    const tabs = (pane?.tabs ?? []).filter(plain);
+    const ns = tabNames(tabs.map(relOf));
+    return new Map(tabs.map((t, i) => [t.id, ns[i]]));
+  });
+  const nameOf = (t: Tab) => {
+    const n = names.get(t.id);
+    if (!n) return { name: tabLabel(t), hint: '' };
+    return { name: t.narrow ? `${n.name} › ${t.narrow.title}` : n.name, hint: n.hint };
+  };
+  const label = (t: Tab) => {
+    const n = nameOf(t);
+    return n.hint ? `${n.name} — ${n.hint}` : n.name;
+  };
   function menu(e: MouseEvent, t: Tab) {
     e.preventDefault();
     onmenu({ x: e.clientX, y: e.clientY }, tabMenuItems(pi, t));
@@ -44,14 +61,15 @@
     {#each pane?.tabs ?? [] as t, ti (t.id)}
       {@const ic = iconOf(t)}
       {@const on = ti === pane.active}
-      <div class="tab" class:on class:pin={isPinned(t)} class:dirty={isDirty(t)} class:gone={isGone(t)} class:untitled={t.kind === 'untitled'} data-tab={t.id}
-        role="tab" aria-selected={on} aria-label={label(t)} tabindex={on ? 0 : -1} title={isPinned(t) ? label(t) : t.kind === 'file' ? (t.path ?? '') : undefined}
+      <div class="tab" class:on class:pin={isPinned(t)} class:dirty={isDirty(t)} class:gone={isGone(t)} class:untitled={t.kind === 'untitled'} class:hinted={!!names.get(t.id)?.hint} data-tab={t.id}
+        role="tab" aria-selected={on} aria-label={label(t)} tabindex={on ? 0 : -1} title={isPinned(t) ? label(t) : t.kind === 'file' ? relOf(t) : undefined}
         onclick={() => store.activateTab(pi, ti)} oncontextmenu={(e) => menu(e, t)}
         onauxclick={(e) => { if (e.button === 1) { e.preventDefault(); void store.closeTab(pi, ti); } }}
         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); store.activateTab(pi, ti); } }}>
         <svg class="ic" width={ic.box === 20 ? 16 : 15} height={ic.box === 20 ? 16 : 15} viewBox="0 0 {ic.box} {ic.box}" fill="none" stroke="currentColor" stroke-width={ic.box === 20 ? 1.6 : 1.4} stroke-linecap="round" stroke-linejoin="round" stroke-dasharray={ic.dash ? '2 1.8' : undefined} aria-hidden="true"><path d={ic.d} /></svg>
         {#if !isPinned(t)}
-          <span class="lbl">{label(t)}</span>
+          {@const n = nameOf(t)}
+          <span class="lbl"><span class="nm">{n.name}</span>{#if n.hint}<span class="hint">{` — ${n.hint}`}</span>{/if}</span>
           <span class="end">
             <span class="dot" aria-hidden="true"></span>
             <button class="x" tabindex="-1" aria-label="Закрыть вкладку {label(t)}" title="Закрыть вкладку" onclick={(e) => { e.stopPropagation(); void store.closeTab(pi, ti); }}>
@@ -79,13 +97,18 @@
   .strip { flex: 1; min-width: 0; display: flex; align-items: stretch; overflow-x: auto; scrollbar-width: none; }
   .strip::-webkit-scrollbar { display: none; }
   .tab { flex: 0 1 190px; min-width: 90px; display: flex; align-items: center; gap: 7px; padding: 0 12px; border-right: 1px solid var(--rule); color: var(--ink2); font-size: 12.5px; white-space: nowrap; cursor: default; }
+  /* a name told apart by its folder (ТЗ 44 §11): room for the folder too, then it gives way */
+  .tab.hinted { flex-basis: 280px; }
   .tab.pin { flex: 0 0 40px; min-width: 40px; justify-content: center; padding: 0; }
   .tab:hover { color: var(--ink); }
   .tab.on { background: var(--bg); box-shadow: inset 0 2px 0 var(--lamp); color: var(--ink); }
   .tab:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; }
   .ic { flex: 0 0 auto; color: var(--ink3); }
   .tab.on .ic { color: var(--lampink); }
-  .lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* the grey folder gives way first, then the name (§11) */
+  .lbl { min-width: 0; display: flex; overflow: hidden; }
+  .lbl .nm { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lbl .hint { flex: 0 100000 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; color: var(--ink3); }
   .untitled .lbl, .gone .lbl { font-style: italic; }
   .end { margin-left: auto; flex: 0 0 16px; height: 16px; display: flex; align-items: center; justify-content: center; position: relative; }
   .dot { display: none; width: 7px; height: 7px; border-radius: 4px; background: var(--ink2); }
