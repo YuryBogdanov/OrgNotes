@@ -27,6 +27,12 @@
     return r.spec.actions.filter((a) => !a.hidden).map((a) => ({ a, off: !!a.disabled && plugins.guard(r.plugin, () => a.disabled!(c.info), false) }));
   });
   const seg = (i: number) => (r && i === r.cur ? 'var(--lamp)' : marks[i] ? TONE[marks[i]!.tone] : r?.doneAt.has(i) ? 'var(--done)' : 'var(--track)');
+  // the summary's buttons of the plugin («Разобрать пропущенные»), as it says now
+  const ends = $derived.by(() => {
+    void plugins.reviewRedraw;
+    if (!r || r.cur >= 0 || !Array.isArray(r.spec.endActions)) return [];
+    return r.spec.endActions.filter((e) => e && typeof e.label === 'string' && (!e.when || plugins.guard(r.plugin, () => e.when!(), false)));
+  });
   const counts = $derived.by(() => {
     const n = new Map<ReviewTone, number>();
     for (const m of marks) if (m) n.set(m.tone, (n.get(m.tone) ?? 0) + 1);
@@ -74,7 +80,7 @@
     {#if r.cur >= 0 && c}
       <div class="acts">
         {#each acts as { a, off } (a.id)}
-          <button class="act" class:ok={a.kind === 'ok'} class:main={a.kind === 'primary'} disabled={off} onclick={() => void plugins.reviewAct(a.id)}>
+          <button class="act" data-act={a.id} class:ok={a.kind === 'ok'} class:main={a.kind === 'primary'} disabled={off} onclick={() => void plugins.reviewAct(a.id)}>
             <span class="l">{a.label}</span>{#if a.sub}<span class="sub">{a.sub}</span>{/if}
             {#if kbd(a.command)}<kbd>{kbd(a.command)}</kbd>{/if}
           </button>
@@ -86,7 +92,12 @@
       </div>
       {#if r.spec.below}<Compat><div class="below" bind:this={belowEl}></div></Compat>{/if}
     {:else}
-      <div class="row"><button class="small main" onclick={() => fileReview.finish()}>Готово<kbd>⎋</kbd></button></div>
+      <div class="row wrap">
+        {#each ends as e (e.label)}
+          <button class="small" class:main={e.kind === 'primary'} onclick={() => r && plugins.guard(r.plugin, () => e.run(), undefined)}>{e.label}{#if kbd(e.command)}<kbd>{kbd(e.command)}</kbd>{/if}</button>
+        {/each}
+        <button class="small" class:main={!ends.some((e) => e.kind === 'primary')} onclick={() => fileReview.finish()}>Готово<kbd>⎋</kbd></button>
+      </div>
     {/if}
   </section>
 {/if}
@@ -113,6 +124,7 @@
   .act:disabled { opacity: 0.45; }
   .act:focus-visible, .small:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
   .row { display: flex; gap: 6px; margin-top: 10px; }
+  .row.wrap { flex-wrap: wrap; }
   .small { height: 26px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; border: 0; border-radius: 6px; background: var(--chip2); color: var(--ink); font: 12px var(--ui); white-space: nowrap; }
   .small.main { background: var(--lamp); color: var(--onlamp); font-weight: 600; }
   .small:disabled { opacity: 0.45; }

@@ -16,6 +16,8 @@ class FileReview {
   /** The card's file is another than the last one's: the strip says «другой файл» for 2 s (ТЗ 41 §1.1). */
   otherFile = $state(false);
   private lastPath = $state<string | null>(null);
+  /** The calendar's card in the review folds and unfolds (its key, ⌘K): set by ReviewCalendar while shown. */
+  calToggle: (() => void) | null = null;
   private otherTimer: ReturnType<typeof setTimeout> | undefined;
   /** The run, when it is in the file. */
   get run() {
@@ -87,6 +89,10 @@ class FileReview {
       if (!r) return false;
       if (id && id === r.spec.backCommand) {
         if (r.cur !== 0) void plugins.reviewStep(-1);
+        return true;
+      }
+      if (id && id === r.spec.calendar?.command && this.calToggle) {
+        this.calToggle();
         return true;
       }
       const a = r.spec.actions.find((x) => x.command === id);

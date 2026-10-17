@@ -268,7 +268,7 @@ class Host {
   /** A plugin's menu items as the core's menu draws them. */
   private coreMenu(id: string, items: (ApiMenuItem | 'sep')[]): CoreMenuItem[] {
     return items.flatMap((it): CoreMenuItem[] => (it === 'sep' ? ['sep'] : [
-      { label: it.label, danger: it.danger, disabled: it.disabled, checked: it.checked, action: () => this.guard(id, () => it.run(), undefined) },
+      { label: it.label, danger: it.danger, disabled: it.disabled, checked: it.checked, ...(typeof it.shortcut === 'string' ? { shortcut: it.shortcut } : {}), action: () => this.guard(id, () => it.run(), undefined) },
       ...(it.hint ? [{ note: it.hint }] : []),
     ]));
   }
@@ -928,6 +928,11 @@ class Host {
                 },
                 end: () => void (this.review === r && this.endReview(true)),
                 place: r.inFile ? ('file' as const) : ('tab' as const),
+                anchor: (aid) => {
+                  const el = r.inFile ? document.querySelector(`[data-review="${CSS.escape(id)}"] [data-act="${CSS.escape(String(aid))}"]`) : null;
+                  const b = el?.getBoundingClientRect();
+                  return b ? { x: b.left, y: b.top, width: b.width, height: b.height } : null;
+                },
               }))(this.review)
             : null,
         setMonthFilter: (f) => {

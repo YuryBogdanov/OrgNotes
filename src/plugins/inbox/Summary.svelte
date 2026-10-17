@@ -22,7 +22,7 @@
     const words = one ? 'пропущенная задача' : few ? 'пропущенные задачи' : 'пропущенных задач';
     return `${one ? 'Осталась' : 'Осталось'} ${n} ${words}. ${one ? 'Её' : 'Их'} можно разобрать сейчас или в следующий раз.`;
   }
-  const again = (list: ReviewItem[]) => session.start(list.map((x) => ({ ...x, result: null, note: undefined })));
+  const again = (list: ReviewItem[]) => session.again(list);
 </script>
 
 <p>{skipped.length ? skippedText(skipped.length) : 'Inbox разобран.'}</p>
