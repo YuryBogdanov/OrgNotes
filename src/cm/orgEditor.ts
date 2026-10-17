@@ -18,6 +18,7 @@ import { findExtension, findField, foundInfo, moveFind, replaceFound, setFind, t
 import { registerEditor } from '../editorKeys';
 import { clipTarget, linkHooks, linkPaste } from '../linkEdit';
 import { openNote } from '../noteReq.svelte';
+import { isArchive } from '../names';
 import { headingActionsFor } from '../headingActions.svelte';
 import { tagsState } from '../tagsState.svelte';
 import { lineTags, withTags } from '../tags';
@@ -399,6 +400,7 @@ export class OrgEditor {
       items.push({ label: 'Теги…', shortcut: key('tags'), action: () => this.openTagPop(v, hl.number) });
       items.push({ label: 'Добавить заметку…', shortcut: key('addNote'), action: () => this.noteAt(v, hl.number - 1) });
       if (this.p.onnarrowTo && !this.p.narrow) items.push({ label: 'Сузить до заголовка', shortcut: key('narrow'), action: () => this.p.onnarrowTo!(hl.number - 1) });
+      if (!isArchive(path)) items.push({ label: 'В архив', shortcut: key('archive'), action: () => linkHooks.archive(path, hl.number - 1) });
       // the plugins' items on a heading (ТЗ 39)
       const more = headingActionsFor(path, hl.number - 1);
       if (more.length) items.push('sep', ...more.map((a): MenuItem => ({ label: a.label, action: () => a.run(path, hl.number - 1) })));
@@ -628,6 +630,9 @@ export class OrgEditor {
         EditorView.lineWrapping,
         autocompletion({ override: [this.tagSource], icons: false, closeOnBlur: true, tooltipClass: () => 'cm-tag-complete' }),
         // the configurable keys are run by the window's handler (editorKeys.ts); here only the fixed ones
+        // ⌘Z right after a step over several files (a move, «В архив»): their other files go back along (false: the
+        // history's own undo runs after it)
+        keymap.of([{ key: 'Mod-z', run: (v) => (linkHooks.undoAlong(this.path, v.state.doc.toString()), false) }]),
         keymap.of([...foldKeymap, ...historyKeymap, ...defaultKeymap]),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) {

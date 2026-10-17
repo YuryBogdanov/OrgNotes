@@ -11,6 +11,8 @@ export { stampText, shiftDate, longDate, relWords } from '../calendar';
 export { listEnter, listIndent, type Edit } from '../textList';
 export { setProperty, insertHeading, replaceBody, treeOf } from '../orgOps';
 export { relevel, place, moveTo, moveWithin } from '../refile';
+// the archive as Emacs keeps it (ТЗ 33 §4, ТЗ 41 §7): where a heading goes, what goes
+export { archiveTarget, archivePath, archiveEntry, categoryOf, readLocation } from '../archive';
 // the index of dated entries (ТЗ 24): what the calendar shows, by day — the core's month under a review's card too
 export {
   LAYERS, isoDay, fromIso, hasDated, entriesIn, sortDay, byDay, undated, monthWeeks, weekDays, weekNumber, monthTitle, monthSub, weekSub,

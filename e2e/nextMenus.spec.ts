@@ -24,7 +24,7 @@ test('the heading\'s menu: its items in order, the plugin\'s section, «Удал
   await open(page);
   await page.locator('.cm-line', { hasText: 'Подготовить бюджет' }).click({ button: 'right' });
   const labels = (await menu(page).locator('[role=menuitem] .l1, [role=menuitem] .capsule').allTextContents()).map((t) => t.trim());
-  expect(labels.slice(0, 9)).toEqual(['Сменить статус', 'Запланировать…', 'Срок…', 'Теги…', 'Перенести в…', 'Сузить до заголовка', 'Добавить заметку…', 'Копировать ссылку', 'Открыть в мини-окне']);
+  expect(labels.slice(0, 10)).toEqual(['Сменить статус', 'Запланировать…', 'Срок…', 'Теги…', 'Перенести в…', 'В архив', 'Сузить до заголовка', 'Добавить заметку…', 'Копировать ссылку', 'Открыть в мини-окне']);
   await expect(menu(page).locator('.head')).toHaveText('Зонд');
   await expect(menu(page).getByRole('menuitem', { name: 'Показать ветку картой' })).toBeVisible();
   const del = menu(page).getByRole('menuitem', { name: 'Удалить заголовок' });

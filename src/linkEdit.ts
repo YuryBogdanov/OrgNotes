@@ -84,6 +84,10 @@ export const linkHooks = {
   readClip: async (): Promise<string> => '',
   /** «Копировать ссылку на заголовок» at a line of the editor's file. False: not a file of the folder. */
   copyHeading: (_path: string, _line: number): boolean => false,
+  /** «В архив» on the heading at a line of the editor's file (ТЗ 41 §7). */
+  archive: (_path: string, _line: number): void => {},
+  /** ⌘Z in the editor, before its own undo: the other files of the step that made its text go back too. */
+  undoAlong: (_path: string, _text: string): void => {},
   /** The palette «Ссылка на» (linkPicker.ts): `apply` puts the link in place of the selection or of the link edited. */
   pick: (_o: { path: string; sel: string; edit: { label: string | null } | null; apply: (insert: string) => void }) => {},
   /** The title of the heading a line of the editor's file is in (the menu's «Копировать ссылку…»), null — none. */

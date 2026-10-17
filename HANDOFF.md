@@ -493,6 +493,20 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   46.1, the narrowing's strip (any narrowing, new interface): already the whole width of the area with the column
   under it (it sits above `.with`); now it slides in in 180 ms and out in 150 (`svelte/transition` slide, cubicOut),
   none with «Уменьшить движение»; its size is `height: 40px` — a flex-basis would hold it and stop the slide.
+  ТЗ 46 was stopped after 46.1 (2026-10-17: the review's concept changed again); ТЗ 41 (обход долгих дел) is next.
+- **«Архивировать поддерево» (ТЗ 41.0, §7):** `src/archive.ts`, pure, shared with the board's «В архив» (ТЗ 33; moved
+  from `plugins/kanban/archive.ts`, exported by `@panopticon/api/org`): `archiveTarget` — `:ARCHIVE:` of the heading or
+  its nearest ancestor, then the header's «#+ARCHIVE:», then `%s_archive::` (`readLocation`: «file::* heading», an
+  empty file part — the same file, `%s`, `../`); `archiveEntry` adds ARCHIVE_TIME/FILE/OLPATH/CATEGORY/TODO. The default
+  is `<file>.org_archive` as in Emacs, not the ТЗ's `<имя>_archive.org` (`isArchive` and the board use `.org_archive`).
+  `store.archiveSubtree(at?)`: `ensureFile`, one transaction (another file: the archive first; the same file: out
+  first), the entry at the end or under its top-level heading (made when missing), the toast «В архиве: …» with
+  «Открыть» / «Отменить». Key `archive` ⌃C ⌃X ⌃S (heading scope, `keyDispatch.runOne`), the palette, «В архив» in both
+  editors' heading menus (`linkHooks.archive` in the old one); none in an `.org_archive` file.
+  ⌘Z in an editor after a step over several files (a move, «В архив»): `linkHooks.undoAlong` → `store.undoAlong` takes
+  the step's other files back when the editor's text is what the step made of it, then CodeMirror undoes its own file
+  (before, the copy stayed in the target). The editor's `path` is the file's name, not its `path`: hooks go through
+  `fileNamed`. e2e `archive.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

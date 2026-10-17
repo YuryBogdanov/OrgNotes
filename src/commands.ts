@@ -237,6 +237,10 @@ register({
   when: onHeading, run: () => store.startRefile(),
 });
 register({
+  id: 'archive', title: 'Архивировать поддерево', icon: 'refile', group: 'heading', synonyms: ['архив', 'archive', 'убрать в архив'],
+  when: (c) => onHeading(c) && !isArchive(c.file!.name), hint: (c) => bare(c.heading!.title), run: () => void setTimeout(() => store.archiveSubtree()),
+});
+register({
   id: 'newFile', title: 'Создать файл…', icon: 'newfile', group: 'general', keyId: 'paletteNewFile', synonyms: ['новый файл', 'заметка'],
   when: (c) => c.canFiles, hint: (c) => `в ${folderName(c)}`, run: (c) => nameStep(c, 'file'),
 });
