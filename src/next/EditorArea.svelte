@@ -12,12 +12,13 @@
   import Structure from './Structure.svelte';
   import Today from './Today.svelte';
   import AgendaDay from './AgendaDay.svelte';
+  import AgendaBlocks from './AgendaBlocks.svelte';
   import { TODAY } from '../todayState.svelte';
   import FileCard from './FileCard.svelte';
   import { FileCardsCtl, caretHeading } from './fileCards.svelte';
   import FindPanel from './FindPanel.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { Agenda, PluginFileView } from './bridges';
+  import { PluginFileView } from './bridges';
   import StatusMenu from './StatusMenu.svelte';
   import Compat from './Compat.svelte';
 
@@ -182,7 +183,8 @@
     <!-- the built-in «Агенда» in the mode «День» (ТЗ 45 §3.2) -->
     <div class="view"><AgendaDay pane={0} /></div>
   {:else if tab?.kind === 'agenda'}
-    <div class="view"><Compat><Agenda pane={0} /></Compat></div>
+    <!-- a custom agenda, «Неделя», «Сегодня», «Все задачи»: blocks in the new style (ТЗ 45 §3.3) -->
+    <div class="view"><AgendaBlocks pane={0} /></div>
   {:else}
     <div class="word" role="status"><b class="title">Нет открытых вкладок</b><span>Откройте файл в сайдбаре или создайте новый.</span></div>
   {/if}
