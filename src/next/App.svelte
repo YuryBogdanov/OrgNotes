@@ -71,6 +71,21 @@
   });
   // «Шрифт текста» (§10): Cormorant, the system's or IBM Plex Mono — the text of «Оформление»
   const textFont = $derived(nextPrefs.font === 'system' ? FONTS.ui : nextPrefs.font === 'mono' ? FONTS.mono : FONTS.text);
+  // half the cap height of that font (ТЗ 44 §12): the capsules beside a heading centre on its capitals; measured, not
+  // written down — Cormorant ≈ 0.63 em, SF Pro and IBM Plex Mono ≈ 0.70; again once the fonts are loaded
+  let capc = $state(0.315);
+  const measureCap = (font: string) => {
+    const c = document.createElement('canvas').getContext('2d');
+    if (!c) return;
+    c.font = `100px ${font}`;
+    const h = c.measureText('H').actualBoundingBoxAscent;
+    if (h > 30 && h < 95) capc = Math.round((h / 200) * 1000) / 1000;
+  };
+  $effect(() => {
+    const f = textFont;
+    measureCap(f);
+    void document.fonts?.ready.then(() => measureCap(f));
+  });
   // the sidebar's width (§4.2), on this Mac
   const readWidth = () => {
     try {
@@ -120,7 +135,7 @@
   });
 </script>
 
-<div class="next" data-ui="next" data-font={nextPrefs.font} style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--text:{textFont};--title:{FONTS.title};--mono:{FONTS.mono};--col:{nextPrefs.col}">
+<div class="next" data-ui="next" data-font={nextPrefs.font} style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--text:{textFont};--title:{FONTS.title};--mono:{FONTS.mono};--col:{nextPrefs.col};--capc:{capc}">
   <div class="win" inert={!!store.builder || store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
   {#if store.showNav}<Sidebar width={sideWidth} onwidth={setWidth} onmenu={(at, items) => (menu = { ...at, items })} />{/if}
   <div class="main">
