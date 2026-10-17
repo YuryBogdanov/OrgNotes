@@ -7,6 +7,7 @@
   import { OrgEditor, type EditorProps } from '../cm/orgEditor';
   import { portal } from '../portal';
   import { ContextMenu, TagPop, type MenuItem } from './bridges';
+  import Compat from './Compat.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
   import './editor.css';
 
@@ -42,8 +43,9 @@
 </script>
 
 <div class="host" bind:this={host}></div>
-{#if tagPop && ed}<TagPop tags={tagPop.tags} x={tagPop.x} y={tagPop.y} onchange={ed.tagsChanged} onclose={ed.closeTagPop} />{/if}
-{#if menu}<div use:portal><ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} width={300} tall /></div>{/if}
+{#if tagPop && ed}<Compat><TagPop tags={tagPop.tags} x={tagPop.x} y={tagPop.y} onchange={ed.tagsChanged} onclose={ed.closeTagPop} /></Compat>{/if}
+<!-- moved to <body>: out of the window's frame, the layer gives it the tokens too (ТЗ 43 §5) -->
+{#if menu}<div use:portal><Compat><ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} width={300} tall /></Compat></div>{/if}
 
 <style>
   .host { height: 100%; min-height: 0; overflow: hidden; }
