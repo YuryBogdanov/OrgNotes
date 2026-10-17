@@ -9,6 +9,7 @@ import Panel from './Panel.svelte';
 import List from './List.svelte';
 import Sources from './Sources.svelte';
 import Today from './Today.svelte';
+import Card from './Card.svelte';
 import { review, reviewed, stopWaiting, wait } from './actions';
 import type { HeadingRef } from '@panopticon/api';
 
@@ -49,6 +50,24 @@ export default definePlugin({
         const b = badgeOf(long.groups);
         ctx.ui.setBadge('long-matters', b.n, b.alert ? { tone: 'alert' } : {});
       });
+    });
+    // the card of a file of the sources (ТЗ 44 §5): its matters' groups, the one under the caret and its actions
+    const cards = new WeakMap<HTMLElement, { path: string; heading: HeadingRef | null }>();
+    const isSource = (path: string) => long.matters.some((m) => m.path === path) || long.settings.sources.some((s) => s.kind === 'file' && s.file === path);
+    ctx.ui.fileCard('long-matters.card', {
+      match: (path) => !long.progress && isSource(path),
+      count: (path) => long.matters.filter((m) => m.path === path).length || null,
+      render: (el, c) => {
+        const at = cards.get(el);
+        if (at) return void Object.assign(at, c);
+        const fresh = $state({ path: c.path, heading: c.heading });
+        cards.set(el, fresh);
+        const app = mount(Card, { target: el, props: { at: fresh } });
+        return () => {
+          void unmount(app);
+          cards.delete(el);
+        };
+      },
     });
     ctx.ui.navSection('long-matters', (el) => {
       const app = mount(Panel, { target: el });

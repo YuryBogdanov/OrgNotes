@@ -90,6 +90,12 @@
         "icon": "M4 16.5V10M8 16.5V4M12 16.5V12M16 16.5V7"
       }
     ],
+    "fileCards": [
+      {
+        "id": "long-matters.card",
+        "title": "Долгие дела"
+      }
+    ],
     "settings": [
       {
         "section": "Долгие дела",

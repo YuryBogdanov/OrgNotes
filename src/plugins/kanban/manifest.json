@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Org-файл как канбан-доска: колонки — статусы одного workflow, карточки — заголовки 1-го уровня. Другой вид того же файла: формат Org не меняется.",
   "author": "Panopticon",
-  "api": "^1.6",
+  "api": "^1.14",
   "minAppVersion": "1.4.0",
   "main": "main.js",
   "permissions": [
@@ -128,6 +128,13 @@
           "карточка",
           "сбоку"
         ]
+      }
+    ],
+    "fileCards": [
+      {
+        "id": "kanban.card",
+        "title": "Канбан",
+        "icon": "M3 4h4v12H3zM8.5 4h4v8h-4zM14 4h3v5h-3z"
       }
     ],
     "fileViews": [

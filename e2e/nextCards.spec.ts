@@ -61,7 +61,7 @@ test('a click on the head folds it, kept after a restart; the setting takes the 
   await settingsSheet(page).getByRole('switch', { name: 'Показывать карточку в редакторе, если есть что сказать по файлу' }).click();
   await page.keyboard.press('Escape');
   await expect(card(page)).toHaveCount(0);
-  expect(await width(page)).toBe(220);
+  await expect(column(page).getByRole('region', { name: 'Канбан' })).toBeVisible(); // the other plugins' cards stay
 });
 
 test('its plugin failing: «Карточка не загрузилась» in its place; the old interface shows no card', async ({ page }) => {

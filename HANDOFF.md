@@ -436,6 +436,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   «⌃C K <letter>» (`declare.ts` `cardChord`); a chord another command declared first has — none, and its note in
   «Клавиши» says whose. The dispatch's three-press chords take it from the text; the plugin's handler checks the
   heading under the caret. «Долгие дела»: R «Проверить через…», W «Ждём…», O «Осмотрено».
+  44.7 (the first half): the built-in plugins' cards. «Долгие дела» (`long-matters/Card.svelte`, mounted once per
+  element, its `{ path, heading }` a $state the later renders assign): its matters of the file — on a file of its
+  sources or with a matter, after the first reading (`match` reads `long.progress`, so the core asks again) —
+  the groups, «Открыть список»; under the caret the capsule and title, untouched, the day to look, the last status;
+  «Статус», «Ждём…» / «Больше не ждём», «Проверить через…», «Осмотрено» with `keyOf`, off on no matter. «Канбан»: a
+  file whose level-1 headings have statuses — «Колонки — статусы файла» (or «#+BOARD»'s), «Открыть доской ⌥⌘B»
+  (`.kb-fcard`). The cards' container is 4 pt off the editor and 18 off the edge, as the mockup. Inbox and «Цели
+  квартала» come next.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
