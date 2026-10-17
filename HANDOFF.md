@@ -382,6 +382,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   `dim`, ⎋), `Button` (30 / small 24, main · plain · danger, its key at 60%), `Field` (30 pt, `lampline` in focus, the
   reason in `todo`). `Kit.svelte` shows them all (e2e `nextKit` mounts it). The window's menu (tabs, the files' tree)
   and the sidebar panels' menus use `Menu` already; the editor's menu waits for 44.3.
+  44.2 (the palette; the refile step comes next): its workings out of Palette.svelte into `src/paletteCtl.svelte.ts`
+  (`PaletteCtl`: the step, the query, the row chosen, the calendar's day and month, the keys; `effects()` from the
+  component), the old palette on it unchanged. `next/Palette.svelte` — the new look (the plate on `chip` with the
+  capsule, the field with «esc» or the day in words, rows 40 pt on `lamp`, groups 11 pt caps, the foot with «> # @»);
+  `next/PaletteCalendar.svelte` — three months, today framed by `lampline`, the chosen on `lamp`, past days faded, a
+  `next` dot on busy days, the chips «Сегодня», «Завтра», the next Monday, «Через неделю», «Убрать дату»
+  (`CalSpec.clear`, set by calendarStep when the date is there). `Palette` is gone from the bridges.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

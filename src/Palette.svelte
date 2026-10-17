@@ -5,47 +5,29 @@
 
 <script lang="ts">
   import { moved } from './pointer';
-  import { onDestroy, onMount, tick, untrack } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { store } from './store.svelte';
-  import { ICONS, bare, calStep, contextOf, gotoStep, headingStep, mainStep, nameStep, type Row, type Step, type Unit } from './commands';
+  import { ICONS, bare, type Row } from './commands';
   import Calendar from './Calendar.svelte';
-  import { busyDays, shiftDate } from './calendar';
-  import { parseDate } from './edits';
   import { runs } from './fuzzy';
   import { displayName } from './names';
   import { toneFor } from './org';
   import { toneStyle } from './colors';
+  import { PaletteCtl } from './paletteCtl.svelte';
 
   // The command palette (⇧⌘P): one window, a query field, grouped rows. A command with «…» replaces the rows with
-  // its next step in the same window; Esc anywhere cancels the whole thing.
-  const ctx = contextOf();
-  const start = store.palette?.start;
-  const cal0 = start === 'calendar' ? store.calReq : null;
-  let step: Step = $state(
-    cal0 ? calStep(cal0, () => cal0.plate ?? null)
-    : start === 'step' && store.stepReq ? store.stepReq
-    : start === 'goto' ? gotoStep() : start === 'newFile' ? nameStep(ctx, 'file') : start === 'newFolder' ? nameStep(ctx, 'folder') : start && start !== 'calendar' && start !== 'step' ? headingStep(ctx, start) : mainStep(ctx),
-  );
-  let q = $state(step.initial ?? '');
-  let sel = $state(0); // an index into the selectable rows
-
-  const rows = $derived(step.rows(q));
-  const pickable = $derived(rows.flatMap((r, i) => (r.run ? [i] : [])));
-  const plate = $derived(step.plate(q));
-  const current = $derived(rows[pickable[sel] ?? -1]);
-  // typing selects the first result (or the row the list prefers: the heading the cursor is in) — only typing: the
-  // rows read again for another reason (a file saved, a plugin's command now available) keep the row chosen
-  $effect(() => {
-    void q;
-    untrack(() => (sel = Math.max(0, pickable.findIndex((i) => rows[i].prefer))));
-  });
-  // fewer rows than the one chosen: back into the list
-  $effect(() => {
-    if (sel >= pickable.length) untrack(() => (sel = Math.max(0, pickable.length - 1)));
-  });
+  // its next step in the same window; Esc anywhere cancels the whole thing. Its workings: paletteCtl.svelte.ts.
+  const ctl = new PaletteCtl();
+  ctl.effects();
+  const step = $derived(ctl.step);
+  const rows = $derived(ctl.rows);
+  const plate = $derived(ctl.plate);
+  const current = $derived(ctl.current);
 
   let input: HTMLInputElement | undefined = $state();
   let list: HTMLDivElement | undefined = $state();
+  ctl.onstep = () => input?.select();
+  ctl.onmove = () => list?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
   const active = document.activeElement as HTMLElement | null;
   const before = active && active !== document.body ? active : restoreTo;
   const tabBefore = store.tab?.id;
@@ -63,105 +45,9 @@
       if (!store.palette) document.querySelector<HTMLElement>('section.pane.active .cm-content')?.focus({ preventScroll: true });
     });
   });
-
-  const close = () => (store.palette = null);
-
-  // ---- the calendar step: the chosen day, the month in the middle, the typed text read as a date ----------------
-  let cal = $state(new Date());
-  let view = $state(new Date());
-  let bad = $state(false);
-  let calOf: Step | null = null;
-  $effect.pre(() => {
-    if (step.calendar && calOf !== step) {
-      calOf = step;
-      cal = view = step.calendar.initial;
-      bad = false;
-    }
-  });
-  const busy = $derived(step.calendar ? busyDays(store.agendaFiles) : new Map());
-  function typedDate() {
-    if (!step.calendar) return;
-    if (!q.trim()) return void (bad = false);
-    const d = parseDate(q);
-    bad = !d;
-    if (d) cal = view = d;
-  }
-  function moveCal(d: Date) {
-    cal = view = d;
-    q = ''; // ⇧ + arrows after typing go on from the typed date; the text goes
-    bad = false;
-  }
-  function pickCal(d: Date) {
-    const spec = step.calendar;
-    close();
-    spec?.pick(d);
-  }
-  const ARROWS: Record<string, [Unit, number]> = { ArrowLeft: ['day', -1], ArrowRight: ['day', 1], ArrowUp: ['week', -1], ArrowDown: ['week', 1] };
-  /** ⇧ ← → a day, ⇧ ↑ ↓ a week; with ⌥ a month, a year (as org-read-date's S- and M-S-arrows). */
-  const unitOf = (e: KeyboardEvent): [Unit, number] | null => {
-    const a = ARROWS[e.key];
-    if (!a || !e.shiftKey || e.metaKey || e.ctrlKey) return null;
-    return e.altKey ? [a[0] === 'day' ? 'month' : 'year', a[1]] : a;
-  };
-  async function run(r: Row | undefined) {
-    if (!r?.run) return; // «Ничего не найдено» and prompts do nothing
-    const next = r.run();
-    if (next) {
-      step = next;
-      q = next.initial ?? '';
-      await tick();
-      input?.select();
-    } else close();
-  }
-  async function move(d: 1 | -1) {
-    if (!pickable.length) return;
-    sel = (sel + d + pickable.length) % pickable.length; // round the ends
-    await tick();
-    list?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
-  }
-  function key(e: KeyboardEvent) {
-    const u = unitOf(e);
-    if (step.calendar) {
-      if (u) {
-        e.preventDefault();
-        return moveCal(shiftDate(cal, u[0], u[1]));
-      }
-      if (e.key === '.' && !q) {
-        e.preventDefault();
-        return moveCal(new Date());
-      }
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        return pickCal(cal);
-      }
-      if (e.key === 'Backspace' && !q && step.calendar.back) {
-        e.preventDefault();
-        step = step.calendar.back();
-        return;
-      }
-    } else if (u && step.shift) {
-      e.preventDefault();
-      step = step.shift(u[0], u[1]);
-      q = '';
-      return;
-    }
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      move(e.key === 'ArrowDown' ? 1 : -1);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      // ⌘↩: a row's other action («Ссылка на»: the heading's title as the label)
-      run(e.metaKey && current?.alt ? { ...current, run: current.alt } : current);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      close();
-    } else if (e.key === 'Tab') e.preventDefault(); // the focus stays in the field
-  }
-  // the pointer picks a row only when it moves (`moved`), not when keyboard scrolling slides a row under it
-  const hover = (i: number) => {
-    const k = pickable.indexOf(i);
-    if (k >= 0) sel = k;
-  };
+  const close = ctl.close;
+  const run = (r: Row | undefined) => ctl.run(r);
+  const hover = (i: number) => ctl.hover(i);
   const keepFocus = (e: MouseEvent) => {
     if (e.target !== input) e.preventDefault();
   };
@@ -212,15 +98,15 @@
       <span class="tok"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICONS[step.token.icon]} /></svg>{step.token.text}</span>
     {/if}
     <div class="box">
-      <input bind:this={input} bind:value={q} oninput={typedDate} placeholder={step.placeholder} aria-label={step.placeholder} spellcheck="false" autocomplete="off"
-        role="combobox" aria-expanded="true" aria-controls="pal-list" aria-activedescendant={current ? 'pal-' + current.id : undefined} onkeydown={key} />
-      {#if step.ghost?.(q)}<span class="ghost" aria-hidden="true"><span class="mirror">{q}</span> {step.ghost(q)}</span>{/if}
+      <input bind:this={input} bind:value={ctl.q} oninput={ctl.typedDate} placeholder={step.placeholder} aria-label={step.placeholder} spellcheck="false" autocomplete="off"
+        role="combobox" aria-expanded="true" aria-controls="pal-list" aria-activedescendant={current ? 'pal-' + current.id : undefined} onkeydown={ctl.key} />
+      {#if step.ghost?.(ctl.q)}<span class="ghost" aria-hidden="true"><span class="mirror">{ctl.q}</span> {step.ghost(ctl.q)}</span>{/if}
     </div>
     {#if store.keyHint('palette')}<kbd>{store.keyHint('palette')}</kbd>{/if}
   </div>
 
   {#if step.calendar}
-    <Calendar spec={step.calendar} sel={cal} {view} {bad} {busy} onselect={(d) => (cal = d)} onpick={pickCal} onturn={(n) => (view = shiftDate(view, 'month', n))} />
+    <Calendar spec={step.calendar} sel={ctl.cal} view={ctl.view} bad={ctl.bad} busy={ctl.busy} onselect={(d) => (ctl.cal = d)} onpick={ctl.pickCal} onturn={ctl.turn} />
   {/if}
   <div class="list" id="pal-list" role="listbox" aria-label="Результаты" bind:this={list} class:none={!!step.calendar}>
     {#each rows as r, i (r.id + i)}

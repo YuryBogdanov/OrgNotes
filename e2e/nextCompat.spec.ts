@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openApp, palette } from './helpers';
+import { openApp, settingsSheet } from './helpers';
 
-// ТЗ 43.2: the compatibility layer — the bridged palette and the editor's menu (moved to <body>) draw with the new
+// ТЗ 43.2: the compatibility layer — the bridged settings and the editor's menu (moved to <body>) draw with the new
 // tokens: the old variables given by them; `data-ui="next"` on the layer.
 
 const css = (page: Page, sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p).trim(), prop);
@@ -14,11 +14,11 @@ async function open(page: Page, scheme: 'light' | 'dark') {
 }
 
 for (const scheme of ['light', 'dark'] as const)
-  test(`the palette in the layer: the old variables are the new tokens (${scheme})`, async ({ page }) => {
+  test(`the settings in the layer: the old variables are the new tokens (${scheme})`, async ({ page }) => {
     await open(page, scheme);
-    await page.keyboard.press('Shift+Meta+p');
-    await expect(palette(page)).toBeVisible();
-    const pal = '[role="dialog"][aria-label="Командная палитра"]';
+    await page.keyboard.press('Meta+,');
+    await expect(settingsSheet(page)).toBeVisible();
+    const pal = '[role="dialog"][aria-label="Настройки"]';
     expect(await page.locator(pal).evaluate((e) => !!e.closest('.compat[data-ui="next"]'))).toBe(true);
     const lampink = scheme === 'light' ? '#8a5f0e' : '#f2c66d';
     expect(await css(page, pal, '--acc')).toBe(await css(page, pal, '--lampink'));
