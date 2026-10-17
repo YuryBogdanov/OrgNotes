@@ -4,7 +4,9 @@
   import { allNavs, navOf } from '../views';
   import { today, TODAY } from '../todayState.svelte';
   import { sectionsOf, shownSection, TODAY_ID, type Section } from './sections';
+  import { plugins } from '../api/host.svelte';
   import FilesPanel from './FilesPanel.svelte';
+  import PluginPanel from './PluginPanel.svelte';
   import { AgendaList, SearchPanel, TagsPanel } from './bridges';
 
   // The sidebar of the new interface (ТЗ 43 §1): the window's lights; the core's sections and the plugins' («Плагины»),
@@ -18,7 +20,26 @@
   const feature = $derived(navOf(shown.id));
   const todayOn = $derived(store.tab?.kind === TODAY);
 
+  // a plugin's panel failing turns the plugin off (as in the old navigator) and takes its section away; till another
+  // section is picked, the panel's place says so (§3)
+  let lastPlugin = $state<{ plugin: string; label: string } | null>(null);
+  let broken = $state<{ plugin: string; label: string; msg: string } | null>(null);
+  // before the panel draws: a panel failing at once turns its plugin off within the same update
+  $effect.pre(() => {
+    const p = plugins.navs.get(shown.id)?.plugin;
+    if (p) lastPlugin = { plugin: p, label: shown.label };
+  });
+  $effect(() => {
+    const l = lastPlugin;
+    const msg = l && plugins.failed.get(l.plugin);
+    if (l && msg) {
+      broken = { ...l, msg };
+      lastPlugin = null;
+    }
+  });
+
   function pick(s: Section) {
+    broken = null;
     if (s.id === TODAY_ID) return today.open();
     if (s.id === 'search') return store.openSearch();
     store.setNavMode(s.id);
@@ -68,12 +89,19 @@
     </nav>
   {/if}
   <div class="rule"></div>
-  <div class="grp head"><span>{shown.label}</span>{#if count(shown)}<span class="n">{shownCount(count(shown))}</span>{/if}</div>
-  <div class="panel" role="region" aria-label="Панель: {shown.label}">
-    {#if shown.id === 'files'}<FilesPanel {onmenu} />
+  <div class="grp head"><span>{broken?.label ?? shown.label}</span>{#if !broken && count(shown)}<span class="n">{shownCount(count(shown))}</span>{/if}</div>
+  <div class="panel" role="region" aria-label="Панель: {broken?.label ?? shown.label}">
+    {#if broken}
+      <div class="broken" role="alert">
+        <b>Раздел плагина не загрузился</b>
+        <span>Плагин выключен: {broken.msg}</span>
+        <button onclick={() => store.openSettings('Плагины')}>Подробнее</button>
+      </div>
+    {:else if shown.id === 'files'}<FilesPanel {onmenu} />
     {:else if shown.id === 'agendas'}<AgendaList />
     {:else if shown.id === 'tags'}<TagsPanel />
     {:else if shown.id === 'search'}<SearchPanel />
+    {:else if plugins.navs.has(shown.id)}{#key shown.id}<PluginPanel id={shown.id} />{/key}
     {:else if feature}{#key feature.id}<feature.component id={feature.id} />{/key}{/if}
   </div>
   <div class="folder">
@@ -104,6 +132,9 @@
   .grp.head { padding-top: 12px; }
   .grp .n { margin-left: auto; font-weight: 400; }
   .rule { flex: 0 0 1px; margin: 12px 4px 0; background: var(--rule); }
+  .broken { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px 10px; font-size: 12px; color: var(--ink2); overflow-wrap: anywhere; }
+  .broken b { color: var(--todo); font-weight: 600; }
+  .broken button { margin-top: 4px; height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--chip2); color: var(--ink); font: 12.5px var(--ui); }
   .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
   .folder { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 12px 10px; border-top: 1px solid var(--rule); color: var(--ink3); font-size: 11.5px; }
   .dot { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 4px; background: var(--done); }
