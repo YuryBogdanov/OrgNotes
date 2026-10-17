@@ -25,6 +25,17 @@ class NextPrefs {
   structure = $state(lsGet('next:structure') !== '0');
   font = $state<TextFont>(pick(lsGet('next:font'), TEXT_FONTS, 'serif'));
   width = $state<TextWidth>(pick(lsGet('next:width'), TEXT_WIDTHS, 'medium'));
+  /** «Структура» and «Связи» folded (ТЗ 44 §10): one for every file. */
+  structFolded = $state(lsGet('next:structFolded') === '1');
+  linksFolded = $state(lsGet('next:linksFolded') === '1');
+  toggleStructFolded() {
+    this.structFolded = !this.structFolded;
+    lsSet('next:structFolded', this.structFolded ? '1' : '0');
+  }
+  toggleLinksFolded() {
+    this.linksFolded = !this.linksFolded;
+    lsSet('next:linksFolded', this.linksFolded ? '1' : '0');
+  }
   setStructure(on: boolean) {
     this.structure = on;
     lsSet('next:structure', on ? '1' : '0');

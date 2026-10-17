@@ -30,7 +30,7 @@ test('a card over «Структура»: 268 pt, the head with the count, the b
   const head = card(page).getByRole('button', { name: /Привет/ });
   await expect(head).toHaveText(/Привет\s*2\s*⌄/);
   // the cards first, then «Структура»
-  const [c, s] = await Promise.all([card(page).boundingBox(), column(page).getByText('Структура', { exact: true }).boundingBox()]);
+  const [c, s] = await Promise.all([card(page).boundingBox(), column(page).getByRole('button', { name: /^Структура/ }).boundingBox()]);
   expect(c!.y + c!.height).toBeLessThan(s!.y);
   // the heading under the caret
   await page.locator('.cm-line', { hasText: 'Найм' }).click();

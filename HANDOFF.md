@@ -450,6 +450,10 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   на 1-1» = `startReview` — not on «Мои цели»; «Отметить прогресс…» = `markFromList` on the goal under the caret,
   else the most silent). The core's switch of the cards goes into the plugin's section, else its block (the Inbox's
   in «Inbox», the goals' in «Агенды»): a section under its name only when it has neither.
+  44.8, the column: «Ссылаются» is «Связи» with its number; «Структура» and «Связи» fold on a click on their head
+  (⌄ / ›), `nextPrefs.structFolded` / `linksFolded` (`next:structFolded`, `next:linksFolded`), one for every file;
+  folded «Связи» is its head with the number. Left of ТЗ 44 by its own «Чего нет»: the screens (Agenda, the builder,
+  the plugins' views) stay bridges; Capture, InboxPicker, NotePop, TaskListHost, StartScreen too, for now.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
