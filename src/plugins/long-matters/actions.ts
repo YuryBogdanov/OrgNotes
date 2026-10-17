@@ -5,7 +5,7 @@
 import type { HeadingRef, MenuItem, Tx } from '@panopticon/api';
 import { weekdayNames } from '@panopticon/api/org';
 import { long } from './state.svelte';
-import { REVIEW_IN, addDays, stampOf, statusBefore, type Matter } from './long';
+import { REVIEW_IN, addDays, mattersWord, stampOf, statusBefore, type Matter } from './long';
 
 type At = { x: number; y: number };
 const today = () => {
@@ -72,7 +72,7 @@ export async function wait(m: Matter) {
     groups: [
       {
         fields: [
-          { type: 'custom', key: 'who', label: 'Кого или что ждём', render: (el, c) => whoField(el, c) },
+          { type: 'text', key: 'who', label: 'Кого или что ждём', placeholder: 'бизнес, Ирина, финансы', suggest: whoFits },
           { type: 'date', key: 'until', label: 'До какой даты', look: 'chip', clear: 'Без даты', hint: `Не указана — проверить через ${long.settings.norm} дн.` },
           ...(offerStatus ? [{ type: 'switch' as const, key: 'setWait', label: `Поставить статус ${W}` }] : []),
         ],
@@ -88,44 +88,13 @@ export async function wait(m: Matter) {
     if (v.setWait && m.keyword !== W) tx.setStatus(ref(m), W);
   });
 }
-/** The field «Кого или что ждём»: the text and the earlier ones under it, those that fit what is typed. */
-function whoField(el: HTMLElement, c: { value(): unknown; set(v: unknown): void }) {
-  el.classList.add('lm-who');
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.placeholder = 'бизнес, Ирина, финансы';
-  input.setAttribute('aria-label', 'Кого или что ждём');
-  input.value = String(c.value() ?? '');
-  const list = document.createElement('div');
-  list.className = 'lm-who-list';
-  const draw = () => {
-    const q = input.value.trim().toLowerCase();
-    list.replaceChildren(
-      ...long.waitedFor
-        .filter((w) => w.toLowerCase() !== q && (!q || w.toLowerCase().includes(q)))
-        .slice(0, 6)
-        .map((w) => {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.textContent = w;
-          b.onclick = () => {
-            input.value = w;
-            c.set(w);
-            draw();
-            input.focus();
-          };
-          return b;
-        }),
-    );
-  };
-  input.oninput = () => {
-    c.set(input.value);
-    draw();
-  };
-  el.append(input, list);
-  draw();
-  setTimeout(() => input.focus());
-  return () => el.replaceChildren();
+/** «Кого или что ждём»: the earlier ones that fit what is typed, the most waited for first, with how many wait. */
+function whoFits(q: string) {
+  const t = q.trim().toLowerCase();
+  return long.waitedFor
+    .filter(([w]) => !t || w.toLowerCase().includes(t))
+    .slice(0, 6)
+    .map(([w, n]) => ({ value: w, hint: mattersWord(n) }));
 }
 /** The status to go back to: the one before waiting by the :LOGBOOK:, else the first open one of its set. */
 function statusAfterWaiting(m: Matter): string | null {

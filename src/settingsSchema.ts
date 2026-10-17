@@ -26,7 +26,7 @@ export type Field =
   | (Base & { type: 'choice'; look: 'segments' | 'menu'; options: Opt[] | ((v: Values) => Opt[]) })
   | (Base & { type: 'switch' })
   /** A line of text, saved when left; `clean` tidies what was typed. */
-  | (Base & { type: 'text'; placeholder?: string; clean?: (s: string) => string })
+  | (Base & { type: 'text'; placeholder?: string; clean?: (s: string) => string; suggest?: (q: string, v: Values) => { value: string; hint?: string }[] })
   /** A file of the folder, chosen with the core's picker («Выбрать…»); null is «not chosen», `clear` names it. */
   | (Base & { type: 'file'; show: (rel: string | null) => string; clear?: string })
   /** Two menus in one row («С 8:00 – До 20:00»): the second key is `key2`. */

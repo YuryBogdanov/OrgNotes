@@ -57,6 +57,17 @@
             </span>
             {#if f.type === 'switch'}
               <Switch id={id(f)} checked={!!v[f.key]} label={f.label} onchange={() => set(f.key, !v[f.key])} />
+            {:else if f.type === 'text' && f.suggest}
+              <!-- with suggestions (API 1.14): set as typed, the fitting ones as chips under it -->
+              {@const q = String(v[f.key] ?? '')}
+              <span class="sug">
+                <input id={id(f)} class="sel txt" value={q} placeholder={f.placeholder} spellcheck="false" autocomplete="off" oninput={(e) => set(f.key, e.currentTarget.value)} />
+                <span class="chips">
+                  {#each f.suggest(q, v).filter((x) => x.value.toLowerCase() !== q.trim().toLowerCase()).slice(0, 6) as x (x.value)}
+                    <button type="button" onclick={() => set(f.key, x.value)}>{x.value}</button>
+                  {/each}
+                </span>
+              </span>
             {:else if f.type === 'text'}
               <input id={id(f)} class="sel txt" value={(v[f.key] as string) ?? ''} placeholder={f.placeholder} spellcheck="false"
                 onchange={(e) => set(f.key, f.clean ? f.clean(e.currentTarget.value) : e.currentTarget.value)} />
@@ -125,5 +136,9 @@
   .val { font-size: 12.5px; color: var(--fg2); }
   .ibfile { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .ibfile .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sug { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 260px; }
+  .chips:empty { display: none; }
+  .chips button { height: 22px; padding: 0 8px; border: 0; border-radius: 11px; background: var(--sel); color: var(--fg); font-size: 12px; }
   .hrs { display: flex; align-items: center; gap: 6px; color: var(--fg2); }
 </style>

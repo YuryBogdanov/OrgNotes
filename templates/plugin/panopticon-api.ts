@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.13.0';
+export const API_VERSION = '1.14.0';
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;
@@ -193,7 +193,9 @@ export interface Opt {
 export type FormField =
   | { type: 'choice'; key: string; label: string; hint?: string; look: 'segments' | 'menu'; options: Opt[] }
   | { type: 'switch'; key: string; label: string; hint?: string }
-  | { type: 'text'; key: string; label: string; hint?: string; placeholder?: string }
+  /** `suggest` (since 1.14): what fits the text typed — the new interface shows it in a popover under the field,
+   *  the old one as chips under it; `hint` is grey at the right («2 дела»). */
+  | { type: 'text'; key: string; label: string; hint?: string; placeholder?: string; suggest?(q: string, v: Values): { value: string; hint?: string }[] }
   | { type: 'file'; key: string; label: string; hint?: string }
   | { type: 'pair'; key: string; key2: string; label: string; hint?: string; labels: [string, string]; options: [Opt[], Opt[]] }
   // ТЗ 27 §2.4: under their label, across the sheet

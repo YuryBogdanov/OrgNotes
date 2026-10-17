@@ -411,6 +411,17 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   views' `onGone`, `capture:file`, and the keys capture, captureHere, pasteText, copyLink, newFolder,
   paletteNewFile, paletteGoto, openFolder, revealInNav, back, miniOpen, miniShow, endDay. Bridges left: Settings,
   PluginSheets, PluginFileView, Agenda, AgendaBuilder, Capture, InboxPicker, NotePop, TaskListHost, StartScreen.
+  44.4, the plugins' sheets: their workings out of PluginSheets.svelte into `src/pluginFormCtl.svelte.ts`
+  (`PluginFormCtl`: the values, `onChange`, `validate`, `headerExtra`, the keys; `pluginSheetKey`, `mountPluginSheet`,
+  `placePicked`/`placeClosed`), the columns' into `src/placeColumns.svelte.ts` (`PlaceColumnsCtl`), the old ones on
+  them. `next/PluginSheets.svelte` — the form (460 pt, 640 with a place; the plugin's name and icon over the title in
+  `plug`), the plugin's sheet (620 pt; its content and `bare` sheets in Compat), `ui.menu` on `Menu`, «Включить
+  плагин?», `ui.place` on PlacePalette; `next/FormFields.svelte` (labels over the fields; a day is a field with «◷»
+  that opens the palette's calendar, both looks; a switch a check; a file from PlacePalette kind file; `custom` in
+  Compat; `validate`'s reason under the first field; `month` nothing) and `next/PlaceColumns.svelte`. API 1.14: a
+  text field's `suggest(q, v)` → `{ value, hint? }[]` — a popover under it in the new interface (the typed text first
+  as «новое», ↓↑, ↩ takes one, ⎋ closes it), chips under it in the old; «Ждём…» of «Долгие дела» uses it (its own
+  field and styles.css gone). `PluginSheets` gone from the bridges.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

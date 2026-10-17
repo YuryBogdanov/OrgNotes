@@ -106,10 +106,10 @@ class LongMatters {
     return ref ? this.matters.find((m) => m.path === ref.path && m.line === ref.line) : undefined;
   }
   /** Whom the matters wait for, the most used first (the sheet «Ждём…» offers them). */
-  get waitedFor(): string[] {
+  get waitedFor(): [string, number][] {
     const n = new Map<string, number>();
     for (const m of this.matters) if (m.waiting) n.set(m.waiting, (n.get(m.waiting) ?? 0) + 1);
-    return [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ru')).map(([w]) => w);
+    return [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ru'));
   }
 
   // ---- what a row does ------------------------------------------------------------------------------------------

@@ -1,72 +1,21 @@
 <script lang="ts">
-  import { tick } from 'svelte';
-  import { plugins, rightsText, type FormReq, type PlaceReq } from './api/host.svelte';
+  import { plugins, rightsText } from './api/host.svelte';
+  import { PluginFormCtl, mountPluginSheet, placeClosed, placePicked, pluginSheetKey } from './pluginFormCtl.svelte';
   import { store } from './store.svelte';
   import PlacePicker from './PlacePicker.svelte';
   import SchemaSettings from './SchemaSettings.svelte';
   import ContextMenu from './ContextMenu.svelte';
-  import { WIDE, type Field, type Group, type Schema, type Values } from './settingsSchema';
+  import { WIDE } from './settingsSchema';
 
   // The core's sheets a plugin asks for (ТЗ 26 §5.2): a form with the fields of the settings by schema, and the
   // choice of a place. Each answers the plugin's promise: the values / the place, or null when cancelled.
 
-  // ---- the form -------------------------------------------------------------------------------------------------
-  let values = $state<Values>({});
-  let problem = $state('');
+  // ---- the form: its workings are pluginFormCtl.svelte.ts (the new interface draws them too) --------------------
+  const form = new PluginFormCtl();
   let sheet: HTMLDivElement | undefined = $state();
-  let formOf: FormReq | null = null;
-  const schema = $derived.by((): Schema | null => {
-    const r = plugins.form;
-    if (!r) return null;
-    const groups: Group[] = r.spec.groups.map((g) => ({
-      caption: g.caption ?? '', help: g.help,
-      fields: g.fields.map((f) => ({ ...f, where: 'local', ...(f.type === 'file' ? { show: (rel: string | null) => rel ?? 'Не выбран' } : {}), ...(f.type === 'pair' ? { options: () => f.options } : {}) }) as Field),
-    }));
-    return {
-      id: 'pf', label: r.spec.title, groups, values: () => values,
-      set: (patch) => {
-        values = { ...values, ...patch };
-        // the plugin may set more on a change (a file chosen gives the name)
-        for (const k of Object.keys(patch)) {
-          const more = r.spec.onChange ? plugins.guard(r.plugin, () => r.spec.onChange!(k, values), undefined) : undefined;
-          if (more && typeof more === 'object') values = { ...values, ...more };
-        }
-        for (const l of formListeners) l(values);
-      },
-    };
-  });
-  $effect(() => {
-    const r = plugins.form;
-    if (r === formOf) return;
-    formOf = r;
-    if (!r) return;
-    const v: Values = {};
-    for (const g of r.spec.groups) for (const f of g.fields) for (const k of f.type === 'pair' ? [f.key, f.key2] : [f.key]) v[k] = r.spec.initial?.[k] ?? (f.type === 'switch' ? false : f.type === 'text' ? '' : null);
-    values = v;
-    problem = '';
-    void tick().then(() => (sheet?.querySelector('input, select, button.switch') as HTMLElement | null)?.focus());
-  });
-  // the plugin's place in the sheet's title
-  const formListeners = new Set<(v: Values) => void>();
   let extra = $state<HTMLElement>();
-  $effect(() => {
-    const node = extra;
-    const r = plugins.form;
-    if (!node || !r?.spec.headerExtra) return;
-    const ctrl = {
-      values: () => values,
-      set: (k: string, x: unknown) => schema?.set({ [k]: x }),
-      onChange: (fn: (v: Values) => void) => {
-        formListeners.add(fn);
-        return () => void formListeners.delete(fn);
-      },
-    };
-    const d = plugins.guard(r.plugin, () => r.spec.headerExtra!(node, ctrl), undefined);
-    return () => {
-      plugins.guard(r.plugin, () => d?.(), undefined);
-      node.replaceChildren();
-    };
-  });
+  form.effects(() => extra, () => sheet?.querySelector('input, select, button.switch') as HTMLElement | null);
+  const schema = $derived(form.schema);
 
   // ---- a sheet of the plugin's -------------------------------------------------------------------------------------
   let sheetBody = $state<HTMLElement>();
@@ -74,84 +23,25 @@
     const node = sheetBody;
     const r = plugins.sheetReq;
     if (!node || !r) return;
-    const d = plugins.guard(r.plugin, () => r.spec.render(node, { close: (b?: string) => r.resolve(b ?? null) }), undefined);
-    void tick().then(() => {
-      // ⎋ and ↩ reach the sheet: its primary button takes the focus (as a macOS sheet), else the sheet itself
-      if (!r.spec.bare && !node.contains(document.activeElement)) ((node.parentElement?.querySelector('footer .pri') ?? node.parentElement) as HTMLElement | null)?.focus();
-    });
-    return () => {
-      plugins.guard(r.plugin, () => d?.(), undefined);
-      node.replaceChildren();
-    };
+    return mountPluginSheet(node, r, () => (node.parentElement?.querySelector('footer .pri') ?? node.parentElement) as HTMLElement | null);
   });
-  // on the window: the focus may come back to the editor after the palette that opened the sheet
-  function sheetKey(e: KeyboardEvent) {
-    const r = plugins.sheetReq;
-    if (!r || r.spec.bare || plugins.form || plugins.trustReq) return; // a bare sheet keeps its own keys
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      r.resolve(null);
-    } else if (e.key === 'Enter' && (e.metaKey || !(e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement))) {
-      const p = r.spec.buttons?.find((b) => b.primary);
-      if (p) {
-        e.preventDefault();
-        r.resolve(p.id);
-      }
-    }
-  }
-
-  function answer(v: Values | null) {
-    const r = plugins.form;
-    if (!r) return;
-    plugins.form = null;
-    r.resolve(v);
-  }
-  function submit() {
-    const r = plugins.form;
-    if (!r) return;
-    const why = r.spec.validate ? plugins.guard(r.plugin, () => r.spec.validate!(values), null) : null;
-    if (why) problem = why;
-    else answer(JSON.parse(JSON.stringify(values)));
-  }
-  function key(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      answer(null);
-    } else if (e.key === 'Enter' && (e.metaKey || (e.target as HTMLElement).tagName === 'INPUT')) {
-      e.preventDefault();
-      (e.target as HTMLElement).blur?.(); // a text field gives its value first
-      void tick().then(submit);
-    }
-  }
-
-  // ---- the place ------------------------------------------------------------------------------------------------
-  function picked(p: PlaceReq, x: { path: string; heading: { line: number; title: string } | null }) {
-    const rel = store.files.find((f) => f.path === x.path)?.name;
-    if (!rel) return 'Файл не найден';
-    plugins.place = null;
-    p.resolve(x.heading ? { path: rel, line: x.heading.line, title: x.heading.title } : { path: rel });
-  }
-  function closed(p: PlaceReq) {
-    if (plugins.place !== p) return;
-    plugins.place = null;
-    p.resolve(null);
+  function picked(x: { path: string; heading: { line: number; title: string } | null }) {
+    return placePicked(x, store.files.find((f) => f.path === x.path)?.name);
   }
 </script>
 
-<svelte:window onkeydowncapture={sheetKey} />
+<svelte:window onkeydowncapture={pluginSheetKey} />
 
 {#if plugins.form && schema}
   {@const r = plugins.form}
   <div class="scrim" aria-hidden="true"></div>
-  <div class="pform" class:wide={r.spec.groups.some((g) => g.fields.some((f) => WIDE.has(f.type)))} role="dialog" aria-modal="true" aria-label={r.spec.title} tabindex="-1" bind:this={sheet} onkeydown={key}>
+  <div class="pform" class:wide={r.spec.groups.some((g) => g.fields.some((f) => WIDE.has(f.type)))} role="dialog" aria-modal="true" aria-label={r.spec.title} tabindex="-1" bind:this={sheet} onkeydown={(e) => form.key(e)}>
     <header><b>{r.spec.title}</b>{#if r.spec.headerExtra}<span class="hx" bind:this={extra}></span>{/if}<span class="who">{plugins.name(r.plugin)}</span></header>
     <div class="body"><SchemaSettings {schema} embedded where={false} /></div>
     <footer>
-      {#if problem}<span class="bad" role="alert">{problem}</span>{:else}<span class="kh">↩ — {r.spec.submit.toLowerCase()} · ⎋ — отмена</span>{/if}
-      <button onclick={() => answer(null)}>Отмена</button>
-      <button class="pri" onclick={submit}>{r.spec.submit}</button>
+      {#if form.problem}<span class="bad" role="alert">{form.problem}</span>{:else}<span class="kh">↩ — {r.spec.submit.toLowerCase()} · ⎋ — отмена</span>{/if}
+      <button onclick={() => form.answer(null)}>Отмена</button>
+      <button class="pri" onclick={() => form.submit()}>{r.spec.submit}</button>
     </footer>
   </div>
 {/if}
@@ -200,7 +90,7 @@
 {/each}
 {#each plugins.place ? [plugins.place] : [] as p (p)}
   <PlacePicker kind={p.kind} title={p.title} token={p.title} placeholder="Найти файл" levels={p.levels} recent={store.refileRecentFiles('')}
-    onpick={(x) => picked(p, x)} onclose={() => closed(p)} />
+    onpick={picked} onclose={() => placeClosed(p)} />
 {/each}
 
 <style>

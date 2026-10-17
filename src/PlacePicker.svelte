@@ -4,11 +4,12 @@
   import { onMount, tick, type Snippet } from 'svelte';
   import { store, type NoteFile } from './store.svelte';
   import { ICONS } from './commands';
-  import { better, fuzzy, runs } from './fuzzy';
+  import { runs } from './fuzzy';
   import { toneFor, type Heading } from './org';
   import { toneStyle } from './colors';
   import { bareTitle, plural } from './refile';
   import { PlacePaletteCtl } from './placePalette.svelte';
+  import { PlaceColumnsCtl, baseName } from './placeColumns.svelte';
 
   // The choice of a place (roadmap 0.5), one component of the core for every «file + heading» of the app, in two
   // looks. «palette»: two steps in one window — a file (recent ones first), then a heading of it in a tree or the
@@ -73,38 +74,20 @@
   const lvColor = (level: number) => (level <= 3 ? `var(--h${level})` : 'var(--fg2)');
 
   // ---- the columns ---------------------------------------------------------------------------------------------
-  let cq = $state('');
-  let col = $state<'file' | 'head'>('file');
+  const cc = new PlaceColumnsCtl(() => ({ levels, file, heading, extra, onfile, onhead }));
   let search: HTMLInputElement | undefined = $state();
-  const base = (n: string) => n.split('/').pop()!.replace(/\.org$/, '');
-  const cfiles = $derived(
-    variant !== 'columns'
-      ? []
-      : store.files
-          .map((f) => ({ f, m: cq.trim() ? fuzzy(cq, f.name) : null }))
-          .filter((x) => !cq.trim() || x.m)
-          .sort((a, b) => (a.m && b.m ? (better(a.m, b.m) ? -1 : better(b.m, a.m) ? 1 : 0) : a.f.name.localeCompare(b.f.name, 'ru')))
-          .map((x) => x.f),
-  );
-  const cur = $derived(store.files.find((f) => f.name === file));
-  const heads = $derived(cur ? cur.headings.map((h, i) => ({ h, i })).filter((x) => !levels || levels.includes(x.h.level)) : []);
+  const base = baseName;
+  const cfiles = $derived(variant === 'columns' ? cc.files : []);
+  const cur = $derived(cc.cur);
+  const heads = $derived(cc.heads);
   /** Which list the sheet's ↑↓ move in: the files', or the headings' (where the sheet starts with a file chosen). */
   export function focusList(which: 'file' | 'head') {
-    col = which;
+    cc.col = which;
     if (which === 'file') void tick().then(() => search?.focus());
   }
   /** ↑↓ of the sheet: in the list in focus. */
   export function move(d: 1 | -1) {
-    if (col === 'file') {
-      const i = cfiles.findIndex((f) => f.name === file);
-      const n = cfiles[Math.max(0, Math.min(cfiles.length - 1, i + d))];
-      if (n) onfile?.(n.name);
-    } else {
-      const opts = [...heads.map((x) => x.h.title), ...(extra ? [extra.id] : [])];
-      const i = opts.indexOf(heading ?? '');
-      const n = opts[Math.max(0, Math.min(opts.length - 1, i + d))];
-      if (n) onhead?.(n);
-    }
+    cc.move(d);
     void tick().then(() => document.querySelector('.c-cols .sel')?.scrollIntoView({ block: 'nearest' }));
   }
 </script>
@@ -183,16 +166,16 @@
   </div>
 {:else}
   <div class="c-cols">
-    <div class="c-col" class:focus={col === 'file'}>
+    <div class="c-col" class:focus={cc.col === 'file'}>
       <span class="c-cap">{fileCap}</span>
       <label class="c-search">
         <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5" /><path d="M13.2 13.2L17 17" /></svg>
-        <input bind:this={search} bind:value={cq} placeholder="Файл…" aria-label="Файл" spellcheck="false" autocomplete="off" onfocus={() => (col = 'file')} />
+        <input bind:this={search} bind:value={cc.q} placeholder="Файл…" aria-label="Файл" spellcheck="false" autocomplete="off" onfocus={() => (cc.col = 'file')} />
       </label>
       <div class="c-list" role="listbox" aria-label="Файлы">
         {#each cfiles as f (f.path)}
           {@const note = fileNote?.(f.name)}
-          <button role="option" aria-selected={file === f.name} class:sel={file === f.name} class:dim={!!note?.dim} onclick={() => { col = 'file'; onfile?.(f.name); }}>
+          <button role="option" aria-selected={file === f.name} class:sel={file === f.name} class:dim={!!note?.dim} onclick={() => { cc.col = 'file'; onfile?.(f.name); }}>
             <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" /></svg>
             <b>{base(f.name)}</b><span class="c-path">{f.name.split('/').slice(0, -1).join(' › ')}</span>{#if note}<span class="c-nt">{note.text}</span>{/if}
           </button>
@@ -201,17 +184,17 @@
         {/each}
       </div>
     </div>
-    <div class="c-col" class:focus={col === 'head'}>
+    <div class="c-col" class:focus={cc.col === 'head'}>
       <span class="c-cap">{headCap}{cur ? ` · ${base(cur.name)}` : ''}</span>
       <div class="c-list" role="listbox" aria-label="Заголовки{levels?.length === 1 ? ' первого уровня' : ''}">
         {#if !cur}<span class="c-empty">Сначала выберите файл</span>{/if}
         {#each heads as x (x.i)}
-          <button role="option" aria-selected={heading === x.h.title} class:sel={heading === x.h.title} onclick={() => { col = 'head'; onhead?.(x.h.title); }}>
+          <button role="option" aria-selected={heading === x.h.title} class:sel={heading === x.h.title} onclick={() => { cc.col = 'head'; onhead?.(x.h.title); }}>
             <span class="c-lv" aria-hidden="true"></span><span class="c-ht">{x.h.title}</span>{#if headNote && cur}<span class="c-nt">{headNote(cur, x.i)}</span>{/if}
           </button>
         {/each}
         {#if cur && extra}
-          <button role="option" aria-selected={heading === extra.id} class="c-new" class:sel={heading === extra.id} onclick={() => { col = 'head'; onhead?.(extra.id); }}>{extra.label}</button>
+          <button role="option" aria-selected={heading === extra.id} class="c-new" class:sel={heading === extra.id} onclick={() => { cc.col = 'head'; onhead?.(extra.id); }}>{extra.label}</button>
         {/if}
       </div>
     </div>

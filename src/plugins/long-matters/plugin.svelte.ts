@@ -11,7 +11,6 @@ import Sources from './Sources.svelte';
 import Today from './Today.svelte';
 import { review, reviewed, stopWaiting, wait } from './actions';
 import type { HeadingRef } from '@panopticon/api';
-import './styles.css';
 
 const FILTERS: Filter[] = ['all', 'due', 'waiting', 'nostatus'];
 let stop: (() => void) | null = null;

@@ -16,7 +16,8 @@
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { AgendaBuilder, Capture, InboxPicker, NotePop, PluginSheets, Settings, StartScreen, TaskListHost } from './bridges';
+  import { AgendaBuilder, Capture, InboxPicker, NotePop, Settings, StartScreen, TaskListHost } from './bridges';
+  import PluginSheets from './PluginSheets.svelte';
   import CloseSheet from './CloseSheet.svelte';
   import DiskSheet from './DiskSheet.svelte';
   import Dialogs from './Dialogs.svelte';
@@ -141,7 +142,11 @@
   $effect(() => {
     const f = textFont;
     measureCap(f);
-    void document.fonts?.ready.then(() => measureCap(f));
+    // `fonts.ready` may come before the text's font is even asked for: load that one, and again on any font loaded
+    const again = () => measureCap(f);
+    void document.fonts?.load(`100px ${f}`).then(again, () => {});
+    document.fonts?.addEventListener('loadingdone', again);
+    return () => document.fonts?.removeEventListener('loadingdone', again);
   });
   // the sidebar's width (§4.2), on this Mac
   const readWidth = () => {
@@ -207,6 +212,8 @@
   {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
   {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
   {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
+  <!-- the plugins' forms, sheets, menus, «Включить плагин?», the choice of a place (ТЗ 44 §4) -->
+  <PluginSheets />
   <!-- the palette and its «Перенести» (ТЗ 44 §2) -->
   {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
   {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
@@ -235,7 +242,6 @@
     <!-- the agenda builder: a sheet over the window, which takes no input under it -->
     {#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
     {#if store.settingsOpen && store.loaded}<Settings />{/if}
-    <PluginSheets />
   </Compat>
 </div>
 
