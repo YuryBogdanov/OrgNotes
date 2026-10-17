@@ -8,6 +8,7 @@
   import { portal } from '../portal';
   import { ContextMenu, TagPop, type MenuItem } from './bridges';
   import Compat from './Compat.svelte';
+  import { editorCompatVars } from './compat';
   import { nextPrefs } from '../nextPrefs.svelte';
   import './editor.css';
 
@@ -42,7 +43,8 @@
   });
 </script>
 
-<div class="host" bind:this={host}></div>
+<!-- app.css draws the editor's tooltips with the old names: given by the new tokens here (ТЗ 43 §5) -->
+<div class="host" bind:this={host} style={editorCompatVars()}></div>
 {#if tagPop && ed}<Compat><TagPop tags={tagPop.tags} x={tagPop.x} y={tagPop.y} onchange={ed.tagsChanged} onclose={ed.closeTagPop} /></Compat>{/if}
 <!-- moved to <body>: out of the window's frame, the layer gives it the tokens too (ТЗ 43 §5) -->
 {#if menu}<div use:portal><Compat><ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} width={300} tall /></Compat></div>{/if}

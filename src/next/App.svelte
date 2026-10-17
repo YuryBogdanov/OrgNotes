@@ -15,7 +15,7 @@
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { CloseSheet, ContextMenu, Dialogs, DiskSheet, Palette, PluginSheets, Refile, Settings, type MenuItem } from './bridges';
+  import { AgendaBuilder, CloseSheet, ContextMenu, Dialogs, DiskSheet, Palette, PluginSheets, Refile, Settings, type MenuItem } from './bridges';
   import Compat from './Compat.svelte';
   import { untrack } from 'svelte';
   import { actionOf } from '../views';
@@ -121,7 +121,7 @@
 </script>
 
 <div class="next" data-ui="next" data-font={nextPrefs.font} style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--text:{textFont};--title:{FONTS.title};--mono:{FONTS.mono};--col:{nextPrefs.col}">
-  <div class="win" inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
+  <div class="win" inert={!!store.builder || store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
   {#if store.showNav}<Sidebar width={sideWidth} onwidth={setWidth} onmenu={(at, items) => (menu = { ...at, items })} />{/if}
   <div class="main">
   <Toolbar onnew={newFile} />
@@ -140,6 +140,8 @@
   </Compat>
   {#if store.toast}<div class="toast" role="status">{store.toast.text}{#each store.toast.actions ?? [] as a (a.label)}<button onclick={() => { store.toast = null; a.run(); }}>{a.label}</button>{/each}</div>{/if}
   <Compat>
+    <!-- the agenda builder: a sheet over the window, which takes no input under it -->
+    {#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
     {#if store.settingsOpen && store.loaded}<Settings />{/if}
     <PluginSheets />
   </Compat>

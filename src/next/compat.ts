@@ -76,3 +76,11 @@ export const compatVars = (a: Appearance) =>
     ...Object.entries(COMPAT).flatMap(([k, v]) => (v === null ? [] : [`--${k}:${v}`])),
     ...Object.entries(compatPalette(a)).map(([k, v]) => `--p-${k}:${v}`),
   ].join(';');
+
+/** The old names inside the new editor: its tooltips (the tags offered, a folded match, a line's link) are drawn by
+ *  app.css with them. Not `--field` and `--shadow` (the new editor's own), nor the named colours: those are the
+ *  editor theme's there. */
+export const editorCompatVars = () =>
+  Object.entries(COMPAT)
+    .flatMap(([k, v]) => (v === null || k === 'field' || k === 'shadow' ? [] : [`--${k}:${v}`]))
+    .join(';');

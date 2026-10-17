@@ -7,6 +7,7 @@
   import { plugins } from '../api/host.svelte';
   import FilesPanel from './FilesPanel.svelte';
   import PluginPanel from './PluginPanel.svelte';
+  import Compat from './Compat.svelte';
   import { AgendaList, SearchPanel, TagsPanel } from './bridges';
 
   // The sidebar of the new interface (ТЗ 43 §1): the window's lights; the core's sections and the plugins' («Плагины»),
@@ -98,11 +99,11 @@
         <button onclick={() => store.openSettings('Плагины')}>Подробнее</button>
       </div>
     {:else if shown.id === 'files'}<FilesPanel {onmenu} />
-    {:else if shown.id === 'agendas'}<AgendaList />
-    {:else if shown.id === 'tags'}<TagsPanel />
-    {:else if shown.id === 'search'}<SearchPanel />
+    {:else if shown.id === 'agendas'}<Compat><AgendaList /></Compat>
+    {:else if shown.id === 'tags'}<Compat><TagsPanel /></Compat>
+    {:else if shown.id === 'search'}<Compat><SearchPanel /></Compat>
     {:else if plugins.navs.has(shown.id)}{#key shown.id}<PluginPanel id={shown.id} />{/key}
-    {:else if feature}{#key feature.id}<feature.component id={feature.id} />{/key}{/if}
+    {:else if feature}{#key feature.id}<Compat><feature.component id={feature.id} /></Compat>{/key}{/if}
   </div>
   <div class="folder">
     <span class="dot" class:off={!folderOk} title={folderOk ? 'Папка доступна' : 'Папка недоступна'}></span>

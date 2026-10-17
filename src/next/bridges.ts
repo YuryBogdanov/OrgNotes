@@ -16,3 +16,7 @@ export type { MenuItem } from '../ContextMenu.svelte'; // the menus' items, the 
 export { default as AgendaList } from '../AgendaList.svelte'; // the sidebar's «Агенда» → its own panel (ТЗ 43 §2.2)
 export { default as TagsPanel } from '../TagsPanel.svelte'; // the sidebar's «Теги» → its own panel (ТЗ 43 §2.3)
 export { default as SearchPanel } from '../SearchPanel.svelte'; // the sidebar's «Поиск» → its own panel (ТЗ 43 §2.4)
+export { default as Agenda } from '../Agenda.svelte'; // the agenda's tab → the screen in the new style, a ТЗ of its own
+export { default as AgendaBuilder } from '../AgendaBuilder.svelte'; // the agenda builder's sheet → the same
+// «Сегодня», the tab «Тег», the Inbox review, the plugins' views and reviews come through the views' registry
+// (views.ts) and are drawn in the compatibility layer (EditorArea) → each a screen in the new style, its own ТЗ.
