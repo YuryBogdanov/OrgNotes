@@ -1,12 +1,28 @@
 <script lang="ts">
   import { store } from '../store.svelte';
+  import { viewOf } from '../views';
+  import { tabLabel } from '../tabLabels';
+  import { TODAY } from '../todayState.svelte';
+  import { fmtLong } from '../org';
 
   // The toolbar of the new interface (ТЗ 42 §4.1), 52 pt: the sidebar's button (⌘0), the file's name and its path in
   // the notes folder, «Искать везде» (the palette, ⌘K) and «+» — a new note (⌘N). It drags the window.
   let { onnew }: { onnew: () => void } = $props();
   const folder = $derived((store.dir ?? '').replace(/^\/Users\/[^/]+/, '~'));
-  const name = $derived(store.file ? store.file.name.split('/').pop()! : 'Panopticon');
-  const path = $derived(store.file ? `${folder}/${store.file.name}` : folder);
+  // a screen's tab (ТЗ 43 §4): the screen's name, under it its crumbs — «Сегодня» the day, the agenda its name, a
+  // plugin's view its `title(state)`; a file's tab: the file's name and its path
+  const screen = $derived.by(() => {
+    const t = store.tab;
+    if (!t || t.kind === 'file' || t.kind === 'untitled') return null;
+    if (t.kind === TODAY) return { name: 'Сегодня', sub: fmtLong(new Date()) };
+    if (t.kind === 'agenda') return { name: 'Агенда', sub: store.agenda?.name ?? '' };
+    const cs = viewOf(t.kind)?.crumbs?.(t) ?? [];
+    const label = tabLabel(t);
+    const name = cs[0] ?? label;
+    return { name, sub: cs.slice(1).join(' › ') || (label !== name ? label : '') };
+  });
+  const name = $derived(screen?.name ?? (store.file ? store.file.name.split('/').pop()! : 'Panopticon'));
+  const path = $derived(screen ? screen.sub : store.file ? `${folder}/${store.file.name}` : folder);
   const key = (id: string) => store.keyHint(id);
 </script>
 

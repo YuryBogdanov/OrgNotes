@@ -351,6 +351,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   `plugins.failed`, says «Раздел плагина не загрузился» with the reason and «Подробнее» (settings → «Плагины») till
   another section is picked. Shots of the sidebar: clip a page screenshot — WebKit's element screenshot misses a
   plugin's panel mounted just before.
+  ТЗ 43.4: the agenda tab (bridge `Agenda`), the views (`viewOf(kind).component`: «Сегодня», «Тег», the Inbox review,
+  the plugins' views and reviews), the agenda builder (bridge `AgendaBuilder`, the window inert under it), the sidebar's
+  old panels — all in Compat; so the root's small `BRIDGE` is gone (`tokenVars` gives the new tokens only). The new
+  editor's host carries `editorCompatVars()` (the old names but `--field`, `--shadow` and the palette): app.css draws
+  its tooltips with them. Toolbar: a screen's name and its crumbs («Сегодня» — `fmtLong` of the day, the agenda — its
+  name, a view — its crumbs after the first, else its `title(state)`). «Оформление / Исходник» over a file or an
+  untitled tab only. e2e `nextScreens` scans a screen for the old theme's blues.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

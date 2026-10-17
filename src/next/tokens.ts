@@ -31,15 +31,9 @@ export const TOKENS: Record<Appearance, Tokens> = {
   },
 };
 
-/** The old interface's variables a bridge (Settings, the palette, the sheets) draws with, in the new tokens: the
- *  bridges show in the new colours though their layout is old (§2). */
-const BRIDGE: Record<string, string> = {
-  fg: 'ink', fg2: 'ink2', fg3: 'ink3', line: 'rule', acc: 'lampink', onacc: 'onlamp', pacc: 'lamp', onpacc: 'onlamp', sel: 'lampsoft', cur: 'lampsoft', pop: 'card', bar: 'side',
-};
-
-/** The variables for an appearance: the mockups' names (`--bg`, `--ink`, `--lamp`…), then the bridges' ones. */
-export const tokenVars = (a: Appearance) =>
-  [...Object.entries(TOKENS[a]).map(([k, v]) => `--${k}:${v}`), ...Object.entries(BRIDGE).map(([k, v]) => `--${k}:var(--${v})`)].join(';');
+/** The variables for an appearance: the mockups' names (`--bg`, `--ink`, `--lamp`…). The old interface's names are the
+ *  compatibility layer's (compat.ts), around anything old only (ТЗ 43 §5). */
+export const tokenVars = (a: Appearance) => Object.entries(TOKENS[a]).map(([k, v]) => `--${k}:${v}`).join(';');
 
 /** The fonts (§3.3): bundled, no network. */
 export const FONTS = {

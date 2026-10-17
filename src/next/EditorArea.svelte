@@ -12,7 +12,7 @@
   import Structure from './Structure.svelte';
   import FindPanel from './FindPanel.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { PluginFileView, RichMenu } from './bridges';
+  import { Agenda, PluginFileView, RichMenu } from './bridges';
   import Compat from './Compat.svelte';
 
   // What the active tab shows in the new interface (ТЗ 42.5): a file — the editor (or a plugin's view of it, the
@@ -100,7 +100,8 @@
   {#if tab && !isCore(tab.kind)}
     {@const v = viewOf(tab.kind)}
     {#if v}
-      <div class="view"><v.component {tab} pane={0} /></div>
+      <!-- «Сегодня», «Тег», a review, a plugin's view: old screens in the compatibility layer (ТЗ 43 §4) -->
+      <div class="view"><Compat><v.component {tab} pane={0} /></Compat></div>
     {:else}
       {@const pe = plugins.pluginOfView(tab.kind)}
       <div class="word" role="status">
@@ -144,7 +145,7 @@
         rich={store.rich} onchange={(t) => (tab.text = t)} oncursor={(line, col) => store.setTabCursor(tab, line, col)} onfollow={(l) => store.follow(l)} />
     </div>
   {:else if tab?.kind === 'agenda'}
-    <div class="word" role="status"><b>Агенда</b><span>В новом интерфейсе агенда появится позже. Пока она есть в старом.</span></div>
+    <div class="view"><Compat><Agenda pane={0} /></Compat></div>
   {:else}
     <div class="word" role="status"><b class="title">Нет открытых вкладок</b><span>Откройте файл в сайдбаре или создайте новый.</span></div>
   {/if}

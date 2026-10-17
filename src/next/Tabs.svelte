@@ -13,6 +13,7 @@
   let { onmenu }: { onmenu: (at: { x: number; y: number }, items: MenuItem[]) => void } = $props();
   const pi = 0;
   const pane = $derived(store.layout.panes[pi]);
+  const text = $derived(store.tab?.kind === 'file' || store.tab?.kind === 'untitled');
 
   const FILE = 'M3.5 2h6l3 3v9h-9z';
   /** The icon of a tab: a path in a 16 box (the file's), or a view's in its 20 box. */
@@ -64,10 +65,13 @@
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
     </button>
   </div>
-  <div class="mode" role="radiogroup" aria-label="Вид текста">
-    <button role="radio" aria-checked={store.rich} class:on={store.rich} onclick={() => store.setRich(true)}>Оформление</button>
-    <button role="radio" aria-checked={!store.rich} class:on={!store.rich} onclick={() => store.setRich(false)}>Исходник</button>
-  </div>
+  <!-- only over a text (ТЗ 43 §4): a screen has no «Оформление / Исходник» -->
+  {#if text}
+    <div class="mode" role="radiogroup" aria-label="Вид текста">
+      <button role="radio" aria-checked={store.rich} class:on={store.rich} onclick={() => store.setRich(true)}>Оформление</button>
+      <button role="radio" aria-checked={!store.rich} class:on={!store.rich} onclick={() => store.setRich(false)}>Исходник</button>
+    </div>
+  {/if}
 </div>
 
 <style>
