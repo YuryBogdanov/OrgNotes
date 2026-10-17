@@ -28,3 +28,24 @@ describe('the installed plugins', () => {
     expect(builtinEntries.find((e) => e.dir === 'hello')).toMatchObject({ builtin: true, enabled: false, problems: [] });
   });
 });
+
+describe('the keys of a card\'s actions (ТЗ 44 §9)', () => {
+  it('«⌃C K <letter>» when the command has no keys of its own; a letter taken — none, and whose it is', async () => {
+    const { cardChord, declareKeys } = await import('./declare');
+    const { parseManifest } = await import('./manifest');
+    const { KEY_COMMANDS } = await import('../keys');
+    expect(cardChord({ id: 'x.a' })).toBeNull();
+    const one = parseManifest({ id: 'cardone', name: 'Первый', version: '1.0.0', api: '^1.14', contributes: { commands: [{ id: 'cardone.a', title: 'Действие', cardKey: 'q' }, { id: 'cardone.b', title: 'Своё', cardKey: 'Z', keys: ['⌃⌥⌘B'] }] } });
+    const two = parseManifest({ id: 'cardtwo', name: 'Второй', version: '1.0.0', api: '^1.14', contributes: { commands: [{ id: 'cardtwo.a', title: 'Другое', cardKey: 'Q' }] } });
+    if (!one.ok || !two.ok) throw new Error();
+    expect(one.manifest.contributes.commands[0].cardKey).toBe('Q');
+    declareKeys(one.manifest);
+    declareKeys(two.manifest);
+    const at = (id: string) => KEY_COMMANDS.find((c) => c.id === id)!;
+    expect(at('cardone.a').keys).toEqual(['⌃C K Q']);
+    expect(at('cardone.b').keys).toEqual(['⌃⌥⌘B']); // its own keys win
+    expect(at('cardtwo.a').keys).toEqual([]);
+    expect(at('cardtwo.a').note).toBe('⌃C K Q уже у «Действие»');
+    expect(parseManifest({ id: 'bad', name: 'B', version: '1.0.0', api: '^1.14', contributes: { commands: [{ id: 'bad.a', title: 'A', cardKey: 'ab' }] } }).ok).toBe(false);
+  });
+});

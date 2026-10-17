@@ -2,7 +2,7 @@
 // to the registry of keys here — before the store reads the saved shortcuts, so their changes are kept (imported by
 // main.ts right after the built-in features' keys). Nothing of the store here.
 
-import { C, registerGroup, registerKeys, registerScope, unregisterKeys } from '../keys';
+import { C, KEY_COMMANDS, registerGroup, registerKeys, registerScope, unregisterKeys } from '../keys';
 import { API_VERSION } from './index';
 import { incompatible, parseManifest, type Manifest } from './manifest';
 import { parseSource, type Source } from './sources';
@@ -130,6 +130,14 @@ function declareViewScope(m: Manifest) {
 }
 
 /** A plugin's commands in the registry of keys (and its group of «Клавиши»). */
+/** A card's action with no keys of its own (ТЗ 44 §9): «⌃C K <letter>», unless a command declared before has that
+ *  chord already — then none, and «Клавиши» says whose it is. */
+export function cardChord(c: { id: string; cardKey?: string }): { key?: string; taken?: string } | null {
+  if (!c.cardKey) return null;
+  const key = `⌃C K ${c.cardKey}`;
+  const owner = KEY_COMMANDS.find((x) => x.id !== c.id && [...(x.keys ?? []), ...(x.mac ?? []), ...(x.emacs ?? [])].includes(key));
+  return owner ? { taken: `${key} уже у «${owner.title}»` } : { key };
+}
 export function declareKeys(m: Manifest) {
   if (!m.contributes.commands.length) return;
   registerGroup({ id: groupOf(m.id), title: m.name.toUpperCase(), note: 'плагин' });
@@ -139,9 +147,11 @@ export function declareKeys(m: Manifest) {
     const w = viewWord(m);
     registerGroup({ id: viewGroup(m.id), title: w.toUpperCase(), note: `только в виде «${w}»` });
   }
-  registerKeys(m.contributes.commands.map((c) =>
-    C(c.id, c.title, c.scope === 'view' ? viewGroup(m.id) : groupOf(m.id), c.scope === 'review' ? reviewScope(m.id) : c.scope === 'view' ? viewScope(m.id) : 'window', c.keys ?? [], { synonyms: c.synonyms, ...(c.note ? { note: c.note } : {}) }),
-  ));
+  registerKeys(m.contributes.commands.map((c) => {
+    const card = c.keys?.length ? null : cardChord(c);
+    const note = [c.note, card?.taken].filter(Boolean).join(' · ');
+    return C(c.id, c.title, c.scope === 'view' ? viewGroup(m.id) : groupOf(m.id), c.scope === 'review' ? reviewScope(m.id) : c.scope === 'view' ? viewScope(m.id) : 'window', card?.key ? [card.key] : (c.keys ?? []), { synonyms: c.synonyms, ...(note ? { note } : {}) });
+  }));
 }
 export function undeclareKeys(m: Manifest) {
   unregisterKeys(m.contributes.commands.map((c) => c.id), groupOf(m.id));
