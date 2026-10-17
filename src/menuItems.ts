@@ -10,10 +10,12 @@ export type MenuItem =
       subWidth?: number; // its least width
       detail?: string; // a grey second line: what exactly it does («https://wiki…», «Ревью архитектуры»), ТЗ 35
       capsule?: string; // the label as a status capsule: the tone's style (`--tl:…`), as the agenda draws it (ТЗ 34)
+      soft?: boolean; // its submenu's rows chosen on `lampsoft`, not `lamp` (statuses: the fill would fight the capsules, ТЗ 44 §3.2)
     }
   | { note: string } // a grey line, not a command («Виды добавляют плагины»)
+  | { head: string } // the head of a section: a plugin's name in capitals (ТЗ 44 §3.1)
   | 'sep';
 
 /** An item that runs something (not a line, not a note). */
-export type MenuCommand = Exclude<MenuItem, 'sep' | { note: string }>;
-export const isCommand = (it: MenuItem | undefined): it is MenuCommand => typeof it === 'object' && !('note' in it);
+export type MenuCommand = Exclude<MenuItem, 'sep' | { note: string } | { head: string }>;
+export const isCommand = (it: MenuItem | undefined): it is MenuCommand => typeof it === 'object' && !('note' in it) && !('head' in it);

@@ -5,6 +5,7 @@
 
 <script lang="ts">
   import Self from './ContextMenu.svelte';
+  import { isCommand } from './menuItems';
 
   // `width`: the least width; `tall`: rows of 28 pt (the task menu of the lists, ТЗ 34)
   let { x, y, items, onclose, nested = false, width = 200, tall = false }: { x: number; y: number; items: MenuItem[]; onclose: () => void; nested?: boolean; width?: number; tall?: boolean } = $props();
@@ -23,7 +24,7 @@
     return { left: Math.max(4, Math.min(x, window.innerWidth - w - 4)), top: Math.max(4, Math.min(y, window.innerHeight - h - 4)) };
   });
 
-  const checks = $derived(items.some((it) => it !== 'sep' && !('note' in it) && it.checked !== undefined));
+  const checks = $derived(items.some((it) => isCommand(it) && it.checked !== undefined));
 
   function key(e: KeyboardEvent) {
     if (e.key === 'Escape') onclose();
@@ -41,6 +42,8 @@
       <div class="sep"></div>
     {:else if 'note' in it}
       <div class="note">{it.note}</div>
+    {:else if 'head' in it}
+      <div class="note">{it.head}</div>
     {:else}
       <button role="menuitem" class:danger={it.danger} class:open={sub?.i === i} disabled={it.disabled} aria-keyshortcuts={it.shortcut} aria-haspopup={it.sub ? 'menu' : undefined} aria-expanded={it.sub ? sub?.i === i : undefined}
         onmouseenter={(e) => (it.sub ? openSub(e, i) : (sub = null))}
@@ -71,7 +74,7 @@
 </div>
 {#if sub}
   {@const host = items[sub.i]}
-  {#if host !== 'sep' && !('note' in host) && host.sub}<Self x={sub.x} y={sub.y} items={host.sub} {onclose} nested width={host.subWidth ?? 200} {tall} />{/if}
+  {#if isCommand(host) && host.sub}<Self x={sub.x} y={sub.y} items={host.sub} {onclose} nested width={host.subWidth ?? 200} {tall} />{/if}
 {/if}
 
 <style>

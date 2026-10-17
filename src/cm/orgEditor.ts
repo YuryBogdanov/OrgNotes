@@ -70,6 +70,8 @@ export interface EditorProps {
   onfollow: (link: OrgLink) => void;
   /** ⌃X N S at this line, ⌃X N W (ТЗ 42 §5.8): the tab narrows or shows the whole file again; none — the keys go on. */
   onnarrowTo?: (line: number) => void;
+  /** The new interface's menu of a heading (ТЗ 44 §3.1), given what the editor does itself; the old menu otherwise. */
+  headingMenu?: (l: { path: string; line: number; tags: () => void; note: () => void; narrow?: () => void; remove: () => void }) => MenuItem[];
   onwiden?: () => void;
 }
 /** What the editor asks its component to draw. */
@@ -320,6 +322,21 @@ export class OrgEditor {
     } else v.dispatch({ changes: { from: s.from, to: s.to, insert: t }, selection: { anchor: s.from + t.length }, userEvent: 'input.paste', scrollIntoView: true });
     v.focus();
   }
+  /** «Удалить заголовок» (ТЗ 44 §3.1): the heading with its subtree, one step of ⌘Z. */
+  private removeHeading(v: EditorView, n: number) {
+    const doc = v.state.doc;
+    const head = doc.line(n);
+    const level = /^\*+/.exec(head.text)![0].length;
+    let last = n;
+    while (last < doc.lines) {
+      const m = /^(\*+)\s/.exec(doc.line(last + 1).text);
+      if (m && m[1].length <= level) break;
+      last++;
+    }
+    const to = last < doc.lines ? doc.line(last + 1).from : doc.length;
+    v.dispatch({ changes: { from: head.from, to }, selection: { anchor: head.from }, userEvent: 'delete', scrollIntoView: true });
+    v.focus();
+  }
   /** Right click (⌃-click): inside the selection it stays, elsewhere the caret goes there; then the menu of §4. */
   private async openMenu(e: MouseEvent, v: EditorView) {
     const path = this.path;
@@ -363,11 +380,21 @@ export class OrgEditor {
         { label: 'Вставить ссылку на заголовок…', shortcut: key('insertLink'), action: () => this.pickLink(v, null) },
       );
     }
+    const hl = v.state.doc.lineAt(s.head);
+    // the new interface: the heading's own menu first, the editing's after it
+    if (this.p.headingMenu && s.empty && headLine(hl.text)) {
+      const n = hl.number;
+      const own = this.p.headingMenu({
+        path, line: n - 1, tags: () => this.openTagPop(v, n), note: () => this.noteAt(v, n - 1),
+        ...(this.p.onnarrowTo && !this.p.narrow ? { narrow: () => this.p.onnarrowTo!(n - 1) } : {}),
+        remove: () => this.removeHeading(v, n),
+      });
+      return this.ui.menu(e.clientX, e.clientY, [...own, 'sep', ...items.filter((it, i) => !(it === 'sep' && (i === 0 || items[i - 1] === 'sep')))]);
+    }
     if (heading) {
       if (!s.empty) items.push('sep');
       items.push({ label: 'Копировать ссылку на заголовок', shortcut: key('copyLink'), detail: `«${heading}»`, action: () => linkHooks.copyHeading(path, v.state.doc.lineAt(s.head).number - 1) });
     }
-    const hl = v.state.doc.lineAt(s.head);
     if (s.empty && headLine(hl.text)) {
       items.push({ label: 'Теги…', shortcut: key('tags'), action: () => this.openTagPop(v, hl.number) });
       items.push({ label: 'Добавить заметку…', shortcut: key('addNote'), action: () => this.noteAt(v, hl.number - 1) });

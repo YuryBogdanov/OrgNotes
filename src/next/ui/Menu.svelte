@@ -7,8 +7,8 @@
   // Mono 11 `ink3`, «›» at a submenu; the row chosen on `lamp` with its text, icon and shortcut `onlamp`; a dangerous
   // one in `todo`; lines of 1 pt `rule`. The same items as the old menu (menuItems.ts). Keys: ↑↓ choose, ↩ runs, → opens
   // a submenu (and a hover after 150 ms), ← or ⎋ closes it; ⎋ closes the menu.
-  let { x, y, items, onclose, width = 200, nested = false, onback }: {
-    x: number; y: number; items: MenuItem[]; onclose: () => void; width?: number; nested?: boolean; onback?: () => void;
+  let { x, y, items, onclose, width = 200, nested = false, soft = false, label, onback }: {
+    x: number; y: number; items: MenuItem[]; onclose: () => void; width?: number; nested?: boolean; soft?: boolean; label?: string; onback?: () => void;
   } = $props();
 
   let el: HTMLDivElement | undefined = $state();
@@ -68,12 +68,15 @@
   }
 </script>
 
-<Popover {x} {y} {width} {nested} role="menu" {onclose} onkeydown={key} bind:el>
+<Popover {x} {y} {width} {nested} role="menu" {label} {onclose} onkeydown={key} bind:el>
+  <div class="m" class:soft>
   {#each items as it, i (i)}
     {#if it === 'sep'}
       <div class="sep" role="separator"></div>
     {:else if typeof it === 'object' && 'note' in it}
       <div class="note">{it.note}</div>
+    {:else if typeof it === 'object' && 'head' in it}
+      <div class="head" role="presentation">{it.head}</div>
     {:else}
       <button role="menuitem" data-row class:cur={cur === i || sub?.i === i} class:danger={it.danger} disabled={it.disabled} tabindex="-1"
         aria-keyshortcuts={it.shortcut} aria-haspopup={it.sub ? 'menu' : undefined} aria-expanded={it.sub ? sub?.i === i : undefined}
@@ -94,11 +97,12 @@
       </button>
     {/if}
   {/each}
+  </div>
 </Popover>
 {#if sub}
   {@const host = items[sub.i]}
   {#if isCommand(host) && host.sub}
-    <Self x={sub.x} y={sub.y} items={host.sub} width={host.subWidth ?? 200} nested {onclose} onback={() => { sub = null; el?.focus(); }} />
+    <Self x={sub.x} y={sub.y} items={host.sub} width={host.subWidth ?? 200} nested soft={!!host.soft} {onclose} onback={() => { sub = null; el?.focus(); }} />
   {/if}
 {/if}
 
@@ -123,4 +127,11 @@
   button.cur .capsule { background: color-mix(in srgb, var(--onlamp) 12%, var(--card)); }
   .sep { height: 1px; margin: 4px 8px; background: var(--rule); }
   .note { padding: 4px 10px; font-size: 11.5px; line-height: 1.4; color: var(--ink3); }
+  .head { padding: 8px 10px 3px; font: 600 11px var(--ui); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink3); }
+  /* the statuses (§3.2): the row chosen on `lampsoft`, the capsule keeps its colour */
+  .soft button { min-height: 30px; }
+  .soft .chk { color: var(--lampink); }
+  .soft button.cur { background: var(--lampsoft); color: var(--ink); }
+  .soft button.cur .ic, .soft button.cur .kb, .soft button.cur .more, .soft button.cur .dt { color: var(--ink3); }
+  .soft button.cur .capsule { background: color-mix(in srgb, var(--tl) 16%, transparent); }
 </style>

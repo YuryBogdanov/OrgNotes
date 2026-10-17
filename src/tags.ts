@@ -174,3 +174,15 @@ export function withTags(line: string, tags: string[]): string {
   if (!tags.length) return base;
   return `${base}${m ? m[2] : ' '}:${tags.join(':')}:`;
 }
+
+/** The tags offered in a heading's field (ТЗ 38 §6): the folder's tags not on it yet, by substring of the query, the
+ *  most used first, up to 7; and «Создать тег :x:» for a new name. `list` is the folder's, by use. */
+export function tagRows(list: { tag: string; n: number }[], tags: string[], q: string): { tag: string; n: number; create: boolean }[] {
+  const key = (t: string) => t.toLowerCase();
+  const have = new Set(tags.map(key));
+  const name = bareTag(q);
+  const s = key(name);
+  const found = list.filter((t) => !have.has(key(t.tag)) && (!s || key(t.tag).includes(s))).slice(0, 7);
+  const create = !!name && tagOk(name) && !have.has(key(name)) && !list.some((t) => key(t.tag) === key(name));
+  return [...found.map((t) => ({ tag: t.tag, n: t.n, create: false })), ...(create ? [{ tag: name, n: 0, create: true }] : [])];
+}

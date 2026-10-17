@@ -2,7 +2,9 @@
   import { moved } from './pointer';
   import { onMount, tick } from 'svelte';
   import { store } from './store.svelte';
-  import { sequenceFor, setKeyword, setPriority, toneFor } from './org';
+  import { toneFor } from './org';
+  import { PRIORITIES, statusChoices } from './headingChoices';
+  import { setPriorityAt, setStatusAt } from './headingWrite';
   import { toneStyle } from './colors';
   import type { RichPick } from './orgRich';
 
@@ -19,20 +21,17 @@
   };
   const items = $derived.by<Item[]>(() => {
     if (!f) return [];
-    const at = (fn: Parameters<typeof store.patchAt>[2]) => close(() => store.patchAt(path, pick.line, fn));
     if (pick.kind === 'status') {
-      const states = sequenceFor(f.wf, pick.keyword ?? null).states;
-      const open = states.filter((s) => !s.done);
-      const done = states.filter((s) => s.done);
+      const { open, done } = statusChoices(f.wf, pick.keyword ?? null);
       return [...open, ...done].map((s, i) => ({
-        id: s.name, label: s.name, cap: s.name, style: toneStyle(toneFor(s.name, f.wf)), check: s.name === pick.keyword, hint: s.name === pick.keyword ? 'сейчас' : '',
-        sep: i === open.length && open.length > 0 && done.length > 0, run: at((t, h, wf) => setKeyword(t, h, s.name, wf)),
+        id: s.name, label: s.name, cap: s.name, style: toneStyle(toneFor(s.name, f.wf)), check: s.current, hint: s.current ? 'сейчас' : '',
+        sep: i === open.length && open.length > 0 && done.length > 0, run: close(() => setStatusAt(path, pick.line, s.name)),
       }));
     }
     if (pick.kind === 'priority') {
       return [
-        ...['A', 'B', 'C'].map((p) => ({ id: p, label: p, cap: p, style: '', check: p === pick.priority, hint: p === pick.priority ? 'сейчас' : '', run: at((t, h) => setPriority(t, h, p)) })),
-        { id: 'none', label: 'Без приоритета', sep: true, run: at((t, h) => setPriority(t, h, null)) },
+        ...PRIORITIES.map((p) => ({ id: p, label: p, cap: p, style: '', check: p === pick.priority, hint: p === pick.priority ? 'сейчас' : '', run: close(() => setPriorityAt(path, pick.line, p)) })),
+        { id: 'none', label: 'Без приоритета', sep: true, run: close(() => setPriorityAt(path, pick.line, null)) },
       ];
     }
     return [];
