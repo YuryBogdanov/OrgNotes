@@ -2,8 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 import { openApp } from './helpers';
 
 // ТЗ 42.9: «Структура» right of the editor — headings of levels 1–3, the current one marked, a click goes there;
-// «Ссылаются» — the links to the heading under the caret, a click opens their place; ⌥⌘0 hides and shows it (kept on
-// this Mac); a narrow window has no room for it.
+// «Связи» (ТЗ 44 §10, «Ссылаются» before) — the links to the heading under the caret, their number by the title, a click
+// opens their place; both fold on a click on their head, kept on this Mac; ⌥⌘0 hides and shows it (kept on this Mac);
+// a narrow window has no room for it.
 
 const MID = ['* TODO Роадмап', ':PROPERTIES:', ':ID: x1', ':END:', 'Текст.', '* NEXT Переезд', '** TODO Бенчмарк', '*** Детали', '**** Глубже', '* DONE Готово', ''].join('\n');
 const F = { '/mock/Midterm.org': MID, '/mock/weeks.org': '* Неделя 42\nСм. [[id:x1][роадмап]].\n' };
@@ -34,9 +35,10 @@ test('one ground with the text: the grid under both, the editor has no ground of
   expect(await col(page).evaluate((e) => getComputedStyle(e.parentElement!).backgroundImage)).toContain('linear-gradient');
 });
 
-test('«Ссылаются»: the links to the heading under the caret; a click opens their place; none — no block', async ({ page }) => {
+test('«Связи»: the links to the heading under the caret, their number; a click opens their place; none — no block', async ({ page }) => {
   await open(page);
   await page.locator('.cm-line', { hasText: 'Текст.' }).click();
+  await expect(col(page).getByRole('region', { name: 'Связи' }).getByRole('button', { name: /Связи/ })).toHaveText(/Связи\s*1\s*⌄/);
   await expect(col(page).locator('.bl')).toHaveText(['↳ weeks · Неделя 42']);
   await page.locator('.cm-line', { hasText: 'Готово' }).click();
   await expect(col(page).locator('.back')).toHaveCount(0);
@@ -56,4 +58,28 @@ test('⌥⌘0 hides and shows it, kept after a reload; a narrow window has no ro
   await expect(col(page)).toBeVisible();
   await page.setViewportSize({ width: 1000, height: 820 }); // the area: 1000 − the sidebar < 900
   await expect(col(page)).toHaveCount(0);
+});
+
+test('«Структура» and «Связи» fold on a click on their head (⌄ / ›), for every file, kept after a reload', async ({ page }) => {
+  await open(page);
+  await page.locator('.cm-line', { hasText: 'Текст.' }).click();
+  const sHead = col(page).getByRole('button', { name: /^Структура/ });
+  const lHead = col(page).getByRole('region', { name: 'Связи' }).getByRole('button', { name: /Связи/ });
+  await sHead.click();
+  await expect(sHead).toHaveAttribute('aria-expanded', 'false');
+  await expect(sHead).toHaveText(/Структура\s*›/);
+  await expect(col(page).locator('.row')).toHaveCount(0);
+  await lHead.click();
+  await expect(lHead).toHaveText(/Связи\s*1\s*›/); // folded: the head with the number — there are links
+  await expect(col(page).locator('.bl')).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('[data-ui="next"] .cm-content')).toBeVisible();
+  await page.locator('.cm-line', { hasText: 'Текст.' }).click();
+  await expect(col(page).getByRole('button', { name: /^Структура/ })).toHaveAttribute('aria-expanded', 'false');
+  await expect(col(page).getByRole('region', { name: 'Связи' }).getByRole('button', { name: /Связи/ })).toHaveAttribute('aria-expanded', 'false');
+  // the same for another file
+  await page.getByRole('tree', { name: 'Файлы' }).getByRole('treeitem', { name: 'weeks' }).click();
+  await expect(col(page).getByRole('button', { name: /^Структура/ })).toHaveAttribute('aria-expanded', 'false');
+  await col(page).getByRole('button', { name: /^Структура/ }).click();
+  await expect(col(page).locator('.row .t')).toHaveText(['Неделя 42']);
 });
