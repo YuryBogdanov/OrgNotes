@@ -126,6 +126,12 @@ export function grouped<T extends { s: Shown; m: Matter }>(rows: T[]): Record<Gr
   return out;
 }
 
+/** The section's badge (ТЗ 43 §1): «Пора проверить» as an alarm when there are some, else how many matters. */
+export function badgeOf(groups: Record<Group, unknown[]>): { n: number; alert: boolean } {
+  const due = groups.due.length;
+  return due ? { n: due, alert: true } : { n: groups.waiting.length + groups.ok.length, alert: false };
+}
+
 /** The source that makes the heading long: its own tag of a tag source (null: none), a file source. */
 export function sourceOf(path: string, h: Heading, sources: Source[]): { byTag: string | null; byPlace: boolean } {
   const tag = sources.flatMap((s) => (s.kind === 'tag' ? h.tags.filter((t) => sameTag(t, s.tag)) : []))[0] ?? null;

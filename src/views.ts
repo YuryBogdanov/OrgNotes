@@ -57,6 +57,8 @@ export interface NavSpec {
   component: Component;
   /** A number on the button (the Inbox's count); 0 shows nothing. */
   badge?(): number;
+  /** The number is an alarm (`ui.setBadge(…, { tone: 'alert' })`, ТЗ 43 §1): red in the new sidebar. */
+  alert?(): boolean;
 }
 const navs = new SvelteMap<string, NavSpec>();
 export function registerNav(n: NavSpec) {

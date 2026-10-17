@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseHeadings } from '@panopticon/api/org';
-import { DEFAULTS, grouped, longIn, readDay, readSettings, shown, dueWords, ageWords, approxWords, mattersWord, sourceOf, stampOf, statusBefore, type Matter } from './long';
+import { DEFAULTS, badgeOf, grouped, longIn, readDay, readSettings, shown, dueWords, ageWords, approxWords, mattersWord, sourceOf, stampOf, statusBefore, type Matter } from './long';
 
 // ТЗ 40 §1, §4.1, §4.5: which headings are long matters, their day to look, their group and tone.
 
@@ -101,5 +101,13 @@ describe('the actions\' helpers', () => {
     ].join('\n');
     expect(statusBefore(t.split('\n'), hs(t)[0], 'WAIT')).toBe('NEXT');
     expect(statusBefore(['* WAIT A'], hs('* WAIT A')[0], 'WAIT')).toBeNull();
+  });
+});
+
+describe('the section\'s badge (ТЗ 43 §1)', () => {
+  it('«Пора проверить» as an alarm when there are some; else how many matters, as any', () => {
+    expect(badgeOf({ due: [1, 2], waiting: [3], ok: [4, 5] })).toEqual({ n: 2, alert: true });
+    expect(badgeOf({ due: [], waiting: [3], ok: [4, 5] })).toEqual({ n: 3, alert: false });
+    expect(badgeOf({ due: [], waiting: [], ok: [] })).toEqual({ n: 0, alert: false });
   });
 });

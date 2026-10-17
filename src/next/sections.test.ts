@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { NavSpec } from '../views';
 import { sectionsOf, shownSection } from './sections';
 
-const nav = (id: string, order: number, label = id): NavSpec => ({ id, label, icon: 'M0 0', order, component: null as never, key: `k.${id}`, badge: () => order });
+const nav = (id: string, order: number, label = id): NavSpec => ({ id, label, icon: 'M0 0', order, component: null as never, key: `k.${id}`, badge: () => order, alert: () => id === 'long-matters' });
 
 describe('the sidebar\'s sections (ТЗ 43 §1)', () => {
   it('the core on top, «Входящие» among them while the Inbox plugin is on; the plugins in the navigator\'s order', () => {
@@ -11,6 +11,7 @@ describe('the sidebar\'s sections (ТЗ 43 §1)', () => {
     expect(s.core[1].badge?.()).toBe(38);
     expect(s.core[2].badge?.()).toBe(10); // the plugin's badge
     expect(s.plugins.map((x) => x.id)).toEqual(['quarter-goals', 'calendar', 'long-matters']);
+    expect(s.plugins.map((x) => x.alert?.())).toEqual([false, false, true]); // the plugin's alarm passed on
   });
   it('no Inbox, no plugins: no «Входящие», no group', () => {
     const s = sectionsOf([], 0);

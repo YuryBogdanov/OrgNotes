@@ -14,6 +14,8 @@ export interface Section {
   /** false: a screen, not a list — «Сегодня» opens its tab. */
   panel: boolean;
   badge?: () => number;
+  /** The number is an alarm: red (a plugin's `setBadge(…, { tone: 'alert' })`). */
+  alert?: () => boolean;
 }
 
 export const TODAY_ID = 'today';
@@ -34,7 +36,7 @@ export function sectionsOf(navs: NavSpec[], files: number): { core: Section[]; p
   const core: Section[] = [
     { id: TODAY_ID, label: 'Сегодня', icon: ICONS.today, vb: 20, key: 'today', panel: false },
     { id: 'files', label: 'Файлы', icon: ICONS.files, vb: 20, key: 'navFiles', panel: true, badge: () => files },
-    ...(inbox ? [{ id: INBOX, label: 'Входящие', icon: ICONS.inbox, vb: 16 as const, key: inbox.key, panel: true, badge: inbox.badge }] : []),
+    ...(inbox ? [{ id: INBOX, label: 'Входящие', icon: ICONS.inbox, vb: 16 as const, key: inbox.key, panel: true, badge: inbox.badge, alert: inbox.alert }] : []),
     { id: 'agendas', label: 'Агенда', icon: ICONS.agendas, vb: 16, key: 'navAgendas', panel: true },
     { id: 'tags', label: 'Теги', icon: ICONS.tags, vb: 16, key: 'navTags', panel: true },
     { id: 'search', label: 'Поиск', icon: ICONS.search, vb: 16, key: 'navSearch', panel: true },
@@ -42,7 +44,7 @@ export function sectionsOf(navs: NavSpec[], files: number): { core: Section[]; p
   const plugins = navs
     .filter((n) => n.id !== INBOX)
     .sort((a, b) => a.order - b.order)
-    .map((n): Section => ({ id: n.id, label: n.label, icon: n.icon, vb: 20, key: n.key, panel: true, badge: n.badge }));
+    .map((n): Section => ({ id: n.id, label: n.label, icon: n.icon, vb: 20, key: n.key, panel: true, badge: n.badge, alert: n.alert }));
   return { core, plugins };
 }
 
