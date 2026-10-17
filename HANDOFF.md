@@ -567,6 +567,10 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   out `hidden` actions, draws `subOf`, and with no summary of the plugin's shows the figures and `endNote`;
   `WalkCard` offers «Проверить снова через» in the file only (`walk.inFile` = `currentReview().place`), the tab goes
   by the norm. e2e `walkOld.spec.ts`. ТЗ 41 is done.
+- **ТЗ 47 (the plugins' screens in the new look), 47.1:** `--font-display` (Yeseva One) and `--font-mono` (IBM Plex
+  Mono) in the compatibility layer (`COMPAT`, not in app.css: old screens fall back), `ctx.ui.look` `'next' | 'old'`
+  (API 1.14, `store.nextUi`; fixed while the window is open). The guide's «В новом интерфейсе» says them and the
+  tokens a plugin's own new screen draws with. The PRs of ТЗ 47 are stacked: each on the one before.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

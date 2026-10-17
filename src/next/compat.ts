@@ -65,6 +65,10 @@ export const COMPAT: Record<string, string | null> = {
   // fonts
   ui: FONTS.ui,
   mono: FONTS.mono,
+  // the new interface's own for the plugins' screens (ТЗ 47 §0): the titles in Yeseva One, the kickers and figures in
+  // IBM Plex Mono — not in app.css: an old screen has none (`var(--font-display, …)` falls back there)
+  'font-display': FONTS.title,
+  'font-mono': FONTS.mono,
 };
 
 /** The named colours (`--p-red` … `--p-gray`) of «Синька» in this appearance (ТЗ 42 §3.2). */
