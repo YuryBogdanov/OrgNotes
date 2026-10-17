@@ -13,10 +13,9 @@ export { default as RichMenu } from '../RichMenu.svelte'; // a drawn status or p
 export { default as PluginFileView } from '../PluginFileView.svelte'; // a plugin's view of a file (the board, the canvas) → the new host
 export { default as Refile } from '../Refile.svelte'; // the choice of a place (refile)
 export type { MenuItem } from '../ContextMenu.svelte'; // the menus' items, the type of the bridge above
-export { default as AgendaList } from '../AgendaList.svelte'; // the sidebar's «Агенда» → its own panel (ТЗ 43 §2.2)
-export { default as TagsPanel } from '../TagsPanel.svelte'; // the sidebar's «Теги» → its own panel (ТЗ 43 §2.3)
-export { default as SearchPanel } from '../SearchPanel.svelte'; // the sidebar's «Поиск» → its own panel (ТЗ 43 §2.4)
 export { default as Agenda } from '../Agenda.svelte'; // the agenda's tab → the screen in the new style, a ТЗ of its own
 export { default as AgendaBuilder } from '../AgendaBuilder.svelte'; // the agenda builder's sheet → the same
 // «Сегодня», the tab «Тег», the Inbox review, the plugins' views and reviews come through the views' registry
 // (views.ts) and are drawn in the compatibility layer (EditorArea) → each a screen in the new style, its own ТЗ.
+export { default as ConfirmDialog } from '../ConfirmDialog.svelte'; // «Удалить агенду?», «Убрать тег?» → the new sheets
+export { default as TagRename } from '../TagRename.svelte'; // a tag renamed or merged in every file → the same

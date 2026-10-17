@@ -19,6 +19,8 @@ export interface SearchState {
   q: string; // the field
   ran: string; // the query of the results shown
   scope: Scope;
+  re: boolean; // «.*» of the new interface's panel (ТЗ 43 §2.4): the query is a regular expression
+  ranRe: boolean; // the results shown were found so
   running: boolean;
   groups: SearchGroup[];
   total: number;
@@ -31,7 +33,7 @@ const SEARCH_RECENT = 'search:recent';
 
 class SearchAll {
   /** The search in every file: its query, where, the results (kept until the app quits). */
-  state = $state<SearchState>({ q: '', ran: '', scope: 'all', running: false, groups: [], total: 0, capped: false, scanned: 0, sel: null, focusN: 0 });
+  state = $state<SearchState>({ q: '', ran: '', scope: 'all', re: false, ranRe: false, running: false, groups: [], total: 0, capped: false, scanned: 0, sel: null, focusN: 0 });
   private runs = 0;
   recent(): { q: string; t: number }[] {
     try {
@@ -46,7 +48,7 @@ class SearchAll {
     this.state.focusN++;
   }
   /** ↩: the files given, a portion at a time (`open`: shown first); a new run stops the old one. */
-  async run(files: NoteFile[], open: Set<string>, opts: { cs: boolean; word: boolean }) {
+  async run(files: NoteFile[], open: Set<string>, opts: { cs: boolean; word: boolean; re?: boolean }) {
     const q = this.state.q.trim();
     if (!q) return;
     const run = ++this.runs;
@@ -55,7 +57,7 @@ class SearchAll {
     const groups: SearchGroup[] = [];
     let total = 0;
     let capped = false;
-    Object.assign(this.state, { ran: q, running: true, groups: [], total: 0, capped: false, scanned: 0, sel: null });
+    Object.assign(this.state, { ran: q, ranRe: !!opts.re, running: true, groups: [], total: 0, capped: false, scanned: 0, sel: null });
     const order = (a: SearchGroup, b: SearchGroup) =>
       Number(open.has(b.path)) - Number(open.has(a.path)) || b.hits.length - a.hits.length || a.name.localeCompare(b.name, 'ru');
     const show = () => {

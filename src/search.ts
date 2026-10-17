@@ -100,8 +100,9 @@ export interface Hit {
 
 /** The hits in a file: per line, with the heading path; a heading line is shown without its stars and status. */
 export function searchFile(text: string, headings: Heading[], q: string, o: FindOpts, scope: Scope, cap = Infinity): Hit[] {
-  const starts = findAll(text, q, o);
-  if (!starts.length) return [];
+  // a regular expression's matches have their own lengths (ТЗ 43 §2.4)
+  const ranges = findRanges(text, q, o);
+  if (!ranges.length) return [];
   const lines = text.split('\n');
   const lineStart: number[] = [];
   let p = 0;
@@ -114,7 +115,8 @@ export function searchFile(text: string, headings: Heading[], q: string, o: Find
   const out: Hit[] = [];
   let li = 0;
   let under = -1;
-  for (const s of starts) {
+  for (const { from: s, to } of ranges) {
+    const len = to - s;
     while (li + 1 < lines.length && lineStart[li + 1] <= s) {
       li++;
     }
@@ -123,7 +125,7 @@ export function searchFile(text: string, headings: Heading[], q: string, o: Find
     if ((scope === 'headings' && !isHead) || (scope === 'text' && isHead)) continue;
     const line = lines[li];
     let col = s - lineStart[li];
-    if (col + q.length > line.length) continue; // across a line break
+    if (col + len > line.length) continue; // across a line break
     const h = isHead ? headings[byLine.get(li) ?? -1] : undefined;
     // the line as shown: no stars, no indent; a heading's status apart (drawn in its colour before the text)
     let shown: string;
@@ -144,10 +146,10 @@ export function searchFile(text: string, headings: Heading[], q: string, o: Find
       shown = line.slice(indent);
       col = Math.max(0, col - indent);
     }
-    const f = fragment(shown, col, q.length);
+    const f = fragment(shown, col, len);
     const path = under >= 0 ? [...headings[under].path, headings[under].title] : [];
     out.push({
-      line: li, col: s - lineStart[li], len: q.length, where: (h ? h.path : path).join(' › '), heading: !!h, keyword,
+      line: li, col: s - lineStart[li], len, where: (h ? h.path : path).join(' › '), heading: !!h, keyword,
       ...f, under: h ? (byLine.get(li) ?? null) : under >= 0 ? under : null,
     });
     if (out.length >= cap) break;

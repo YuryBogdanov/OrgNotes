@@ -8,7 +8,9 @@
   import FilesPanel from './FilesPanel.svelte';
   import PluginPanel from './PluginPanel.svelte';
   import Compat from './Compat.svelte';
-  import { AgendaList, SearchPanel, TagsPanel } from './bridges';
+  import AgendaPanel from './AgendaPanel.svelte';
+  import TagsPanel from './TagsPanel.svelte';
+  import SearchPanel from './SearchPanel.svelte';
 
   // The sidebar of the new interface (ТЗ 43 §1): the window's lights; the core's sections and the plugins' («Плагины»),
   // 28 pt rows with an icon, a name and a number; a line; the panel of the section picked, under the head of its
@@ -99,9 +101,9 @@
         <button onclick={() => store.openSettings('Плагины')}>Подробнее</button>
       </div>
     {:else if shown.id === 'files'}<FilesPanel {onmenu} />
-    {:else if shown.id === 'agendas'}<Compat><AgendaList /></Compat>
-    {:else if shown.id === 'tags'}<Compat><TagsPanel /></Compat>
-    {:else if shown.id === 'search'}<Compat><SearchPanel /></Compat>
+    {:else if shown.id === 'agendas'}<AgendaPanel />
+    {:else if shown.id === 'tags'}<TagsPanel />
+    {:else if shown.id === 'search'}<SearchPanel />
     {:else if plugins.navs.has(shown.id)}{#key shown.id}<PluginPanel id={shown.id} />{/key}
     {:else if feature}{#key feature.id}<Compat><feature.component id={feature.id} /></Compat>{/key}{/if}
   </div>

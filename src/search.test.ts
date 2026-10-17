@@ -60,3 +60,13 @@ describe('regular expressions and replacing (ТЗ 42 §5.7)', () => {
     expect(replacementOf('да', 'да', { cs: false, word: false }, 'нет')).toBe('нет');
   });
 });
+
+describe('searchFile with «.*» (ТЗ 43 §2.4)', () => {
+  it('finds a regular expression\'s matches with their own lengths; a wrong one finds nothing', () => {
+    const text = '* TODO Миграция v1\nВерсия v12 и v3.\n';
+    const hits = searchFile(text, parseHeadings(text, DEFAULT_WORKFLOW), 'v\\d+', { cs: false, word: false, re: true }, 'all');
+    expect(hits.map((h) => [h.line, h.col, h.len])).toEqual([[0, 16, 2], [1, 7, 3], [1, 13, 2]]);
+    expect(hits[1].match).toBe('v12');
+    expect(searchFile(text, parseHeadings(text, DEFAULT_WORKFLOW), 'v(', { cs: false, word: false, re: true }, 'all')).toEqual([]);
+  });
+});
