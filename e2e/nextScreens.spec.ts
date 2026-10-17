@@ -29,14 +29,14 @@ const foreign = (page: Page, sel: string) =>
 const bar = (page: Page) => page.locator('.next[data-ui="next"] header.bar');
 const mode = (page: Page) => page.getByRole('radiogroup', { name: 'Вид текста' });
 
-test('«Сегодня»: the pinned first tab, its icon alone; the toolbar — «Сегодня» and the day; in the layer, no old colours', async ({ page }) => {
+test('«Сегодня»: the pinned first tab, its icon alone; the toolbar — «Сегодня» and the day; its own screen (ТЗ 45), no old colours', async ({ page }) => {
   await open(page);
   await page.getByRole('tree', { name: 'Файлы' }).getByRole('treeitem', { name: 'work' }).click();
   await expect(mode(page)).toBeVisible();
   await page.keyboard.press('Shift+Meta+h');
   const today = page.locator('.today[role="region"][aria-label="Сегодня"]');
   await expect(today).toBeVisible();
-  expect(await today.evaluate((e) => !!e.closest('.compat[data-ui="next"]'))).toBe(true);
+  expect(await today.evaluate((e) => !e.closest('.compat'))).toBe(true); // drawn by the new interface now (ТЗ 45.1)
   const first = page.getByRole('tablist', { name: 'Вкладки' }).getByRole('tab').first();
   await expect(first).toHaveAttribute('aria-label', 'Сегодня');
   await expect(first).toHaveAttribute('aria-selected', 'true');

@@ -454,6 +454,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   (⌄ / ›), `nextPrefs.structFolded` / `linksFolded` (`next:structFolded`, `next:linksFolded`), one for every file;
   folded «Связи» is its head with the number. Left of ТЗ 44 by its own «Чего нет»: the screens (Agenda, the builder,
   the plugins' views) stay bridges; Capture, InboxPicker, NotePop, TaskListHost, StartScreen too, for now.
+  45.1, «Сегодня» in the new style: its workings out of Today.svelte into `src/todayCtl.svelte.ts` (`TodayCtl`: the
+  journal's note and choice, the agenda of the day, the tasks, the overdue ones, the meetings, the rows as one list —
+  frozen till a refresh, the chosen one, the keys, `lists.register` — the layout, the actions; `effects()`), the 1-1
+  card's into `src/meetingsCtl.svelte.ts` (`MeetingsCtl`; not «todayMeetings» — the casing clash with
+  TodayMeetings.svelte); the old screen on them. `next/Today.svelte` (the kicker in IBM Plex Mono, the title in Yeseva
+  36, cards on `card` 12 pt, the note on `lampsoft`, rows 32 pt with the capsule in 46 pt, the files' names without
+  «.org»; a plugin's block — the core's card, its content in Compat; its own head stays the plugin's till 45.6) and
+  `next/ListToast.svelte`; EditorArea draws it for the tab TODAY. A regex in a Svelte template's `{…}` breaks the
+  compile and svelte-check does not say so: put it in a function.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
