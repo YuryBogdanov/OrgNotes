@@ -142,7 +142,11 @@
   $effect(() => {
     const f = textFont;
     measureCap(f);
-    void document.fonts?.ready.then(() => measureCap(f));
+    // `fonts.ready` may come before the text's font is even asked for: load that one, and again on any font loaded
+    const again = () => measureCap(f);
+    void document.fonts?.load(`100px ${f}`).then(again, () => {});
+    document.fonts?.addEventListener('loadingdone', again);
+    return () => document.fonts?.removeEventListener('loadingdone', again);
   });
   // the sidebar's width (§4.2), on this Mac
   const readWidth = () => {
