@@ -15,7 +15,8 @@
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { AgendaBuilder, CloseSheet, Dialogs, DiskSheet, Palette, PluginSheets, Refile, Settings } from './bridges';
+  import { AgendaBuilder, CloseSheet, Dialogs, DiskSheet, PluginSheets, Refile, Settings } from './bridges';
+  import Palette from './Palette.svelte';
   import type { MenuItem } from '../menuItems';
   import Compat from './Compat.svelte';
   import Menu from './ui/Menu.svelte';
@@ -146,13 +147,14 @@
   <EditorArea />
   </div>
   </div>
+  <!-- the palette (ТЗ 44 §2) -->
+  {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
   <!-- the window's menus (a tab's, the files' tree): the new menu (ТЗ 44 §3.4) -->
   {#if menu}<Menu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
   <!-- the bridged sheets and menus in the compatibility layer (ТЗ 43 §5) -->
   <Compat>
     <Dialogs />
     {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
-    {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
     {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
     {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
   </Compat>

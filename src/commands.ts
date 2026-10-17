@@ -125,6 +125,7 @@ export interface CalSpec {
   names: string[]; // the day names the file writes
   pick: (d: Date) => void;
   back?: () => Step; // ⌫ on an empty field
+  clear?: () => void; // «Убрать дату»: the task has one of this kind (the new palette's chip, ТЗ 44 §2.1)
 }
 export type Unit = 'day' | 'week' | 'month' | 'year';
 export interface Step {
@@ -475,7 +476,7 @@ function calendarStep(c: Ctx, kind: 'SCHEDULED' | 'DEADLINE', initial: Date): St
   const cur = kind === 'SCHEDULED' ? h.scheduled : h.deadline;
   const old = new RegExp(`${kind}:\\s*(<[^>]*>)`).exec(f.text.split('\n')[h.line + 1] ?? '')?.[1];
   return calStep(
-    { kind, initial, current: cur ? jsDate(cur) : null, old, names: weekdayNames(f.text), pick: (d) => actOf(c).planning(kind, d), back: () => dateStep(c, kind) },
+    { kind, initial, current: cur ? jsDate(cur) : null, old, names: weekdayNames(f.text), pick: (d) => actOf(c).planning(kind, d), back: () => dateStep(c, kind), ...(cur ? { clear: () => actOf(c).planning(kind, null) } : {}) },
     headingPlate(c),
   );
 }
