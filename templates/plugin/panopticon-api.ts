@@ -403,8 +403,11 @@ export interface ReviewSpec {
   calendar?: { date?(h: HeadingInfo): string | null; defer?(h: HeadingInfo, day: Date): void | Promise<void>; command?: string };
   /** A card not handled yet in the queue of the review in the file, over `header`: its words, red when `late`. */
   queueNote?(h: HeadingInfo): { text: string; late?: boolean } | null;
-  /** A line of the summary in the file under its figures («Пора проверить: 0. Ближайшая проверка — пт, 23 окт»). */
+  /** A line of the summary in the file under its figures («Пора проверить: 0. Ближайшая проверка — пт, 23 окт»); in
+   *  the tab too, when the plugin draws no `summary`. */
   endNote?(): string;
+  /** The order of the summary's figures, by their words (`ReviewMark.group`); by default the tones' order. */
+  endOrder?: string[];
   /** The buttons of the summary in the file before «Готово» («Разобрать пропущенные»): shown when `when()` says. */
   endActions?: { label: string; command?: string; kind?: 'primary'; when?(): boolean; run(): void }[];
 }

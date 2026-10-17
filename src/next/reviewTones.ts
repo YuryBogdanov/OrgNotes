@@ -13,13 +13,4 @@ export const TONE: Record<ReviewTone, string> = {
   seen: 'var(--ink2)',
   arch: 'var(--plug)',
 };
-export const TONE_WORD: Record<ReviewTone, string> = {
-  done: 'выполнено',
-  cancel: 'отменено',
-  moved: 'перенесено',
-  later: 'отложено',
-  skip: 'пропущено',
-  wait: 'ждём',
-  seen: 'осмотрено',
-  arch: 'в архив',
-};
+export { TONE_WORD } from '../reviewSums';

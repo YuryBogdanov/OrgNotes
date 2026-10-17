@@ -146,3 +146,21 @@ test('nothing due: «Проверять нечего. Ближайшая про�
   await expect(page.getByText('Проверять нечего. Ближайшая проверка — пт, 23 окт')).toBeVisible();
   await expect(scard(page)).toHaveCount(0);
 });
+
+test('the summary\'s figures in the walk\'s order — продолжаем, осмотрено, пропущено — whatever the order of the decisions', async ({ page }) => {
+  await open(page);
+  await start(page);
+  await page.keyboard.press('Meta+Enter'); // пропущено
+  await expect(scard(page).locator('.count')).toHaveText(/^2из/);
+  await page.keyboard.press('Meta+3'); // осмотрено
+  await expect(scard(page).locator('.count')).toHaveText(/^3из/);
+  await page.keyboard.press('Meta+1'); // продолжаем
+  const done = col(page).getByRole('region', { name: 'Разбор окончен' });
+  await expect(done.locator('.sum')).toHaveText(['1продолжаем', '1осмотрено', '1пропущено']);
+  await expect(done.locator('.segs span')).toHaveCount(3);
+  // the queue stays with the outcomes while the summary is shown; «Готово» — «Структура» again
+  await expect(queue(page).locator('.row .note.late')).toHaveCount(0);
+  await expect(queue(page).locator('.row .note')).toHaveCount(3);
+  await done.getByRole('button', { name: /Готово/ }).click();
+  await expect(col(page).getByRole('button', { name: /^Структура/ })).toBeVisible();
+});
