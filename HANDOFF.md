@@ -389,6 +389,11 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   `next/PaletteCalendar.svelte` — three months, today framed by `lampline`, the chosen on `lamp`, past days faded, a
   `next` dot on busy days, the chips «Сегодня», «Завтра», the next Monday, «Через неделю», «Убрать дату»
   (`CalSpec.clear`, set by calendarStep when the date is there). `Palette` is gone from the bridges.
+  44.2, the refile step: the palette look of the choice of a place out of PlacePicker into `src/placePalette.svelte.ts`
+  (`PlacePaletteCtl`: the two steps, the tree's open branches, the keys, the foot), the old PlacePicker on it;
+  `next/PlacePalette.svelte` (680 pt, the label «Перенести › файл», the pinned «на 1-й уровень» in a dashed frame,
+  the tree with guides, level marks, capsules, the children's pill, «станет N-м уровнем») and `next/Refile.svelte`
+  (the plate «Переносим»). `Refile` is gone from the bridges; the columns' look (forms, sheets) stays old till 44.4.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

@@ -10,7 +10,6 @@ export { default as Dialogs } from '../Dialogs.svelte'; // rename, move, the Tra
 export { default as TagPop } from '../TagPop.svelte'; // the heading's tags (⌃C Q) → the new popover
 export { default as RichMenu } from '../RichMenu.svelte'; // a drawn status or priority clicked → the new menu
 export { default as PluginFileView } from '../PluginFileView.svelte'; // a plugin's view of a file (the board, the canvas) → the new host
-export { default as Refile } from '../Refile.svelte'; // the choice of a place (refile)
 export { default as Agenda } from '../Agenda.svelte'; // the agenda's tab → the screen in the new style, a ТЗ of its own
 export { default as AgendaBuilder } from '../AgendaBuilder.svelte'; // the agenda builder's sheet → the same
 // «Сегодня», the tab «Тег», the Inbox review, the plugins' views and reviews come through the views' registry
