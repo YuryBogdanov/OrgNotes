@@ -47,13 +47,14 @@ test('«Сегодня»: the pinned first tab, its icon alone; the toolbar — 
   expect(await foreign(page, '.today[role="region"]')).toEqual([]);
 });
 
-test('the agenda: its tab from the sidebar\'s list, in the layer; the builder over the window', async ({ page }) => {
+test('the agenda: its tab from the sidebar\'s list, the built-in its own «День» (ТЗ 45.3); the builder over the window', async ({ page }) => {
   await open(page);
   await page.getByRole('navigation', { name: 'Разделы', exact: true }).getByRole('button', { name: /Агенда/ }).click();
   const list = page.getByRole('navigation', { name: 'Список агенд' });
   await list.getByRole('button').first().click();
   await expect(bar(page).locator('.name')).toHaveText('Агенда');
-  await expect(page.locator('.next .area .compat')).toHaveCount(1);
+  await expect(page.getByRole('region', { name: 'Агенда', exact: true })).toBeVisible();
+  await expect(page.locator('.next .area .compat')).toHaveCount(0); // drawn by the new interface now
   expect(await foreign(page, '.next .area')).toEqual([]);
   expect(await foreign(page, '[aria-label="Панель: Агенда"]')).toEqual([]);
   await list.getByRole('button', { name: /Новая агенда/ }).click();

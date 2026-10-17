@@ -470,6 +470,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   выбрать задачу…» as the last row, the note a textarea in Cormorant 18 with the lists going on (textList), not a
   CodeMirror. The new window had shown no «Завершить день» at all, nor had it the window's ⌘Z (`store.undoLast` off a
   text field): both as in the old one now. `svelte-ignore` takes several codes comma-separated, no `--` reason.
+  45.3, the built-in «Агенда» in the mode «День» (new interface only; a custom agenda stays the bridged Agenda till
+  45.4): `src/agendaDay.ts` (pure: `dayOf` — the timed entries as chips, past / now, the planned without a time and
+  the deadlines of the day, done struck; `horizonOf` the 30 days after, by date, `due` on a deadline; `weekOf`,
+  `weekCounts`, `horizonDate` «СР 21 · СРОК») and `next/AgendaDay.svelte` (the day in its state, opened on today; the
+  overdue from today.ts `overdue` on today only; the rows a list of tasks, `lists.register` id `agendaDay:<pane>`;
+  ← → «.» ↑↓ ↩, ⌘↩ opens the task behind the agenda, ⌘↓ «Неделя»; «Неделя» / «Месяц» put a `calendar.view` tab with
+  `{ view, date }` in the agenda's place, the switch only while the calendar plugin is live). The way back from the
+  calendar to «День» is the calendar's own keys: not there yet.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
