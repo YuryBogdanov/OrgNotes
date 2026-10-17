@@ -463,6 +463,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   «.org»; a plugin's block — the core's card, its content in Compat; its own head stays the plugin's till 45.6) and
   `next/ListToast.svelte`; EditorArea draws it for the tab TODAY. A regex in a Svelte template's `{…}` breaks the
   compile and svelte-check does not say so: put it in a function.
+  45.2, «Завершить день»: its workings out of EndDay.svelte into `src/endDayCtl.svelte.ts` (`EndDayCtl`: done, left
+  and the choice for each, the three for tomorrow found as in the palette, their order by drag and ⌥↑↓, the note,
+  `finish`, the window's keys), the old sheet on it. `next/EndDay.svelte`: a Sheet of 640 pt, the parts one under
+  another, «Не успел»'s choices under each row (the chosen on `lampsoft`), «Главное на завтра» numbered with «+
+  выбрать задачу…» as the last row, the note a textarea in Cormorant 18 with the lists going on (textList), not a
+  CodeMirror. The new window had shown no «Завершить день» at all, nor had it the window's ⌘Z (`store.undoLast` off a
+  text field): both as in the old one now. `svelte-ignore` takes several codes comma-separated, no `--` reason.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
