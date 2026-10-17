@@ -17,6 +17,8 @@ async function open(page: Page, flagOnce = false) {
   }, flagOnce);
   await openApp(page, { files: FILES, ready: false });
   await expect(page.locator('.next[data-ui="next"]')).toBeVisible();
+  // the layout restored and the first file open before a test opens more (else the restore takes them back)
+  await expect.poll(() => store(page, 'return store.loaded && store.layout.panes[0]?.tabs.length > 0')).toBe(true);
 }
 
 test('a tab per file, its name without `.org`; a click activates; «×» closes; «+» an untitled one', async ({ page }) => {

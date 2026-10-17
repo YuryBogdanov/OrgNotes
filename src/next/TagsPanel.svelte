@@ -2,7 +2,9 @@
   import { tagsState as ts } from '../tagsState.svelte';
   import { PALETTE, toneOf, toneStyle } from '../colors';
   import Compat from './Compat.svelte';
-  import { ConfirmDialog, ContextMenu, TagRename, type MenuItem } from './bridges';
+  import { ConfirmDialog, TagRename } from './bridges';
+  import type { MenuItem } from '../menuItems';
+  import Menu from './ui/Menu.svelte';
 
   // «Теги» of the new sidebar (ТЗ 43 §2.3, ТЗ 38): «Найти тег», «по частоте / А–Я»; 28 pt rows — the tag's colour, its
   // name in IBM Plex Mono 12.5, how many headings have it. A click shows its headings in the tab «Тег», ⌘-click adds it
@@ -96,8 +98,8 @@
   </div>
 </div>
 
+{#if menu}<Menu x={menu.x} y={menu.y} items={menu.items} width={290} onclose={() => (menu = null)} />{/if}
 <Compat>
-  {#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} width={290} onclose={() => (menu = null)} />{/if}
   {#if renaming}<TagRename from={renaming.tag} merge={renaming.merge} onclose={() => (renaming = null)} />{/if}
   {#if removing && removeInfo}
     {@const tag = removing}
