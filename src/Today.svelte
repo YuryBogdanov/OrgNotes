@@ -1,253 +1,54 @@
 <script lang="ts">
   import { slide } from 'svelte/transition';
   import { store } from './store.svelte';
-  import { openFile } from './layout';
-  import { actionOf } from './views';
-  import { entriesIn } from './calIndex';
-  import { runAgenda } from './agendas';
-  import { firstOpen, sequenceFor, titleIndex } from './org';
-  import { toneFor } from './org';
-  import { toneStyle } from './colors';
-  import { weekdayNames } from './edits';
   import { today } from './todayState.svelte';
-  import { allTodayBlocks, arrange, todayBlockOf } from './todayBlocks';
-  import { oneOnOnes } from './oneOnOne';
-  import { untrack } from 'svelte';
-  import { lists, type DateKind, type ListTask } from './taskLists.svelte';
+  import { todayBlockOf } from './todayBlocks';
   import ListToast from './ListToast.svelte';
   import TodayNote from './TodayNote.svelte';
   import TodayMeetings from './TodayMeetings.svelte';
-  import {
-    agendaRows, dateTitle, doneStatus, focusRows, journalDays, kicker, lastDay, overdue, overdueWords, taskGroups, whenChosen,
-    type OverdueRow, type TaskRow,
-  } from './today';
+  import { dateTitle, kicker, overdueWords, whenChosen } from './today';
+  import { LATE_CAP, TodayCtl } from './todayCtl.svelte';
 
   // «Сегодня» (ТЗ 32 §2): the morning's overview — the note from yesterday and the choice for today (from the
   // journal), the agenda of the day, the tasks, the overdue ones. A click on a row chooses its task, a double click
-  // or ↩ opens it in a tab (ТЗ 34): the rows of all the blocks are one list of tasks.
+  // or ↩ opens it in a tab (ТЗ 34): the rows of all the blocks are one list of tasks. Its workings are
+  // todayCtl.svelte.ts (the new interface draws them too, ТЗ 45).
   let { pane = 0 }: { pane?: number } = $props();
-
-  const cfg = $derived(today.folder);
-  const day = $derived(today.day);
-  const now = $derived(today.now);
-  const files = $derived(store.agendaFiles);
-  const tone = (kw: string, path: string) => {
-    const f = files.find((x) => x.path === path);
-    return f && kw ? toneStyle(toneFor(kw, f.wf)) : '';
-  };
-  const base = (p: string) => p.split('/').pop() ?? p;
-
-  // ---- the rows as one list of tasks (ТЗ 34) ----
-  /** Which of the headings with its title in its file a row's task is: its name whatever its line. */
-  function nOf(path: string, line: number, title: string) {
-    return titleIndex(files.find((x) => x.path === path)?.headings ?? [], line, title);
-  }
-  type Row = { path: string; line: number; title: string; kw: string | null; slot: string; n: number; stale?: boolean; gone?: boolean };
-  /** Rows changed from the list stay as they were until a refresh (`frozen`): drawn with the task's values now. */
-  // the rows of three kinds, as they were drawn
-  let frozen = $state.raw<{ agenda: any[]; groups: { file: string; rows: any[] }[]; late: any[]; texts: Map<string, string> } | null>(null);
-  function shownRows<T extends { path: string; line: number; title: string; kw: string | null }>(block: string, live: T[], was: (T & Row)[] | undefined): (T & Row)[] {
-    const rows = live.map((r) => {
-      const n = nOf(r.path, r.line, r.title);
-      return { ...r, n, slot: `${block}|${r.path}|${r.title}|${n}` };
-    });
-    if (!was) return rows;
-    const now = new Map(rows.map((r) => [r.slot, r]));
-    return was.flatMap((r) => {
-      const hit = now.get(r.slot);
-      if (hit) return [hit];
-      const f = store.files.find((x) => x.path === r.path);
-      const h = f?.headings.filter((x) => x.title === r.title)[r.n];
-      if (!f || !h) return [];
-      return [{ ...r, line: h.line, kw: h.keyword ?? '', prio: h.priority, stale: true, gone: !!h.keyword && f.wf.done.includes(h.keyword) }];
-    });
-  }
-
-  // ---- the journal: yesterday's note and choice ----
-  const journal = $derived(files.find((f) => f.name === cfg.journal));
-  const jd = $derived(journal ? lastDay(journalDays(journal), day) : null);
-  const focus = $derived(jd ? focusRows(jd.focus, files, day) : []);
-  const focusRows2 = $derived(focus.map((f) => ({ ...f, task: f.task ? { ...f.task, slot: `f|${f.task.path}|${f.task.title}|${nOf(f.task.path, f.task.line, f.task.title)}`, n: 0 } : null })));
-
-  // ---- the agenda of the day ----
-  const agendaId = $derived(store.agendas.some((a) => a.id === cfg.agenda) ? cfg.agenda : '');
-  const agendaLive = $derived.by(() => {
-    let list = entriesIn(files, day, day);
-    const a = store.agendas.find((x) => x.id === agendaId);
-    if (a) {
-      const keys = new Set(runAgenda(a, files, day).flatMap((r) => r.groups.flatMap((g) => g.tasks.map((t) => t.path + '#' + t.line))));
-      list = list.filter((e) => keys.has(e.file + '#' + e.line));
-    }
-    return agendaRows(list, files, day, now, cfg.tag);
-  });
-  const agenda = $derived(shownRows('a', agendaLive, frozen?.agenda));
-
-  // ---- the tasks, the overdue ones ----
-  const groupsLive = $derived(taskGroups(files, cfg.statuses, today.taskFiles));
-  const groups = $derived(groupsLive.map((g, gi) => ({ ...g, rows: shownRows('t' + g.file, g.rows, frozen?.groups[gi]?.file === g.file ? frozen.groups[gi].rows : undefined) })));
-  const tasksTotal = $derived(groups.reduce((n, g) => n + g.total, 0));
-  const lateLive = $derived(overdue(cfg.overdueAll ? files : files.filter((f) => today.taskFiles.includes(f.name)), day));
-  const late = $derived(shownRows('o', lateLive, frozen?.late));
-  const LATE_CAP = 6;
-
-  function freeze() {
-    if (!frozen) frozen = { agenda, groups: groups.map((g) => ({ file: g.file, rows: g.rows })), late, texts: new Map(store.files.map((f) => [f.path, f.text])) };
-  }
-  function refresh() {
-    frozen = null;
-  }
-  // a change not made from the lists (the box of «Главное», «Завтра» of an overdue task, the editor): computed again
-  $effect(() => {
-    const fz = frozen;
-    if (!fz) return;
-    if (lists.changedOutside(store.files, fz.texts)) untrack(refresh);
-  });
-  $effect(() => {
-    void day.getTime();
-    untrack(refresh);
-  });
-
-  // the chosen row: its slot; the task and the date it stands by come from the row
-  let selKey = $state('');
   let el: HTMLDivElement | undefined = $state();
-  const chosen = $derived.by((): (ListTask & { slot: string }) | null => {
-    if (!selKey) return null;
-    const pick = (r: Row, dk: DateKind | null) => ({ path: r.path, line: r.line, title: r.title, dk, slot: r.slot });
-    for (const f of focusRows2) if (f.task?.slot === selKey) return pick(f.task, null);
-    for (const a of agenda) if (a.slot === selKey) return pick(a, a.kind === 'event' ? 'event' : a.kind === 'deadline' ? 'DEADLINE' : 'SCHEDULED');
-    for (const g of groups) for (const r of g.rows) if (r.slot === selKey) return pick(r, null);
-    for (const r of late) if (r.slot === selKey) return pick(r, r.kind);
-    return null;
-  });
-  // a task gone: the selection goes
-  $effect(() => {
-    if (selKey && !chosen) untrack(() => (selKey = ''));
-  });
-  const rowsOnScreen = () => [...(el?.querySelectorAll<HTMLElement>('[data-k]') ?? [])];
-  function choose(k: string) {
-    selKey = k;
-    queueMicrotask(() => {
-      const b = rowsOnScreen().find((x) => x.dataset.k === k);
-      b?.focus({ preventScroll: true });
-      b?.scrollIntoView({ block: 'nearest' });
-    });
-  }
-  // The chosen row had the focus and was drawn anew (a block came or went with the folder read, a plugin's block came):
-  // the focus left with the old button — it goes to the new one, so the list's keys keep working.
-  let rowFocus = false;
-  $effect(() => {
-    const node = el;
-    if (!node) return;
-    const into = (e: FocusEvent) => (rowFocus = !!(e.target as HTMLElement).closest?.('[data-k]') && node.contains(e.target as Node));
-    document.addEventListener('focusin', into);
-    const watch = new MutationObserver(() => {
-      if (!rowFocus || !selKey || (document.activeElement && document.activeElement !== document.body)) return;
-      rowsOnScreen().find((x) => x.dataset.k === selKey)?.focus({ preventScroll: true });
-    });
-    watch.observe(node, { childList: true, subtree: true });
-    return () => {
-      document.removeEventListener('focusin', into);
-      watch.disconnect();
-    };
-  });
-  function keydown(e: KeyboardEvent) {
-    if ((e.key !== 'ArrowDown' && e.key !== 'ArrowUp') || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) {
-      if (e.code === 'KeyZ' && e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && lists.canUndo) {
-        e.preventDefault();
-        void lists.undo();
-      }
-      return;
-    }
-    const rows = rowsOnScreen();
-    if (!rows.length) return;
-    e.preventDefault();
-    const i = rows.findIndex((x) => x.dataset.k === selKey);
-    const j = i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)));
-    choose(rows[j].dataset.k!);
-  }
-  function clickEmpty(e: MouseEvent) {
-    if (!(e.target as HTMLElement).closest('[data-k], button, a, input')) selKey = '';
-  }
-  function openChosen(other: boolean) {
-    const t = chosen;
-    if (!t) return;
-    const fi = store.files.findIndex((f) => f.path === t.path);
-    if (other) store.openFromAgenda(pane, fi, t.line, 'neighbor-focus');
-    else open(t.path, t.line);
-  }
-  function menu(e: MouseEvent, k: string) {
-    choose(k);
-    const sp = lists.spec(listId);
-    if (sp) queueMicrotask(() => lists.openMenu(e, sp));
-    e.preventDefault();
-  }
-  const listId = $derived('today:' + pane);
-  $effect(() => {
-    const id = 'today:' + pane;
-    return untrack(() =>
-      lists.register({
-        id,
-        el: () => el,
-        tab: () => store.layout.panes[pane]?.tabs[store.layout.panes[pane].active],
-        selected: () => {
-          const t = chosen;
-          return t ? { path: t.path, line: t.line, title: t.title, dk: t.dk } : null;
-        },
-        open: openChosen,
-        clear: () => (selKey = ''),
-        refresh,
-        freeze,
-      }),
-    );
-  });
-
-  // ---- 1-1: the meetings of the day (their cards: TodayMeetings.svelte) ----
-  const meetings = $derived(oneOnOnes(files, day, cfg.tag));
-
-  const EMPTY: Record<string, () => boolean> = { overdue: () => !late.length, oneOnOne: () => !meetings.length };
-  const shown = (id: string) => {
-    const b = todayBlockOf(id);
-    if (!b || (b.empty?.() ?? EMPTY[id]?.() ?? false)) return undefined;
-    return b;
-  };
-  // a plugin's block left out stays drawn out of sight: it can come back by itself
-  const resting = $derived(today.blocks.filter((o) => o.on && todayBlockOf(o.id)?.component && !shown(o.id)).map((o) => o.id));
-  const layout = $derived.by(() => {
-    void allTodayBlocks();
-    return arrange(today.blocks, shown);
-  });
-
-  // ---- actions ----
-  function open(path: string, line: number) {
-    openFile(store.layout, pane, path, line, { focus: true });
-    store.layout.active = pane;
-  }
-  const ref = (r: TaskRow) => ({ path: r.path, line: r.line, title: r.title });
-  async function tick(r: TaskRow) {
-    const f = files.find((x) => x.path === r.path);
-    if (!f) return;
-    const to = r.done ? firstOpen(sequenceFor(f.wf, r.kw)) : doneStatus(r.kw, f.wf);
-    if (to) await store.transaction(r.done ? 'Вернуть задачу' : 'Задача выполнена', (tx) => tx.setStatus(ref(r), to));
-  }
-  async function move(r: OverdueRow, d: Date) {
-    await store.transaction('Перенести задачу', (tx) => r.kinds.forEach((k) => tx.setPlanning(ref(r), k, d)));
-  }
-  const shift = (n: number) => {
-    const d = new Date(day);
-    d.setDate(d.getDate() + n);
-    return d;
-  };
-  function pick(r: OverdueRow) {
-    const f = files.find((x) => x.path === r.path);
-    store.openCalendar({ kind: r.kind, initial: day, current: r.date, names: weekdayNames(f?.text ?? ''), pick: (d) => void move(r, d) });
-  }
-  function openAgenda() {
-    if (agendaId) store.openAgendaHere(agendaId);
-    else store.showAgendaHere();
-  }
-  const isInbox = (p: string) => p === (store.inboxCfg.file || 'inbox.org');
-  const review = $derived(actionOf('inbox.review'));
-  const key = $derived(store.keyHint('today'));
+  const c = new TodayCtl(() => pane, () => el);
+  c.effects();
+  const cfg = $derived(c.cfg);
+  const day = $derived(c.day);
+  const now = $derived(c.now);
+  const files = $derived(c.files);
+  const tone = c.tone;
+  const base = (p: string) => p.split('/').pop() ?? p;
+  const jd = $derived(c.jd);
+  const journal = $derived(c.journal);
+  const focus = $derived(c.focus);
+  const focusRows2 = $derived(c.focusRows);
+  const agenda = $derived(c.agenda);
+  const groups = $derived(c.groups);
+  const tasksTotal = $derived(c.tasksTotal);
+  const late = $derived(c.late);
+  const selKey = $derived(c.selKey);
+  const meetings = $derived(c.meetings);
+  const layout = $derived(c.layout);
+  const resting = $derived(c.resting);
+  const listId = $derived(c.listId);
+  const review = $derived(c.review);
+  const key = $derived(c.key);
+  const choose = (k: string) => c.choose(k);
+  const open = (path: string, line: number) => c.open(path, line);
+  const menu = (e: MouseEvent, k: string) => c.menu(e, k);
+  const keydown = (e: KeyboardEvent) => c.keydown(e);
+  const clickEmpty = (e: MouseEvent) => c.clickEmpty(e);
+  const tick = c.tick.bind(c);
+  const move = c.move.bind(c);
+  const shift = (n: number) => c.shift(n);
+  const pick = c.pick.bind(c);
+  const openAgenda = () => c.openAgenda();
+  const isInbox = c.isInbox;
 </script>
 
 <div class="host">

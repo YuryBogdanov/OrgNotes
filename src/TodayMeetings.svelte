@@ -1,41 +1,16 @@
 <script lang="ts">
-  import { store } from './store.svelte';
   import { fmtDay } from './org';
-  import { newMeeting, type OneOnOne } from './oneOnOne';
-  import { plugins } from './api/host.svelte';
+  import type { OneOnOne } from './oneOnOne';
+  import { MeetingsCtl } from './meetingsCtl.svelte';
 
   // «Сегодня» → «1-1 сегодня» (tech sprint 4.2, from Today.svelte): a card per meeting of the day — who, how often,
-  // the last one; what the plugins add to it (the goals' line, «Разбор целей»); a new meeting note or the file.
+  // the last one; what the plugins add to it (the goals' line, «Разбор целей»); a new meeting note or the file. Its
+  // workings are meetingsCtl.svelte.ts (the new interface draws them too).
   let { meetings, day, onopen }: { meetings: OneOnOne[]; day: Date; onopen: (path: string, line: number) => void } = $props();
-  const files = $derived(store.agendaFiles);
-
-  const extras = $state<Record<string, { line: string | null; action: { label: string; run: () => void } | null }[]>>({});
-  $effect(() => {
-    const specs = [...plugins.oneOnOnes.entries()];
-    for (const m of meetings) {
-      const file = m.file;
-      void Promise.all(
-        specs.map(async ([pid, s]) => ({
-          line: s.line ? await Promise.resolve(plugins.guard(pid, () => s.line!(file), null)).catch(() => null) : null,
-          action: s.action && (await Promise.resolve(plugins.guard(pid, () => s.action!.available?.(file) ?? true, false)).catch(() => false))
-            ? { label: s.action.label, run: () => plugins.guard(pid, () => s.action!.run(file), undefined) } : null,
-        })),
-      ).then((r) => (extras[m.key] = r));
-    }
-  });
-  async function meeting(m: OneOnOne) {
-    if (m.today !== null) return onopen(m.path, m.today + 1);
-    let at = -1;
-    const step = await store.transaction('Новая встреча', (tx) =>
-      tx.update(m.path, (text) => {
-        const f = files.find((x) => x.path === m.path);
-        const r = f ? newMeeting(text, f.headings, m.line, day) : null;
-        if (r) at = r.line;
-        return r?.text ?? null;
-      }),
-    );
-    if (step && at >= 0) onopen(m.path, at);
-  }
+  const ctl = new MeetingsCtl(() => ({ meetings, day, onopen }));
+  ctl.effects();
+  const extras = $derived(ctl.extras);
+  const meeting = (m: OneOnOne) => ctl.meeting(m);
 </script>
 
 {#each meetings as m (m.key)}

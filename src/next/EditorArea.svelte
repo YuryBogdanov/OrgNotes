@@ -10,6 +10,8 @@
   import { narrowRangeOf } from '../narrowTab';
   import Editor from './Editor.svelte';
   import Structure from './Structure.svelte';
+  import Today from './Today.svelte';
+  import { TODAY } from '../todayState.svelte';
   import FileCard from './FileCard.svelte';
   import { FileCardsCtl, caretHeading } from './fileCards.svelte';
   import FindPanel from './FindPanel.svelte';
@@ -117,7 +119,10 @@
 </script>
 
 <div class="area">
-  {#if tab && !isCore(tab.kind)}
+  {#if tab?.kind === TODAY}
+    <!-- «Сегодня» in the new style (ТЗ 45 §2) -->
+    <div class="view"><Today pane={0} /></div>
+  {:else if tab && !isCore(tab.kind)}
     {@const v = viewOf(tab.kind)}
     {#if v}
       <!-- «Сегодня», «Тег», a review, a plugin's view: old screens in the compatibility layer (ТЗ 43 §4) -->
