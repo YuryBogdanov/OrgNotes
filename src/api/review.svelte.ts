@@ -75,11 +75,14 @@ export class ReviewController {
     if (!r || !c || !a || this.host.failed(r.plugin)) return;
     if (a.disabled && this.host.guard(r.plugin, () => a.disabled!(c.info), false)) return;
     let res: 'next' | 'stay';
+    this.acting++;
     try {
       res = await a.run(c.info);
     } catch (err) {
       this.host.fail(r.plugin, err);
       return;
+    } finally {
+      this.acting--;
     }
     if (this.run !== r) return;
     const now = this.heading();
@@ -104,6 +107,16 @@ export class ReviewController {
     // only the same heading: moved by an edit above it (its title) or retitled in place (its line); a rewrite of the
     // file (a goal moved to another quarter) leaves the narrowed range pointing elsewhere — the title finds it then
     if (r && ref && h && (h.title === ref.title || h.line === ref.line) && (ref.line !== h.line || ref.title !== h.title)) r.refs[r.cur] = { path: ref.path, line: h.line, title: h.title };
+  }
+  /** An action is running: its card may be gone for a moment (archived, moved) — not «нет в файле» yet. */
+  acting = $state(0);
+  /** The card's heading is gone from its file (removed, moved outside): in the file it is passed over, «нет в файле»
+   *  (ТЗ 41 §5). */
+  gone() {
+    const r = this.run;
+    if (!r || r.cur < 0 || this.acting) return;
+    r.marks = { ...r.marks, [r.cur]: { tone: 'skip', text: 'нет в файле' } };
+    void this.step(1);
   }
   /** The card drawn again (the plugin's parts read the file anew). */
   redraw = $state(0);

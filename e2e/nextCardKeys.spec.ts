@@ -37,7 +37,7 @@ test('«⌃C K W» from the text on a long matter opens «Ждём…»; the let
   // «Клавиши»: the chord, set as any
   await page.keyboard.press('Meta+,');
   await settingsSheet(page).getByRole('tab', { name: 'Клавиши', exact: true }).click();
-  await expect(settingsSheet(page).locator('.row', { hasText: 'Ждём…' })).toContainText('⌃C K W');
+  await expect(settingsSheet(page).locator('.row[data-cmd="long-matters.wait"]')).toContainText('⌃C K W');
 });
 
 test('on a heading that is not a long matter the chord does nothing, and types nothing', async ({ page }) => {

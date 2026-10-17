@@ -540,6 +540,27 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   menu. Inbox: «Отложить…» in the file — `ui.menu` of `deferDates` with their days, «Выбрать дату…», 292 pt left of
   the button; `calendar: { command: 'inbox.calendar', defer }`; `endActions` «Разобрать пропущенные» (⇧⌘R from the
   summary too: `start()` there) and «Разобрать и новые»; `session.again(list)`.
+- **«Обход долгих дел» (ТЗ 41.2–41.3):** `plugins/long-matters/walk.svelte.ts` (`walk`) on the core's review in the
+  file: `long-matters.walk` ⌃⌘O (the palette «Долгие дела: начать обход»), «Обход» on the plugin's file card, «Обход ›»
+  on «Сегодня», «Начать обход» in the tab's header. The queue: `long.groups.due` in the list's order; none — the
+  toast «Проверять нечего. Ближайшая проверка — пт, 23 окт» (the nearest due of the others). The decisions, scope
+  `review` keys in the manifest (`long-matters.walk.*`): ⌘1 «Продолжаем» (`subOf` «WAIT → NEXT»: no more waiting,
+  `statusAfterWaiting`, `:NEXT_REVIEW:` by «Проверить снова через»), ⌘2 «Ждём…» (`actions.wait(m, {days, also})` —
+  the sheet, its days for no date, the note in the same step), ⌘3 «Осмотрено» (`markReviewed`, the note before),
+  ⌘4 «В архив» (the core command `heading.archive {ref, note?}` → `store.archiveSubtree(at, {note})`: the note goes
+  into the entry, one step), ⌘5 «Закрыть» (the first done status of its set), ⌘↩ on with no decision («пропущено»,
+  a typed status written), ⌘[ back. The plugin keeps each matter's mark (`spec.mark`, `group` — the summary's word).
+  `WalkCard.svelte` (the card's `below`): the line «≈45 дн. без касания · по дате файла · проверить надо было 15 сен»,
+  «Новый статус» (↩ `writeNote` — a note, the focus stays; ⇧↩ a line; the focus there at each matter), the chips
+  «неделя / 2 нед. / месяц / дата…» (the norm by default, kept till the end). The status typed goes in the decision's
+  transaction (⌘Z takes both back). The core for it (API 1.14): `ReviewAction.subOf(h)`, `ReviewMark.group`,
+  `ReviewSpec.queueNote(h) {text, late}` (red in the queue), `endNote()` (under the summary's figures); the summary
+  titled «<first word> окончен»; a card gone from its file meanwhile is passed over «нет в файле» (not during an
+  action: `reviewActing`; not for a review of its own order); one review in the window — another plugin's going on
+  asks «Закончить «…» и начать «…»?» (`host.openReview`). Fixed on the way: the tab did not follow a card into another
+  file (the follow effect checked the new file, not the one the tab was on); the queue's rows took no clicks (the
+  column's `pointer-events` rule is scoped to Structure). e2e `nextWalk.spec.ts`. Still to come: 41.4 (the summary
+  as ТЗ 41 §4 — the figures in Yeseva, «Готово» back to «Долгие дела»), 41.5 (the old interface).
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

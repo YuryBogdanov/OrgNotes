@@ -110,6 +110,7 @@
       <h1>Долгие дела</h1>
       <span class="sub">{mattersWord(counts.all)}{counts.due ? ` · ${counts.due} пора проверить` : ''}</span>
       <button class="src" onclick={() => long.openSources()}>Источники…</button>
+      <button class="src walk" disabled={!counts.due} title={counts.due ? undefined : 'Проверять нечего'} onclick={() => void long.ctx.commands.run('long-matters.walk')}>Начать обход{#if long.ctx.commands.keyOf('long-matters.walk')}<kbd>{long.ctx.commands.keyOf('long-matters.walk')}</kbd>{/if}</button>
     </div>
     <div class="seg" role="tablist" aria-label="Показать">
       {#each FILTERS as f (f.id)}
@@ -177,6 +178,9 @@
   .sub { color: var(--fg3); }
   .src { margin-left: auto; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12.5px; }
   .src:hover { background: var(--side); }
+  .src.walk { margin-left: 0; display: inline-flex; align-items: center; gap: 6px; border-color: transparent; background: var(--acc); color: #fff; font-weight: 600; }
+  .src.walk:disabled { opacity: 0.45; }
+  .src.walk kbd { font: 11px inherit; opacity: 0.7; }
   .seg { align-self: flex-start; display: flex; padding: 2px; border-radius: 7px; background: var(--field); }
   .seg button { height: 24px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: var(--fg2); font-size: 12px; }
   .seg button.on { background: var(--bg); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }

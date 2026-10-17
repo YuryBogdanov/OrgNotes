@@ -24,7 +24,7 @@ import type { Values } from '../settingsSchema';
 import { builtinEntries, declareKeys, entries, viewScope, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, type Entry, type Listed } from './declare';
 import PluginsSettings from '../PluginsSettings.svelte';
 import { iconOf, type Manifest } from './manifest';
-import type { MenuItem as ApiMenuItem, Ctx, Dispose, FileCardSpec, SheetSpec, FormSpec, HeadingRef, Place, Plugin, Render, Store, ViewSpec } from './index';
+import type { MenuItem as ApiMenuItem, Ctx, Dispose, FileCardSpec, SheetSpec, FormSpec, HeadingRef, Place, Plugin, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
 import PluginInspector from '../PluginInspector.svelte';
 import PluginNav from '../PluginNav.svelte';
@@ -246,9 +246,23 @@ class Host {
   readonly reviewShow = this.reviews.show.bind(this.reviews);
   readonly endReview = this.reviews.end.bind(this.reviews);
   readonly reviewMark = this.reviews.markOf.bind(this.reviews);
+  readonly reviewGone = this.reviews.gone.bind(this.reviews);
+  get reviewActing() {
+    return this.reviews.acting > 0;
+  }
   /** The new interface's side of a review in the file (next/fileReview). */
   set reviewFile(h: FileReviewHooks | null) {
     this.reviews.file = h;
+  }
+
+  /** A plugin's review shown: the earlier one answers (its tab reused); in the file, or in the review's tab. */
+  private openReview(id: string, spec: ReviewSpec, resolve: (r: ReviewResult) => void) {
+    this.endReview(false, true); // the earlier review answers; its tab is reused (closing it would race the new one)
+    if (!spec.items.length) return resolve({ total: 0, done: 0, finished: true });
+    const inFile = spec.place === 'file' && store.nextUi; // the old interface: in a tab
+    this.review = { plugin: id, spec, refs: spec.items.map((r) => ({ ...r })), cur: Math.min(Math.max(0, spec.start ?? 0), spec.items.length - 1), done: 0, doneAt: new Set<number>(), gen: 0, resolved: false, resolve, inFile, marks: {} };
+    if (inFile) return void this.reviews.file?.front();
+    openView(store.layout, store.layout.active, REVIEW_KIND, () => ({}), (t) => this.redraw.set(t.id, (this.redraw.get(t.id) ?? 0) + 1));
   }
 
   // ---- what the manifests declare, before any code ---------------------------------------------------------------
@@ -820,12 +834,19 @@ class Host {
           }),
         review: (spec) =>
           new Promise((resolve) => {
-            this.endReview(false, true); // the earlier review answers; its tab is reused (closing it would race the new one)
-            if (!spec.items.length) return resolve({ total: 0, done: 0, finished: true });
-            const inFile = spec.place === 'file' && store.nextUi; // the old interface: in a tab
-            this.review = { plugin: id, spec, refs: spec.items.map((r) => ({ ...r })), cur: Math.min(Math.max(0, spec.start ?? 0), spec.items.length - 1), done: 0, doneAt: new Set<number>(), gen: 0, resolved: false, resolve, inFile, marks: {} };
-            if (inFile) return void this.reviews.file?.front();
-            openView(store.layout, store.layout.active, REVIEW_KIND, () => ({}), (t) => this.redraw.set(t.id, (this.redraw.get(t.id) ?? 0) + 1));
+            const other = this.review && this.review.plugin !== id && !this.review.resolved ? this.review : null;
+            if (!other) return this.openReview(id, spec, resolve);
+            // one review in the window (ТЗ 41 §5): another plugin's going on — asked first
+            this.sheetReq?.resolve(null);
+            this.sheetReq = {
+              plugin: id,
+              spec: { title: `Закончить «${other.spec.title}» и начать «${spec.title}»?`, render: (el) => void (el.textContent = 'Всё, что сделано, уже записано в файлы.'), buttons: [{ id: 'no', label: 'Отмена' }, { id: 'yes', label: 'Закончить и начать', primary: true }] },
+              resolve: (b) => {
+                this.sheetReq = null;
+                if (b !== 'yes') return resolve({ total: spec.items.length, done: 0, finished: false });
+                this.openReview(id, spec, resolve);
+              },
+            };
           }),
         sheet: (spec) =>
           new Promise((resolve) => {

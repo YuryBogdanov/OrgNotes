@@ -37,6 +37,79 @@
         ]
       },
       {
+        "id": "long-matters.walk",
+        "title": "Долгие дела: начать обход",
+        "keys": [
+          "⌃⌘O"
+        ],
+        "synonyms": [
+          "обход",
+          "долгие дела",
+          "проверить",
+          "weekly review"
+        ]
+      },
+      {
+        "id": "long-matters.walk.continue",
+        "title": "Обход: Продолжаем",
+        "keys": [
+          "⌘1"
+        ],
+        "scope": "review"
+      },
+      {
+        "id": "long-matters.walk.wait",
+        "title": "Обход: Ждём…",
+        "keys": [
+          "⌘2"
+        ],
+        "scope": "review"
+      },
+      {
+        "id": "long-matters.walk.seen",
+        "title": "Обход: Осмотрено",
+        "keys": [
+          "⌘3"
+        ],
+        "scope": "review"
+      },
+      {
+        "id": "long-matters.walk.archive",
+        "title": "Обход: В архив",
+        "keys": [
+          "⌘4"
+        ],
+        "scope": "review"
+      },
+      {
+        "id": "long-matters.walk.close",
+        "title": "Обход: Закрыть",
+        "keys": [
+          "⌘5"
+        ],
+        "scope": "review"
+      },
+      {
+        "id": "long-matters.walk.next",
+        "title": "Обход: Дальше без решения",
+        "keys": [
+          "⌘↩"
+        ],
+        "scope": "review",
+        "synonyms": [
+          "пропустить",
+          "дальше"
+        ]
+      },
+      {
+        "id": "long-matters.walk.back",
+        "title": "Обход: Назад",
+        "keys": [
+          "⌘["
+        ],
+        "scope": "review"
+      },
+      {
         "id": "long-matters.review",
         "title": "Проверить через…",
         "cardKey": "R",

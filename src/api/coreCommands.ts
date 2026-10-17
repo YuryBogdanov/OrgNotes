@@ -63,6 +63,16 @@ export function coreCommand(cmd: string, arg: unknown) {
       const at = typeof o.x === 'number' && typeof o.y === 'number' ? { x: o.x, y: o.y } : undefined;
       return openNote(f.name, h.line, at);
     }
+    case 'heading.archive': {
+      // «Архивировать поддерево» (ТЗ 41 §7) for the walk's «В архив»: a note first, in the same step
+      const f = a.ref ? fileOf(a.ref.path) : undefined;
+      const h = f && a.ref ? findHeading(f.headings, a.ref) : undefined;
+      if (!f || !h) throw new Error('заголовок не найден');
+      const note = (arg as { note?: unknown })?.note;
+      return store.archiveSubtree({ path: f.path, line: h.line }, typeof note === 'string' && note.trim() ? { note } : {}).then((ok) => {
+        if (!ok) throw new Error('не удалось перенести в архив');
+      });
+    }
     case 'heading.status':
     case 'heading.schedule':
     case 'heading.deadline':
