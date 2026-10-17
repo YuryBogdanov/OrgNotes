@@ -358,6 +358,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   its tooltips with them. Toolbar: a screen's name and its crumbs («Сегодня» — `fmtLong` of the day, the agenda — its
   name, a view — its crumbs after the first, else its `title(state)`). «Оформление / Исходник» over a file or an
   untitled tab only. e2e `nextScreens` scans a screen for the old theme's blues.
+  ТЗ 43.5: the sidebar's own panels in `next/` — `AgendaPanel` (built-in, «Мои агенды» with the first block's colour,
+  «Новая агенда…»; the menu and «Удалить?» bridged), `TagsPanel` (find, по частоте / А–Я, mono names; the menu,
+  TagRename and «Убрать тег?» bridged, in Compat), `SearchPanel` (Aa, «.*», «только заголовки»; by file, the match on
+  lampsoft, the heading under it grey; the recent queries). The global search takes `re` (`search.ts` `searchFile` by
+  `findRanges`, `SearchState.re` / `ranRe`, `findReq.re`); the new EditorArea handles `findReq` `jump` (the match the
+  current one, as Pane does).
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

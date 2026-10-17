@@ -1450,7 +1450,7 @@ class Store {
 
   // ---- search: ⌘F in a pane, ⇧⌘F in every file ------------------------------------------------------------
   /** What a pane's find bar is asked (the menu, the keys, a jump from the search in every file). */
-  findReq = $state<{ kind: 'open' | 'next' | 'prev' | 'useSel' | 'jump' | 'replace'; pane: number; n: number; q?: string; at?: { path: string; line: number; col: number } } | null>(null);
+  findReq = $state<{ kind: 'open' | 'next' | 'prev' | 'useSel' | 'jump' | 'replace'; pane: number; n: number; q?: string; re?: boolean; at?: { path: string; line: number; col: number } } | null>(null);
   askFind(kind: 'open' | 'next' | 'prev' | 'useSel' | 'replace') {
     this.findReq = { kind, pane: this.layout.active, n: Date.now() + Math.random() };
   }
@@ -1464,7 +1464,7 @@ class Store {
   runSearch() {
     const open = new Set(this.layout.panes.flatMap((p) => p.tabs.flatMap((t) => (t.kind === 'file' && t.path ? [t.path] : []))));
     // not a plugin's file (a canvas's JSON)
-    return searchAll.run(this.files.filter((f) => isOrgName(f.name)), open, { cs: this.findCase, word: this.findWord });
+    return searchAll.run(this.files.filter((f) => isOrgName(f.name)), open, { cs: this.findCase, word: this.findWord, re: this.search.re });
   }
   /** A result: its file in the active pane at the match; the pane's find bar with the same query. */
   openHit(g: number, i: number) {
@@ -1474,7 +1474,7 @@ class Store {
     if (!hit || idx < 0) return;
     this.search.sel = { g, i };
     this.open(idx, hit.line, false);
-    this.findReq = { kind: 'jump', pane: this.layout.active, n: Date.now() + Math.random(), q: this.search.ran, at: { path: grp.path, line: hit.line, col: hit.col } };
+    this.findReq = { kind: 'jump', pane: this.layout.active, n: Date.now() + Math.random(), q: this.search.ran, re: this.search.ranRe, at: { path: grp.path, line: hit.line, col: hit.col } };
   }
   /** ⌥⌘G / ⇧⌥⌘G: the next / previous result, from file to file. */
   searchStep(dir: 1 | -1) {

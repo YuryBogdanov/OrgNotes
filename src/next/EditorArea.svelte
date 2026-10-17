@@ -67,6 +67,14 @@
     else if (r.kind === 'useSel') {
       const s = oneLine();
       if (s) fb.q = s;
+    } else if (r.kind === 'jump' && r.at && r.q) {
+      // from the search in every file (the sidebar's «Поиск»): the file is open now; the match there is the current
+      const f = store.files.find((x) => x.path === r.at!.path);
+      if (!f) return;
+      const lines = f.text.split('\n');
+      let pos = 0;
+      for (let k = 0; k < r.at.line; k++) pos += lines[k].length + 1;
+      Object.assign(fb, { q: r.q, re: !!r.re, at: pos + r.at.col, open: true });
     }
   });
   const crumb = $derived(narrowed && file ? [file.name.replace(/\.org$/, '').split('/').pop()!, ...narrowed.path].join(' › ') : '');
