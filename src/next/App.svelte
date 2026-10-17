@@ -15,8 +15,10 @@
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { AgendaBuilder, CloseSheet, ContextMenu, Dialogs, DiskSheet, Palette, PluginSheets, Refile, Settings, type MenuItem } from './bridges';
+  import { AgendaBuilder, CloseSheet, Dialogs, DiskSheet, Palette, PluginSheets, Refile, Settings } from './bridges';
+  import type { MenuItem } from '../menuItems';
   import Compat from './Compat.svelte';
+  import Menu from './ui/Menu.svelte';
   import { untrack } from 'svelte';
   import { actionOf } from '../views';
   import { today } from '../todayState.svelte';
@@ -144,10 +146,11 @@
   <EditorArea />
   </div>
   </div>
+  <!-- the window's menus (a tab's, the files' tree): the new menu (ТЗ 44 §3.4) -->
+  {#if menu}<Menu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
   <!-- the bridged sheets and menus in the compatibility layer (ТЗ 43 §5) -->
   <Compat>
     <Dialogs />
-    {#if menu}<ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
     {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
     {#if store.palette}{#key store.palette.n}<Palette />{/key}{/if}
     {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}

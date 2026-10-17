@@ -6,7 +6,8 @@
   import type { RichPick } from '../orgRich';
   import { OrgEditor, type EditorProps } from '../cm/orgEditor';
   import { portal } from '../portal';
-  import { ContextMenu, TagPop, type MenuItem } from './bridges';
+  import { ContextMenu, TagPop } from './bridges';
+  import type { MenuItem } from '../menuItems';
   import Compat from './Compat.svelte';
   import { editorCompatVars } from './compat';
   import { nextPrefs } from '../nextPrefs.svelte';

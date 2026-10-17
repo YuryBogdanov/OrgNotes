@@ -5,7 +5,7 @@
   import { OFF_ICON, isCore, isDirty, isGone, tabLabel } from '../tabLabels';
   import { tabMenuItems } from '../tabMenu';
   import { tabNames } from './tabNames';
-  import type { MenuItem } from './bridges';
+  import type { MenuItem } from '../menuItems';
 
   // The tabs of the new interface (ТЗ 42 §4.3), 36 pt under the toolbar: a pinned tab — its icon alone; a tab — its
   // icon and name, «×» on the active one and on hover, a dot instead while unsaved; up to 190 pt, down to 90, then the

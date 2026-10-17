@@ -1,16 +1,6 @@
 <script module lang="ts">
-  export type MenuItem =
-    | {
-        label: string; action: () => void; danger?: boolean; disabled?: boolean; shortcut?: string;
-        // the tab list of a pane: a check at the active one, the tab's icon, a dot at an unsaved one
-        checked?: boolean; icon?: string; dot?: boolean; italic?: boolean; // icon: 'file' | 'agenda' | 'untitled', or an SVG path (a feature's tab)
-        sub?: MenuItem[]; // a submenu, opened by hovering or a click («Показать как ›»)
-        subWidth?: number; // its least width
-        detail?: string; // a grey second line: what exactly it does («https://wiki…», «Ревью архитектуры»), ТЗ 35
-        capsule?: string; // the label as a status capsule: the tone's style (`--tl:…`), as the agenda draws it (ТЗ 34)
-      }
-    | { note: string } // a grey line, not a command («Виды добавляют плагины»)
-    | 'sep';
+  import type { MenuItem as Item } from './menuItems';
+  export type MenuItem = Item; // the items' type lives in menuItems.ts, shared with the new menu
 </script>
 
 <script lang="ts">

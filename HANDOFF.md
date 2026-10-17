@@ -376,6 +376,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   middle: boxes with `overflow: hidden` (their baseline the bottom edge) raised by `calc(var(--hfs) * var(--capc) -
   half the box)`; `--hfs` is each level's size in editor.css (19 on the text), `--capc` half the cap height of «Шрифт
   текста», measured by a canvas in App («H»'s ascent). e2e `nextCapsule` measures the offset (≤ 1 pt) in all fonts.
+  44.1: the new interface's controls in `src/next/ui/` — `Popover` (card, rule, popshadow, 10 pt, kept in the window,
+  120 ms in), `Menu` (the old menu's items, now typed in `src/menuItems.ts` with `isCommand`; rows 28 pt, the chosen on
+  `lamp`, ↑↓ ↩, → / a 150 ms hover a submenu, ← / ⎋ back), `Sheet` (from under the toolbar, 440 pt, lower corners 14,
+  `dim`, ⎋), `Button` (30 / small 24, main · plain · danger, its key at 60%), `Field` (30 pt, `lampline` in focus, the
+  reason in `todo`). `Kit.svelte` shows them all (e2e `nextKit` mounts it). The window's menu (tabs, the files' tree)
+  and the sidebar panels' menus use `Menu` already; the editor's menu waits for 44.3.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
