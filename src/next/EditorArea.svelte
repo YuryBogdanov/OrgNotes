@@ -27,6 +27,9 @@
   import { iconOf } from '../api/manifest';
   import SessionCard from './SessionCard.svelte';
   import ReviewQueue from './ReviewQueue.svelte';
+  import ReviewCalendar from './ReviewCalendar.svelte';
+  import Menu from './ui/Menu.svelte';
+  import type { MenuItem } from '../menuItems';
 
   // What the active tab shows in the new interface (ТЗ 42.5): a file — the editor (or a plugin's view of it, the
   // board, the canvas); an untitled tab — the editor on its text; a plugin's tab — its view; none — a word.
@@ -113,6 +116,19 @@
   const sessionIcon = $derived(session ? (iconOf(plugins.manifest(session.plugin) ?? ({ contributes: { navSections: [], views: [], fileViews: [] } } as never)) ?? '') : '');
   const sessionNext = $derived(session?.spec.actions.find((a) => a.command && store.keyHint(a.command) === '⌘↩'));
   const colW = $derived(cardsCtl.cards.length || session ? 268 : 220);
+  let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  function actsMenu(e: MouseEvent) {
+    const r = session;
+    const c = fileReview.card;
+    if (!r || !c) return;
+    const b = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const items: MenuItem[] = r.spec.actions.filter((a) => !a.hidden).map((a) => ({
+      label: a.label + (a.sub ? ` · ${a.sub}` : ''), shortcut: a.command ? store.keyHint(a.command) || undefined : undefined,
+      disabled: !!a.disabled && plugins.guard(r.plugin, () => a.disabled!(c.info), false), action: () => void plugins.reviewAct(a.id),
+    }));
+    items.push('sep', { label: '← Назад', shortcut: r.spec.backCommand ? store.keyHint(r.spec.backCommand) || undefined : undefined, disabled: r.cur === 0, action: () => fileReview.back() });
+    menu = { x: b.left, y: b.bottom + 4, items };
+  }
   // «Midterm.org · изменён 2 мин назад» (§5.2): the file's last change, as the index of touches knows it
   function eyebrow(): string | null {
     if (!file) return null;
@@ -165,6 +181,11 @@
           {#if sessionIcon}<svg class="si" width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={sessionIcon} /></svg>{/if}
           <b>{session.spec.title.split(' ')[0]}</b><span class="np" title={crumb}>{crumb}</span>
           {#if fileReview.otherFile}<span class="chipf">другой файл</span>{/if}
+          {#if !structure && session.cur >= 0}
+            <!-- the column hidden (a narrow window, ⌥⌘0): the count and the card's actions here (ТЗ 46 §2) -->
+            <span class="cnt">{session.cur + 1} из {session.refs.length}</span>
+            <button class="acts" aria-haspopup="menu" onclick={(e) => actsMenu(e)}>Действия ▾</button>
+          {/if}
           {#if sessionNext}<span class="k">{store.keyHint(sessionNext.command!)} дальше</span>{/if}
           <button onclick={() => fileReview.finish()}>Закончить <span class="kk">⎋</span></button>
         {:else}
@@ -175,7 +196,8 @@
       </div>
     {/if}
     <div class="with grid" bind:clientWidth={areaW} style:--sw={structure ? `${colW}px` : '0px'}>
-    <div class="ed">
+    <!-- the review's summary: typing in the text is done with it (ТЗ 46 §5); a change from outside is not -->
+    <div class="ed" onkeydown={(e) => { if (session && session.cur < 0 && !e.metaKey && !e.ctrlKey && (e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace')) fileReview.finish(); }} role="presentation">
       {#if fb.open}
         <FindPanel bind:q={() => fb.q, (v) => { fb.q = v; fb.at = null; }} bind:re={() => fb.re, (v) => (fb.re = v)} replacing={fb.replacing} info={found} focusN={fb.focusN}
           onnext={() => step(1)} onprev={() => step(-1)} onreplace={(text, all) => (fb.rep = { text, all, n: (fb.rep?.n ?? 0) + 1 })} onclose={closeFind} />
@@ -193,7 +215,7 @@
     {#if structure}
       <Structure range={narrowed} width={colW} queue={session ? queue : undefined}>
         {#snippet cards()}
-          {#if session}<SessionCard />{/if}
+          {#if session}<SessionCard />{#if session.spec.calendar && session.cur >= 0 && plugins.live('calendar')}<ReviewCalendar />{/if}{/if}
           {#each shownCards as c (c.id)}
             <FileCard card={c} path={file.name} heading={caret} folded={cardsCtl.folded.has(c.id)} ontoggle={() => cardsCtl.toggle(c.id)} />
           {/each}
@@ -217,6 +239,7 @@
   {/if}
 </div>
 {#snippet queue()}<ReviewQueue />{/snippet}
+{#if menu}<Menu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
 {#if richPick}<StatusMenu pick={richPick.pick} path={richPick.path} onclose={() => (richPick = null)} />{/if}
 
 <style>
@@ -240,6 +263,8 @@
   .narrow .si { flex: 0 0 15px; color: var(--lampink); }
   .narrow .chipf { height: 20px; display: inline-flex; align-items: center; padding: 0 7px; border-radius: 5px; background: var(--chip2); color: var(--ink2); font-size: 11px; }
   .narrow .kk { font-size: 11px; opacity: 0.65; }
+  .narrow .cnt { font-size: 12px; color: var(--ink2); white-space: nowrap; }
+  .narrow button.acts { background: var(--chip2); }
   .narrow button { height: 26px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--card); color: var(--ink); font: 12.5px var(--ui); }
   .empty { position: absolute; inset: 0 var(--sw, 0px) 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; pointer-events: none; color: var(--ink3); font: 500 17px var(--text); }
   .empty .et { font: 400 28px/1.2 var(--title); color: var(--ink2); }

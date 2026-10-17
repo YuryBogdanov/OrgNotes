@@ -14,10 +14,10 @@ const scard = (page: Page) => col(page).getByRole('region', { name: 'Разбо�
 const strip = (page: Page) => page.getByRole('status', { name: 'Разбор Inbox' });
 const queue = (page: Page) => col(page).getByRole('group', { name: 'Очередь разбора' });
 
-async function open(page: Page) {
+async function open(page: Page, width = 1440) {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   await page.addInitScript(() => localStorage.setItem('ui:next', '1'));
-  await openApp(page, { files: FILES(), plugins: { inbox: ['index.read', 'files.edit'] }, now: NOW, ready: false, viewport: { width: 1440, height: 900 } });
+  await openApp(page, { files: FILES(), plugins: { inbox: ['index.read', 'files.edit'], calendar: ['index.read', 'files.edit'] }, now: NOW, ready: false, viewport: { width, height: 900 } });
   await expect.poll(() => store(page, 'return store.loaded')).toBe(true);
   await pluginsReady(page);
 }
@@ -103,3 +103,78 @@ test('leaving the tab keeps it; ⎋ ends it — the whole file, the strip gone, 
   await expect(page.locator('.cm-line', { hasText: 'Проверить доступы подрядчика' })).toBeVisible();
   await expect(col(page).getByRole('button', { name: /^Структура/ })).toBeVisible();
 });
+
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const cal = (page: Page) => col(page).getByRole('region', { name: 'Календарь' });
+
+test('«Календарь» under the card: the month, today framed; a day — its list and «Отложить сюда»; ⌘K folds it', async ({ page }) => {
+  await open(page);
+  await start(page);
+  await expect(cal(page)).toBeVisible();
+  await expect(cal(page).locator('.cell.today')).toHaveText(String(NOW.getDate()));
+  const tomorrow = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() + 1);
+  if (tomorrow.getMonth() !== NOW.getMonth()) await cal(page).getByRole('button', { name: 'Следующий месяц' }).click();
+  await cal(page).locator('.cell:not(.out)', { hasText: new RegExp(`^${tomorrow.getDate()}$`) }).click();
+  const pop = page.getByRole('dialog', { name: /^День / });
+  await expect(pop).toBeVisible();
+  const second = (await queue(page).locator('.row .t').nth(1).textContent())!;
+  await pop.getByRole('button', { name: 'Отложить сюда' }).click();
+  await expect.poll(async () => (await diskAll(page))['/mock/inbox.org']).toMatch(new RegExp(`\\* TODO Идея: ежемесячный обзор рисков\\nSCHEDULED: <${ymd(tomorrow)}`));
+  await expect(strip(page)).toContainText(second);
+  await expect(queue(page).locator('.row').first()).toContainText('отложено до');
+  // ⌘K from the text folds and unfolds it
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('Meta+k');
+  await expect(cal(page).locator('.grid')).toHaveCount(0);
+  await page.keyboard.press('Meta+k');
+  await expect(cal(page).locator('.grid')).toBeVisible();
+});
+
+test('⌘4 «Отложить…»: «Отложить до…» left of the card — the days with their dates; a choice writes SCHEDULED', async ({ page }) => {
+  await open(page);
+  await start(page);
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('Meta+4');
+  const m = page.getByRole('menu');
+  await expect(m.getByRole('menuitem', { name: /Завтра/ })).toBeVisible();
+  await expect(m.getByRole('menuitem', { name: /Выбрать дату/ })).toBeVisible();
+  expect((await m.boundingBox())!.x + (await m.boundingBox())!.width).toBeLessThanOrEqual((await scard(page).boundingBox())!.x + 2);
+  await m.getByRole('menuitem', { name: /Завтра/ }).click();
+  const tomorrow = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate() + 1);
+  await expect.poll(async () => (await diskAll(page))['/mock/inbox.org']).toContain(`SCHEDULED: <${ymd(tomorrow)}`);
+  await expect(scard(page).locator('.count')).toHaveText(/^2из 4/);
+});
+
+test('the summary: the outcomes, «Разобрать пропущенные» goes through them again; ⎋ «Готово»', async ({ page }) => {
+  await open(page);
+  await start(page);
+  await page.locator('.cm-content').click();
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press('Meta+5');
+    if (i < 3) await expect(scard(page).locator('.count')).toHaveText(new RegExp(`^${i + 2}из`));
+  }
+  const done = col(page).getByRole('region', { name: 'Разбор окончен' });
+  await expect(done).toBeVisible();
+  await expect(done.locator('.sum')).toHaveText(['4пропущено']);
+  await expect(page.getByRole('status', { name: 'Разбор Inbox' })).toHaveCount(0); // the whole file
+  await done.getByRole('button', { name: /Разобрать пропущенные/ }).click();
+  await expect(scard(page).locator('.count')).toHaveText('1из 4 · осталось 3');
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('Escape');
+  await expect(scard(page)).toHaveCount(0);
+});
+
+test('the column hidden: «1 из 4» and «Действия ▾» in the strip, the actions there with their keys', async ({ page }) => {
+  await open(page, 860);
+  await start2(page);
+  await expect(strip(page).locator('.cnt')).toHaveText('1 из 4');
+  await strip(page).getByRole('button', { name: /Действия/ }).click();
+  const m = page.getByRole('menu');
+  await expect(m.getByRole('menuitem', { name: /Выполнено/ })).toContainText('⌘1');
+  await m.getByRole('menuitem', { name: /Пропустить/ }).click();
+  await expect(strip(page).locator('.cnt')).toHaveText('2 из 4');
+});
+async function start2(page: Page) {
+  await page.keyboard.press('Shift+Meta+r');
+  await expect(strip(page)).toBeVisible();
+}

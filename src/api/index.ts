@@ -273,6 +273,8 @@ export interface MenuItem {
   checked?: boolean;
   /** A grey line under it, not a command; since 1.5. */
   hint?: string;
+  /** Right of it, grey: a key, a date («сб, 18 окт»); since 1.14. */
+  shortcut?: string;
 }
 /** A list of tasks the plugin draws (the board's cards, ТЗ 34). Since 1.6. */
 export interface TaskListSpec {
@@ -391,6 +393,12 @@ export interface ReviewSpec {
   /** What became of the card `index` as the plugin knows it (a review of its own order); null: nothing yet. Over the
    *  actions' `mark`. */
   mark?(index: number): ReviewMark | null;
+  /** The card «Календарь» under the review's in the file (ТЗ 46 §6; while the plugin «Календарь» is on): a month of
+   *  the dated entries, the card's day framed (`date`, ISO; by default its SCHEDULED, else DEADLINE), «Отложить сюда»
+   *  in a day's list (`defer`: then the next card, as an action); `command` — the key that folds it (⌘K). */
+  calendar?: { date?(h: HeadingInfo): string | null; defer?(h: HeadingInfo, day: Date): void | Promise<void>; command?: string };
+  /** The buttons of the summary in the file before «Готово» («Разобрать пропущенные»): shown when `when()` says. */
+  endActions?: { label: string; command?: string; kind?: 'primary'; when?(): boolean; run(): void }[];
 }
 /** The review shown (from `ui.review`): move it, draw the card again. */
 export interface ReviewHandle {
@@ -407,6 +415,8 @@ export interface ReviewHandle {
   end(): void;
   /** Where it is shown (1.14): a tab, or the file's tab (`place: 'file'` in the new interface). */
   readonly place: 'tab' | 'file';
+  /** The place of an action's button in the review in the file (a popover of the plugin's beside it); null: none. */
+  anchor(actionId: string): { x: number; y: number; width: number; height: number } | null;
 }
 export interface ReviewResult {
   total: number;

@@ -5,7 +5,7 @@
 import { mount, unmount, type Component } from 'svelte';
 import type { CardRender, HeadingInfo, HeadingRef, ReviewMark } from '@panopticon/api';
 import { data } from './state.svelte';
-import { ageShort, nextOpen, short, type Result, type ReviewItem } from './review';
+import { ageShort, deferDates, nextOpen, short, withDay, type Result, type ReviewItem } from './review';
 import Head from './Head.svelte';
 import Quick from './Quick.svelte';
 import Bar from './Bar.svelte';
@@ -59,7 +59,24 @@ class Session {
   get inFile() {
     return this.handle?.place === 'file';
   }
-  /** «Отложить…» in the file: the core's date picker (its quick days), then the same write as «Отложить до». */
+  /** The tasks gone through again, as new (the summary's «Разобрать пропущенные»). */
+  again(list: ReviewItem[]) {
+    this.start(list.map((x) => ({ ...x, result: null, note: undefined })));
+  }
+  /** «Отложить…» in the file: «Отложить до…» as a menu left of the card, by its button (ТЗ 46 §3); «Выбрать дату…» —
+   *  the core's date picker. */
+  private deferMenu() {
+    const at = this.handle?.anchor('defer');
+    const it = this.item;
+    if (!it) return;
+    const items = [
+      ...deferDates().map((d) => ({ label: d.label, shortcut: withDay(d.date), run: () => void this.act(() => (this.item === it ? this.deferNow(d.date) : undefined)) })),
+      'sep' as const,
+      { label: 'Выбрать дату…', run: () => void this.act(() => this.pickDefer()) },
+    ];
+    data.ctx.ui.menu(items, at ? { x: Math.max(8, at.x - 292), y: at.y - 6 } : { x: window.innerWidth / 2 - 130, y: 200 });
+  }
+  /** The core's date picker, then the same write as «Отложить до». */
   private async pickDefer() {
     const it = this.item;
     if (!it) return;
@@ -70,8 +87,13 @@ class Session {
   // ---- start, show, end ---------------------------------------------------------------------------------------
   /** «Разобрать»: a review of `items` (by default what is in the Inbox now) in the tab «Разбор Inbox». */
   start(items: ReviewItem[] = data.pending) {
-    // one review in the window: a second start in the file goes to the one going on (ТЗ 46 §1)
-    if (this.run && this.inFile && items === data.pending) return this.show(this.run.cur);
+    // one review in the window: a second start in the file goes to the one going on (ТЗ 46 §1); from its summary
+    // ⇧⌘R is «Разобрать пропущенные» (§5)
+    if (this.run && this.inFile && items === data.pending) {
+      const skipped = this.run.items.filter((x) => x.result === 'skip');
+      if (this.run.cur >= 0) return this.show(this.run.cur);
+      if (skipped.length) return this.again(skipped);
+    }
     if (!items.length) return;
     this.run = { items, cur: 0, known: data.pending.map(keyOf) };
     const run = this.run; // the state's own (its changes are seen), not the object it was made of
@@ -85,6 +107,11 @@ class Session {
       // the new interface: a mode of the inbox file's tab (ТЗ 46), the core's card and queue; the old one: the tab
       place: 'file',
       mark: (i) => markOf(run.items[i]),
+      calendar: { command: 'inbox.calendar', defer: (_h, day) => void this.act(() => this.deferNow(day)) },
+      endActions: [
+        { label: 'Разобрать пропущенные', command: 'inbox.review', kind: 'primary', when: () => run.items.some((x) => x.result === 'skip'), run: () => this.again(run.items.filter((x) => x.result === 'skip')) },
+        { label: 'Разобрать и новые', when: () => this.added.length > 0, run: () => this.start(this.added) },
+      ],
       header: (h) => {
         const it = run.items.find((x) => x.path === h.ref.path && x.title === h.ref.title);
         return it ? createdShort(it.created) : '';
@@ -116,7 +143,7 @@ class Session {
         { id: 'done', label: 'Выполнено', sub: data.closingOf(first, 'done') ?? undefined, kind: 'ok', command: 'inbox.done', run: () => this.act(() => this.close('done')) },
         { id: 'cancel', label: 'Отменить', sub: data.closingOf(first, 'cancel') ?? undefined, command: 'inbox.cancel', run: () => this.act(() => this.close('cancel')) },
         { id: 'move', label: 'Перенести…', kind: 'primary', command: 'inbox.move', run: () => this.act(() => this.move()) },
-        { id: 'defer', label: 'Отложить…', command: 'inbox.defer', run: () => this.act(() => (this.inFile ? this.pickDefer() : void (this.defer = this.defer ? null : { sel: 0 }))) },
+        { id: 'defer', label: 'Отложить…', command: 'inbox.defer', run: () => this.act(() => (this.inFile ? this.deferMenu() : void (this.defer = this.defer ? null : { sel: 0 }))) },
         { id: 'skip', label: 'Пропустить', command: 'inbox.skip', run: () => this.act(() => this.skip()) },
         { id: 'next', label: 'Далее', hidden: true, command: 'inbox.next', run: () => this.act(() => this.pass()) },
         { id: 'calendar', label: 'Календарь', hidden: true, command: 'inbox.calendar', run: () => this.act(() => this.toggleCal()) },

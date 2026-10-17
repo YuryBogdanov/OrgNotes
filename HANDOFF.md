@@ -528,8 +528,18 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   status as `sub`, «Перенести…» primary, «Далее» / «Календарь» hidden; in the file «Отложить…» is `ui.pickDate`
   (no popover of ours), `below` (the month) not drawn, `narrow` does `sync` (no head there); a second ⇧⌘R goes to
   the review going on. Its sidebar panel during it: the plain list, the task on the card `.row.now`, no progress.
-  Still to come (41.1b): the calendar's card in the review (ТЗ 46 §6), «Разобрать пропущенные» in the summary, «2
-  из 5» / «Действия ▾» in the strip when the column is hidden. e2e `nextFileReview.spec.ts`.
+  e2e `nextFileReview.spec.ts`.
+  41.1b: `ReviewSpec.calendar {date?, defer?, command?}` → `next/ReviewCalendar.svelte` under the card while the
+  plugin «Календарь» is on (the month of `allDays` — the calendar's layers and files —, today `lampline`, the past
+  faded, a `next` dot under a day with entries, the card's day dashed; ‹ ›; a day's list with «Отложить сюда» →
+  `defer`; folds by its head or by `command` (the scope keys call `fileReview.calToggle`), kept in
+  `next:reviewCalFolded`). `ReviewSpec.endActions` — the summary's buttons before «Готово» (`when()`); typing in the
+  text while the summary shows ends it (keydown on `.ed`, not `onchange`: a write from outside must not). The
+  column hidden: «N из M» and «Действия ▾» (EditorArea's own `Menu`) in the strip. `ReviewHandle.anchor(actionId)`
+  — the rect of the action's button (`data-act` in `[data-review]`); API `MenuItem.shortcut` passed to the core's
+  menu. Inbox: «Отложить…» in the file — `ui.menu` of `deferDates` with their days, «Выбрать дату…», 292 pt left of
+  the button; `calendar: { command: 'inbox.calendar', defer }`; `endActions` «Разобрать пропущенные» (⇧⌘R from the
+  summary too: `start()` there) and «Разобрать и новые»; `session.again(list)`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
