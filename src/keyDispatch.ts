@@ -35,9 +35,10 @@ function scopesNow(c: Ctx): Scope[] {
 function runOne(id: string, scope: Scope, c: Ctx): boolean {
   const f = c.features.find(([s]) => s === scope);
   if (f) return f[1].run(id);
-  if (scope === 'heading' && (PALETTE.has(id) || id === 'refile')) {
+  if (scope === 'heading' && (PALETTE.has(id) || id === 'refile' || id === 'archive')) {
     if (!contextOf().heading || store.sheetOpen) return false;
     if (id === 'refile') store.startRefile();
+    else if (id === 'archive') void store.archiveSubtree();
     else store.openPalette(id as 'status');
     return true;
   }

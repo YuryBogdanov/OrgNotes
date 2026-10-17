@@ -8,7 +8,8 @@ import { narrowTarget } from './narrowTab';
 import { isMainWindow, nextOn, setNext } from './uiFlag';
 import { displayName, isArchive, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags } from './edits';
-import { caretAfter } from './refile';
+import { bareTitle, caretAfter } from './refile';
+import { archiveEntry, archiveTarget, categoryOf } from './archive';
 import type { CalSpec, Plate } from './commands';
 import { lsGet, lsSet } from './storage';
 import { notify } from './notify.svelte';
@@ -971,6 +972,20 @@ class Store {
     step.onUndo?.();
     return true;
   }
+  /** ⌘Z in an editor whose text is what the last step made of it (a move, «В архив» — the step over several files):
+   *  the editor takes its own file back by its history; the step's other files go back here, and the step is gone. */
+  undoAlong(path: string, text: string) {
+    const s = this.journal.last();
+    const own = s?.changes.find((c) => c.path === path);
+    if (!s || !own || own.after !== text || s.changes.length < 2) return;
+    const rest = { ...s, changes: s.changes.filter((c) => c.path !== path) };
+    if (!canUndo(rest, (p) => this.files.find((x) => x.path === p)?.text)) return;
+    this.journal.drop(s);
+    void this.queued(async () => {
+      for (const c of [...rest.changes].reverse()) await this.writeNow(c.path, c.before);
+      s.onUndo?.();
+    });
+  }
   /** ⌘Z outside a text editor: the last step, wherever it was made. False: there is none (or it cannot be). */
   undoLast(): Promise<boolean> {
     return this.queued(async () => {
@@ -1497,6 +1512,48 @@ class Store {
     const rest = m ? f.headings.filter((x) => x.line < m.line || x.line >= m.end) : f.headings;
     const at = m && m.line <= h.line ? h.line + size : h.line;
     this.revealLine(caretAfter(rest, at), true);
+  }
+  /** «Архивировать поддерево» (ТЗ 41 §7, Emacs `C-c C-x C-s`): the heading under the caret, its subtree whole, to
+   *  its archive (`archiveTarget`), at the end of it or under its heading there; one step of ⌘Z over both files. */
+  async archiveSubtree(at?: { path: string; line: number }): Promise<boolean> {
+    const f = at ? this.files.find((x) => x.path === at.path) : this.file;
+    const h = at ? f?.headings.find((x) => x.line === at.line) : f?.headings[this.selected];
+    if (!f || !h) return false;
+    if (isArchive(f.name)) {
+      this.say('Заголовок уже в архиве');
+      return false;
+    }
+    const to = archiveTarget(f.text, f.headings, h, f.name);
+    const dst = to.file === f.name ? f : await this.ensureFile(to.file);
+    if (!dst) return false;
+    const entry = archiveEntry(f.text, h, f.wf, { now: new Date(), file: f.path, category: categoryOf(f.text, f.name) });
+    const ref = { path: f.path, line: h.line, title: h.title };
+    const title = bareTitle(h.title);
+    const put = (tx: Tx) => {
+      if (!to.heading) return void tx.insertHeading({ file: dst.path, position: 'end' }, entry);
+      const top = tx.headings(dst.path)?.find((x) => x.level === 1 && x.title.trim() === to.heading);
+      const under = top ? { path: dst.path, line: top.line, title: top.title } : tx.insertHeading({ file: dst.path, position: 'end' }, '* ' + to.heading);
+      if (under) tx.insertHeading({ under, position: 'last' }, entry);
+    };
+    const step = await this.transaction(`В архив: ${title}`, (tx) => {
+      // another file: the archive first, a failed write loses nothing; the same file: out first, its lines move
+      if (dst.path === f.path) {
+        tx.remove(ref);
+        put(tx);
+      } else {
+        put(tx);
+        tx.remove(ref);
+      }
+    });
+    if (!step) return false;
+    const now = this.files.find((x) => x.path === f.path);
+    if (this.tab?.kind === 'file' && this.tab.path === f.path && now) this.revealLine(caretAfter(now.headings, h.line), true);
+    const name = displayName(dst.name) + (to.heading ? ' › ' + to.heading : '');
+    notify.note(`В архиве: ${name}`, [
+      { label: 'Открыть', run: () => { const i = this.files.findIndex((x) => x.path === dst.path); if (i >= 0) this.open(i); } },
+      { label: 'Отменить', run: () => void this.undo(step) },
+    ], 3000);
+    return true;
   }
   /** "Новая задача": a top-level task at the end of the current file, the caret after its keyword. */
   newTask() {
@@ -2213,6 +2270,8 @@ const fileNamed = (p: string) => store.files.find((f) => f.name === p || f.path 
 linkHooks.rel = (p) => fileNamed(p)?.name ?? '';
 linkHooks.pasted = () => store.note('Ссылка вставлена · ⌘Z — вернуть текст', undefined, 3000, LINK_ICON);
 linkHooks.readClip = () => store.readClipboard();
+linkHooks.archive = (p, line) => void store.archiveSubtree({ path: fileNamed(p)?.path ?? p, line });
+linkHooks.undoAlong = (p, text) => store.undoAlong(fileNamed(p)?.path ?? p, text);
 linkHooks.copyHeading = (p, line) => {
   const f = fileNamed(p);
   if (!f) return false;

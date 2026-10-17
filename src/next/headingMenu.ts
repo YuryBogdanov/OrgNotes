@@ -1,5 +1,5 @@
 // The menu of a heading in the new interface's editor (ТЗ 44 §3.1): as the old one has it, with what a heading
-// takes — «Сменить статус ›» (the statuses as capsules, §3.2), «Запланировать…», «Срок…», «Теги…»; «Перенести в…»,
+// takes — «Сменить статус ›» (the statuses as capsules, §3.2), «Запланировать…», «Срок…», «Теги…»; «Перенести в…», «В архив»,
 // «Сузить до заголовка», «Добавить заметку…»; «Копировать ссылку», «Открыть в мини-окне»; each plugin's section under
 // its name; «Удалить заголовок» in `todo`. The editor (cm/orgEditor.ts) puts its own items above or below.
 
@@ -10,6 +10,7 @@ import { statusChoices } from '../headingChoices';
 import { setStatusAt } from '../headingWrite';
 import { toneFor } from '../org';
 import { toneStyle } from '../colors';
+import { isArchive } from '../names';
 import type { MenuItem } from '../menuItems';
 
 const PLUG = 'M8 2.5v4M12 2.5v4M5.5 6.5h9v3a4.5 4.5 0 0 1-9 0zM10 14v3.5';
@@ -50,6 +51,7 @@ export function headingMenu(l: HeadingLocal): MenuItem[] {
     { label: 'Теги…', shortcut: key('tags'), action: l.tags },
     'sep',
     { label: 'Перенести в…', shortcut: key('refile'), action: () => store.startRefile() },
+    ...(isArchive(f.name) ? [] : [{ label: 'В архив', shortcut: key('archive'), action: () => void store.archiveSubtree({ path: f.path, line: l.line }) }]),
     ...(l.narrow ? [{ label: 'Сузить до заголовка', shortcut: key('narrow'), action: l.narrow }] : []),
     { label: 'Добавить заметку…', shortcut: key('addNote'), action: l.note },
     'sep',

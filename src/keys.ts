@@ -129,6 +129,7 @@ export const KEY_COMMANDS: KeyCommand[] = [
   C('widen', 'Показать весь файл', 'heading', 'editor', ['⌃X N W'], { synonyms: ['сужение', 'widen', 'весь файл'] }),
   C('copyLink', 'Копировать ссылку на заголовок', 'heading', 'editor', ['⌃C L'], { synonyms: ['ссылка', 'link', 'org-store-link'] }),
   C('refile', 'Перенести в другой файл…', 'heading', 'heading', [], { emacs: ['⌃C ⌃W'], mac: [], synonyms: ['refile', 'переместить'] }),
+  C('archive', 'Архивировать поддерево', 'heading', 'heading', ['⌃C ⌃X ⌃S'], { synonyms: ['архив', 'archive', 'org-archive-subtree', 'убрать в архив'], note: 'Заголовок с подзаголовками — в файл архива, как C-c C-x C-s в Emacs' }),
 
   C('captureHere', 'Новая задача в Inbox (внутри окна)', 'inbox', 'window', [], { synonyms: ['быстрый ввод'] }),
 

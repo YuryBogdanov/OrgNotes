@@ -4,7 +4,7 @@
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { Ctx, Named } from '@panopticon/api';
 import { readOrg, type Heading, type Workflow } from '@panopticon/api/org';
-import { archiveEntry, archivePath, categoryOf } from './archive';
+import { archiveEntry, archivePath, categoryOf } from '@panopticon/api/org';
 import { withBoard, type StatusSet } from './board';
 
 export const VIEW = 'kanban.board';
