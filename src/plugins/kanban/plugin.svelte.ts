@@ -34,6 +34,25 @@ export default definePlugin({
       run: () => void ctx.ui.showAs(VIEW),
     });
 
+    // the card of a file (ТЗ 44 §5): one line — what the columns are, «Открыть доской» with its key; on a file whose
+    // level-1 headings have statuses (they would be on the board)
+    ctx.ui.fileCard('kanban.card', {
+      match: async (path) => (await ctx.index!.outline(path)).some((h) => h.level === 1 && !!h.keyword),
+      render: (el, c) => {
+        if (el.firstChild) return;
+        void ctx.files!.read(c.path).then((text) => {
+          const name = boardOf(text);
+          const line = Object.assign(document.createElement('div'), { className: 'kb-fcard' });
+          const what = Object.assign(document.createElement('span'), { textContent: name ? `Колонки — статусы «${name}»` : 'Колонки — статусы файла' });
+          const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'fc-btn', textContent: 'Открыть доской', onclick: () => void ctx.ui.showAs(VIEW) });
+          const k = ctx.commands.keyOf('kanban.toggle');
+          if (k) btn.append(Object.assign(document.createElement('kbd'), { textContent: k }));
+          line.append(what, btn);
+          el.replaceChildren(line);
+        });
+      },
+    });
+
     // ⌥⌘B: the board and back; «Показать как доску» in the palette
     ctx.commands.on('kanban.toggle', () => void ctx.ui.showAs(kanban.active.view === VIEW ? null : VIEW));
     ctx.commands.on('kanban.show', () => void ctx.ui.showAs(VIEW));

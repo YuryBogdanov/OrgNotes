@@ -111,7 +111,7 @@
   .body :global(.fc-stat span) { font-size: 11px; color: var(--ink3); }
   .body :global(.fc-under) { margin: 10px 0 4px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink3); }
   .body :global(.fc-btns) { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
-  .body :global(.fc-btn) { height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; border: 0; border-radius: 6px; background: var(--chip2); color: var(--ink); font: 11.5px var(--ui); white-space: nowrap; }
+  .body :global(.fc-btn) { height: 24px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border: 0; border-radius: 6px; background: var(--chip2); color: var(--ink); font: 11.5px var(--ui); white-space: nowrap; }
   .body :global(.fc-btn.main) { background: var(--lamp); color: var(--onlamp); font-weight: 600; }
   .body :global(.fc-btn:disabled) { opacity: 0.45; }
   .body :global(.fc-btn kbd) { font: 10.5px var(--ui); opacity: 0.6; }

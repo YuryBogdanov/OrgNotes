@@ -92,7 +92,8 @@
      scrolls the text. */
   .struct { position: absolute; top: 0; right: 0; bottom: 0; z-index: 2; width: 220px; min-height: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 46px 22px 16px 0; overflow: hidden; pointer-events: none; }
   .struct > * { pointer-events: auto; }
-  .cards { flex: 0 1 auto; min-height: 0; overflow: auto; margin: 0 0 8px 22px; scrollbar-width: none; }
+  /* the cards as the mockup has them: 4 pt off the editor, 18 off the window's edge (the column's own 22 less 4) */
+  .cards { flex: 0 1 auto; min-height: 0; overflow: auto; margin: 0 -4px 8px 4px; scrollbar-width: none; }
   .cards::-webkit-scrollbar { display: none; }
   .lbl { padding-left: 22px; margin-bottom: 12px; font-size: 11px; font-weight: 600; color: var(--ink3); }
   .list { position: relative; min-height: 0; overflow: auto; padding-left: 22px; scrollbar-width: none; }
