@@ -487,6 +487,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   `builtin:week`, «Сегодня» `builtin:today`, «Все задачи» `builtin:all`: plain agendas run by `runAgenda`, not in
   config.json, no «Редактировать…»; `AgendaStore.of` resolves them. The sidebar's panel lists them under «Встроенные»
   after «Агенда · 30 дней». The bridge `Agenda` is gone.
+  ТЗ 46 (the Inbox's review in the editor) replaces ТЗ 45 §4: the review a mode of the inbox file's tab — narrowed to
+  the entry, the card «Разбор Inbox», the queue in «Структура». PR #233 (the review's tab in the new style) was closed
+  unmerged (2026-10-17); 45.6 and 45.7 come after ТЗ 46.
+  46.1, the narrowing's strip (any narrowing, new interface): already the whole width of the area with the column
+  under it (it sits above `.with`); now it slides in in 180 ms and out in 150 (`svelte/transition` slide, cubicOut),
+  none with «Уменьшить движение»; its size is `height: 40px` — a flex-basis would hold it and stop the slide.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { store } from '../store.svelte';
+  import { slide } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import { plugins } from '../api/host.svelte';
   import { fileViewOf, viewOf } from '../views';
   import { fileTypeOf } from '../fileTypes.svelte';
@@ -84,6 +86,10 @@
       Object.assign(fb, { q: r.q, re: !!r.re, at: pos + r.at.col, open: true });
     }
   });
+  // the strip's moves (ТЗ 46 §2), none with «Уменьшить движение»
+  const still = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const stripIn = $derived({ duration: still() ? 0 : 180, easing: cubicOut });
+  const stripOut = $derived({ duration: still() ? 0 : 150, easing: cubicOut });
   const crumb = $derived(narrowed && file ? [file.name.replace(/\.org$/, '').split('/').pop()!, ...narrowed.path].join(' › ') : '');
   // «Структура» right of the editor (§7): on by the preference, and when the area is 900 pt wide or more
   let areaW = $state(0);
@@ -142,7 +148,8 @@
     <div class="view"><Compat><PluginFileView id={fview} path={file.name} {tab} pane={0} /></Compat></div>
   {:else if file && tab}
     {#if narrowed}
-      <div class="narrow" role="status" aria-label="Сужено">
+      <!-- it comes out from the top in 180 ms, goes in 150; the column and the text move down and up with it (ТЗ 46 §2) -->
+      <div class="narrow" role="status" aria-label="Сужено" in:slide={stripIn} out:slide={stripOut}>
         <b>Сужено</b><span class="np" title={crumb}>{crumb}</span>
         <span class="k">{store.keyHint('widen')}</span>
         <button onclick={() => store.widenTab(tab)}>Показать весь файл</button>
@@ -205,7 +212,7 @@
     background-size: 24px 24px; background-position: -1px -1px;
   }
   /* the narrowing's strip (§5.8): 40 pt of the lamp over the column */
-  .narrow { flex: 0 0 40px; display: flex; align-items: center; gap: 10px; padding: 0 20px; box-sizing: border-box; background: var(--lampsoft); border-bottom: 1px solid var(--lampline); font-size: 12.5px; color: var(--ink2); }
+  .narrow { flex: 0 0 auto; height: 40px; overflow: hidden; display: flex; align-items: center; gap: 10px; padding: 0 20px; box-sizing: border-box; background: var(--lampsoft); border-bottom: 1px solid var(--lampline); font-size: 12.5px; color: var(--ink2); }
   .narrow b { color: var(--lampink); }
   .narrow .np { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .narrow .k { font: 11px var(--mono); color: var(--ink3); }

@@ -53,3 +53,42 @@ test('the new interface: the strip of §5.8, «Структура» of the subtr
   await page.getByRole('option', { name: /^Сузить до заголовка/ }).click();
   await expect(page.getByRole('status', { name: 'Сужено' })).toContainText('a › Роадмап');
 });
+
+// ТЗ 46.1 (§2): the strip of any narrowing in the new interface goes the whole width, the column under it; it comes
+// out from the top in 180 ms and goes in 150, the column with it; no moves with «Уменьшить движение»
+for (const motion of ['no-preference', 'reduce'] as const)
+  test(`the new interface: the strip the whole width, the column under it; its moves (${motion})`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: motion });
+    await page.addInitScript(() => localStorage.setItem('ui:next', '1'));
+    await openApp(page, { files: { '/mock/a.org': DOC }, ready: false, viewport: { width: 1440, height: 820 } });
+    await page.getByRole('tree', { name: 'Файлы' }).getByRole('treeitem', { name: 'a' }).click();
+    // the strip's height through its coming: sampled on each frame
+    await page.evaluate(() => {
+      (window as any).__h = [];
+      const tick = () => {
+        const el = document.querySelector<HTMLElement>('[data-ui="next"] .narrow');
+        if (el) (window as any).__h.push(Math.round(el.getBoundingClientRect().height));
+        if ((window as any).__h.length < 30) requestAnimationFrame(tick);
+      };
+      // from the frame it comes in
+      const mo = new MutationObserver(() => {
+        if (!document.querySelector('[data-ui="next"] .narrow')) return;
+        mo.disconnect();
+        tick();
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    });
+    await narrowAt(page, 'Бенчмарк');
+    const strip = page.getByRole('status', { name: 'Сужено' });
+    await expect(strip).toBeVisible();
+    await expect.poll(() => page.evaluate(() => (window as any).__h.length)).toBeGreaterThan(20);
+    const hs: number[] = await page.evaluate(() => (window as any).__h);
+    if (motion === 'reduce') expect(hs.every((h) => h >= 40)).toBe(true);
+    else expect(hs.some((h) => h > 0 && h < 39)).toBe(true); // it came out, not at once
+    const b = (await strip.boundingBox())!;
+    expect(Math.round(b.x + b.width)).toBe(1440); // to the window's right edge, over the column too
+    const col = (await page.getByRole('complementary', { name: 'Структура' }).boundingBox())!;
+    expect(col.y).toBeGreaterThanOrEqual(b.y + b.height - 1);
+    await page.getByRole('button', { name: 'Показать весь файл' }).click();
+    await expect(strip).toHaveCount(0);
+  });
