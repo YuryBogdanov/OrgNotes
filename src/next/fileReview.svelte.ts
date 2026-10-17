@@ -121,13 +121,21 @@ class FileReview {
       // away from its tab (another tab, another file in it): it follows when the tab is on the file again
       const p = store.layout.panes[0];
       const t = p?.tabs[p.active];
-      if (!this.tabId || t?.id !== this.tabId || t.path !== this.shownPath) return;
+      if (!this.tabId || t?.id !== this.tabId || (t.path !== this.shownPath && t.path !== untrack(() => this.lastPath))) return;
       untrack(() => {
         const c = this.card;
         const t = this.tab;
         if (c && t && t.path === c.file.path && t.narrow?.title === c.heading.title && t.narrow.line === c.heading.line) return;
         this.front();
       });
+    });
+    // the card's heading gone from its file meanwhile (removed, moved outside): passed over, «нет в файле» (ТЗ 41 §5);
+    // a review of its own order (the Inbox's `next`) follows its queue itself
+    $effect(() => {
+      const r = this.run;
+      if (!r || r.cur < 0 || r.spec.next || plugins.reviewActing || this.card) return;
+      const t = setTimeout(() => untrack(() => (!this.card && plugins.review === r ? plugins.reviewGone() : undefined)), 300);
+      return () => clearTimeout(t);
     });
     // the review over: its tab is no one's
     $effect(() => {

@@ -61,7 +61,9 @@ export async function review(m: Matter, at?: At) {
 /** The file's statuses know the status of waiting. */
 const knowsWait = (m: Matter) => !!long.files.get(m.path)?.info.open.includes(long.settings.wait);
 
-export async function wait(m: Matter) {
+/** The sheet «Ждём…» and its write; `o.days` — the days to look again when no date is given (the walk's choice),
+ *  `o.also` — what goes in the same step (the walk's status). Whom it waits for, null: cancelled. */
+export async function wait(m: Matter, o: { days?: number; also?: (tx: Tx) => void } = {}): Promise<string | null> {
   const W = long.settings.wait;
   const offerStatus = knowsWait(m);
   const v = await long.ctx.ui.form({
@@ -73,20 +75,22 @@ export async function wait(m: Matter) {
       {
         fields: [
           { type: 'text', key: 'who', label: 'Кого или что ждём', placeholder: 'бизнес, Ирина, финансы', suggest: whoFits },
-          { type: 'date', key: 'until', label: 'До какой даты', look: 'chip', clear: 'Без даты', hint: `Не указана — проверить через ${long.settings.norm} дн.` },
+          { type: 'date', key: 'until', label: 'До какой даты', look: 'chip', clear: 'Без даты', hint: `Не указана — проверить через ${o.days ?? long.settings.norm} дн.` },
           ...(offerStatus ? [{ type: 'switch' as const, key: 'setWait', label: `Поставить статус ${W}` }] : []),
         ],
       },
     ],
   });
-  if (!v) return;
+  if (!v) return null;
   const who = String(v.who).trim();
-  const until = typeof v.until === 'string' && v.until ? fromIso(v.until) : null;
-  await write('Ждём', (tx) => {
+  const until = typeof v.until === 'string' && v.until ? fromIso(v.until) : o.days ? addDays(today(), o.days) : null;
+  const ok = await write('Ждём', (tx) => {
+    o.also?.(tx);
     tx.setProperty(ref(m), 'WAITING_ON', who);
     tx.setProperty(ref(m), 'NEXT_REVIEW', until ? stampOf(until, namesOf(m)) : null);
     if (v.setWait && m.keyword !== W) tx.setStatus(ref(m), W);
   });
+  return ok ? who : null;
 }
 /** «Кого или что ждём»: the earlier ones that fit what is typed, the most waited for first, with how many wait. */
 function whoFits(q: string) {
@@ -97,7 +101,7 @@ function whoFits(q: string) {
     .map(([w, n]) => ({ value: w, hint: mattersWord(n) }));
 }
 /** The status to go back to: the one before waiting by the :LOGBOOK:, else the first open one of its set. */
-function statusAfterWaiting(m: Matter): string | null {
+export function statusAfterWaiting(m: Matter): string | null {
   const f = long.files.get(m.path);
   const h = headingOf(m);
   const W = long.settings.wait;
@@ -117,6 +121,7 @@ export function stopWaiting(m: Matter) {
 }
 /** W: «Ждём…», or «Больше не ждём» while it waits. */
 export const toggleWait = (m: Matter) => (m.waiting ? void stopWaiting(m) : void wait(m));
+export { write, namesOf };
 
 // ---- «Осмотрено», «Убрать из долгих дел» -----------------------------------------------------------------------------
 export async function reviewed(m: Matter) {

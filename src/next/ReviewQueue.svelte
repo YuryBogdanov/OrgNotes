@@ -20,9 +20,11 @@
       const mark = plugins.reviewMark(i);
       const f = fileOf(ref.path);
       const h = f ? findHeading(f.headings, ref) : undefined;
-      const note = mark?.text ?? (!mark && h && f && r.spec.header ? plugins.guard(r.plugin, () => r.spec.header!(infoOf(f, h)), '') : '');
+      // not handled yet: what the plugin says of it (`queueNote`, red when late; else `header`)
+      const q = !mark && h && f && r.spec.queueNote ? plugins.guard(r.plugin, () => r.spec.queueNote!(infoOf(f, h)), null) : null;
+      const note = mark?.text ?? (q?.text ?? (!mark && h && f && r.spec.header ? plugins.guard(r.plugin, () => r.spec.header!(infoOf(f, h)), '') : ''));
       const handled = !!mark || r.doneAt.has(i);
-      return { i, ref, mark, note: String(note ?? ''), handled, file: ref.path };
+      return { i, ref, mark, note: String(note ?? ''), late: !!q?.late, handled, file: ref.path };
     });
   });
   const files = $derived(new Set(rows.map((x) => x.file)).size);
@@ -39,13 +41,15 @@
         aria-current={x.i === r.cur ? 'true' : undefined} title={plain(x.ref.title)} onclick={() => plugins.reviewShow(r, x.i)}>
         <span class="dot" style:background={x.i === r.cur ? undefined : dot(x)}></span>
         <span class="t">{plain(x.ref.title)}</span>
-        {#if x.note}<span class="note" class:skip={x.mark?.tone === 'skip' || x.mark?.tone === 'wait'}>{x.note}</span>{/if}
+        {#if x.note}<span class="note" class:skip={x.mark?.tone === 'skip' || x.mark?.tone === 'wait'} class:late={x.late}>{x.note}</span>{/if}
       </button>
     {/each}
   </div>
 {/if}
 
 <style>
+  /* over the editor in «Структура»'s column: its own parts take the pointer (the column's rule is scoped to it) */
+  .head, .list { pointer-events: auto; }
   .lbl { padding-left: 22px; margin-bottom: 12px; font-size: 11px; font-weight: 600; color: var(--ink3); }
   .head { display: flex; align-items: center; gap: 6px; width: 100%; padding-top: 0; padding-bottom: 0; padding-right: 2px; border: 0; background: none; text-align: left; font-family: var(--ui); cursor: default; }
   .head:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; border-radius: 4px; }
@@ -61,6 +65,7 @@
   .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .note { flex: 0 0 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; font-size: 11px; font-weight: 400; color: var(--ink3); }
   .note.skip { color: var(--wait); }
+  .note.late { color: var(--todo); font-weight: 600; }
   .dot { position: absolute; left: -20px; width: 7px; height: 7px; border-radius: 4px; }
   .row.faded { opacity: 0.55; }
   .row.struck .t { text-decoration: line-through; }

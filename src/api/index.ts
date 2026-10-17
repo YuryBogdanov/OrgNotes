@@ -310,6 +310,8 @@ export interface ReviewAction {
   command?: string;
   /** A word after the label («COMPLETED»). */
   sub?: string;
+  /** The word after the label for this card («WAIT → NEXT»), over `sub`; a review in the file. Since 1.14. */
+  subOf?(h: HeadingInfo): string | null;
   /** The look: the main one, a «done» one (green). */
   kind?: 'primary' | 'ok';
   /** Not now (no text of the mark yet, the goal is closed already). */
@@ -329,6 +331,8 @@ export type ReviewTone = 'done' | 'cancel' | 'moved' | 'later' | 'skip' | 'wait'
 export interface ReviewMark {
   tone: ReviewTone;
   text?: string;
+  /** The word of the summary it is counted under («продолжаем», «закрыто»); by default its tone's. */
+  group?: string;
 }
 /** What a part of the card is drawn for: the heading now, and the card's place in the queue. */
 export interface ReviewCard {
@@ -397,6 +401,10 @@ export interface ReviewSpec {
    *  the dated entries, the card's day framed (`date`, ISO; by default its SCHEDULED, else DEADLINE), «Отложить сюда»
    *  in a day's list (`defer`: then the next card, as an action); `command` — the key that folds it (⌘K). */
   calendar?: { date?(h: HeadingInfo): string | null; defer?(h: HeadingInfo, day: Date): void | Promise<void>; command?: string };
+  /** A card not handled yet in the queue of the review in the file, over `header`: its words, red when `late`. */
+  queueNote?(h: HeadingInfo): { text: string; late?: boolean } | null;
+  /** A line of the summary in the file under its figures («Пора проверить: 0. Ближайшая проверка — пт, 23 окт»). */
+  endNote?(): string;
   /** The buttons of the summary in the file before «Готово» («Разобрать пропущенные»): shown when `when()` says. */
   endActions?: { label: string; command?: string; kind?: 'primary'; when?(): boolean; run(): void }[];
 }
@@ -453,7 +461,8 @@ export interface Ctx {
      *  `agenda.open`, `settings.open` {section?}, `file.reveal` {path} (the file in Finder, 1.11), `heading.note` {ref, x?, y?} (the popover «Добавить заметку…»
      *  at this point of the window, else at its top; 1.12), `heading.status` / `heading.schedule` / `heading.deadline` / `heading.tags` / `heading.priority`
      *  {ref} (the palette's step for it; the heading's file is the one shown), `capture.open` (the quick entry),
-     *  `inbox.pickFile`, `inbox.createFile`. */
+     *  `inbox.pickFile`, `inbox.createFile`, `heading.archive` {ref, note?} (the core's «Архивировать поддерево», one
+     *  step of ⌘Z; `note` written into its :LOGBOOK: first, in the same step; it fails when nothing was archived; 1.14). */
     run(id: string, arg?: unknown): Promise<void>;
   };
   ui: {

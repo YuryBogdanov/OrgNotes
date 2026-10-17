@@ -10,6 +10,7 @@ import { displayName, isArchive, noteName, withOrg } from './names';
 import { appendTask, setPlanning, setTags } from './edits';
 import { bareTitle, caretAfter } from './refile';
 import { archiveEntry, archiveTarget, categoryOf } from './archive';
+import { addNote } from './logbook';
 import type { CalSpec, Plate } from './commands';
 import { lsGet, lsSet } from './storage';
 import { notify } from './notify.svelte';
@@ -1515,7 +1516,7 @@ class Store {
   }
   /** «Архивировать поддерево» (ТЗ 41 §7, Emacs `C-c C-x C-s`): the heading under the caret, its subtree whole, to
    *  its archive (`archiveTarget`), at the end of it or under its heading there; one step of ⌘Z over both files. */
-  async archiveSubtree(at?: { path: string; line: number }): Promise<boolean> {
+  async archiveSubtree(at?: { path: string; line: number }, o: { note?: string } = {}): Promise<boolean> {
     const f = at ? this.files.find((x) => x.path === at.path) : this.file;
     const h = at ? f?.headings.find((x) => x.line === at.line) : f?.headings[this.selected];
     if (!f || !h) return false;
@@ -1526,7 +1527,10 @@ class Store {
     const to = archiveTarget(f.text, f.headings, h, f.name);
     const dst = to.file === f.name ? f : await this.ensureFile(to.file);
     if (!dst) return false;
-    const entry = archiveEntry(f.text, h, f.wf, { now: new Date(), file: f.path, category: categoryOf(f.text, f.name) });
+    // a note first (the walk's status, ТЗ 41 §3): it goes to the archive with the subtree
+    const noted = o.note ? addNote(f.text, h, o.note) : f.text;
+    const nh = o.note ? (parseHeadings(noted, f.wf).find((x) => x.line === h.line) ?? h) : h;
+    const entry = archiveEntry(noted, nh, f.wf, { now: new Date(), file: f.path, category: categoryOf(f.text, f.name) });
     const ref = { path: f.path, line: h.line, title: h.title };
     const title = bareTitle(h.title);
     const put = (tx: Tx) => {

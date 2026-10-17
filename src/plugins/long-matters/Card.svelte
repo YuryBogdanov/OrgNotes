@@ -4,8 +4,8 @@
   import { ageWords, dueWords, grouped, shortDay } from './long';
   import { review, reviewed, status, toggleWait } from './actions';
 
-  // The card of a file of the long matters (ТЗ 44 §5, §7): «пора проверить · ждём · в норме» of its matters, «Открыть
-  // список»; under the caret — the matter's status and title, how long untouched, the day to look, its last status,
+  // The card of a file of the long matters (ТЗ 44 §5, §7): «пора проверить · ждём · в норме» of its matters, «Обход»
+  // (ТЗ 41 §2), «Открыть список»; under the caret — the matter's status and title, how long untouched, the day to look, its last status,
   // and the actions with their keys (§9). Not on a matter: the actions are there, off.
   let { at }: { at: { path: string; heading: HeadingRef | null } } = $props();
   const rows = $derived(long.rows.filter((r) => r.m.path === at.path));
@@ -25,7 +25,8 @@
   <div class="fc-stat"><b>{g.ok.length}</b><span>в норме</span></div>
 </div>
 <div class="fc-btns">
-  <button type="button" class="fc-btn main" onclick={() => void long.ctx.commands.run('long-matters.open')}>Открыть список</button>
+  <button type="button" class="fc-btn main" disabled={!g.due.length && !long.groups.due.length} onclick={() => void long.ctx.commands.run('long-matters.walk')}>Обход{#if key('long-matters.walk')}<kbd>{key('long-matters.walk')}</kbd>{/if}</button>
+  <button type="button" class="fc-btn" onclick={() => void long.ctx.commands.run('long-matters.open')}>Открыть список</button>
 </div>
 <div class="fc-under">Под курсором</div>
 {#if row}

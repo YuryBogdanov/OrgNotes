@@ -24,7 +24,11 @@
     void plugins.reviewBar;
     void plugins.reviewRedraw;
     if (!r || !c) return [];
-    return r.spec.actions.filter((a) => !a.hidden).map((a) => ({ a, off: !!a.disabled && plugins.guard(r.plugin, () => a.disabled!(c.info), false) }));
+    return r.spec.actions.filter((a) => !a.hidden).map((a) => ({
+      a,
+      off: !!a.disabled && plugins.guard(r.plugin, () => a.disabled!(c.info), false),
+      sub: (a.subOf ? plugins.guard(r.plugin, () => a.subOf!(c.info), null) : null) ?? a.sub ?? '',
+    }));
   });
   const seg = (i: number) => (r && i === r.cur ? 'var(--lamp)' : marks[i] ? TONE[marks[i]!.tone] : r?.doneAt.has(i) ? 'var(--done)' : 'var(--track)');
   // the summary's buttons of the plugin («Разобрать пропущенные»), as it says now
@@ -33,11 +37,18 @@
     if (!r || r.cur >= 0 || !Array.isArray(r.spec.endActions)) return [];
     return r.spec.endActions.filter((e) => e && typeof e.label === 'string' && (!e.when || plugins.guard(r.plugin, () => e.when!(), false)));
   });
+  // the summary's figures: by the mark's group (the plugin's word), else by its tone; in the order they came
   const counts = $derived.by(() => {
-    const n = new Map<ReviewTone, number>();
-    for (const m of marks) if (m) n.set(m.tone, (n.get(m.tone) ?? 0) + 1);
-    return [...n].filter(([, v]) => v > 0);
+    const n = new Map<string, { tone: ReviewTone; n: number }>();
+    for (const m of marks) {
+      if (!m) continue;
+      const k = m.group ?? TONE_WORD[m.tone];
+      const was = n.get(k);
+      n.set(k, { tone: was?.tone ?? m.tone, n: (was?.n ?? 0) + 1 });
+    }
+    return [...n].map(([word, v]) => ({ word, ...v }));
   });
+  const endNote = $derived(r && r.cur < 0 && r.spec.endNote ? String(plugins.guard(r.plugin, () => r.spec.endNote!(), '') ?? '') : '');
 
   // the plugin's part under the actions: drawn for each card
   let belowEl = $state<HTMLElement>();
@@ -67,8 +78,8 @@
       <div class="count"><b>{r.cur + 1}</b><span>из {total} · осталось {remaining}</span></div>
     {:else}
       <div class="sums">
-        {#each counts as [tone, n] (tone)}
-          <div class="sum"><b style:color={TONE[tone]}>{n}</b><span>{TONE_WORD[tone]}</span></div>
+        {#each counts as x (x.word)}
+          <div class="sum"><b style:color={TONE[x.tone]}>{x.n}</b><span>{x.word}</span></div>
         {:else}
           <div class="sum"><b>0</b><span>разобрано</span></div>
         {/each}
@@ -79,9 +90,9 @@
     </div>
     {#if r.cur >= 0 && c}
       <div class="acts">
-        {#each acts as { a, off } (a.id)}
+        {#each acts as { a, off, sub } (a.id)}
           <button class="act" data-act={a.id} class:ok={a.kind === 'ok'} class:main={a.kind === 'primary'} disabled={off} onclick={() => void plugins.reviewAct(a.id)}>
-            <span class="l">{a.label}</span>{#if a.sub}<span class="sub">{a.sub}</span>{/if}
+            <span class="l">{a.label}</span>{#if sub}<span class="sub">{sub}</span>{/if}
             {#if kbd(a.command)}<kbd>{kbd(a.command)}</kbd>{/if}
           </button>
         {/each}
@@ -92,6 +103,7 @@
       </div>
       {#if r.spec.below}<Compat><div class="below" bind:this={belowEl}></div></Compat>{/if}
     {:else}
+      {#if endNote}<p class="enote">{endNote}</p>{/if}
       <div class="row wrap">
         {#each ends as e (e.label)}
           <button class="small" class:main={e.kind === 'primary'} onclick={() => r && plugins.guard(r.plugin, () => e.run(), undefined)}>{e.label}{#if kbd(e.command)}<kbd>{kbd(e.command)}</kbd>{/if}</button>
@@ -129,4 +141,5 @@
   .small.main { background: var(--lamp); color: var(--onlamp); font-weight: 600; }
   .small:disabled { opacity: 0.45; }
   .below { margin-top: 10px; }
+  .enote { margin: 0 0 2px; font-size: 11.5px; color: var(--ink2); }
 </style>

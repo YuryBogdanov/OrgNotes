@@ -11,6 +11,7 @@ import Sources from './Sources.svelte';
 import Today from './Today.svelte';
 import Card from './Card.svelte';
 import { review, reviewed, stopWaiting, wait } from './actions';
+import { walk } from './walk.svelte';
 import type { HeadingRef } from '@panopticon/api';
 
 const FILTERS: Filter[] = ['all', 'due', 'waiting', 'nostatus'];
@@ -83,6 +84,8 @@ export default definePlugin({
       },
     });
     ctx.commands.on('long-matters.open', () => long.openList());
+    // «Обход» (ТЗ 41 §2): the matters of «Пора проверить», one by one, in their files
+    ctx.commands.on('long-matters.walk', () => walk.start());
     // «Сегодня» (§7): what is due, up to three
     ctx.ui.todayBlock('long-matters.today', (el, block) => {
       const app = mount(Today, { target: el, props: { hide: (h: boolean) => block.setHidden(h) } });
