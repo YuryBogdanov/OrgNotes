@@ -746,6 +746,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   screen wraps its blocks in a place of the same name) and «the new look (ТЗ 51)»: fonts, the lamp, the grid, the
   compact day's rows «можно» / «1 из 3» / «нет плана», the column of 40 and the button of 24. It needs
   ../panopticon-week built from its latest branch.
+  52.1, the mini window and the quick entry in the new interface: main.ts mounts next/SideWindow.svelte for #mini and
+  #capture when `ui:next` is on (the old code may not import src/next; the old App mounted only their components
+  there anyway) — its root has the tokens by the appearance (`effective(readChoice())`, followed by `storage` and the
+  system's), `data-ui="next"`, `--ui`/`--mono`. They reload when the flag changes (a `storage` listener in main.ts,
+  the main window writes it). next/MiniWindow (the old one's workings: the new Editor with `rich={false}` and the new
+  `gutter` prop, FindPanel), next/MiniPalette, next/CaptureWindow (next/Capture with `standalone` — no `dim`); their
+  look comes in 52.2–52.4. e2e miniNote.spec.ts runs in both shells; nextSideWindows.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

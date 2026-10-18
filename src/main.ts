@@ -32,6 +32,19 @@ async function start() {
     store.note('Новый интерфейс не запустился — вернули старый. Подробности в журнале', undefined, 8000);
     return;
   }
+  // the mini window and the quick entry (ТЗ 52 §1): the same flag
+  if (!isMainWindow() && nextOn()) {
+    try {
+      const { default: Side } = await import('./next/SideWindow.svelte');
+      mount(Side, { target });
+      return;
+    } catch (e) {
+      console.error('the new interface did not start', e);
+      target.replaceChildren();
+    }
+  }
   mount(App, { target });
 }
+// the interface switched in the main window (its flag in the shared storage): these windows reload too (ТЗ 52 §1)
+if (!isMainWindow()) window.addEventListener('storage', (e) => void (e.key === 'ui:next' && location.reload()));
 void start();
