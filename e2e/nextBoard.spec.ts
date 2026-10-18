@@ -44,7 +44,7 @@ test('the columns and the cards: 272 pt, radius 12; the title in the text\'s fon
   const load = page.locator('.kb-card', { hasText: 'Нагрузочное' });
   await expect(load.locator('.kb-chip')).toHaveText(['#A', /^⚑ /, ':billing:']);
   await expect(load.locator('.kb-chip.late')).toHaveCount(1);
-  await expect(page.locator('.kb-card', { hasText: 'Дашборд SLA для поддержки' }).first().locator('.kb-chip').first()).toHaveText('◷ 21 окт');
+  await expect(page.locator('.kb-card', { hasText: 'Дашборд SLA для поддержки' }).first().locator('.kb-chip').first()).toHaveText(/^◷ \d+ [а-я]+$/); // the fixture's dates are today's: the day moves
   const dc = page.locator('.kb-card', { hasText: 'Переезд в новый ДЦ' });
   await dc.click();
   await expect(dc).toHaveClass(/sel/);
