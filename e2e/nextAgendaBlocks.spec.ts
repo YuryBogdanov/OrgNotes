@@ -35,7 +35,8 @@ test('«Мой день»: the head, the blocks with their conditions, the rows;
   await page.keyboard.press('ArrowDown');
   await expect(scr.locator('.row.sel .t')).not.toHaveText('Ревизия целей команд');
   await scr.getByRole('button', { name: 'Редактировать…' }).click();
-  await expect(page.getByRole('dialog', { name: 'Конструктор агенды' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Конструктор агенды' })).toBeVisible(); // a tab (ТЗ 48 §5)
+  await expect(page.getByRole('tablist', { name: 'Вкладки' }).getByRole('tab').filter({ hasText: 'Мой день — правка' })).toHaveCount(1);
 });
 
 test('the built-in «Неделя», «Сегодня», «Все задачи»: blocks, read-only; «Все задачи» by file', async ({ page }) => {

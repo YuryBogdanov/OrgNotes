@@ -626,6 +626,19 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   ↑↓ ↩, «+ Создать inbox.org в корне папки» while there is none. The quick window outside the app (`CaptureWindow`)
   stays old till the ТЗ of the other windows. e2e `nextCapture.spec.ts`. The bridges `Capture` and `InboxPicker`
   are gone.
+  48.4, the agenda builder as a tab: `AGENDA_EDIT = 'agenda.edit'` (store.svelte.ts), a view registered by next/App
+  (transient, single, «<name> — правка», `ViewSpec.dirty` → the tab's dot via `tabLabels.isDirty`, `onGone` →
+  `closeBuilder`); an effect opens the tab when `store.builder` is set and takes it away when it is gone. The
+  workings — `src/agendaBuilderCtl.svelte.ts` (`AgendaBuilderCtl`: the popover of a choice, its keys, the date
+  forms, the blocks, dragging, `save` with the checks); `next/AgendaBuilder.svelte` draws them (the header with the
+  name in `--title` 36 edited in place, «Источники: … · архивы не входят», the blocks on `card`, the open one
+  `lampline`, values as chips with «×», «+ условие», «+ Блок» dashed, the preview 340 pt on `panel`; the block's
+  colour from the 8 named). The old sheet AgendaBuilder.svelte keeps its own copy of the workings (the old
+  interface, unchanged). `saveAgenda(a, { keep: true })` keeps the builder open, clean; ⌘S in the tab →
+  `builderSave++`. Closing it unsaved: `Unsaved.kind 'agenda'` in `unsavedOf`, `closeWords` «Сохранить изменения
+  в агенде «…»?» / «Сохранить агенду»; «Не сохранять» → `closeBuilder`; «Сохранить» → `store.builderSaveFn` (the
+  tab's checks may stop the closing). In the new interface `sheetOpen` leaves the builder out and the window is not
+  inert. e2e `nextAgendaBuilder.spec.ts`. The bridge `AgendaBuilder` is gone.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

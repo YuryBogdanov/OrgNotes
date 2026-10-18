@@ -29,7 +29,7 @@ test('«Агенда»: the built-in opens the agenda\'s tab, marked; «Нова
   await expect(page.locator('header.bar .name')).toHaveText('Агенда');
   await expect(list.getByRole('button', { name: /^Агенда/ })).toHaveAttribute('aria-current', 'true');
   await list.getByRole('button', { name: 'Новая агенда…' }).click();
-  await expect(page.getByRole('dialog', { name: 'Конструктор агенды' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Конструктор агенды' })).toBeVisible(); // a tab (ТЗ 48 §5)
 });
 
 test('«Теги»: by count, mono names; find; А–Я; a click — the tab «Тег», ⌘-click adds; the menu', async ({ page }) => {

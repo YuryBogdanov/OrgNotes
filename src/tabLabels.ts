@@ -16,6 +16,8 @@ export const OFF_ICON = 'M8 3h4v2.5a1.5 1.5 0 0 0 3 0V3h2v5h-2.5a1.5 1.5 0 0 0 0
 export const isGone = (t: Tab) => t.kind === 'file' && !!store.orphans[t.path ?? ''];
 export const isDirty = (t: Tab) => {
   if (t.kind === 'untitled') return !!t.text?.trim(); // spaces and blank lines are not worth a dot
+  const v = viewOf(t.kind);
+  if (v?.dirty) return v.dirty(t);
   const f = store.fileOf(t);
   return !!f && f.text !== f.disk;
 };

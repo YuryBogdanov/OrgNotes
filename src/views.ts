@@ -34,6 +34,8 @@ export interface ViewSpec {
   pinned?: boolean;
   /** Called when the last tab of the kind is closed (a review ends). */
   onGone?(): void;
+  /** Unsaved: a dot on the tab (the agenda builder's, ТЗ 48 §5). */
+  dirty?(t: Tab): boolean;
 }
 // reactive: a plugin's kinds, sections and commands come and go while the window is open (roadmap 1.1)
 const views = new SvelteMap<string, ViewSpec>();

@@ -117,6 +117,8 @@ class Store {
   readonly newAgendaInBuilder = this.agendaStore.newAgendaInBuilder.bind(this.agendaStore);
   readonly editAgenda = this.agendaStore.editAgenda.bind(this.agendaStore);
   readonly closeBuilder = this.agendaStore.closeBuilder.bind(this.agendaStore);
+  /** The open builder's «Сохранить» with its checks (the new interface's tab sets it): what closing the tab calls. */
+  builderSaveFn: (() => Promise<boolean>) | null = null;
   readonly saveAgenda = this.agendaStore.saveAgenda.bind(this.agendaStore);
   readonly deleteAgenda = this.agendaStore.deleteAgenda.bind(this.agendaStore);
   private inbox = new InboxStore({
@@ -483,7 +485,7 @@ class Store {
     this.sheetChecks = [...this.sheetChecks, open];
   }
   get sheetOpen() {
-    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || this.builder || this.capture || this.refile || this.pickInbox || this.settingsOpen || this.sheetChecks.some((f) => f()));
+    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || (this.builder && !this.nextUi) || this.capture || this.refile || this.pickInbox || this.settingsOpen || this.sheetChecks.some((f) => f()));
   }
   /** The command palette; `start` opens it right at a step ("Создать файл…" ⇧⌘N, "Перейти к файлу…" ⇧⌘O). */
   palette = $state<{ start?: PaletteStart; n: number } | null>(null);
@@ -1761,6 +1763,7 @@ class Store {
     const seen = new Set<string>();
     for (const t of order) {
       if (t.kind === 'untitled' && t.text?.trim()) out.push({ tab: t, kind: 'note', name: noteName(t.text) });
+      if (t.kind === AGENDA_EDIT && this.builderDirty) out.push({ tab: t, kind: 'agenda', name: this.builder?.draft.name.trim() || 'Новая агенда' });
       if (t.kind !== 'file' || !t.path || !paths.includes(t.path) || seen.has(t.path)) continue;
       seen.add(t.path); // listed and counted once, whichever pane
       const f = this.files.find((x) => x.path === t.path) ?? this.orphans[t.path];
@@ -1787,8 +1790,11 @@ class Store {
     if (answer === 'cancel') return false;
     if (answer === 'discard') {
       for (const it of items) if (it.kind === 'file') this.revert(it.tab.path!);
+      if (items.some((it) => it.kind === 'agenda')) this.closeBuilder();
       return true;
     }
+    // the agenda builder's tab (ТЗ 48 §5): saved by the tab itself — its checks may stop the closing
+    if (items.some((it) => it.kind === 'agenda') && !(await (this.builderSaveFn?.() ?? Promise.resolve(false)))) return false;
     for (const it of items.filter((x) => x.kind === 'file')) {
       const path = it.tab.path!;
       if (this.orphans[path]) {
@@ -2258,12 +2264,14 @@ export type SettingsSection = string;
 export type NavMode = string;
 export type Scan = { name: string; path: string; shown: string; org: number; folders: number; other: number; capped: boolean; big: boolean };
 export type StartScreen = { kind: 'welcome' } | { kind: 'found'; path: string; scan: Scan | null; change: boolean } | { kind: 'missing'; path: string } | null;
-export type Unsaved = { tab: Tab; kind: 'file' | 'note'; name: string };
+export type Unsaved = { tab: Tab; kind: 'file' | 'note' | 'agenda'; name: string };
 export type Conflict = { path: string; name: string; disk: string; diskRaw: string; eol: Eol; mtime: number; postponed: boolean };
 export type DiskAnswer = 'disk' | 'mine' | 'later' | 'saveas' | 'keep' | 'close';
 const CONFLICT = 'файл на диске изменён другой программой';
 
 export const store = new Store();
+/** The agenda builder's tab in the new interface (ТЗ 48 §5). */
+export const AGENDA_EDIT = 'agenda.edit';
 // a plugin's file type came or went (ТЗ 39): the Rust side lists those files too, the folder is read again
 let typesQueued = false;
 watchFileTypes(() => {

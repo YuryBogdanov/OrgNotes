@@ -16,7 +16,11 @@
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { AgendaBuilder, Settings, StartScreen } from './bridges';
+  import { Settings, StartScreen } from './bridges';
+  import AgendaBuilderTab from './AgendaBuilder.svelte';
+  import { AGENDA_EDIT } from '../store.svelte';
+  import { registerView } from '../views';
+  import { openView } from '../layout';
   import Capture from './Capture.svelte';
   import InboxPicker from './InboxPicker.svelte';
   import { lists } from '../taskLists.svelte';
@@ -42,6 +46,29 @@
 
   // a review in the file (ТЗ 41 §1): the tab follows its cards
   fileReview.effects();
+  // the agenda builder is a tab here (ТЗ 48 §5): «<Агенда> — правка», a dot while unsaved; it opens with the builder
+  // and the builder goes with its tab
+  registerView({
+    kind: AGENDA_EDIT, icon: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3', component: AgendaBuilderTab, transient: true, single: true,
+    label: () => `${store.builder?.draft.name.trim() || 'Новая агенда'} — правка`,
+    crumbs: () => ['Агенды', `${store.builder?.draft.name.trim() || 'Новая агенда'} — правка`],
+    dirty: () => store.builderDirty,
+    onGone: () => void (store.builder && store.closeBuilder()),
+  });
+  $effect(() => {
+    const n = store.builder?.n;
+    untrack(() => {
+      const has = store.layout.panes[0]?.tabs.findIndex((t) => t.kind === AGENDA_EDIT) ?? -1;
+      if (n) {
+        openView(store.layout, 0, AGENDA_EDIT, () => ({}));
+        store.layout.active = 0;
+      } else if (has >= 0) {
+        const p = store.layout.panes[0];
+        p.tabs.splice(has, 1);
+        p.active = Math.max(0, Math.min(p.active, p.tabs.length - 1));
+      }
+    });
+  });
   // The new shell (ТЗ 42): the store, the plugins, the window's keys and the menu, the old sheets through
   // `bridges.ts` (42.1); the sidebar with the files and the toolbar (42.3); the tabs (42.4); the editor (42.5).
   /** «Открыть» of «Добавлено в Inbox»: the Inbox's file, at its end (where the entry went). */
@@ -78,7 +105,7 @@
       const p = store.layout.panes[0];
       if (p) void store.closeOthers(0, p.active);
     },
-    save: () => store.saveActive(),
+    save: () => (store.tab?.kind === AGENDA_EDIT ? void store.builderSave++ : store.saveActive()), // the builder's tab: «Сохранить агенду»
     copyPath: () => store.copyPath(store.tab),
     closeWindow: () => store.hideWindow(),
     splitRight: () => store.splitRight(),
@@ -223,7 +250,7 @@
 </script>
 
 <div class="next" data-ui="next" data-font={nextPrefs.font} style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--text:{textFont};--title:{FONTS.title};--mono:{FONTS.mono};--col:{nextPrefs.col};--capc:{capc}">
-  <div class="win" inert={!!store.builder || store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
+  <div class="win" inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
   {#if store.showNav}<Sidebar width={sideWidth} onwidth={setWidth} onmenu={(at, items) => (menu = { ...at, items })} />{/if}
   <div class="main">
   <Toolbar onnew={newFile} />
@@ -265,7 +292,6 @@
   {#if store.toast}<div class="toast" role="status">{store.toast.text}{#each store.toast.actions ?? [] as a (a.label)}<button onclick={() => { store.toast = null; a.run(); }}>{a.label}</button>{/each}</div>{/if}
   <Compat>
     <!-- the agenda builder: a sheet over the window, which takes no input under it -->
-    {#if store.builder}{#key store.builder.n}<AgendaBuilder />{/key}{/if}
     {#if store.settingsOpen && store.loaded}<Settings />{/if}
   </Compat>
 </div>
