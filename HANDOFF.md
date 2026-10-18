@@ -646,6 +646,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   недоступна» (the warning on `wait`). While it shows, next/App hides its window (`display: none`: no sidebar, no
   tabs). `src/next/bridges.ts` keeps `Settings` and `PluginFileView` only (boundary.test.ts checks it). e2e
   `nextStart.spec.ts`. ТЗ 48 is done.
+- **ТЗ 49 (the file view and the board), 49.1 — the host:** `next/FileView.svelte` in place of the bridge
+  PluginFileView (the same `showText`, `setHeading`, drawing again on another file, `plugins.guard`): the layer's
+  variables (`tokenVars` + `compatVars`) and `data-ui="next"` on the element itself, no Compat around it; `bg` with
+  the grid of 24 pt under it; «Загрузка плагина…» after 300 ms; a stopped plugin — «Плагин «…» остановлен из-за
+  ошибки», «Показать текст» (not for a file of its own type), «Настройки плагинов». A view chosen whose plugin
+  stopped keeps its place: `store.wantedView(tab)` (the tab's choice, the file's memory, its file type) and
+  EditorArea's `stopped`; the view chosen by default only («#+BOARD» with no choice yet) goes back to the text, its
+  plugin's `defaultFor` gone with it. `bridges.ts` keeps `Settings` only (boundary.test.ts). e2e `nextFileView.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
