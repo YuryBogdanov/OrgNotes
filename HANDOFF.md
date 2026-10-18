@@ -654,6 +654,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   stopped keeps its place: `store.wantedView(tab)` (the tab's choice, the file's memory, its file type) and
   EditorArea's `stopped`; the view chosen by default only («#+BOARD» with no choice yet) goes back to the text, its
   plugin's `defaultFor` gone with it. `bridges.ts` keeps `Settings` only (boundary.test.ts). e2e `nextFileView.spec.ts`.
+  49.2, the view switch (next/Tabs.svelte «Вид текста»): «Оформление / Исходник» and a segment per file view that
+  is on (`allFileViews()` less the file types' own), titled from the manifest; lit — `store.viewOf(tab)`, else the
+  text's mode; «Оформление» / «Исходник» on a view → `showAs(tab, '')` (a tab on one heading — the text at it) and
+  the mode; a view's segment → `showAs(tab, id)` (no «#+BOARD»: the board asks for the workflow, «Отмена» back to
+  the text). One view with a key — its `kbd` by the switch (⌥⌘B); more — the keys in the segments' titles. A file of
+  its own type (`.canvas`) has no switch. ⌃⌘E (`rich`) on a view: back to the text in its mode. e2e
+  `nextViewSwitch.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

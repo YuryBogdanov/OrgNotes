@@ -1,6 +1,7 @@
 <script lang="ts">
   import { store } from '../store.svelte';
-  import { viewOf, fileViewOf } from '../views';
+  import { viewOf, fileViewOf, allFileViews } from '../views';
+  import { fileTypeOf, fileTypes } from '../fileTypes.svelte';
   import { isPinned, type Tab } from '../layout';
   import { OFF_ICON, isCore, isDirty, isGone, tabLabel } from '../tabLabels';
   import { tabMenuItems } from '../tabMenu';
@@ -9,12 +10,30 @@
 
   // The tabs of the new interface (ТЗ 42 §4.3), 36 pt under the toolbar: a pinned tab — its icon alone; a tab — its
   // icon and name, «×» on the active one and on hover, a dot instead while unsaved; up to 190 pt, down to 90, then the
-  // row scrolls; «+» — an untitled tab; right, «Оформление / Исходник» (the old «Текст / Оформление», one for all
-  // tabs). One pane: the tabs of the layout's first (the second is folded in, store.foldPanesForNext).
+  // row scrolls; «+» — an untitled tab; right, «Оформление / Исходник» and the file's views (ТЗ 49 §2; the text's mode is
+  // one for all tabs). One pane: the tabs of the layout's first (the second is folded in, store.foldPanesForNext).
   let { onmenu }: { onmenu: (at: { x: number; y: number }, items: MenuItem[]) => void } = $props();
   const pi = 0;
   const pane = $derived(store.layout.panes[pi]);
-  const text = $derived(store.tab?.kind === 'file' || store.tab?.kind === 'untitled');
+  const text = $derived((store.tab?.kind === 'file' && !fileTypeOf(store.tab.path)) || store.tab?.kind === 'untitled');
+  // the views of a file (ТЗ 49 §2): «Оформление / Исходник / Доска» — a segment for each view that is on (not a file
+  // type's own), in the plugins' order; the one the tab shows lit, else the text's mode. A file of its own type has
+  // no switch (its view is its only one); a screen neither.
+  const views = $derived(store.tab?.kind === 'file' ? allFileViews().filter((v) => !fileTypes().some((t) => t.view === v.id)) : []);
+  const shown = $derived(store.tab?.kind === 'file' ? store.viewOf(store.tab) : '');
+  /** «Оформление» / «Исходник» on a view: back to the text in that mode (a tab on one heading — its text at it). */
+  function asText(rich: boolean) {
+    const t = store.tab;
+    if (t && shown) {
+      if (t.scope) {
+        t.reveal = { line: t.scope.line, n: Date.now(), focus: true };
+        t.scope = undefined;
+      }
+      store.showAs(t, '');
+    }
+    store.setRich(rich);
+  }
+  const viewKey = (id: string | undefined) => (id ? store.keyHint(id) : '');
 
   const FILE = 'M3.5 2h6l3 3v9h-9z';
   /** The icon of a tab: a path in a 16 box (the file's), or a view's in its 20 box. */
@@ -86,9 +105,14 @@
   <!-- only over a text (ТЗ 43 §4): a screen has no «Оформление / Исходник» -->
   {#if text}
     <div class="mode" role="radiogroup" aria-label="Вид текста">
-      <button role="radio" aria-checked={store.rich} class:on={store.rich} onclick={() => store.setRich(true)}>Оформление</button>
-      <button role="radio" aria-checked={!store.rich} class:on={!store.rich} onclick={() => store.setRich(false)}>Исходник</button>
+      <button role="radio" aria-checked={!shown && store.rich} class:on={!shown && store.rich} onclick={() => asText(true)}>Оформление</button>
+      <button role="radio" aria-checked={!shown && !store.rich} class:on={!shown && !store.rich} onclick={() => asText(false)}>Исходник</button>
+      {#each views as v (v.id)}
+        <button role="radio" aria-checked={shown === v.id} class:on={shown === v.id} title={views.length > 1 && viewKey(v.key) ? `${v.title} · ${viewKey(v.key)}` : undefined}
+          onclick={() => store.tab && store.showAs(store.tab, v.id)}>{v.title}</button>
+      {/each}
     </div>
+    {#if views.length === 1 && viewKey(views[0].key)}<kbd class="vk" title="{views[0].title} ↔ текст">{viewKey(views[0].key)}</kbd>{/if}
   {/if}
 </div>
 
@@ -125,5 +149,6 @@
   .mode { flex: 0 0 auto; align-self: center; display: flex; gap: 2px; margin: 0 12px; padding: 2px; border-radius: 7px; background: var(--chip); }
   .mode button { height: 22px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: var(--ink2); font: 12px var(--ui); white-space: nowrap; }
   .mode button.on { background: var(--segon); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18); }
+  .vk { align-self: center; margin: 0 12px 0 -6px; font: 11px var(--mono); color: var(--ink3); }
   .mode button:focus-visible, .add:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
 </style>

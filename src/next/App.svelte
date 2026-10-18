@@ -44,6 +44,7 @@
   import { actionOf, allViews } from '../views';
   import { today } from '../todayState.svelte';
   import { fileReview } from './fileReview.svelte';
+  import { fileTypeOf } from '../fileTypes.svelte';
 
   // a review in the file (ТЗ 41 §1): the tab follows its cards
   fileReview.effects();
@@ -110,7 +111,8 @@
     copyPath: () => store.copyPath(store.tab),
     closeWindow: () => store.hideWindow(),
     splitRight: () => store.splitRight(),
-    rich: () => store.setRich(!store.rich),
+    // ⌃⌘E on a file's view: back to its text in the mode it has (ТЗ 49 §2); on the text — the other mode
+    rich: () => (store.tab?.kind === 'file' && store.viewOf(store.tab) && !fileTypeOf(store.tab.path) ? store.showAs(store.tab, '') : store.setRich(!store.rich)),
     // ⌥⌘0: the old inspector's keys show «Структура» here (§8)
     insp: () => nextPrefs.setStructure(!nextPrefs.structure),
     // ⌘F, ⌘G, ⇧⌘G, ⌘E, ⌥⌘F (§5.7)
