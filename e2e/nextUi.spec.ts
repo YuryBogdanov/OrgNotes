@@ -50,14 +50,15 @@ test('the new shell failing to start: the old one and a word why; the flag stays
   expect(await page.evaluate(() => localStorage.getItem('ui:next'))).toBe('1');
 });
 
-test('the mini window and the quick entry stay old with the flag on', async ({ page }) => {
+test('the mini window and the quick entry follow the flag (ТЗ 52, was «stay old» of ТЗ 42): their own root, not the main shell', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('ui:next', '1'));
   await openApp(page, { files: FILES, ready: false });
   await expect(nextShell(page)).toBeVisible();
   await page.goto('/#capture');
   await page.reload(); // a new hash alone does not load the page again
   await expect(page.locator('#app')).not.toBeEmpty();
-  await expect(nextShell(page)).toHaveCount(0);
+  await expect(page.locator('.side-win[data-ui="next"]')).toHaveCount(1);
+  await expect(page.locator('.next:not(.side-win)')).toHaveCount(0); // not the main window's shell
 });
 
 test('42.2: the tokens of the appearance, «Синька» by default, the bundled fonts; the old shell keeps Panopticon', async ({ page }) => {
