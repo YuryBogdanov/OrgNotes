@@ -184,7 +184,8 @@
   .lights { flex: 0 0 52px; align-self: stretch; -webkit-app-region: drag; }
   .rail { flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 12px; box-sizing: border-box; }
   .rail > .lights { margin-bottom: 2px; } /* the first button at 58 pt */
-  .list { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; overflow: hidden; }
+  /* the whole rail's width, not clipped: the badges stand out of their buttons (what does not fit is in «⋯») */
+  .list { flex: 1; min-height: 0; align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: 4px; }
   .secs { display: flex; flex-direction: column; gap: 4px; }
   .sep { flex: 0 0 1px; width: 24px; margin: 4px 0; background: var(--rule); }
   .ri { position: relative; flex: 0 0 34px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink2); }
