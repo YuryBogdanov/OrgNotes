@@ -17,12 +17,14 @@ const snapshot = (text = TEXT, note: unknown = { path: 'Work.org', line: 0, titl
 const mini = (page: Page) => page.getByRole('application', { name: 'Мини-окно' });
 const lines = (page: Page) => mini(page).locator('.cm-line');
 
+// every scenario in both shells (ТЗ 52): the old one and the new, where the window draws the new look
+let UI: 'old' | 'next' = 'old';
 async function open(page: Page, note?: unknown, ls: Record<string, string> = {}) {
   await page.setViewportSize({ width: 440, height: 330 });
   await page.addInitScript((kv) => {
     localStorage.clear();
     for (const [k, v] of Object.entries(kv)) localStorage.setItem(k, v);
-  }, ls);
+  }, UI === 'next' ? { ...ls, 'ui:next': '1' } : ls);
   await installTauriMock(page, {});
   await page.goto('/#mini');
   await expect(mini(page)).toBeVisible();
@@ -30,89 +32,94 @@ async function open(page: Page, note?: unknown, ls: Record<string, string> = {})
   await send(page, 'mini-snapshot', snapshot(TEXT, note === undefined ? { path: 'Work.org', line: 0, title: 'Созвон' } : note));
 }
 
-test('the heading narrowed: its subtree only, no gutter; the header; typing goes to the main window', async ({ page }) => {
-  await open(page);
-  await expect(mini(page).locator('header .path')).toHaveText(/Work\.org ›\s*Созвон/);
-  await expect(lines(page)).toHaveText(['* Созвон', '** Что показали', '- миграция биллинга']);
-  await expect(mini(page).locator('.cm-lineNumbers')).toHaveCount(0);
-  await page.keyboard.type(' и тарифов'); // the caret is at the end of the subtree
-  await expect.poll(async () => (await edits(page)).at(-1)).toBe('* Созвон\n** Что показали\n- миграция биллинга и тарифов\n* Другое\nтекст\n');
-});
+for (const ui of ['old', 'next'] as const)
+  test.describe(ui === 'next' ? 'the new interface' : 'the old interface', () => {
+    test.beforeEach(() => void (UI = ui));
 
-test('an edit from the main window (or the disk) comes in; the heading gone: «Заголовок удалён»', async ({ page }) => {
-  await open(page);
-  await send(page, 'mini-file', { path: W, text: '* Созвон\n** Что показали\n- миграция биллинга\n- дашборд SLA\n* Другое\n', disk: '', diskRaw: '' });
-  await expect(lines(page)).toHaveText(['* Созвон', '** Что показали', '- миграция биллинга', '- дашборд SLA']);
-  await send(page, 'mini-file', { path: W, text: '* Другое\n', disk: '', diskRaw: '' });
-  await expect(mini(page)).toContainText('Заголовок удалён');
-  await expect(mini(page).getByRole('button', { name: 'Выбрать заметку · ⌘P' })).toBeVisible();
-});
+    test('the heading narrowed: its subtree only, no gutter; the header; typing goes to the main window', async ({ page }) => {
+      await open(page);
+      await expect(mini(page).locator('header .path')).toHaveText(/Work\.org ›\s*Созвон/);
+      await expect(lines(page)).toHaveText(['* Созвон', '** Что показали', '- миграция биллинга']);
+      await expect(mini(page).locator('.cm-lineNumbers')).toHaveCount(0);
+      await page.keyboard.type(' и тарифов'); // the caret is at the end of the subtree
+      await expect.poll(async () => (await edits(page)).at(-1)).toBe('* Созвон\n** Что показали\n- миграция биллинга и тарифов\n* Другое\nтекст\n');
+    });
 
-test('⌥↩ on the root heading: the next one after its subtree, the note there', async ({ page }) => {
-  await open(page);
-  await lines(page).first().click();
-  await page.keyboard.press('End');
-  await page.keyboard.press('Alt+Enter');
-  await expect.poll(async () => (await edits(page)).at(-1)).toBe('* Созвон\n** Что показали\n- миграция биллинга\n* \n* Другое\nтекст\n');
-  await page.keyboard.type('Договорились');
-  await expect(mini(page).locator('header .path b')).toHaveText('Договорились');
-  await expect.poll(async () => (await edits(page)).at(-1)).toContain('\n* Договорились\n* Другое');
-});
+    test('an edit from the main window (or the disk) comes in; the heading gone: «Заголовок удалён»', async ({ page }) => {
+      await open(page);
+      await send(page, 'mini-file', { path: W, text: '* Созвон\n** Что показали\n- миграция биллинга\n- дашборд SLA\n* Другое\n', disk: '', diskRaw: '' });
+      await expect(lines(page)).toHaveText(['* Созвон', '** Что показали', '- миграция биллинга', '- дашборд SLA']);
+      await send(page, 'mini-file', { path: W, text: '* Другое\n', disk: '', diskRaw: '' });
+      await expect(mini(page)).toContainText('Заголовок удалён');
+      await expect(mini(page).getByRole('button', { name: 'Выбрать заметку · ⌘P' })).toBeVisible();
+    });
 
-test('⌘P: the headings and files; ↩ a heading narrowed, ⌘↩ its file whole; ⎋ closes it', async ({ page }) => {
-  await open(page);
-  await page.keyboard.press('Meta+p');
-  const pal = page.getByRole('dialog', { name: 'Сменить заметку' });
-  await expect(pal).toBeVisible();
-  await expect.poll(async () => (await log(page)).some((e) => e[0] === 'mini_pin' && (e[1] as { on: boolean }).on)).toBe(true); // full while open
-  await page.keyboard.type('друг');
-  await expect(pal.locator('.row.on .t')).toHaveText('Другое');
-  await page.keyboard.press('Enter');
-  await expect(pal).toHaveCount(0);
-  await expect(lines(page)).toHaveText(['* Другое', 'текст']);
-  await page.keyboard.press('Meta+p');
-  await page.keyboard.type('покуп');
-  await page.keyboard.press('Meta+Enter');
-  await expect(mini(page).locator('header .path')).toHaveText('Дом.org'); // the file whole
-  await expect(lines(page)).toHaveText(['* Покупки', '']);
-  await page.keyboard.press('Meta+p');
-  await page.keyboard.press('Escape');
-  await expect(pal).toHaveCount(0);
-});
+    test('⌥↩ on the root heading: the next one after its subtree, the note there', async ({ page }) => {
+      await open(page);
+      await lines(page).first().click();
+      await page.keyboard.press('End');
+      await page.keyboard.press('Alt+Enter');
+      await expect.poll(async () => (await edits(page)).at(-1)).toBe('* Созвон\n** Что показали\n- миграция биллинга\n* \n* Другое\nтекст\n');
+      await page.keyboard.type('Договорились');
+      await expect(mini(page).locator('header .path b')).toHaveText('Договорились');
+      await expect.poll(async () => (await edits(page)).at(-1)).toContain('\n* Договорились\n* Другое');
+    });
 
-test('no note yet: the palette at once; a command of the big window says so; ⎋ gives the keys back', async ({ page }) => {
-  await open(page, null);
-  await expect(page.getByRole('dialog', { name: 'Сменить заметку' })).toBeVisible();
-  await page.keyboard.type('созв');
-  await page.keyboard.press('Enter');
-  await page.keyboard.press('Shift+Meta+f'); // search in every file: the big window's
-  await expect(mini(page).getByRole('status')).toHaveText('Доступно в главном окне');
-  await page.keyboard.press('Escape'); // the hint goes
-  await page.keyboard.press('Escape'); // then the keys go back
-  await expect.poll(async () => (await log(page)).some((e) => e[0] === 'mini_return_focus')).toBe(true);
-  await page.getByRole('button', { name: 'Открыть в главном окне' }).click();
-  await expect.poll(async () => (await log(page)).find((e) => e[0] === 'emit' && e[2] === 'mini-open-main')?.[3]).toEqual({ path: 'Work.org', line: 0 });
-});
+    test('⌘P: the headings and files; ↩ a heading narrowed, ⌘↩ its file whole; ⎋ closes it', async ({ page }) => {
+      await open(page);
+      await page.keyboard.press('Meta+p');
+      const pal = page.getByRole('dialog', { name: 'Сменить заметку' });
+      await expect(pal).toBeVisible();
+      await expect.poll(async () => (await log(page)).some((e) => e[0] === 'mini_pin' && (e[1] as { on: boolean }).on)).toBe(true); // full while open
+      await page.keyboard.type('друг');
+      await expect(pal.locator('.row.on .t')).toHaveText('Другое');
+      await page.keyboard.press('Enter');
+      await expect(pal).toHaveCount(0);
+      await expect(lines(page)).toHaveText(['* Другое', 'текст']);
+      await page.keyboard.press('Meta+p');
+      await page.keyboard.type('покуп');
+      await page.keyboard.press('Meta+Enter');
+      await expect(mini(page).locator('header .path')).toHaveText('Дом.org'); // the file whole
+      await expect(lines(page)).toHaveText(['* Покупки', '']);
+      await page.keyboard.press('Meta+p');
+      await page.keyboard.press('Escape');
+      await expect(pal).toHaveCount(0);
+    });
 
-test('⌘F searches what the window shows; ⎋ closes the bar first; full while it is open', async ({ page }) => {
-  await open(page);
-  await page.keyboard.press('Meta+f');
-  const bar = page.getByRole('textbox', { name: /Найти/ });
-  await expect(bar).toBeFocused();
-  await page.keyboard.type('биллинг');
-  await expect(mini(page).locator('.cm-find').first()).toBeVisible();
-  await expect.poll(async () => (await log(page)).filter((e) => e[0] === 'mini_pin').at(-1)?.[1]).toEqual({ on: true });
-  await page.keyboard.press('Escape');
-  await expect(bar).toHaveCount(0);
-  await expect.poll(async () => (await log(page)).filter((e) => e[0] === 'mini_pin').at(-1)?.[1]).toEqual({ on: false });
-  expect((await log(page)).some((e) => e[0] === 'mini_return_focus')).toBe(false); // the bar closed, the keys stay here
-});
+    test('no note yet: the palette at once; a command of the big window says so; ⎋ gives the keys back', async ({ page }) => {
+      await open(page, null);
+      await expect(page.getByRole('dialog', { name: 'Сменить заметку' })).toBeVisible();
+      await page.keyboard.type('созв');
+      await page.keyboard.press('Enter');
+      await page.keyboard.press('Shift+Meta+f'); // search in every file: the big window's
+      await expect(mini(page).getByRole('status')).toHaveText('Доступно в главном окне');
+      await page.keyboard.press('Escape'); // the hint goes
+      await page.keyboard.press('Escape'); // then the keys go back
+      await expect.poll(async () => (await log(page)).some((e) => e[0] === 'mini_return_focus')).toBe(true);
+      await page.getByRole('button', { name: 'Открыть в главном окне' }).click();
+      await expect.poll(async () => (await log(page)).find((e) => e[0] === 'emit' && e[2] === 'mini-open-main')?.[3]).toEqual({ path: 'Work.org', line: 0 });
+    });
 
-test('its keys are the ones of «Клавиши»: ⌘W hides it, a changed ⌘P opens the palette', async ({ page }) => {
-  await open(page, undefined, { keys: JSON.stringify({ preset: 'emacs', overrides: { miniPalette: ['⌘O'] } }) });
-  await page.keyboard.press('Meta+o');
-  await expect(page.getByRole('dialog', { name: 'Сменить заметку' })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await page.keyboard.press('Meta+w');
-  await expect.poll(async () => (await log(page)).some((e) => e[0] === 'mini_hide')).toBe(true);
-});
+    test('⌘F searches what the window shows; ⎋ closes the bar first; full while it is open', async ({ page }) => {
+      await open(page);
+      await page.keyboard.press('Meta+f');
+      const bar = page.getByRole('textbox', { name: /Найти/ });
+      await expect(bar).toBeFocused();
+      await page.keyboard.type('биллинг');
+      await expect(mini(page).locator('.cm-find').first()).toBeVisible();
+      await expect.poll(async () => (await log(page)).filter((e) => e[0] === 'mini_pin').at(-1)?.[1]).toEqual({ on: true });
+      await page.keyboard.press('Escape');
+      await expect(bar).toHaveCount(0);
+      await expect.poll(async () => (await log(page)).filter((e) => e[0] === 'mini_pin').at(-1)?.[1]).toEqual({ on: false });
+      expect((await log(page)).some((e) => e[0] === 'mini_return_focus')).toBe(false); // the bar closed, the keys stay here
+    });
+
+    test('its keys are the ones of «Клавиши»: ⌘W hides it, a changed ⌘P opens the palette', async ({ page }) => {
+      await open(page, undefined, { keys: JSON.stringify({ preset: 'emacs', overrides: { miniPalette: ['⌘O'] } }) });
+      await page.keyboard.press('Meta+o');
+      await expect(page.getByRole('dialog', { name: 'Сменить заметку' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('Meta+w');
+      await expect.poll(async () => (await log(page)).some((e) => e[0] === 'mini_hide')).toBe(true);
+    });
+  });

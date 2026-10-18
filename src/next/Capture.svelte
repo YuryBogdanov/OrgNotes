@@ -6,8 +6,10 @@
   // from the top over `dim`. The title — the Inbox's icon `lampink`, a field in Cormorant 24 semibold, «Что записать?»;
   // «Tab — детали», after Tab the details in Cormorant 17, 1–8 lines; the foot — «→ inbox» (a click: the Inbox's file),
   // the keys, «⇧⌘I». ↩ adds, ⌘↩ from the details, ⇧Tab back to the title, ⎋ closes and keeps the draft (as typed).
-  let { file, onsubmit, onpick, onclose }: {
+  // `standalone`: the panel of its own over another program (ТЗ 52 §4) — no `dim` under it, the panel is its size.
+  let { file, standalone = false, onsubmit, onpick, onclose }: {
     file: string | null;
+    standalone?: boolean;
     onsubmit: (title: string, details: string) => Promise<'ok' | 'nofile' | 'empty' | 'error'>;
     onpick: () => void;
     onclose: (added: boolean) => void;
@@ -108,7 +110,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="dim" onmousedown={(e) => e.target === e.currentTarget && close()}>
+<div class="dim" class:standalone onmousedown={(e) => e.target === e.currentTarget && close()}>
   <div class="cap" role="dialog" aria-label="Новая задача в Inbox">
     {#if phase === 'nofile'}
       <div class="nofile">
@@ -137,6 +139,7 @@
 
 <style>
   .dim { position: fixed; inset: 0; z-index: 95; display: flex; justify-content: center; align-items: flex-start; padding-top: 150px; background: var(--dim); }
+  .dim.standalone { position: static; padding: 0; background: transparent; }
   .cap { width: 600px; max-width: calc(100vw - 32px); box-sizing: border-box; display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: 14px; background: var(--card); box-shadow: var(--popshadow); color: var(--ink); overflow: hidden; }
   .trow { display: flex; align-items: center; gap: 12px; padding: 16px 20px 6px; color: var(--lampink); }
   .trow.shake { animation: shake 0.3s; }
