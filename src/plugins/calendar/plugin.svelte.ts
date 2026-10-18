@@ -34,7 +34,7 @@ export default definePlugin({
     ctx.ui.view<CalState>('calendar.view', {
       title: () => 'Календарь',
       crumbs: (s) => ['Календарь', crumb(s)],
-      restore: (raw) => (valid(raw) ? { view: raw.view === 'week' ? 'week' : 'month', date: raw.date } : cal.fresh()),
+      restore: (raw) => (valid(raw) ? { view: raw.view === 'week' ? 'week' : 'month', date: raw.date, ...(raw.back === 'agenda' ? { back: 'agenda' as const } : {}) } : cal.fresh()),
       render: (el, state, tab) => {
         const app = mount(View, { target: el, props: { initial: state, setState: (s: CalState) => tab.setState(s) } });
         return () => void unmount(app);

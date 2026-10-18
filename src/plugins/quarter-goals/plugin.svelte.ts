@@ -5,7 +5,7 @@ import type { HeadingRef } from '@panopticon/api';
 import { definePlugin, type Ctx } from '@panopticon/api';
 import { mount, unmount } from 'svelte';
 import { core } from './core.svelte';
-import { goals, OVERVIEW } from './state.svelte';
+import { goals, OVERVIEW, splitView } from './state.svelte';
 import { GOALS_WORKFLOW, GOAL_STATES, goalsIn, isDone, oneOnOneLine, quarterOf, todayPerson } from './goals';
 import Card from './Card.svelte';
 import { openAdd, openForm, startReview } from './actions';
@@ -15,7 +15,10 @@ import Today from './Today.svelte';
 import './styles.css';
 
 /** The name of a goals tab: the overview or a person. */
-const label = (key: string | null) => (!key || key === '*' ? 'Обзор квартала' : (goals.goalPeople.find((p) => p.key === key)?.name ?? 'Цели'));
+const label = (state: string | null) => {
+  const key = splitView(state).key;
+  return key === '*' ? 'Обзор квартала' : (goals.goalPeople.find((p) => p.key === key)?.name ?? 'Цели');
+};
 
 /** «Цели на квартал»: the goals' statuses once there are goals, while no set of the project knows ACTIVE. */
 let setsOn: boolean | null = null;
@@ -67,8 +70,9 @@ export default definePlugin({
       title: (key) => label(key),
       crumbs: (key) => ['Цели', label(key)],
       restore: (raw) => (typeof raw === 'string' && raw ? raw : '*'),
-      render: (el, state) => {
-        const app = mount(Overview, { target: el, props: { who: state } });
+      render: (el, state, tab) => {
+        const v = splitView(state);
+        const app = mount(Overview, { target: el, props: { who: v.key, wheel: v.wheel, setWheel: (on: boolean) => tab.setState(on ? v.key + '~wheel' : v.key) } });
         return () => void unmount(app);
       },
     });

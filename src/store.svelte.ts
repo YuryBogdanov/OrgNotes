@@ -1691,6 +1691,15 @@ class Store {
   showAgendaHere() {
     openAgenda(this.layout, this.layout.active);
   }
+  /** The active tab becomes the built-in «Агенда» («День») on a day: back from the calendar (ТЗ 47 §1.6). */
+  agendaInTab(date?: string) {
+    const p = this.layout.panes[this.layout.active];
+    if (!p) return;
+    const t = { ...newTab('agenda'), ...(date ? { data: { date } } : {}) };
+    if (p.tabs.length) p.tabs[p.active] = t;
+    else (p.tabs.push(t), (p.active = 0));
+    this.persistLayout();
+  }
   showNotesHere() {
     const p = this.layout.panes[this.layout.active];
     const i = p ? p.tabs.findLastIndex((t) => t.kind === 'file') : -1;

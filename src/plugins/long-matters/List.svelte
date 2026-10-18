@@ -102,9 +102,35 @@
   /** The bar of «Давность»: to 160% of the norm. */
   const fill = (r: Row) => (r.s.age === null ? 0 : Math.min(100, (r.s.age / (long.settings.norm * 1.6)) * 100));
   const NORM_AT = 100 / 1.6;
+
+  // ---- the new interface (ТЗ 47 §2): the header of the new screens, the list in the new tokens ----
+  const next = long.ctx.ui.look === 'next';
+  const LEVELS = ['', 'первый уровень', 'второй уровень', 'третий уровень', 'четвёртый уровень'];
+  /** «Midterm.org · первый уровень + тег :long:» — where the matters come from, the kicker. */
+  const kicker = $derived(
+    long.settings.sources.map((s) => (s.kind === 'file' ? `${s.file} · ${LEVELS[s.level] ?? `уровень ${s.level}`}` : `тег :${s.tag}:`)).join(' + '),
+  );
+  const walkKey = $derived(long.ctx.commands.keyOf('long-matters.walk'));
 </script>
 
-<div class="lmv">
+<div class="lmv" class:next>
+  {#if next}
+    <header class="nh">
+      <div class="ttl">
+        {#if kicker}<div class="kick">{kicker}</div>{/if}
+        <h1>Долгие дела</h1>
+      </div>
+      <div class="tools">
+        <div class="seg" role="tablist" aria-label="Показать">
+          {#each FILTERS as f (f.id)}
+            <button role="tab" aria-selected={filter === f.id} class:on={filter === f.id} onclick={() => choose(f.id)}>{f.label} · {counts[f.id]}</button>
+          {/each}
+        </div>
+        <button class="chip2" onclick={() => long.openSources()}>Источники…</button>
+        <button class="main" disabled={!counts.due} title={counts.due ? undefined : 'Проверять нечего'} onclick={() => void long.ctx.commands.run('long-matters.walk')}>Начать обход{#if walkKey}<kbd>{walkKey}</kbd>{/if}</button>
+      </div>
+    </header>
+  {:else}
   <header>
     <div class="title">
       <h1>Долгие дела</h1>
@@ -118,6 +144,7 @@
       {/each}
     </div>
   </header>
+  {/if}
 
   {#if long.progress}
     <p class="empty">Считаем касания… {long.progress.done} из {long.progress.total} файлов</p>
@@ -134,10 +161,10 @@
       </div>
     {/if}
     <div class="list" bind:this={list} tabindex="0" role="grid" aria-label="Долгие дела" onkeydown={keydown}>
-      <div class="cols" role="row"><span role="columnheader">Дело и последний статус</span><span role="columnheader">Давность</span><span role="columnheader">Проверить</span></div>
+      <div class="cols" role="row"><span role="columnheader">Дело и последний статус</span><span role="columnheader">{next ? 'Давность · черта = норма' : 'Давность'}</span><span role="columnheader">Проверить</span></div>
       {#if allCalm && filter === 'all'}<div class="allcalm">Всё под присмотром</div>{/if}
       {#each groups as g (g.id)}
-        <button class="grp" class:fold={g.id === 'ok' && folding} aria-expanded={isOpen(g.id)} onclick={() => g.id === 'ok' && folding && (okOpen = !okOpen)}>
+        <button class="grp {g.id}" class:fold={g.id === 'ok' && folding} aria-expanded={isOpen(g.id)} onclick={() => g.id === 'ok' && folding && (okOpen = !okOpen)}>
           {#if g.id === 'ok' && folding}<svg class="chev" class:on={okOpen} width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>{/if}
           <span>{g.title}</span><span class="n">{g.rows.length}</span>
         </button>
@@ -224,4 +251,52 @@
   .age.soon .bar i { background: var(--wait); }
   .due { text-align: right; white-space: nowrap; font-size: 12.5px; color: var(--fg2); font-variant-numeric: tabular-nums; }
   .due.late { color: var(--todo); font-weight: 600; }
+
+  /* ---- the new interface (ТЗ 47 §2) ---- */
+  .lmv.next { color: var(--ink); font-family: var(--ui); }
+  .nh { flex: 0 0 auto; display: flex; flex-direction: row; align-items: flex-end; flex-wrap: wrap; gap: 12px 16px; padding: 26px 32px 16px; border-bottom: 0; }
+  .nh .ttl { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .kick { font: 500 11px var(--font-mono, ui-monospace, monospace); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
+  .nh h1 { margin: 0; font: 400 38px/1.05 var(--font-display, Georgia, serif); color: var(--ink); }
+  .tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .next .seg { align-self: auto; background: var(--chip); border-radius: 8px; }
+  .next .seg button { color: var(--ink2); font-size: 12.5px; }
+  .next .seg button.on { background: var(--segon); color: var(--ink); }
+  .tools button.chip2, .tools button.main { height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 0; border-radius: 7px; font: 12.5px var(--ui); }
+  .tools .chip2 { background: var(--chip2); color: var(--ink); }
+  .tools .main { background: var(--lamp); color: var(--onlamp); font-weight: 600; }
+  .tools .main:disabled { opacity: 0.45; }
+  .tools kbd { font: 11px var(--ui); opacity: 0.65; }
+  .next .approx { margin: 0 32px 8px; background: var(--lampsoft); color: var(--ink2); }
+  .next .btn { background: var(--lamp); color: var(--onlamp); }
+  .next .list { padding: 0 24px 28px; }
+  .next .cols, .next .row { grid-template-columns: minmax(0, 1fr) 210px 120px; }
+  .next .cols { background: var(--bg); border-color: var(--rule); font-size: 11px; font-weight: 600; letter-spacing: 0; color: var(--ink3); }
+  .next .grp { height: auto; margin-top: 18px; padding: 0 8px 6px; color: var(--ink); font-size: 15px; font-weight: 600; }
+  .next .grp.due { color: var(--todo); }
+  .next .grp .n { font-size: 12px; color: var(--ink3); }
+  .next .chev { color: var(--ink3); }
+  .next .row { min-height: 58px; padding: 8px; border-top: 1px solid var(--rule); border-radius: 0; }
+  .next .row:hover { background: var(--chip); }
+  .next .row.on { background: var(--lampsoft); }
+  .next .row.dim > * { opacity: 0.5; }
+  .next .kw { font: 600 10.5px var(--font-mono, ui-monospace, monospace); }
+  .next .nm { font-size: 15px; font-weight: 500; }
+  .next .wait { background: color-mix(in srgb, var(--lampink) 14%, transparent); color: var(--lampink); font-size: 11.5px; font-weight: 500; }
+  .next .path { color: var(--ink3); }
+  .next .nd { font: 11px var(--font-mono, ui-monospace, monospace); color: var(--ink3); }
+  .next .nt { font-size: 13px; color: var(--ink2); }
+  .next .none { color: var(--ink3); font-size: 13px; }
+  .next .age { gap: 6px; font-size: 12.5px; color: var(--done); }
+  .next .age.soon { color: var(--wait); }
+  .next .age.late { color: var(--todo); }
+  .next .bar { background: var(--track); }
+  .next .bar i { background: var(--done); }
+  .next .age.soon .bar i { background: var(--wait); }
+  .next .age.late .bar i { background: var(--todo); }
+  .next .bar b { background: var(--ink3); }
+  .next .due { font-size: 12.5px; color: var(--ink2); }
+  .next .due.late { color: var(--todo); }
+  .next .allcalm { color: var(--done); }
+  .next .empty { color: var(--ink2); padding: 8px 32px; }
 </style>

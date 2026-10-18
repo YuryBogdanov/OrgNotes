@@ -21,7 +21,12 @@
   let { pane = 0 }: { pane?: number } = $props();
   const files = $derived(store.agendaFiles);
   const mid = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  let day = $state(mid(store.today));
+  // the day it opens on: the calendar's chosen day when it came back from there (ТЗ 47 §1.6), else today
+  const startDay = () => {
+    const d = (store.layout.panes[pane]?.tabs[store.layout.panes[pane].active]?.data as { date?: string } | undefined)?.date;
+    return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) : mid(store.today);
+  };
+  let day = $state(startDay());
   const now = $derived(today.now);
   const week = $derived(weekOf(day));
   const counts = $derived(weekCounts(files, week));
@@ -70,7 +75,7 @@
   function showAs(view: 'week' | 'month') {
     const p = store.layout.panes[pane];
     if (!p) return;
-    p.tabs[p.active] = { ...newTab('calendar.view' as never), data: { view, date: isoDay(day) } };
+    p.tabs[p.active] = { ...newTab('calendar.view' as never), data: { view, date: isoDay(day), back: 'agenda' } };
   }
   function keydown(e: KeyboardEvent) {
     if ((e.target as HTMLElement).closest('input, textarea')) return;
