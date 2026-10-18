@@ -1,311 +1,58 @@
 <script lang="ts">
   import ConfirmDialog from './ConfirmDialog.svelte';
-  import { store } from './store.svelte';
-  import { toneFor, type Workflow } from './org';
-  import { toneOf, toneStyle, colorName } from './colors';
+  import { toneFor } from './org';
+  import { colorName } from './colors';
   import ColorPicker from './ColorPicker.svelte';
-  import { Reorder } from './reorder.svelte';
-  import { setLayer } from './settingsNav.svelte';
-  import {
-    MAX_KEYWORD, addState, checkKey, normalizeKey, addWorkflow, canRemoveState, canRemoveWorkflow, checkKeyword, displayName, dropState, dropWorkflow,
-    effectiveKeys, fromConfig, initialOf, moveState, normalizeKeyword, orgLine, removeState, removeWorkflow,
-    toJson, validate, type DraftState,
-  } from './workflowEditor';
+  import { MAX_KEYWORD, displayName, orgLine } from './workflowEditor';
+  import { StatusEditor } from './statusesEditor.svelte';
 
-  // «Статусы» of the settings (ТЗ 22 §3): the sets on the left, the chosen one's states on the right. A draft of the
-  // config, written a moment after each change while it has no problems.
-  let draft = $state(fromConfig(store.config));
-  let selectedId = $state(draft.workflows[0]?.id ?? '');
-  const wf = $derived(draft.workflows.find((w) => w.id === selectedId) ?? draft.workflows[0]);
-  const problems = $derived(validate(draft));
-  const json = $derived(toJson(store.configText, draft));
-  // nothing is written until the user actually changes something
-  let baseline = toJson(store.configText, draft);
-
-  $effect(() => {
-    const j = json;
-    if (problems.length || j === baseline) return;
-    const t = setTimeout(async () => {
-      baseline = j;
-      // from the newest file: the main window may have written agendas meanwhile
-      await store.updateConfig((raw) => toJson(raw, draft));
-    }, 250);
-    return () => clearTimeout(t);
-  });
-
-  // statuses as a Workflow, so chips use the same colours as everywhere in the app
-  const asWorkflow = $derived<Workflow>({
-    open: draft.workflows.flatMap((w) => w.states.filter((s) => !s.done && !s.pending).map((s) => s.keyword)),
-    done: draft.workflows.flatMap((w) => w.states.filter((s) => s.done && !s.pending).map((s) => s.keyword)),
-    sequences: draft.workflows.map((w) => ({
-      name: w.name,
-      states: w.states.filter((s) => !s.pending).map((s) => ({ name: s.keyword, done: s.done, color: s.color || undefined })),
-    })),
-  });
-  const toneOfState = (s: DraftState) => toneOf(s.color) ?? toneFor(s.keyword || 'X', asWorkflow);
-  const chipStyle = (s: DraftState) => toneStyle(toneOfState(s));
-
-  const keys = $derived(wf ? effectiveKeys(wf) : new Map<string, string>());
-  const open = $derived(wf ? wf.states.filter((s) => !s.done) : []);
-  const done = $derived(wf ? wf.states.filter((s) => s.done) : []);
-  const initial = $derived(wf ? initialOf(wf) : undefined);
-  const used = (kw: string) => (kw ? store.keywordUsage(kw) : 0);
-
-  // ---- editing a keyword: a buffer per row, Return confirms, Esc cancels --------------------------
-  let edits = $state<Record<string, string>>({});
-  let errors = $state<Record<string, string>>({});
-  let focusId = $state<string | null>(null);
-  let focusTick = $state(0);
-  const inputs: Record<string, HTMLInputElement | undefined> = {};
-  /** Remember a row's keyword field so it can be focused from code. */
-  function track(el: HTMLInputElement, id: string) {
-    inputs[id] = el;
-    return {
-      destroy() {
-        if (inputs[id] === el) delete inputs[id];
-      },
-    };
-  }
-
-  const valueOf = (s: DraftState) => edits[s.id] ?? s.keyword;
-  function typing(s: DraftState, raw: string) {
-    const v = normalizeKeyword(raw);
-    edits[s.id] = raw.length && /\s$/.test(raw) ? v + '-' : v; // a trailing space becomes the dash at once
-    const e = v ? checkKeyword(draft, v, s.id) : null;
-    if (e) errors[s.id] = e;
-    else delete errors[s.id];
-  }
-  function clearEdit(id: string) {
-    delete edits[id];
-    delete errors[id];
-  }
-
-  // quick keys: the field shows the automatic letter until one is typed; empty = automatic again
-  let keyEdits = $state<Record<string, string>>({});
-  const keyShown = (s: DraftState) => keyEdits[s.id] ?? (s.key || keys.get(s.id) || '');
-  function typingKey(s: DraftState, raw: string) {
-    const v = normalizeKey(raw);
-    keyEdits[s.id] = v;
-    const e = wf ? checkKey(wf, v, s.id) : null;
-    if (e) errors['k' + s.id] = e;
-    else delete errors['k' + s.id];
-  }
-  function clearKeyEdit(id: string) {
-    delete keyEdits[id];
-    delete errors['k' + id];
-  }
-  function commitKey(s: DraftState) {
-    const v = keyEdits[s.id];
-    if (v === undefined) return true;
-    if (errors['k' + s.id]) return false;
-    const current = s.key || keys.get(s.id) || '';
-    if (v === '') s.key = ''; // back to automatic
-    else if (v !== current) s.key = v; // typing the letter that is already shown changes nothing
-    clearKeyEdit(s.id);
-    return true;
-  }
-  function keyKeydown(e: KeyboardEvent, s: DraftState) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (commitKey(s)) (e.currentTarget as HTMLInputElement).blur();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      clearKeyEdit(s.id);
-      (e.currentTarget as HTMLInputElement).blur();
-    }
-  }
-  function keyBlur(s: DraftState) {
-    if (errors['k' + s.id]) clearKeyEdit(s.id);
-    else commitKey(s);
-  }
-  function cancel(s: DraftState) {
-    clearEdit(s.id);
-    if (s.pending) {
-      if (wf) removeState(wf, s.id);
-      return;
-    }
-    inputs[s.id]?.blur();
-  }
-  type Rename = { s: DraftState; from: string; to: string; count: number };
-  let rename = $state<Rename | null>(null);
-  let confirmDelete = $state<{ s: DraftState; count: number } | null>(null);
-
-  function commit(s: DraftState) {
-    const v = valueOf(s);
-    if (!v && s.pending) {
-      cancel(s);
-      return false;
-    }
-    if (v === s.keyword && !s.pending) {
-      clearEdit(s.id);
-      return true;
-    }
-    const err = checkKeyword(draft, v, s.id);
-    if (err) {
-      errors[s.id] = err;
-      return false;
-    }
-    if (!s.pending && used(s.keyword) > 0) {
-      rename = { s, from: s.keyword, to: v, count: used(s.keyword) };
-      return true; // the dialog decides
-    }
-    applyKeyword(s, v);
-    return true;
-  }
-  function applyKeyword(s: DraftState, v: string) {
-    s.keyword = v;
-    s.pending = false;
-    clearEdit(s.id);
-  }
-  function keydown(e: KeyboardEvent, s: DraftState) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (commit(s) && !errors[s.id]) inputs[s.id]?.blur();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      cancel(s);
-    }
-  }
-  function blur(s: DraftState) {
-    if (rename || errors[s.id]) {
-      if (!s.pending) clearEdit(s.id); // an invalid edit is dropped, the old word stays
-      else if (!valueOf(s)) cancel(s);
-      return;
-    }
-    if (edits[s.id] !== undefined || s.pending) commit(s);
-  }
-  function chooseRename(mode: 'files' | 'settings' | 'cancel') {
-    const r = rename;
-    rename = null;
-    if (!r) return;
-    if (mode === 'cancel') {
-      clearEdit(r.s.id);
-      return;
-    }
-    if (mode === 'files') store.renameKeywordInFiles(r.from, r.to);
-    applyKeyword(r.s, r.to);
-  }
-
-  function plus(done = false) {
-    if (!wf) return;
-    const s = addState(draft, wf, done);
-    focusId = s.id;
-    focusTick++;
-  }
-  $effect(() => {
-    focusTick; // each press of "+" focuses the empty row again
-    const id = focusId;
-    if (!id) return;
-    queueMicrotask(() => {
-      const el = inputs[id];
-      el?.focus();
-      el?.scrollIntoView({ block: 'nearest' });
-    });
-  });
-
-  // ---- deleting ------------------------------------------------------------------------------------
-  function askDelete(s: DraftState) {
-    if (!wf || !canRemoveState(wf, s.id)) return;
-    const n = s.pending ? 0 : used(s.keyword);
-    if (n > 0) confirmDelete = { s, count: n };
-    else removeState(wf, s.id);
-  }
-  function doDelete() {
-    const c = confirmDelete;
-    confirmDelete = null;
-    if (c && wf) removeState(wf, c.s.id);
-  }
-  let confirmWf = $state(false);
-  const wfUsed = $derived(wf ? wf.states.reduce((n, s) => n + (s.pending ? 0 : used(s.keyword)), 0) : 0);
-  function deleteWorkflow() {
-    if (!wf || !canRemoveWorkflow(draft)) return;
-    if (wfUsed > 0 && !confirmWf) {
-      confirmWf = true;
-      return;
-    }
-    confirmWf = false;
-    const idx = draft.workflows.findIndex((w) => w.id === wf.id);
-    removeWorkflow(draft, wf.id);
-    selectedId = draft.workflows[Math.max(0, idx - 1)]?.id ?? '';
-  }
-  $effect(() => {
-    selectedId;
-    confirmWf = false;
-    picker = null;
-  });
-
-  // ---- colour picker ---------------------------------------------------------------------------------
-  let picker = $state<{ id: string; anchor: HTMLElement } | null>(null);
-  const pickerState = $derived(picker && wf ? wf.states.find((s) => s.id === picker!.id) : undefined);
-  function togglePicker(e: MouseEvent | KeyboardEvent, s: DraftState) {
-    const anchor = e.currentTarget as HTMLElement;
-    picker = picker?.id === s.id ? null : { id: s.id, anchor };
-  }
-
-  // ---- drag and drop ------------------------------------------------------------------------------------
-  // a set by its grip onto another set (before it) or the end; a state by its grip onto a state, the line between the
-  // open and the done ones, or the end (the whole row is the drag image)
-  const wfDrag = new Reorder((id, target) => dropWorkflow(draft, id, target === 'end' ? null : target));
-  const rowDrag = new Reorder((id, target) => void (wf && dropState(wf, id, target === 'end' ? null : target)));
-
-  // keyboard reordering of the focused row: ⌥↑ / ⌥↓
-  function rowKey(e: KeyboardEvent, s: DraftState) {
-    if (!e.altKey || !wf || (e.target as HTMLElement).tagName === 'INPUT' && false) return;
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      moveState(wf, s.id, e.key === 'ArrowUp' ? -1 : 1);
-      queueMicrotask(() => document.querySelector<HTMLElement>(`[data-row="${s.id}"]`)?.focus());
-    }
-  }
-  const bannerCount = $derived(problems.length + Object.keys(errors).length);
-  // ⎋ takes the picker or a dialog first, not the sheet
-  $effect(() => setLayer('statuses', !!(picker || rename || confirmDelete)));
-  $effect(() => () => setLayer('statuses', false));
+  // «Статусы» of the settings (ТЗ 22 §3): the sets on the left, the chosen one's states on the right; the logic is the
+  // shared StatusEditor.
+  const ed = new StatusEditor();
+  ed.effects();
 </script>
 
 <div class="body">
       <aside>
         <div class="cap">НАБОРЫ СТАТУСОВ</div>
-        {#each draft.workflows as w (w.id)}
-          <div class="wfrow" class:over={wfDrag.overId === w.id} use:wfDrag.zone={w.id}>
-            <button class="wf" class:on={w.id === wf?.id} aria-pressed={w.id === wf?.id} onclick={() => (selectedId = w.id)}>
+        {#each ed.draft.workflows as w (w.id)}
+          <div class="wfrow" class:over={ed.wfDrag.overId === w.id} use:ed.wfDrag.zone={w.id}>
+            <button class="wf" class:on={w.id === ed.wf?.id} aria-pressed={w.id === ed.wf?.id} onclick={() => (ed.selectedId = w.id)}>
               <span class="wfh">
-                <span class="wfgrip" role="img" aria-label="Перетащить набор" use:wfDrag.handle={{ id: w.id }}>⋮⋮</span>
+                <span class="wfgrip" role="img" aria-label="Перетащить набор" use:ed.wfDrag.handle={{ id: w.id }}>⋮⋮</span>
                 <span class="wfn">{w.name || '—'}</span>
               </span>
               <span class="chips">
-                {#each w.states.filter((s) => !s.pending) as s (s.id)}<span class="chip tone-chip" style={chipStyle(s)}>{displayName(s.keyword) || '…'}</span>{/each}
+                {#each w.states.filter((s) => !s.pending) as s (s.id)}<span class="chip tone-chip" style={ed.chipStyle(s)}>{displayName(s.keyword) || '…'}</span>{/each}
               </span>
             </button>
           </div>
         {/each}
-        <div class="wfend" class:over={wfDrag.overId === 'end'} use:wfDrag.zone={'end'}></div>
-        <button class="add" onclick={() => (selectedId = addWorkflow(draft).id)}>+ Новый набор</button>
+        <div class="wfend" class:over={ed.wfDrag.overId === 'end'} use:ed.wfDrag.zone={'end'}></div>
+        <button class="add" onclick={ed.addSet}>+ Новый набор</button>
         <p class="help">Набор — это цепочка состояний. Первый набор в списке используется по умолчанию. Порядок меняется перетаскиванием. Переключаться между наборами на заголовке можно клавишами ⌃⇧← и ⌃⇧→.</p>
       </aside>
 
-      {#if wf}
+      {#if ed.wf}
         <section>
           <div class="head">
             <label class="field">
               <span>Название набора</span>
-              <input aria-label="Название набора" value={wf.name} oninput={(e) => (wf.name = e.currentTarget.value)} />
+              <input aria-label="Название набора" value={ed.wf.name} oninput={(e) => (ed.wf.name = e.currentTarget.value)} />
             </label>
             <label class="field">
               <span>Состояние новой задачи</span>
-              <select aria-label="Состояние новой задачи" value={initial?.id} onchange={(e) => (wf.initialId = e.currentTarget.value)}>
-                {#each open.filter((s) => !s.pending) as s (s.id)}<option value={s.id}>{displayName(s.keyword)}</option>{/each}
+              <select aria-label="Состояние новой задачи" value={ed.initial?.id} onchange={(e) => (ed.wf.initialId = e.currentTarget.value)}>
+                {#each ed.openStates.filter((s) => !s.pending) as s (s.id)}<option value={s.id}>{displayName(s.keyword)}</option>{/each}
               </select>
             </label>
             <div class="tools">
-              <button class="danger" aria-label="Удалить набор" disabled={!canRemoveWorkflow(draft)} title={canRemoveWorkflow(draft) ? '' : 'Единственный набор удалить нельзя'} onclick={deleteWorkflow}>
-                {confirmWf ? `Удалить (в заметках: ${wfUsed})?` : 'Удалить набор'}
+              <button class="danger" aria-label="Удалить набор" disabled={!ed.canRemoveSet} title={ed.canRemoveSet ? '' : 'Единственный набор удалить нельзя'} onclick={ed.deleteWorkflow}>
+                {ed.confirmWf ? `Удалить (в заметках: ${ed.wfUsed})?` : 'Удалить набор'}
               </button>
             </div>
           </div>
-          {#each problems.filter((p) => p.workflow === wf.id && !p.state) as p}<div class="err">{p.message}</div>{/each}
+          {#each ed.problems.filter((p) => p.workflow === ed.wf.id && !p.state) as p}<div class="err">{p.message}</div>{/each}
 
           <div class="table" role="table" aria-label="Состояния набора">
             <div class="grid th" role="row">
@@ -321,71 +68,71 @@
               </span><span></span>
             </div>
 
-            {#each [...open, 'sep', ...done] as item (typeof item === 'string' ? 'sep' : item.id)}
+            {#each [...ed.openStates, 'sep', ...ed.doneStates] as item (typeof item === 'string' ? 'sep' : item.id)}
               {#if typeof item === 'string'}
-                <div class="sep" class:over={rowDrag.overId === 'separator'} use:rowDrag.zone={'separator'}>
+                <div class="sep" class:over={ed.rowDrag.overId === 'separator'} use:ed.rowDrag.zone={'separator'}>
                   <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5l4 4 8-9" /></svg>
                   Ниже — завершающие состояния: задача считается закрытой
                 </div>
               {:else}
                 {@const s = item}
-                {@const kw = valueOf(s)}
-                <div class="grid srow" class:over={rowDrag.overId === s.id} class:isdone={s.done} class:bad={!!errors[s.id]} role="row" tabindex="0" data-row={s.id}
+                {@const kw = ed.valueOf(s)}
+                <div class="grid srow" class:over={ed.rowDrag.overId === s.id} class:isdone={s.done} class:bad={!!ed.errors[s.id]} role="row" tabindex="0" data-row={s.id}
                   aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" aria-label="{displayName(s.keyword) || 'Новое состояние'}. Option со стрелками вверх и вниз меняет порядок"
-                  onkeydown={(e) => rowKey(e, s)} use:rowDrag.zone={s.id}>
-                  <span class="grip" role="img" aria-label="Перетащить строку" use:rowDrag.handle={{ id: s.id, image: '.srow' }}>⋮⋮</span>
+                  onkeydown={(e) => ed.rowKey(e, s)} use:ed.rowDrag.zone={s.id}>
+                  <span class="grip" role="img" aria-label="Перетащить строку" use:ed.rowDrag.handle={{ id: s.id, image: '.srow' }}>⋮⋮</span>
                   <span class="colorcell">
-                    <button class="swatch" aria-label="Цвет: {s.color ? colorName(s.color) : 'авто'}. Изменить" aria-haspopup="dialog" aria-expanded={picker?.id === s.id}
-                      onclick={(e) => togglePicker(e, s)}>
-                      <span class="dot tone-bg" style={chipStyle(s)}></span>
+                    <button class="swatch" aria-label="Цвет: {s.color ? colorName(s.color) : 'авто'}. Изменить" aria-haspopup="dialog" aria-expanded={ed.picker?.id === s.id}
+                      onclick={(e) => ed.togglePicker(e, s)}>
+                      <span class="dot tone-bg" style={ed.chipStyle(s)}></span>
                       <svg class="chev" width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5l4 4 4-4" /></svg>
                     </button>
                   </span>
-                  <span class="name" role="cell" class:chip={!!kw} class:tone-chip={!!kw} class:empty={!kw} style={kw ? chipStyle(s) : ''}>{kw ? displayName(kw) : '—'}</span>
+                  <span class="name" role="cell" class:chip={!!kw} class:tone-chip={!!kw} class:empty={!kw} style={kw ? ed.chipStyle(s) : ''}>{kw ? displayName(kw) : '—'}</span>
                   <span class="filecell">
-                    <input class="kw" class:red={!!errors[s.id]} role="cell" aria-label="Ключевое слово в файле" aria-invalid={!!errors[s.id]}
+                    <input class="kw" class:red={!!ed.errors[s.id]} role="cell" aria-label="Ключевое слово в файле" aria-invalid={!!ed.errors[s.id]}
                       placeholder="например, REVIEW" maxlength={MAX_KEYWORD + 8} spellcheck="false" autocomplete="off"
-                      use:track={s.id} value={kw}
-                      oninput={(e) => typing(s, e.currentTarget.value)} onkeydown={(e) => keydown(e, s)} onblur={() => blur(s)}
-                      onfocus={() => (focusId = s.id)} />
+                      use:ed.track={s.id} value={kw}
+                      oninput={(e) => ed.typing(s, e.currentTarget.value)} onkeydown={(e) => ed.keydown(e, s)} onblur={() => ed.blur(s)}
+                      onfocus={() => ed.focused(s)} />
                   </span>
                   <span class="keycell">
-                    <input class="qk" class:auto={!s.key && keyEdits[s.id] === undefined} class:red={!!errors['k' + s.id]} aria-label="Клавиша" aria-invalid={!!errors['k' + s.id]}
+                    <input class="qk" class:auto={!s.key && ed.keyEdits[s.id] === undefined} class:red={!!ed.errors['k' + s.id]} aria-label="Клавиша" aria-invalid={!!ed.errors['k' + s.id]}
                       spellcheck="false" autocomplete="off" disabled={s.pending}
-                      value={keyShown(s)} onfocus={(e) => e.currentTarget.select()} onmouseup={(e) => { e.preventDefault(); e.currentTarget.select(); }}
-                      oninput={(e) => { typingKey(s, (e instanceof InputEvent ? e.data : null) || e.currentTarget.value); e.currentTarget.value = keyEdits[s.id] ?? ''; }} onkeydown={(e) => keyKeydown(e, s)} onblur={() => keyBlur(s)} />
+                      value={ed.keyShown(s)} onfocus={(e) => e.currentTarget.select()} onmouseup={(e) => { e.preventDefault(); e.currentTarget.select(); }}
+                      oninput={(e) => { ed.typingKey(s, (e instanceof InputEvent ? e.data : null) || e.currentTarget.value); e.currentTarget.value = ed.keyEdits[s.id] ?? ''; }} onkeydown={(e) => ed.keyKeydown(e, s)} onblur={() => ed.keyBlur(s)} />
                   </span>
                   <span class="acts">
-                    <button class="x" aria-label="Удалить состояние {displayName(s.keyword)}" disabled={!canRemoveState(wf, s.id)}
-                      title={canRemoveState(wf, s.id) ? '' : 'Последнее открытое состояние удалить нельзя'} onclick={() => askDelete(s)}>×</button>
+                    <button class="x" aria-label="Удалить состояние {displayName(s.keyword)}" disabled={!ed.canRemove(s)}
+                      title={ed.canRemove(s) ? '' : 'Последнее открытое состояние удалить нельзя'} onclick={() => ed.askDelete(s)}>×</button>
                   </span>
                 </div>
-                {#if errors['k' + s.id]}
-                  <div class="hint err">{errors['k' + s.id]}</div>
-                {:else if errors[s.id]}
-                  <div class="hint err">{errors[s.id]}</div>
+                {#if ed.errors['k' + s.id]}
+                  <div class="hint err">{ed.errors['k' + s.id]}</div>
+                {:else if ed.errors[s.id]}
+                  <div class="hint err">{ed.errors[s.id]}</div>
                 {:else if s.pending}
                   <div class="hint">Введите ключевое слово и нажмите ↩ · ⎋ — отмена</div>
                 {/if}
-                {#each problems.filter((p) => p.state === s.id) as p}<div class="hint err">{p.message}</div>{/each}
+                {#each ed.problems.filter((p) => p.state === s.id) as p}<div class="hint err">{p.message}</div>{/each}
               {/if}
             {/each}
 
-            <div class="addrow" class:over={rowDrag.overId === 'end'} use:rowDrag.zone={'end'}>
-              <button onclick={() => plus(false)}>+ Состояние</button>
-              <button onclick={() => plus(true)}>+ Завершающее</button>
+            <div class="addrow" class:over={ed.rowDrag.overId === 'end'} use:ed.rowDrag.zone={'end'}>
+              <button onclick={() => ed.plus(false)}>+ Состояние</button>
+              <button onclick={() => ed.plus(true)}>+ Завершающее</button>
             </div>
           </div>
           <div class="note">Название строится из ключевого слова. Редактируются колонки «В файле» и «Клавиша».</div>
 
           <div class="block">
             <div class="cap">ПОВЕДЕНИЕ</div>
-            <button class="sw-row" role="switch" aria-checked={draft.behavior.closed} onclick={() => (draft.behavior.closed = !draft.behavior.closed)}>
-              <span class="tg" class:on={draft.behavior.closed}><span></span></span>
+            <button class="sw-row" role="switch" aria-checked={ed.draft.behavior.closed} onclick={() => (ed.draft.behavior.closed = !ed.draft.behavior.closed)}>
+              <span class="tg" class:on={ed.draft.behavior.closed}><span></span></span>
               <span>Записывать время закрытия <code>CLOSED:</code></span>
             </button>
-            <button class="sw-row" role="switch" aria-checked={draft.behavior.logbook} onclick={() => (draft.behavior.logbook = !draft.behavior.logbook)}>
-              <span class="tg" class:on={draft.behavior.logbook}><span></span></span>
+            <button class="sw-row" role="switch" aria-checked={ed.draft.behavior.logbook} onclick={() => (ed.draft.behavior.logbook = !ed.draft.behavior.logbook)}>
+              <span class="tg" class:on={ed.draft.behavior.logbook}><span></span></span>
               <span>Вести историю смены состояний в <code>:LOGBOOK:</code></span>
             </button>
             <div class="note">Поведение действует на весь проект и на все наборы.</div>
@@ -394,36 +141,37 @@
           <div class="block">
             <div class="cap">КАК ЭТО ВЫГЛЯДИТ</div>
             <div class="flow">
-              {#each wf.states.filter((s) => !s.pending && s.keyword) as s, i (s.id)}
-                <span class="fchip tone-chip" style={chipStyle(s)}>{displayName(s.keyword)}</span>
-                {#if i < wf.states.filter((x) => !x.pending && x.keyword).length - 1}<span class="arrow" aria-hidden="true">→</span>{/if}
+              {#each ed.wf.states.filter((s) => !s.pending && s.keyword) as s, i (s.id)}
+                <span class="fchip tone-chip" style={ed.chipStyle(s)}>{displayName(s.keyword)}</span>
+                {#if i < ed.wf.states.filter((x) => !x.pending && x.keyword).length - 1}<span class="arrow" aria-hidden="true">→</span>{/if}
               {/each}
             </div>
-            <div class="orgline" aria-label="Строка #+TODO">{orgLine(wf)}</div>
+            <div class="orgline" aria-label="Строка #+TODO">{orgLine(ed.wf)}</div>
             <div class="note">В файле ключевое слово не может содержать пробелов, поэтому «IN PROGRESS» записывается как IN-PROGRESS. Приложение не пишет эту строку в ваши файлы; она показана для Emacs.</div>
           </div>
 
-          {#if bannerCount}
-            <div class="err banner">Изменения не сохраняются, пока есть ошибки ({bannerCount}).</div>
+          {#if ed.bannerCount}
+            <div class="err banner">Изменения не сохраняются, пока есть ошибки ({ed.bannerCount}).</div>
           {/if}
         </section>
       {/if}
 </div>
 
-    {#if picker && pickerState}
-      <ColorPicker value={pickerState.color} keyword={pickerState.keyword} fallback={toneFor(pickerState.keyword || 'X', asWorkflow)}
-        anchor={picker?.anchor as HTMLElement} onpick={(c) => (pickerState.color = c)} onclose={() => (picker = null)} />
+    {#if ed.picker && ed.pickerState}
+      {@const ps = ed.pickerState}
+      <ColorPicker value={ps.color} keyword={ps.keyword} fallback={toneFor(ps.keyword || 'X', ed.asWorkflow)}
+        anchor={ed.picker?.anchor as HTMLElement} onpick={(c) => (ps.color = c)} onclose={() => (ed.picker = null)} />
     {/if}
-    {#if rename}
+    {#if ed.rename}
       <!-- «Отмена» of the dialog is the rename's «cancel» too -->
-      <ConfirmDialog label="Переименование статуса" title="Заменить {rename.from} на {rename.to} в {rename.count} заголовках?" onclose={() => rename && chooseRename('cancel')}
-        actions={[{ label: 'Только в настройках', run: () => chooseRename('settings') }, { label: 'Заменить в файлах', kind: 'primary', run: () => chooseRename('files') }]}>
+      <ConfirmDialog label="Переименование статуса" title="Заменить {ed.rename.from} на {ed.rename.to} в {ed.rename.count} заголовках?" onclose={() => ed.rename && ed.chooseRename('cancel')}
+        actions={[{ label: 'Только в настройках', run: () => ed.chooseRename('settings') }, { label: 'Заменить в файлах', kind: 'primary', run: () => ed.chooseRename('files') }]}>
         Если оставить слово в заметках как есть, эти заголовки перестанут считаться задачами со статусом.
       </ConfirmDialog>
     {/if}
 
-    {#if confirmDelete}
-      <ConfirmDialog label="Удаление статуса" title="{confirmDelete.s.keyword} используется в {confirmDelete.count} заголовках" onclose={() => (confirmDelete = null)} actions={[{ label: 'Удалить', kind: 'danger', run: doDelete }]}>
+    {#if ed.confirmDelete}
+      <ConfirmDialog label="Удаление статуса" title="{ed.confirmDelete.s.keyword} используется в {ed.confirmDelete.count} заголовках" onclose={() => (ed.confirmDelete = null)} actions={[{ label: 'Удалить', kind: 'danger', run: ed.doDelete }]}>
         Файлы не изменятся: слово останется в тексте, но перестанет считаться статусом.
       </ConfirmDialog>
     {/if}
