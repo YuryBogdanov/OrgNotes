@@ -582,6 +582,11 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   DayList is the ТЗ 44 popover under `[data-ui=next]`. «Агенда» ⇄ calendar: AgendaDay's «Неделя» / «Месяц» put
   `back: 'agenda'`; the core command `agenda.open {date, here}` → `store.agendaInTab(date)` (the tab becomes the
   agenda, `data.date`); AgendaDay opens on `tab.data.date`. e2e `nextCalendar.spec.ts`.
+  47.3, the tab «Долгие дела» (List.svelte `next`): the header `.nh` — the kicker made of the sources («Midterm.org ·
+  первый уровень + тег :long:»), «Долгие дела» in `--font-display` 38; the filter, «Источники…» `chip2`, «Начать обход
+  ⌃⌘O» on `lamp`; «Давность · черта = норма»; the groups 15 pt («Пора проверить» `todo`), rows with a `rule` line, 15 pt
+  titles, «ждём: …» `lampink`, the age by its state (`done` / `wait` / `todo`) on `track` with the norm's mark `ink3`.
+  The sidebar's panel is as it was (in the layer's colours). e2e `nextLongList.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
