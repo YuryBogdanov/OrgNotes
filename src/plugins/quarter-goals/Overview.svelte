@@ -38,7 +38,7 @@
   const tiles = $derived([
     { f: 'active' as const, n: counts.active, t: 'активных', c: 'var(--next)' },
     { f: 'done' as const, n: counts.done, t: counts.done % 10 === 1 && counts.done % 100 !== 11 ? 'закрыта' : 'закрыто', c: 'var(--done)' },
-    { f: 'backlog' as const, n: counts.backlog, t: 'в бэклоге', c: 'var(--fg2)' },
+    { f: 'backlog' as const, n: counts.backlog, t: 'в бэклоге', c: goals.ctx.ui.look === 'next' ? 'var(--ink3)' : 'var(--fg2)' },
     { f: 'silent' as const, n: counts.silent, t: counts.silent === 1 ? 'молчит больше 2 недель' : 'молчат больше 2 недель', c: 'var(--wait)' },
   ]);
   const shown = (g: Goal, p: GoalPerson) => !filter || (filter === 'silent' ? goals.goalSilent(g) : kind(g, p) === filter);
@@ -58,11 +58,35 @@
   // a quarter gone by: its open goals can go on to the next one
   const past = $derived(cmpQuarter(q, quarterOf(new Date())) < 0);
   const openLeft = $derived(people.some((p) => goals.openGoalsOf(p).length));
+  // ---- the new interface (ТЗ 47 §3.2–§3.4): the header of the new screens, the tiles, the list by people ----
+  const next = goals.ctx.ui.look === 'next';
+  const isNow = $derived(cmpQuarter(q, quarterOf(new Date())) === 0);
+  /** «Платформа · 1on1/boris»: the heading and the file, as the person's line. */
+  const whereOf = (p: GoalPerson) => `${p.src.heading} · ${p.src.file.replace(/\.org$/, '')}`;
   const chip = (kw: string | null, p: GoalPerson) =>
     !kw ? '' : GOAL_TONES[kw] ? `color:${GOAL_TONES[kw]};background:color-mix(in srgb, ${GOAL_TONES[kw]} 15%, transparent)` : goals.toneStyle(kw, p.file!.path);
 </script>
 
-<div class="goals">
+<div class="goals" class:next>
+  {#if next}
+    <header class="nh">
+      <div class="ttl">
+        <div class="kick">{person ? sub : quarterSub(q)}</div>
+        <h1>{person ? person.name : 'Цели квартала'}</h1>
+      </div>
+      <div class="tools">
+        <div class="nq" role="group" aria-label="Квартал">
+          <button aria-label="Предыдущий квартал" onclick={() => (goals.goalsQuarter = shiftQuarter(q, -1))}>‹ Q{shiftQuarter(q, -1).q}</button>
+          <span class="cur" class:now={isNow}>{quarterLabel(q)}</span>
+          <button aria-label="Следующий квартал" onclick={() => (goals.goalsQuarter = shiftQuarter(q, 1))}>Q{shiftQuarter(q, 1).q} ›</button>
+        </div>
+        {#if person}<button class="chip2" disabled={!person.found} onclick={() => startReview(person.key)}>Разобрать цели</button>{/if}
+        {#if past && openLeft}<button class="chip2" onclick={() => openCarry(person?.key ?? '*')}>Перенести незакрытые в {quarterLabel(shiftQuarter(q, 1))}</button>{/if}
+        <button class="chip2" disabled={!goals.goalPeople.length} onclick={() => openReport(person?.key ?? '*')}>Отчёт за квартал</button>
+        <button class="main" disabled={!goals.goalPeople.length} onclick={() => openForm(person?.key ?? null)}>+ Новая цель</button>
+      </div>
+    </header>
+  {:else}
   <header>
     <div class="ttl">
       <h1>{person ? person.name : 'Обзор квартала'}</h1>
@@ -78,6 +102,7 @@
     <button class="sec" disabled={!goals.goalPeople.length} onclick={() => openReport(person?.key ?? '*')}>Отчёт за квартал</button>
     {#if past && openLeft}<button class="sec" onclick={() => openCarry(person?.key ?? '*')}>Перенести незакрытые в {quarterLabel(shiftQuarter(q, 1))}</button>{/if}
   </header>
+  {/if}
 
   {#if !goals.goalPeople.length}
     <div class="empty">
@@ -99,8 +124,13 @@
         {#if !filter || gs.length}
           <section class="grp" aria-label={p.name}>
             <div class="gh">
+              {#if next}
+                <span class="av" style="background:color-mix(in srgb, {p.color} 22%, var(--card));color:{p.color}" aria-hidden="true">{p.ini}</span>
+                <span class="who"><span class="gn">{p.name}</span><span class="gs">{whereOf(p)}</span></span>
+              {:else}
               <span class="av" style="background:{p.color}" aria-hidden="true">{p.ini}</span>
               <span class="gn">{p.name}</span><span class="gs">{p.src.file.split('/').pop()} › {p.src.heading}</span>
+              {/if}
               <span class="sum">{p.found ? summary(p) : ''}</span>
               {#if all && p.found}<button class="rv" onclick={() => startReview(p.key)}>Разобрать цели</button>{/if}
               <button class="plus" aria-label="Новая цель: {p.name}" title="Новая цель" disabled={!p.found} onclick={() => openForm(p.key)}>+</button>
@@ -117,7 +147,7 @@
                 {@const closed = isDone(g, done(p))}
                 {@const soon = goals.goalSoon(g, done(p))}
                 {@const silent = goals.goalSilent(g)}
-                <button class="row" title="⌥-клик — разобрать с этой цели" onclick={(e) => (e.altKey && !closed ? startReview(p.key, g.title) : goals.openGoalFile(p.key, g.line))}>
+                <button class="row" class:closed title="⌥-клик — разобрать с этой цели" onclick={(e) => (e.altKey && !closed ? startReview(p.key, g.title) : goals.openGoalFile(p.key, g.line))}>
                   <span class="st" class:tone-chip={!!g.keyword && !GOAL_TONES[g.keyword]} style={chip(g.keyword, p)}>{g.keyword ?? '—'}</span>
                   <span class="tt"><span class="t" class:closed>{g.title}</span>{#if resultLine(g)}<span class="res">Результат: {resultLine(g)}</span>{/if}</span>
                   {#if closed && g.closed}
@@ -184,4 +214,55 @@
   .lost button, .empty button:not(.pri) { height: 24px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 12px; }
   .empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 10px 24px; max-width: 520px; }
   .empty p { margin: 0; color: var(--fg2); line-height: 1.5; }
+
+  /* ---- the new interface (ТЗ 47 §3.2–§3.4) ---- */
+  .goals.next { color: var(--ink); font-family: var(--ui); }
+  .nh { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px 16px; padding: 26px 32px 18px; }
+  .nh .ttl { flex: 1 1 auto; gap: 4px; }
+  .kick { font: 500 11px var(--font-mono, ui-monospace, monospace); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
+  .nh h1 { font: 400 38px/1.05 var(--font-display, Georgia, serif); color: var(--ink); }
+  .tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .nq { display: flex; align-items: center; gap: 4px; }
+  .nq button, .nq .cur { height: 28px; padding: 0 10px; display: inline-flex; align-items: center; border: 0; border-radius: 7px; background: var(--chip2); color: var(--ink); font: 12.5px var(--ui); }
+  .nq .cur { background: var(--chip); font-weight: 600; }
+  .nq .cur.now { background: var(--lampsoft); color: var(--lampink); }
+  .tools .chip2, .tools .main { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; font: 12.5px var(--ui); }
+  .tools .chip2 { background: var(--chip2); color: var(--ink); }
+  .tools .main { background: var(--lamp); color: var(--onlamp); font-weight: 600; }
+  .tools button:disabled { opacity: 0.45; }
+  .next .tiles { gap: 12px; padding: 0 32px 20px; }
+  .next .tile { padding: 12px 16px; border: 1px solid var(--rule); border-radius: 12px; background: var(--card); color: var(--ink); }
+  .next .tile.on { background: var(--lampsoft); border-color: var(--lampline); box-shadow: none; }
+  .next .tile b { font: 400 30px/1.1 var(--font-display, Georgia, serif); }
+  .next .tile span { font-size: 12px; color: var(--ink3); }
+  .next .groups { gap: 26px; padding: 0 32px 32px; }
+  .next .grp { border: 0; border-radius: 0; overflow: visible; }
+  .next .gh { gap: 12px; padding: 0 0 10px; background: none; border: 0; }
+  .next .gh .av { flex: 0 0 30px; width: 30px; height: 30px; border-radius: 15px; font-size: 11px; }
+  .who { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .next .gn { font-size: 15px; font-weight: 600; }
+  .next .gs { font-size: 11.5px; color: var(--ink3); }
+  .next .sum { font-size: 12.5px; color: var(--ink2); }
+  .next .rv { height: 26px; border: 0; border-radius: 7px; background: var(--chip2); color: var(--ink); font: 12px var(--ui); }
+  .next .plus { border: 0; background: var(--chip2); color: var(--ink2); }
+  .next .row { min-height: 50px; display: grid; grid-template-columns: 84px minmax(0, 1fr) auto 150px; align-items: center; column-gap: 12px; padding: 8px 6px; border-top: 1px solid var(--rule); color: var(--ink); }
+  .next .row > .st { grid-column: 1; justify-self: start; }
+  .next .row > .tt { grid-column: 2; }
+  .next .row > .dl { grid-column: 3; }
+  .next .row > .note { grid-column: 4; }
+  .next .row + .row { border-top: 1px solid var(--rule); }
+  .next .row:hover { background: var(--chip); }
+  .next .row.closed > * { opacity: 0.6; }
+  .next .st { max-width: 84px; box-sizing: border-box; overflow: hidden; font: 600 10.5px var(--font-mono, ui-monospace, monospace); }
+  .next .t { font-size: 14px; font-weight: 500; }
+  .next .t.closed { color: var(--ink); }
+  .next .res { font-size: 12px; color: var(--ink3); }
+  .next .dl { background: var(--chip); color: var(--ink2); font-size: 12px; }
+  .next .dl.soon { background: color-mix(in srgb, var(--wait) 14%, transparent); color: var(--wait); }
+  .next .note { font-size: 12px; color: var(--ink2); }
+  .next .note.silent { color: var(--wait); font-weight: 600; }
+  .next .none, .next .lost { padding: 10px 6px; border-top: 1px solid var(--rule); color: var(--ink3); }
+  .next .lost { color: var(--wait); }
+  .next .empty { padding: 0 32px; }
+  .next .empty p { color: var(--ink2); }
 </style>

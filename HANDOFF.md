@@ -587,6 +587,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   ⌃⌘O» on `lamp`; «Давность · черта = норма»; the groups 15 pt («Пора проверить» `todo`), rows with a `rule` line, 15 pt
   titles, «ждём: …» `lampink`, the age by its state (`done` / `wait` / `todo`) on `track` with the norm's mark `ink3`.
   The sidebar's panel is as it was (in the layer's colours). e2e `nextLongList.spec.ts`.
+  47.4, «Цели квартала» (`next`): Panel.svelte — «Мои цели» a card (avatar 30, «N цели · отметка 6 дней назад» by
+  `lastMark`), «Обзор квартала» with the goal's target icon, «КОМАНДА» (avatars 22: the person's colour at 22 % over
+  `card`, the initials in it), the silent dot `wait`, «+ Добавить ещё цели» dashed `rule` 1.5 in `lampink`; no hint.
+  Overview.svelte — the header `.nh` (the kicker `quarterSub`, «Цели квартала» / the person's name; «‹ Q3 · Q4 2026 ·
+  Q1 ›», the current quarter `lampsoft` / `lampink`; «Разобрать цели» for a person, «Отчёт за квартал», «+ Новая
+  цель» on `lamp`), the tiles (`card`, 12 pt, the figures in `--font-display` 30, the filter on `lampsoft`), the
+  groups unboxed (avatar 30, «Квартальные задачи · Работа/Тимлиды/petrov»), the rows a grid 84 pt | title | deadline
+  | 150 pt, the closed at 60 %. e2e `nextGoals.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
