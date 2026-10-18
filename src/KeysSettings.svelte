@@ -1,133 +1,30 @@
 <script lang="ts">
   import ConfirmDialog from './ConfirmDialog.svelte';
-  import { store, DEFAULT_CAPTURE_KEY } from './store.svelte';
-  import {
-    FIXED_KEYS, GROUPS, KEY_COMMANDS, chordNote, commandById, conflictsOf, defaultsOf, isChord, isModified, matchesQuery, modifiedCount,
-    outerNote, parsePress, pressOf, refusal, type Conflict, type KeyCommand,
-  } from './keys';
+  import { store } from './store.svelte';
+  import { FIXED_KEYS, type KeyCommand } from './keys';
+  import { KeyEditor } from './keysEditor.svelte';
 
   // «Клавиши»: every command with its shortcuts, by groups. A click on a chip records a new one (⌃ waits a second
   // for the second press of a chord), «+» adds another, ↺ gives the default back. A shortcut another command has
-  // where both work asks before it is moved.
+  // where both work asks before it is moved. The logic is the shared KeyEditor.
 
-  let q = $state('');
+  const ed = new KeyEditor();
   let sel = $state<string | null>(null); // the row in focus: its «+» shows
-  // recording: which command, which of its shortcuts (null: a new one), the first press of a chord
-  let rec = $state<{ id: string; index: number | null; first?: string } | null>(null);
-  let chordTimer: ReturnType<typeof setTimeout> | undefined;
-  let pend = $state<{ id: string; index: number | null; key: string; conflicts: Conflict[] } | null>(null);
-  let errors = $state<Record<string, string>>({});
   let confirmReset = $state(false);
-
-  const keysOf = (id: string) => store.bindings.get(id) ?? [];
-  const captureModified = $derived(store.captureKey !== DEFAULT_CAPTURE_KEY);
-  const modified = (id: string) => (id === 'capture' ? captureModified : isModified(store.keyState, id));
-  const changed = $derived(modifiedCount(store.keyState) + (captureModified ? 1 : 0));
-  const defaults = (c: KeyCommand) => (c.id === 'capture' ? ['⇧⌘I'] : defaultsOf(c, store.keyState.preset));
-  const presetName = $derived(store.keyState.preset === 'emacs' ? 'Как в Emacs' : 'Как в macOS');
-
-  const groups = $derived(
-    GROUPS.map((g) => ({ ...g, rows: KEY_COMMANDS.filter((c) => c.group === g.id && matchesQuery(c, keysOf(c.id), q)) })).filter((g) => g.rows.length),
-  );
-  function sub(c: KeyCommand): string {
-    const ks = keysOf(c.id);
-    const chord = ks.find(isChord);
-    const parts = [chord ? chordNote(chord) : '', outerNote(store.bindings, c.id), c.note ?? ''];
-    if (c.id === 'capture' && !store.captureGlobal) parts.push('Только в окне: «Работает из любой программы» выключено в разделе Inbox');
-    return parts.filter(Boolean).join(' · ');
-  }
-
-  // ---- recording -----------------------------------------------------------------------------------------------
-  function start(id: string, index: number | null) {
-    pend = null;
-    delete errors[id];
-    rec = { id, index };
-    store.keyRecording = true;
-  }
-  function stop() {
-    clearTimeout(chordTimer);
-    rec = null;
-    store.keyRecording = false;
-  }
-  $effect(() => () => {
-    clearTimeout(chordTimer);
-    store.keyRecording = false;
-  });
-  async function put(id: string, index: number | null, key: string) {
-    const list = [...keysOf(id)];
-    if (index === null) list.push(key);
-    else list[index] = key;
-    const err = await store.setKeys(id, list.filter(Boolean));
-    if (err) errors[id] = /registered|taken|exist|занят/i.test(err) ? 'Занято другой программой' : err;
-    else delete errors[id];
-  }
-  function finish(key: string) {
-    const r = rec;
-    stop();
-    if (!r) return;
-    const own = keysOf(r.id);
-    if (own.includes(key) && own.indexOf(key) !== r.index) return; // it has it already
-    const conflicts = conflictsOf(store.bindings, r.id, key);
-    if (conflicts.length) pend = { id: r.id, index: r.index, key, conflicts };
-    else void put(r.id, r.index, key);
-  }
-  function recKey(e: KeyboardEvent) {
-    if (!rec) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return; // a modifier alone: wait for the key
-    const bare = !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
-    const r = rec;
-    if (bare && e.key === 'Escape') return stop();
-    if (bare && e.key === 'Backspace' && !r.first) {
-      stop();
-      if (r.index !== null) void store.setKeys(r.id, keysOf(r.id).filter((_, i) => i !== r.index)).then((err) => err && (errors[r.id] = err));
-      return;
-    }
-    const press = pressOf(e);
-    if (!press) return;
-    if (r.first) return finish(r.first + ' ' + press);
-    const c = commandById.get(r.id)!;
-    const why = refusal(press, c.scope);
-    if (why) {
-      errors[r.id] = why;
-      return;
-    }
-    delete errors[r.id];
-    // a press with ⌃ may begin a chord: a second press within a second makes one (not for the system's shortcut)
-    if (parsePress(press)!.ctrl && c.scope !== 'global') {
-      rec = { ...r, first: press };
-      clearTimeout(chordTimer);
-      chordTimer = setTimeout(() => finish(press), 1000);
-      return;
-    }
-    finish(press);
-  }
-  async function replace() {
-    const p = pend;
-    pend = null;
-    if (!p) return;
-    for (const c of p.conflicts) await store.setKeys(c.id, keysOf(c.id).filter((k) => k !== c.key));
-    await put(p.id, p.index, p.key);
-  }
-  async function reset(c: KeyCommand) {
-    pend = null;
-    const err = await store.setKeys(c.id, defaults(c));
-    if (err) errors[c.id] = 'Занято другой программой';
-    else delete errors[c.id];
-  }
-  /** «⌘E уже назначено команде „Искать выделенное“ (Поиск). Назначить здесь и снять там?» */
-  function warnText(p: { key: string; conflicts: Conflict[] }) {
-    const names = p.conflicts.map((x) => {
-      const c = commandById.get(x.id)!;
-      const g = GROUPS.find((gr) => gr.id === c.group)!.title;
-      const where = g.charAt(0) + g.slice(1).toLowerCase();
-      return `«${c.title}» (${where}${x.key !== p.key ? `, ${x.key}` : ''})`;
-    });
-    const who = names.length > 1 ? `командам ${names.join(', ')}` : `команде ${names[0]}`;
-    const same = p.conflicts.every((x) => x.key === p.key);
-    return `${p.key} ${same ? 'уже назначено' : 'пересекается с аккордом, назначенным'} ${who}. Назначить здесь и снять там?`;
-  }
+  const keysOf = ed.keysOf;
+  const modified = ed.modified;
+  const defaults = ed.defaults;
+  const changed = $derived(ed.changed);
+  const presetName = $derived(ed.presetName);
+  const groups = $derived(ed.groups);
+  const sub = (c: KeyCommand) => ed.sub(c);
+  const start = (id: string, index: number | null) => ed.start(id, index);
+  const stop = () => ed.stop();
+  $effect(() => () => ed.dispose());
+  const recKey = (e: KeyboardEvent) => ed.key(e);
+  const replace = () => ed.replace();
+  const reset = (c: KeyCommand) => ed.reset(c);
+  const warnText = (p: Parameters<KeyEditor['warnText']>[0]) => ed.warnText(p);
   function rowKey(e: KeyboardEvent, c: KeyCommand) {
     if (e.key === 'Enter' && e.target === e.currentTarget) {
       e.preventDefault();
@@ -136,14 +33,14 @@
   }
   // a click elsewhere stops the recording
   function down(e: MouseEvent) {
-    if (rec && !(e.target as Element).closest('.chip.rec')) stop();
+    if (ed.rec && !(e.target as Element).closest('.chip.rec')) stop();
   }
 
   function searchKey(e: KeyboardEvent) {
-    if (e.key === 'Escape' && q) {
+    if (e.key === 'Escape' && ed.q) {
       e.preventDefault();
       e.stopPropagation();
-      q = '';
+      ed.q = '';
     }
   }
 </script>
@@ -154,7 +51,7 @@
   <div class="tools">
     <label class="search">
       <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5" /><path d="M13.2 13.2L17 17" /></svg>
-      <input bind:value={q} placeholder="Команда или сочетание" aria-label="Команда или сочетание" spellcheck="false" autocomplete="off" onkeydown={searchKey} />
+      <input bind:value={ed.q} placeholder="Команда или сочетание" aria-label="Команда или сочетание" spellcheck="false" autocomplete="off" onkeydown={searchKey} />
     </label>
     <div class="preset" role="radiogroup" aria-label="Набор сочетаний">
       <span>Набор</span>
@@ -176,6 +73,9 @@
       <div class="card" role="list" aria-label={g.title}>
         {#each g.rows as c (c.id)}
           {@const ks = keysOf(c.id)}
+          {@const rec = ed.rec}
+          {@const pend = ed.pend}
+          {@const errors = ed.errors}
           {@const recHere = rec?.id === c.id}
           {@const pendHere = pend?.id === c.id}
           <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -221,10 +121,10 @@
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="var(--wait)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3l8 14H2zM10 8v4M10 14.5v.01" /></svg>
                 <span>{warnText(pend)}</span>
                 <button class="pri" onclick={replace}>Заменить</button>
-                <button class="plain" onclick={() => (pend = null)}>Отмена</button>
+                <button class="plain" onclick={() => (ed.pend = null)}>Отмена</button>
               </div>
             {:else if recHere}
-              <div class="hint">{rec?.first ? `${rec.first}, затем… — нажмите вторую клавишу аккорда` : c.scope === 'global' ? 'Нажмите сочетание · ⎋ отмена · ⌫ убрать сочетание' : 'Нажмите сочетание · можно аккорд, например ⌃C, затем S · ⎋ отмена · ⌫ убрать сочетание'}</div>
+              <div class="hint">{ed.recHint(c)}</div>
             {/if}
             {#if errors[c.id]}<div class="hint err" role="alert">{errors[c.id]}</div>{/if}
           </div>
@@ -235,7 +135,7 @@
     <p class="empty">Ничего не найдено</p>
   {/each}
 
-  {#if !q.trim()}
+  {#if !ed.q.trim()}
     <details class="fixed">
       <summary>НЕ НАСТРАИВАЮТСЯ</summary>
       <div class="card">

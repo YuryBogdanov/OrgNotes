@@ -833,6 +833,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   «Экспериментальное», «заголовки в навигаторе», «Оформленный текст», the line numbers (the old sheet keeps all).
   The theme's editor is still the old one through a bridge (54.8). Mind the class `.tcard`: a global one exists.
   e2e nextSettingsLook.spec.ts, nextSettings.spec.ts moved to «Оформление».
+  54.4, «Клавиши» and «Мини-окно»: the recording's logic moved out of KeysSettings.svelte into
+  `src/keysEditor.svelte.ts` (`KeyEditor`: the query, `rec`, `pend`, the errors, start/stop/key/replace/reset, the
+  texts; both shells' sections use it). `next/SetKeys.svelte`: the field, «Как в Emacs / Как в macOS» (Segments),
+  «Сбросить все» (ConfirmSheet); a group per GROUPS with its note; a row — the name, `sub` (the chord spelt out), the
+  chips (Plex Mono 12 on `field`, a changed one ringed `lampline`, recording `lamp` with a `lampsoft` ring, «Назначить»
+  dashed, «+» in every row's slot, ↺), the clash and the recording's hint under the name; «Не настраиваются» a group.
+  The old info plate is gone; the hints are the chips' tips. `next/SetMini.svelte`: the mini window's schema in rows
+  («Не гаснуть после ввода» as segments, a copy of the schema), its three keys; a click sets `keysFocus` and opens
+  «Клавиши» on that row. `SetRow` takes `dataId`. e2e nextSettingsKeys.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
