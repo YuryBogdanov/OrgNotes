@@ -1499,7 +1499,8 @@ class Store {
     const flat = this.search.groups.flatMap((g, gi) => g.hits.map((_, i) => ({ g: gi, i })));
     if (!flat.length) return;
     const s = this.search.sel;
-    const at = s ? flat.findIndex((x) => x.g === s.g && x.i === s.i) : -1;
+    // a file's row chosen (the new panel, ТЗ 50 §5): as if just before its first result
+    const at = !s ? -1 : s.i < 0 ? flat.findIndex((x) => x.g === s.g) - 1 : flat.findIndex((x) => x.g === s.g && x.i === s.i);
     const next = flat[(at + dir + flat.length) % flat.length];
     this.openHit(next.g, next.i);
   }

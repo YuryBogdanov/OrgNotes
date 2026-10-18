@@ -63,11 +63,14 @@ test('«Поиск»: ↩ in every file, by file; «.*» and «только за
   await page.getByRole('button', { name: '.*' }).click();
   await expect(res.locator('.file .fn')).toHaveText(['a', 'b']);
   await expect(res.locator('mark')).toHaveText(['v1', 'v12', 'v3']);
-  await expect(res.locator('.hit').nth(1).locator('.wh')).toHaveText('Миграция v1');
+  // one line a result (ТЗ 50 §5): the heading it is under in its tip
+  await expect(res.locator('.hit').nth(1)).toHaveAttribute('title', 'Миграция v1');
+  await expect(res.locator('.hit').first()).toHaveCSS('height', '24px');
   await page.getByRole('button', { name: 'только заголовки' }).click();
   await expect(res.locator('mark')).toHaveText(['v1']);
   await page.getByRole('button', { name: 'только заголовки' }).click();
-  await q.press('ArrowDown');
+  await q.press('ArrowDown'); // the file's row
+  await res.press('ArrowDown');
   await res.press('ArrowDown');
   await res.press('Enter');
   await expect(page.locator('header.bar .name')).toHaveText('a');

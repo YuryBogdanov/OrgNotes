@@ -730,6 +730,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   mark of their active goals — «Борис · 5 нед.», alert past the section's threshold, else wait; their manifests ask
   `^1.15`. The surface snapshot (apiSurface.json) has the ctx only — the handle is not in it, so it is the same.
   README: `ui.todayBlock`. e2e `nextTodaySummary.spec.ts`.
+  50.6, the search of the panel one line a result (next/SearchPanel.svelte): a result 24 pt — a heading's capsule (9
+  pt) and title, or the line of text, the match on `lampsoft` bold, the heading it is under in its `title`; a file's
+  row 24 pt with its icon. `searchAll.dense` (set by next/App; the old window keeps the first five files open):
+  every file open, past 40 results the ones after the third folded. The keys go over the files' rows too (`sel.i`
+  -1): ↩ on one folds it, → ← unfold and fold it, ← on a result folds its file and chooses its row; ⌥⌘G from a
+  file's row goes to its first result (`searchStep`). e2e `nextSearchLines.spec.ts` (25 rows in a window of 900 pt);
+  nextPanels follows.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
