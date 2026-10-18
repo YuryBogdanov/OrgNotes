@@ -695,6 +695,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   in «⋯» — the window's menu (icon, name, the badge as its shortcut), lit while its section is picked. The gear in
   the rail; the folder's line without it. The panel's head: the name and the section's key (`kbd`). e2e
   `nextRail.spec.ts`; nextSidebar / nextWindow / nextAlertBadge / nextPluginPanel follow the new layout.
+  50.2, the panel hidden, the rail kept: next/App always mounts the Sidebar with `open={store.showNav}`, kept on this
+  Mac as `next:showNav` (the new interface only — the old window keeps it per run, as before). A click on the
+  section picked hides it (`pick`), any other shows it (`setNavMode` shows); ⌘0 and the toolbar's button as before.
+  Hidden: the aside 53 (`.side.closed`), the width eased 180 ms (none while dragging the edge, none with reduced
+  motion), the pane `inert` and `visibility: hidden` after the ease; nothing lit; the rail's top is the toolbar's —
+  `bg` and its line on `.lights`, the 1 pt over the line by `::before`, the rail's line from 52 (`::after`); the
+  toolbar's content 32 pt in (`.bar.lights`, the lights over it). e2e `nextHidePanel.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

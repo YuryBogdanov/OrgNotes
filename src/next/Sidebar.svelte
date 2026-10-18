@@ -18,7 +18,10 @@
   // panel scrolling on its own, the line of the folder. The panel 260 pt, from 200 to 360 by dragging its edge (kept on
   // this Mac). Over the toolbar's line the rail and the panel are one surface under the window's lights.
   // «Сегодня» is a screen: it opens its tab and keeps the panel.
-  let { width, onwidth, onmenu }: { width: number; onwidth: (w: number) => void; onmenu: (at: { x: number; y: number }, items: MenuItem[]) => void } = $props();
+  // The panel hidden (ТЗ 50 §3: `open` — `prefs.showNav`, ⌘0, the toolbar's button, a click on the section picked):
+  // the rail stays, nothing lit in it; its top is the toolbar's (`bg` and its line) with the window's lights; the
+  // width goes in 180 ms, as the column at the right.
+  let { open = true, width, onwidth, onmenu }: { open?: boolean; width: number; onwidth: (w: number) => void; onmenu: (at: { x: number; y: number }, items: MenuItem[]) => void } = $props();
 
   const groups = $derived(sectionsOf(allNavs(), store.files.length));
   const shown = $derived(shownSection(store.navMode, groups));
@@ -44,6 +47,8 @@
   });
 
   function pick(s: Section) {
+    // the section picked, its panel shown: hidden; any other — shown with it (setNavMode shows it)
+    if (open && s.id !== TODAY_ID && s.id === shown.id) return void (store.showNav = false);
     broken = null;
     if (s.id === TODAY_ID) return today.open();
     if (s.id === 'search') return store.openSearch();
@@ -52,7 +57,7 @@
   const hint = (s: Section) => (s.key ? store.keyHint(s.key) : '');
   const count = (s: Section) => s.badge?.() ?? 0;
   const badge = (n: number) => (n > 99 ? '99+' : String(n));
-  const isOn = (s: Section) => (s.id === TODAY_ID ? todayOn : s.id === shown.id);
+  const isOn = (s: Section) => (s.id === TODAY_ID ? todayOn : open && s.id === shown.id);
 
   // ---- what fits in the rail: a button 34 + 4 apart; the line 1 + 8 + 8; «⋯» takes a place when some do not fit
   const STEP = 38;
@@ -69,7 +74,7 @@
   });
   const inRail = $derived(groups.plugins.slice(0, fit));
   const more = $derived(groups.plugins.slice(fit));
-  const moreOn = $derived(more.some((s) => s.id === shown.id));
+  const moreOn = $derived(open && more.some((s) => s.id === shown.id));
   function moreMenu(e: MouseEvent) {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     onmenu(
@@ -83,12 +88,15 @@
   const folderOk = $derived(!!store.dir && !store.folderGone);
 
   // ---- the panel's edge: 200–360 pt
+  let dragging = $state(false);
   function drag(e: PointerEvent) {
     e.preventDefault();
     const x0 = e.clientX;
     const w0 = width;
+    dragging = true; // no easing while the edge follows the pointer
     const move = (m: PointerEvent) => onwidth(Math.max(200, Math.min(360, Math.round(w0 + m.clientX - x0))));
     const up = () => {
+      dragging = false;
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
     };
@@ -107,7 +115,7 @@
   </button>
 {/snippet}
 
-<aside class="side" style:width="{52 + width + 1}px" aria-label="Боковая панель">
+<aside class="side" class:closed={!open} class:dragging style:width="{open ? 52 + width + 1 : 53}px" aria-label="Боковая панель">
   <div class="rail" bind:clientHeight={railH}>
     <div class="lights" aria-hidden="true"></div>
     <div class="list">
@@ -130,7 +138,7 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
     </button>
   </div>
-  <div class="pane">
+  <div class="pane" style:width="{width}px" inert={!open}>
     <div class="lights" aria-hidden="true"></div>
     <div class="grp head">
       <span class="pt">{broken?.label ?? shown.label}</span>
@@ -160,7 +168,15 @@
 </aside>
 
 <style>
-  .side { position: relative; flex: 0 0 auto; box-sizing: border-box; display: flex; background: var(--side); border-right: 1px solid var(--rule); }
+  .side { position: relative; flex: 0 0 auto; box-sizing: border-box; display: flex; overflow: hidden; background: var(--side); transition: width 180ms ease; }
+  .side.dragging { transition: none; }
+  @media (prefers-reduced-motion: reduce) { .side, .side .pane { transition: none !important; } }
+  /* its line at the right: the whole height; the panel hidden — under the toolbar, which goes over the rail */
+  .side::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 1px; background: var(--rule); transition: top 0s 0s; }
+  .side.closed::after { top: 52px; }
+  .side.closed .rail > .lights { background: var(--bg); box-shadow: inset 0 -1px var(--rule); }
+  /* and the 1 pt of its line over the toolbar's line: the toolbar's too, no seam under the lights */
+  .side.closed::before { content: ''; position: absolute; right: 0; top: 0; width: 1px; height: 52px; background: var(--bg); box-shadow: inset 0 -1px var(--rule); }
   /* the window's lights are drawn by macOS over the top 52 pt; it drags the window */
   .lights { flex: 0 0 52px; align-self: stretch; -webkit-app-region: drag; }
   .rail { flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 12px; box-sizing: border-box; }
@@ -178,7 +194,7 @@
   /* an alarm (ТЗ 43 §1) */
   .bd.alert { background: var(--todo); color: #fff; }
   /* the panel: by the rail, its line from the toolbar's line to 12 pt over the bottom */
-  .pane { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 0 10px; }
+  .pane { position: relative; flex: 0 0 auto; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 0 10px; }
   .pane::before { content: ''; position: absolute; left: 0; top: 52px; bottom: 12px; width: 1px; background: var(--rule); }
   .grp.head { flex: 0 0 auto; display: flex; align-items: baseline; gap: 8px; padding: 10px 6px; }
   .pt { min-width: 0; font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -191,5 +207,7 @@
   .dot { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 4px; background: var(--done); }
   .dot.off { background: var(--todo); }
   .path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* hidden once it has gone in (the tree and the rest out of reach and out of sight) */
+  .side.closed .pane { visibility: hidden; transition: visibility 0s 180ms; }
   .edge { position: absolute; top: 0; right: -3px; bottom: 0; width: 6px; cursor: col-resize; }
 </style>
