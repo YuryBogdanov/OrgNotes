@@ -56,7 +56,8 @@ export class AgendaStore {
     this.leaveBuilder();
   }
   /** «Сохранить агенду»: writes it (a saved one is replaced whole), closes the builder and shows the agenda. */
-  async saveAgenda(a: Agenda): Promise<boolean> {
+  /** `keep` (the new interface's tab, ТЗ 48 §5): the builder stays open on the agenda saved, clean. */
+  async saveAgenda(a: Agenda, o: { keep?: boolean } = {}): Promise<boolean> {
     const copy = cloneAgenda(a);
     const ok = await this.host.updateConfig((raw) => {
       const list = this.agendasIn(raw);
@@ -66,6 +67,10 @@ export class AgendaStore {
       return withAgendas(raw, list);
     });
     if (!ok) return false;
+    if (o.keep && this.builder) {
+      this.builder.orig = cloneAgenda(copy);
+      return true;
+    }
     this.leaveBuilder();
     this.host.show(copy.id);
     return true;

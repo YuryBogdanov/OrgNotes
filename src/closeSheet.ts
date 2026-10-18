@@ -4,7 +4,7 @@
 import { inTabs } from './names';
 
 export interface CloseItem {
-  kind: 'file' | 'note';
+  kind: 'file' | 'note' | 'agenda';
   name: string;
 }
 export function closeWords(items: CloseItem[], error?: { title: string; text: string }) {
@@ -13,12 +13,13 @@ export function closeWords(items: CloseItem[], error?: { title: string; text: st
   const title = error
     ? error.title
     : one?.kind === 'file' ? `Сохранить изменения в «${one.name}»?`
+    : one?.kind === 'agenda' ? `Сохранить изменения в агенде «${one.name}»?`
     : one ? `Сохранить заметку «${one.name}»?`
     : `Сохранить изменения в ${inTabs(items.length)}?`;
   const text = error
     ? error.text
     : one?.kind === 'note' ? 'Текст пока не записан в файл. Нажмите «Сохранить…», чтобы выбрать, куда его сохранить.'
     : 'Если не сохранить, изменения будут потеряны.' + (!one && hasNote ? ' Для новой заметки откроется «Сохранить как».' : '');
-  const primary = error ? 'ОК' : one?.kind === 'file' ? 'Сохранить' : one ? 'Сохранить…' : 'Сохранить всё';
+  const primary = error ? 'ОК' : one?.kind === 'file' ? 'Сохранить' : one?.kind === 'agenda' ? 'Сохранить агенду' : one ? 'Сохранить…' : 'Сохранить всё';
   return { title, text, primary };
 }

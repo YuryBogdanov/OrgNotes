@@ -47,7 +47,7 @@ test('«Сегодня»: the pinned first tab, its icon alone; the toolbar — 
   expect(await foreign(page, '.today[role="region"]')).toEqual([]);
 });
 
-test('the agenda: its tab from the sidebar\'s list, the built-in its own «День» (ТЗ 45.3); the builder over the window', async ({ page }) => {
+test('the agenda: its tab from the sidebar\'s list, the built-in its own «День» (ТЗ 45.3); the builder its tab', async ({ page }) => {
   await open(page);
   await page.getByRole('navigation', { name: 'Разделы', exact: true }).getByRole('button', { name: /Агенда/ }).click();
   const list = page.getByRole('navigation', { name: 'Список агенд' });
@@ -58,10 +58,10 @@ test('the agenda: its tab from the sidebar\'s list, the built-in its own «Де�
   expect(await foreign(page, '.next .area')).toEqual([]);
   expect(await foreign(page, '[aria-label="Панель: Агенда"]')).toEqual([]);
   await list.getByRole('button', { name: /Новая агенда/ }).click();
-  const builder = page.getByRole('dialog', { name: 'Конструктор агенды' });
+  // a tab of its own now (ТЗ 48 §5), the window takes input
+  const builder = page.getByRole('region', { name: 'Конструктор агенды' });
   await expect(builder).toBeVisible();
-  expect(await builder.evaluate((e) => !!e.closest('.compat[data-ui="next"]'))).toBe(true);
-  expect(await page.locator('.next > .win').evaluate((e) => (e as HTMLElement).inert)).toBe(true);
+  expect(await page.locator('.next > .win').evaluate((e) => (e as HTMLElement).inert)).toBe(false);
 });
 
 test('a plugin\'s view: «Долгие дела» in the layer; the toolbar names it', async ({ page }) => {

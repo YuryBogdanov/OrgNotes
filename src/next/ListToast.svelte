@@ -17,7 +17,12 @@
       {:else}
         <span class="tx">{t.text}</span>
       {/if}
-      <button onclick={() => void lists.undo()}>Отменить <span class="k">⌘Z</span></button>
+      {#if t.action}
+        {@const a = t.action}
+        <button onclick={() => { lists.toast = null; a.run(); }}>{a.label}</button>
+      {:else}
+        <button onclick={() => void lists.undo()}>Отменить <span class="k">⌘Z</span></button>
+      {/if}
     </div>
   </div>
 {/if}

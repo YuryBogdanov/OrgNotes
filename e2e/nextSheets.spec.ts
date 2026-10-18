@@ -82,5 +82,5 @@ test('what the window lacked: ⌃C ⌃Z\'s note, the quick entry', async ({ page
   await expect(page.getByRole('dialog', { name: /заметк/i })).toBeVisible();
   await page.keyboard.press('Escape');
   await page.keyboard.press('Shift+Meta+i');
-  await expect(page.locator('.capscrim')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Новая задача в Inbox' })).toBeVisible();
 });

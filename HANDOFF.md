@@ -617,6 +617,28 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   (Cormorant) 17, `field`, `lampline` in focus, to 5 lines; the two last notes, no block with none; ↩ with an
   empty field does nothing (the old one closed). The plugins' `heading.note` (long matters' «Статус…») opens it
   too. e2e `nextNotePop.spec.ts`. The bridge `NotePop` is gone.
+  48.3, the quick entry and the Inbox's file: `next/Capture.svelte` (the old one's workings and draft
+  `capture:draft`; a box 600 pt at 150 pt over `dim`, the Inbox's icon `lampink`, the title in `--text` 600 24,
+  «Tab — детали», the details 1–8 lines, the foot «→ inbox» (a click: the picker), the keys, ⇧⌘I); «Добавлено в
+  Inbox» is the window's toast — `lists.tell({lead, action})` (ListToast draws the action's button in place of
+  «Отменить»), «Открыть» goes to the Inbox's end. `next/InboxPicker.svelte` — Sheet 460 «Куда складывать
+  входящие?», Field «Найти файл…», the org files (not archives; inbox.org first) with their number of headings,
+  ↑↓ ↩, «+ Создать inbox.org в корне папки» while there is none. The quick window outside the app (`CaptureWindow`)
+  stays old till the ТЗ of the other windows. e2e `nextCapture.spec.ts`. The bridges `Capture` and `InboxPicker`
+  are gone.
+  48.4, the agenda builder as a tab: `AGENDA_EDIT = 'agenda.edit'` (store.svelte.ts), a view registered by next/App
+  (transient, single, «<name> — правка», `ViewSpec.dirty` → the tab's dot via `tabLabels.isDirty`, `onGone` →
+  `closeBuilder`); an effect opens the tab when `store.builder` is set and takes it away when it is gone. The
+  workings — `src/agendaBuilderCtl.svelte.ts` (`AgendaBuilderCtl`: the popover of a choice, its keys, the date
+  forms, the blocks, dragging, `save` with the checks); `next/AgendaBuilder.svelte` draws them (the header with the
+  name in `--title` 36 edited in place, «Источники: … · архивы не входят», the blocks on `card`, the open one
+  `lampline`, values as chips with «×», «+ условие», «+ Блок» dashed, the preview 340 pt on `panel`; the block's
+  colour from the 8 named). The old sheet AgendaBuilder.svelte keeps its own copy of the workings (the old
+  interface, unchanged). `saveAgenda(a, { keep: true })` keeps the builder open, clean; ⌘S in the tab →
+  `builderSave++`. Closing it unsaved: `Unsaved.kind 'agenda'` in `unsavedOf`, `closeWords` «Сохранить изменения
+  в агенде «…»?» / «Сохранить агенду»; «Не сохранять» → `closeBuilder`; «Сохранить» → `store.builderSaveFn` (the
+  tab's checks may stop the closing). In the new interface `sheetOpen` leaves the builder out and the window is not
+  inert. e2e `nextAgendaBuilder.spec.ts`. The bridge `AgendaBuilder` is gone.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
