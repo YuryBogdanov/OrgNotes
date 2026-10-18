@@ -677,6 +677,16 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   `cardDates`: «⚑ ср 21» — the weekday within a week, else «⚑ 21 окт», red today or past; «◷ 19 окт»; «закрыта 12
   окт» on a finished one), the progress, the tags; chosen — `lamp` with a 3 pt `lampsoft` ring; finished — 0.55.
   The old interface unchanged. e2e `nextBoard.spec.ts`.
+  49.5, the board's dragging, card at the side, choice of a workflow in the new interface (styles.css): the copy
+  −2° in `lampline` with `popshadow`, the old place 0.35 dashed, the new one dashed `lampline` on `lampsoft` radius 9;
+  the zones 32 from the sides, 20 from the bottom, 16 apart, radius 12 (Board's `zones` by `next`); the folded column
+  under the pointer — `lamp`. The card at the side: header 48, the status capsule ▾, «В файле ›» `lampink`, the footer
+  «⎋ закрыть · ⌘↩ открыть в файле». Setup.svelte by `ctx.ui.look`: the sheet of ТЗ 44 (the core's bare sheet is in
+  Compat, `data-ui="next"`), 500 pt, «Показать «name» как доску», «10 из 12», the plate with «N заголовков без
+  статуса на доску не попадут», «Отмена esc» / «Показать доску ↩». «Workflow не найден» with the ТЗ 44 buttons. Fixed
+  for both interfaces: a plugin's view keys (`viewScope`, host.svelte.ts `inView`) are off while a plugin's sheet is
+  open or the focus is in a dialog — ↩ in the choice of a workflow went to the board's command. README «Вид файла в
+  новом интерфейсе» (49.6 in this PR). e2e `nextBoardDrag.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

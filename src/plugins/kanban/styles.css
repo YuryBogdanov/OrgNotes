@@ -163,3 +163,52 @@
 [data-ui='next'] .kb-chip.pr { color: var(--c); font-weight: 700; }
 [data-ui='next'] .kb-chip.late { color: var(--todo); }
 [data-ui='next'] .kb-chip.tg { font-family: var(--font-mono); font-size: 11px; }
+
+/* ТЗ 49 §5–6: dragging, the card at the side, the choice of a workflow, «Workflow не найден» in the new interface */
+[data-ui='next'] .kb-card.ghost { opacity: 0.35; border-style: dashed; }
+[data-ui='next'] .kb-ph { border: 1.5px dashed var(--lampline); border-radius: 9px; background: var(--lampsoft); }
+[data-ui='next'] .kb-col.folded.over { box-shadow: inset 0 0 0 2px var(--lamp); }
+[data-ui='next'] .kb-drag { gap: 0; padding: 9px 11px; border-radius: 9px; background: var(--card); border: 1px solid var(--lampline); box-shadow: var(--popshadow); transform: rotate(-2deg); color: var(--ink); }
+[data-ui='next'] .kb-drag .kb-meta { margin-top: 6px; }
+[data-ui='next'] .kb-drag .kb-tags { font: 11px var(--font-mono); color: var(--ink2); }
+[data-ui='next'] .kb-zones { gap: 16px; }
+[data-ui='next'] .kb-zone { border-radius: 12px; background: var(--bg); font-size: 13px; }
+[data-ui='next'] .kb-zone.arch { border: 2px dashed var(--ink3); color: var(--ink2); }
+[data-ui='next'] .kb-zone.del { border: 2px dashed var(--todo); color: var(--todo); }
+[data-ui='next'] .kb-zone.on { border-style: solid; }
+[data-ui='next'] .kb-zone.arch.on { background: color-mix(in srgb, var(--ink3) 16%, var(--bg)); }
+[data-ui='next'] .kb-zone.del.on { background: color-mix(in srgb, var(--todo) 16%, var(--bg)); }
+[data-ui='next'] .kb-zw { font: 11px var(--font-mono); color: var(--ink3); }
+
+[data-ui='next'] .kb-peek { background: var(--bg); border-left: 1px solid var(--rule); box-shadow: -18px 0 40px rgba(0, 0, 0, 0.18); }
+[data-ui='next'] .kb-ph2 { flex: 0 0 48px; border-bottom: 1px solid var(--rule); }
+[data-ui='next'] .kb-pk { height: 20px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: 4px; font: 700 10.5px var(--ui); letter-spacing: 0.02em; }
+[data-ui='next'] .kb-pk:hover { filter: brightness(0.95); }
+[data-ui='next'] .kb-pt { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+[data-ui='next'] .kb-pl { color: var(--lampink) !important; }
+[data-ui='next'] .kb-px { color: var(--ink3) !important; }
+[data-ui='next'] .kb-px:hover { background: var(--chip2); color: var(--ink) !important; }
+[data-ui='next'] .kb-pf { border-top: 1px solid var(--rule); font-size: 11.5px; color: var(--ink3); }
+
+[data-ui='next'] .kb-btn { height: 30px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border: 0; border-radius: 7px; background: var(--chip2); color: var(--ink); font: 500 13px var(--ui); }
+[data-ui='next'] .kb-btn.pri { background: var(--lamp); color: var(--onlamp); font-weight: 600; }
+[data-ui='next'] .kb-btn:focus-visible { outline: 2px solid var(--lampline); outline-offset: 2px; }
+[data-ui='next'] .kb-bk { font: 11px var(--font-mono); opacity: 0.6; }
+[data-ui='next'] .kb-missing { gap: 16px; color: var(--ink2); }
+[data-ui='next'] .kb-missing b { color: var(--ink); font-size: 14px; font-weight: 600; }
+
+/* the sheet of ТЗ 44 (the core's bare sheet has `data-ui="next"`): from under the toolbar, 500 pt, lower corners 14 */
+[data-ui='next'] .kb-setup.nx { top: 52px; width: 500px; gap: 10px; padding: 20px 22px 18px; border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 14px 14px; background: var(--card); color: var(--ink); box-shadow: var(--popshadow); font: 13px/1.45 var(--ui); }
+[data-ui='next'] .kb-st { font: 600 15px/1.3 var(--ui); }
+[data-ui='next'] .kb-sp { margin: 0; font-size: 13px; color: var(--ink2); }
+[data-ui='next'] .kb-setup.nx .kb-sets { gap: 8px; padding: 4px 0; }
+[data-ui='next'] .kb-setup.nx .kb-set { padding: 12px 14px; border: 1px solid var(--rule); border-radius: 10px; background: var(--card); color: var(--ink); }
+[data-ui='next'] .kb-setup.nx .kb-set.on { padding: 11.5px 13.5px; border: 1.5px solid var(--lampline); background: var(--lampsoft); }
+[data-ui='next'] .kb-setup.nx .kb-radio { border-color: var(--ink3); background: var(--card); }
+[data-ui='next'] .kb-setup.nx .kb-set.on .kb-radio { border: 5px solid var(--lamp); }
+[data-ui='next'] .kb-setup.nx .kb-cnt { font-size: 12px; color: var(--ink2); }
+[data-ui='next'] .kb-setup.nx .kb-set.on .kb-cnt { color: var(--lampink); font-weight: 600; }
+[data-ui='next'] .kb-setup.nx .kb-cnt.none { color: var(--ink3) !important; font-weight: 400; }
+[data-ui='next'] .kb-setup.nx .kb-plate { margin: 0; padding: 9px 12px; border-radius: 8px; background: var(--chip); font-size: 12px; color: var(--ink2); }
+[data-ui='next'] .kb-setup.nx .kb-plate code { font: 11.5px var(--font-mono); color: var(--ink); }
+[data-ui='next'] .kb-setup.nx .kb-btns { padding: 6px 0 0; }
