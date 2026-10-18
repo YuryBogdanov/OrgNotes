@@ -317,9 +317,10 @@ class Host {
       return !!t && t.kind === 'file' && m.contributes.fileViews.some((v) => v.id === store.viewOf(t));
     };
     const inView = () => {
-      if (!viewShown()) return false;
+      // a sheet over it (the board's choice of a workflow) or a dialog of its own keeps ↩ ⎋ and the arrows
+      if (!viewShown() || this.sheetReq) return false;
       const a = document.activeElement as HTMLElement | null;
-      return !(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable));
+      return !(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable || a.closest('[role="dialog"]')));
     };
     if (m.contributes.commands.some((c) => c.scope === 'view')) {
       const scope = viewScope(id);

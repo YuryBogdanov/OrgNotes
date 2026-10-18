@@ -179,7 +179,7 @@
   type Pending = { key: string; line: number; title: string; kw: string; sx: number; sy: number; ox: number; oy: number; w: number; h: number; html: string; tags: string };
   let pending: Pending | null = null;
   type Over = { kw: string; index: number } | { zone: 'archive' | 'delete' };
-  // the zones: 20 from the sides, 16 from the bottom of the board, while a card is dragged
+  // the zones while a card is dragged: 20 from the sides, 16 from the bottom of the board (the new interface: 32, 20)
   let zones = $state({ left: 0, width: 0, top: 0 });
   let drag = $state<(Pending & { x: number; y: number; over: Over | null }) | null>(null);
   const overCol = (o: Over | null | undefined) => (o && 'kw' in o ? o : null);
@@ -214,7 +214,9 @@
     if (!drag && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) < 4) return;
     if (!drag && root) {
       const r = root.getBoundingClientRect();
-      zones = { left: r.left + 20, width: r.width - 40, top: r.bottom - 16 - 60 };
+      // the new interface's: 32 from the sides, 20 from the bottom (ТЗ 49 §5)
+      const side = next ? 32 : 20;
+      zones = { left: r.left + side, width: r.width - 2 * side, top: r.bottom - (next ? 20 : 16) - 60 };
     }
     drag = { ...p, x: e.clientX, y: e.clientY, over: targetAt(e.clientX, e.clientY, p.key) };
   }
@@ -446,7 +448,7 @@
         <button class="kb-px" aria-label="Закрыть" title="Закрыть" onclick={closePeek}>×</button>
       </div>
       <div class="kb-pb" bind:this={peekEl}></div>
-      <div class="kb-pf">Редактируется прямо здесь · ⎋ закрыть · ⌘↩ открыть в файле</div>
+      <div class="kb-pf">{next ? '' : 'Редактируется прямо здесь · '}⎋ закрыть · ⌘↩ открыть в файле</div>
     </div>
   {/if}
 </div>
