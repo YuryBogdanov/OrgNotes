@@ -64,6 +64,8 @@ test('the toolbar: ⌘K and «Искать везде» open the palette; ⌘0 a
   await expect(tree(page)).toBeVisible();
   // the panel's edge (ТЗ 50 §2): 260 → 300, kept after a reload; never under 200; the rail 52 aside
   const pane = page.locator('aside.side .pane');
+  // shown again in 180 ms: the rail 52, the panel 260, the line
+  await expect.poll(async () => Math.round((await page.locator('aside.side').boundingBox())!.width)).toBe(313);
   const box = (await pane.boundingBox())!;
   expect(Math.round(box.width)).toBe(260);
   expect(Math.round((await page.locator('aside.side .rail').boundingBox())!.width)).toBe(52);

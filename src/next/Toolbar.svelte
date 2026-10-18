@@ -48,8 +48,9 @@
 
 <style>
   .bar { flex: 0 0 52px; display: flex; align-items: center; gap: 12px; padding: 0 16px 0 20px; border-bottom: 1px solid var(--rule); -webkit-app-region: drag; }
-  /* the sidebar hidden: the window's lights are over the toolbar */
-  .bar.lights { padding-left: 84px; }
+  /* the sidebar's panel hidden (ТЗ 50 §3): the toolbar over the rail too, the window's lights on it — its content
+     right of them (84 pt from the window's edge, the rail's 52 aside) */
+  .bar.lights { padding-left: 32px; }
   .bar button { -webkit-app-region: no-drag; }
   .ib { width: 30px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--ink2); }
   .ib:hover { background: var(--chip); color: var(--ink); }

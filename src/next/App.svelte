@@ -12,6 +12,7 @@
   import { parentOf } from '../navTree';
   import { focusedEditor } from '../editorKeys';
   import Sidebar from './Sidebar.svelte';
+  import { lsGet, lsSet } from '../storage';
   import Toolbar from './Toolbar.svelte';
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
@@ -206,6 +207,9 @@
     }
   };
   let sideWidth = $state(readWidth());
+  // the panel hidden or not (ТЗ 50 §3), on this Mac — the new interface's own (the old window keeps it per run)
+  if (lsGet('next:showNav') === '0') store.showNav = false;
+  $effect(() => lsSet('next:showNav', store.showNav ? '1' : '0'));
   function setWidth(w: number) {
     sideWidth = w;
     try {
@@ -258,7 +262,8 @@
 <div class="next" data-ui="next" data-font={nextPrefs.font} style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--text:{textFont};--title:{FONTS.title};--mono:{FONTS.mono};--col:{nextPrefs.col};--capc:{capc}">
   <!-- the first start has the window to itself (ТЗ 48 §6): no sidebar, no tabs under it -->
   <div class="win" style:display={store.start ? "none" : undefined} inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
-  {#if store.showNav}<Sidebar width={sideWidth} onwidth={setWidth} onmenu={(at, items) => (menu = { ...at, items })} />{/if}
+  <!-- the rail always; ⌘0 hides and shows its panel (ТЗ 50 §3) -->
+  <Sidebar open={store.showNav} width={sideWidth} onwidth={setWidth} onmenu={(at, items) => (menu = { ...at, items })} />
   <div class="main">
   <Toolbar onnew={newFile} />
   <Tabs onmenu={(at, items) => (menu = { ...at, items })} />
