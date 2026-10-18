@@ -4,6 +4,11 @@
 import { store } from '../store.svelte';
 import { openView } from '../layout';
 import { summary } from '../search';
+import { noFilters, passes, type Facet, type Filters } from '../searchFilters';
+import { tagsOf, type TagFile } from '../tags';
+import { tagsState } from '../tagsState.svelte';
+import { DEFAULT_WORKFLOW, parseHeadings, type Heading } from '../org';
+import type { SearchGroup } from '../store.svelte';
 
 export const SEARCH_TAB = 'search';
 /** Bumped: the tab's field takes the focus (the panel's is `search.focusN`). */
@@ -31,3 +36,47 @@ export function openSearchTab() {
 }
 /** The search tab is the active one. */
 export const searchTabActive = () => store.tab?.kind === SEARCH_TAB;
+
+// ---- the filters (ТЗ 53 §4): they choose from what was found; a new query drops them (not «Где искать») ----------
+/** The filters and the query they were set for; replaced whole on a change (the sets are not reactive inside). */
+export const tabFilters = $state({ f: noFilters(), ran: '' });
+export const setFilters = (change: (f: Filters) => void) => {
+  own();
+  const f: Filters = { off: new Set(tabFilters.f.off), status: new Set(tabFilters.f.status), tags: new Set(tabFilters.f.tags) };
+  change(f);
+  tabFilters.f = f;
+};
+export const resetFilters = () => (tabFilters.f = noFilters());
+/** The filters for the results shown: a new query has none. */
+export const liveFilters = (): Filters => (tabFilters.ran === store.search.ran ? tabFilters.f : noFilters());
+/** Before a change: the filters are the shown query's (the old ones dropped). */
+function own() {
+  if (tabFilters.ran !== store.search.ran) Object.assign(tabFilters, { ran: store.search.ran, f: noFilters() });
+}
+
+/** The headings of a group's text as searched (the file's own, when not changed since). */
+export function headsOf(g: SearchGroup): Heading[] {
+  const f = store.files.find((x) => x.path === g.path);
+  return f && f.text === g.stamp ? f.headings : parseHeadings(g.stamp, f?.wf ?? DEFAULT_WORKFLOW);
+}
+/** Every match's file, status and tags (with the inherited ones), in the order of the results. */
+export function facetsOf(groups: SearchGroup[]): Facet[][] {
+  const noInherit = tagsState.noInheritSet;
+  return groups.map((g) => {
+    const f = store.files.find((x) => x.path === g.path);
+    const tf: TagFile = { name: g.name, headings: headsOf(g), filetags: f?.filetags ?? [] };
+    const byHead = new Map<number, Facet>();
+    const fileOnly: Facet = { file: g.path, status: '', tags: tf.filetags.map((t) => t.toLowerCase()) };
+    return g.hits.map((h) => {
+      if (h.under === null || !tf.headings[h.under]) return fileOnly;
+      let x = byHead.get(h.under);
+      if (!x) {
+        x = { file: g.path, status: tf.headings[h.under].keyword ?? '', tags: tagsOf(tf, h.under, noInherit).map((t) => t.tag.toLowerCase()) };
+        byHead.set(h.under, x);
+      }
+      return x;
+    });
+  });
+}
+/** Per group, the indices of its matches that pass the filters. */
+export const keptOf = (facets: Facet[][], f: Filters): number[][] => facets.map((fs) => fs.flatMap((x, i) => (passes(x, f) ? [i] : [])));

@@ -790,6 +790,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   the count; a block — the capsule and the path 42 pt in, the lines with their numbers (Plex Mono 10.5 in 30, the
   match's `lampink`), 13.5 / 1.55, three lines at most, the marks on `lampsoft` with a `lampline` ring; four blocks,
   then «Ещё N в <файл> ›»; «Ничего не найдено»; «Показаны первые 1000…» `wait`.
+  53.3, the filters (src/searchFilters.ts `passes`/`facetCounts`, pure, tested; the state in searchTabState
+  `tabFilters` — replaced whole on a change, dropped when `search.ran` changes, `liveFilters` pure for deriveds): a
+  match's facet is its file, the status of the heading it is under (`Hit.under`) and that heading's tags with the
+  inherited ones (`tagsOf`, the noInherit of tagsState), lower case. Files off, statuses ИЛИ, tags И; each facet's
+  numbers over the others, not itself. «Где искать» is `search.scope` (runs again, the filters stay). The blocks are
+  built on the kept matches and mapped back to the group's indices (`openHit`). The tab: the results and the 268 pt
+  column scroll apart; «Файлы» top 5 + «Ещё N файлов ›», «Статус» with «без статуса» last, «Теги» top 12 + «Ещё N ›»
+  (the chosen first); «N из M — с фильтрами»; «С фильтрами ничего не найдено» + «Сбросить фильтры».
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

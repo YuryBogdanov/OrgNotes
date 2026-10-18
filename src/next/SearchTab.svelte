@@ -3,9 +3,10 @@
   import { store } from '../store.svelte';
   import { summary } from '../search';
   import { displayName } from '../names';
-  import { tabFocus } from './searchTabState.svelte';
+  import { facetsOf, headsOf, keptOf, liveFilters, resetFilters, setFilters, tabFocus } from './searchTabState.svelte';
+  import { anyFilter, facetCounts, filteredWord } from '../searchFilters';
   import { contextBlocks, type CtxBlock } from '../searchContext';
-  import { DEFAULT_WORKFLOW, parseHeadings, toneFor } from '../org';
+  import { toneFor } from '../org';
   import { toneStyle } from '../colors';
   import type { SearchGroup } from '../store.svelte';
 
@@ -33,7 +34,59 @@
     for (const g of s.groups) g.open = open;
   };
   const rerun = () => s.ran && void store.runSearch();
-  const count = $derived(s.running ? `Ищу… ${s.scanned} ${s.scanned % 10 === 1 && s.scanned % 100 !== 11 ? 'файл' : 'файлов'}` : s.ran ? (s.total ? summary(s.total, s.groups.length) : 'Ничего не найдено') : '');
+  // ---- the filters (§4): what was found, chosen; the numbers of each over the others ----
+  const flt = $derived(liveFilters());
+  const filtered = $derived(anyFilter(flt));
+  const facets = $derived(s.running ? [] : facetsOf(s.groups));
+  const kept = $derived(facets.length === s.groups.length ? keptOf(facets, flt) : s.groups.map((g) => g.hits.map((_, i) => i)));
+  const counts = $derived(facetCounts(facets.flat(), flt));
+  let filesAll = $state(false);
+  let tagsAll = $state(false);
+  const FILES = 5;
+  const TAGS = 12;
+  const files = $derived(
+    s.groups
+      .map((g) => ({ path: g.path, name: g.name, n: counts.files.get(g.path) ?? 0 }))
+      .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'ru')),
+  );
+  const statuses = $derived(
+    [...new Set([...counts.status.keys(), ...flt.status])]
+      .map((k) => ({ k, n: counts.status.get(k) ?? 0 }))
+      .sort((a, b) => (a.k === '') !== (b.k === '') ? (a.k === '' ? 1 : -1) : b.n - a.n || a.k.localeCompare(b.k)),
+  );
+  /** A tag as written (the filters keep them in lower case). */
+  const tagNames = $derived.by(() => {
+    const m = new Map<string, string>();
+    for (const g of s.groups) for (const h of headsOf(g)) for (const t of h.tags) if (!m.has(t.toLowerCase())) m.set(t.toLowerCase(), t);
+    for (const g of s.groups) for (const t of fileOf(g.path)?.filetags ?? []) if (!m.has(t.toLowerCase())) m.set(t.toLowerCase(), t);
+    return m;
+  });
+  const tagList = $derived(
+    [...new Set([...counts.tags.keys(), ...flt.tags])]
+      .map((k) => ({ k, n: counts.tags.get(k) ?? 0 }))
+      .sort((a, b) => Number(flt.tags.has(b.k)) - Number(flt.tags.has(a.k)) || b.n - a.n || a.k.localeCompare(b.k, 'ru')),
+  );
+  const toggle = <T,>(set: Set<T>, v: T) => (set.has(v) ? set.delete(v) : set.add(v));
+  const scopes = [
+    { v: 'all', l: 'Везде' },
+    { v: 'headings', l: 'Заголовки' },
+    { v: 'text', l: 'Текст' },
+  ] as const;
+  const setScope = (v: (typeof scopes)[number]['v']) => {
+    if (s.scope === v) return;
+    s.scope = v;
+    rerun();
+  };
+  const shownGroups = $derived(s.groups.map((g, gi) => ({ g, gi, keep: kept[gi] ?? [] })).filter((x) => x.keep.length));
+  const count = $derived(
+    s.running
+      ? `Ищу… ${s.scanned} ${s.scanned % 10 === 1 && s.scanned % 100 !== 11 ? 'файл' : 'файлов'}`
+      : s.ran
+        ? s.total
+          ? filtered ? filteredWord(counts.shown, s.total) : summary(s.total, s.groups.length)
+          : 'Ничего не найдено'
+        : '',
+  );
   function fieldKey(e: KeyboardEvent) {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -48,16 +101,15 @@
   }
   const SHOWN = 4; // blocks of a group before «Ещё N в …» (as the panel)
 
-  // ---- the blocks of a group: from the text searched (its lines are the hits'); computed for the open ones only ----
+  // ---- the blocks of a group: from the text searched (its lines are the hits'); computed for the open ones only.
+  // Built on the matches kept by the filters; a block's `hits` are the group's own indices. ----
   const fileOf = (path: string) => store.files.find((f) => f.path === path);
-  const cache = new Map<string, { stamp: string; blocks: CtxBlock[] }>();
-  function blocksOf(g: SearchGroup): CtxBlock[] {
+  const cache = new Map<string, { stamp: string; keep: number[]; blocks: CtxBlock[] }>();
+  function blocksOf(g: SearchGroup, keep: number[]): CtxBlock[] {
     const c = cache.get(g.path);
-    if (c && c.stamp === g.stamp && c.blocks.length) return c.blocks;
-    const f = fileOf(g.path);
-    const heads = f && f.text === g.stamp ? f.headings : parseHeadings(g.stamp, f?.wf ?? DEFAULT_WORKFLOW);
-    const blocks = contextBlocks(g.stamp, heads, g.hits);
-    cache.set(g.path, { stamp: g.stamp, blocks });
+    if (c && c.stamp === g.stamp && c.keep.length === keep.length && c.keep.every((x, i) => x === keep[i]) && c.blocks.length) return c.blocks;
+    const blocks = contextBlocks(g.stamp, headsOf(g), keep.map((i) => g.hits[i])).map((b) => ({ ...b, hits: b.hits.map((i) => keep[i]) }));
+    cache.set(g.path, { stamp: g.stamp, keep, blocks });
     return blocks;
   }
   const folderOf = (name: string) => (name.includes('/') ? name.slice(0, name.lastIndexOf('/')) : 'корень');
@@ -102,9 +154,10 @@
       <button class="tg" title="Слово целиком" aria-pressed={store.findWord} class:on={store.findWord} onclick={() => (store.setFindOpts({ word: !store.findWord }), rerun())}>Слово</button>
       <span class="cnt" aria-live="polite">{count}{#if s.capped} · первые 1000{/if}</span>
     </div>
+    <div class="body">
     <div class="list" bind:this={list} role="listbox" tabindex="0" aria-label="Результаты поиска">
       {#if s.capped}<div class="capped">Показаны первые 1000 совпадений — уточните запрос</div>{/if}
-      {#each s.groups as g, gi (g.path)}
+      {#each shownGroups as { g, gi, keep } (g.path)}
         <section class="grp" aria-label={displayName(g.name)}>
           <button class="file" aria-expanded={g.open} onclick={() => (g.open = !g.open)}>
             <svg class="chev" class:open={g.open} width="10" height="10" viewBox="0 0 8 8" aria-hidden="true"><path d="M2.5 1.2 5.8 4 2.5 6.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -112,10 +165,10 @@
             <span class="fn">{displayName(g.name.split('/').pop() ?? g.name)}</span>
             <span class="fd">{folderOf(g.name)}</span>
             {#if changed(g)}<span class="stale" role="link" tabindex="-1" onclick={(e) => { e.stopPropagation(); void store.runSearch(); }} onkeydown={() => {}}>изменён — ↩ обновить</span>{/if}
-            <span class="n">{g.hits.length}</span>
+            <span class="n">{keep.length}</span>
           </button>
           {#if g.open}
-            {@const bs = blocksOf(g)}
+            {@const bs = blocksOf(g, keep)}
             {@const shownBs = g.all ? bs : bs.slice(0, SHOWN)}
             {#each shownBs as b (b.lines[0]?.n ?? 0)}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -138,8 +191,53 @@
           {/if}
         </section>
       {:else}
-        {#if s.ran && !s.running}<div class="none">Ничего не найдено</div>{/if}
+        {#if s.ran && !s.running}
+          {#if filtered && s.total}
+            <div class="none">С фильтрами ничего не найдено<button class="btn" onclick={resetFilters}>Сбросить фильтры</button></div>
+          {:else}<div class="none">Ничего не найдено</div>{/if}
+        {/if}
       {/each}
+    </div>
+    <aside class="flt" aria-label="Фильтры">
+      <div class="fh"><span>Фильтры</span>{#if filtered}<button class="reset" onclick={resetFilters}>Сбросить</button>{/if}</div>
+      <div class="lab">Где искать</div>
+      <div class="seg" role="radiogroup" aria-label="Где искать">
+        {#each scopes as o (o.v)}<button role="radio" aria-checked={s.scope === o.v} class:on={s.scope === o.v} onclick={() => setScope(o.v)}>{o.l}</button>{/each}
+      </div>
+      {#if s.ran && s.total && !s.running}
+        <div class="lab">Файлы</div>
+        <div class="files" role="group" aria-label="Файлы">
+          {#each filesAll ? files : files.slice(0, FILES) as x (x.path)}
+            <label class="fr">
+              <input type="checkbox" checked={!flt.off.has(x.path)} onchange={() => setFilters((f) => toggle(f.off, x.path))} />
+              <span class="box" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2 4.1 7.3 8 2.9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+              <span class="nm">{displayName(x.name.split('/').pop() ?? x.name)}{#if x.name.includes('/')}<span class="fd">&nbsp;· {folderOf(x.name)}</span>{/if}</span>
+              <span class="n">{x.n}</span>
+            </label>
+          {/each}
+          {#if !filesAll && files.length > FILES}<button class="more" onclick={() => (filesAll = true)}>Ещё {files.length - FILES} {files.length - FILES === 1 ? 'файл' : files.length - FILES < 5 ? 'файла' : 'файлов'} ›</button>{/if}
+        </div>
+        <div class="lab">Статус</div>
+        <div class="chips" role="group" aria-label="Статус">
+          {#each statuses as x (x.k)}
+            <button class="chip" class:on={flt.status.has(x.k)} aria-pressed={flt.status.has(x.k)} onclick={() => setFilters((f) => toggle(f.status, x.k))}>
+              {#if x.k}<span class="cap" style={tone(x.k, s.groups[0]?.path ?? '')}>{x.k}</span>{:else}<span class="plain">без статуса</span>{/if}<span class="cn">{x.n}</span>
+            </button>
+          {/each}
+        </div>
+        {#if tagList.length}
+          <div class="lab">Теги</div>
+          <div class="chips" role="group" aria-label="Теги">
+            {#each tagsAll ? tagList : tagList.slice(0, TAGS) as x (x.k)}
+              <button class="chip tag" class:on={flt.tags.has(x.k)} aria-pressed={flt.tags.has(x.k)} onclick={() => setFilters((f) => toggle(f.tags, x.k))}>
+                <span class="plain">{tagNames.get(x.k) ?? x.k}</span><span class="cn">{x.n}</span>
+              </button>
+            {/each}
+            {#if !tagsAll && tagList.length > TAGS}<button class="more" onclick={() => (tagsAll = true)}>Ещё {tagList.length - TAGS} ›</button>{/if}
+          </div>
+        {/if}
+      {/if}
+    </aside>
     </div>
   </div>
 </div>
@@ -195,4 +293,36 @@
   .more { align-self: flex-start; margin: 2px 0 0 54px; padding: 0; border: 0; background: none; color: var(--lampink); font: 12.5px var(--ui); }
   .more:hover { text-decoration: underline; }
   .none { padding: 60px 0; text-align: center; font-size: 14px; color: var(--ink2); }
+  /* the results and the filters: each scrolls on its own */
+  .stab { display: flex; flex-direction: column; overflow: hidden; }
+  .wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-bottom: 0; }
+  .body { flex: 1; min-height: 0; display: flex; gap: 28px; }
+  .body > .list { flex: 1; min-width: 0; overflow: auto; padding-bottom: 32px; }
+  .flt { flex: 0 0 268px; overflow: auto; padding: 0 0 32px; display: flex; flex-direction: column; }
+  .fh { display: flex; align-items: center; justify-content: space-between; font: 600 11px var(--ui); color: var(--ink3); letter-spacing: 0.04em; text-transform: uppercase; min-height: 20px; }
+  .reset { padding: 0; border: 0; background: none; color: var(--lampink); font: 12px var(--ui); text-transform: none; letter-spacing: 0; }
+  .reset:hover { text-decoration: underline; }
+  .lab { margin: 16px 0 8px; font: 600 11px var(--ui); color: var(--ink3); }
+  .seg { align-self: flex-start; display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--chip); }
+  .seg button { height: 24px; padding: 0 12px; border: 0; border-radius: 5px; background: transparent; color: var(--ink2); font: 12.5px var(--ui); }
+  .seg button.on { background: var(--segon); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18); }
+  .files { display: flex; flex-direction: column; }
+  .fr { display: flex; align-items: center; gap: 9px; height: 26px; padding: 0 4px; border-radius: 6px; cursor: default; font-size: 13px; }
+  .fr:hover { background: var(--chip); }
+  .fr input { position: absolute; opacity: 0; pointer-events: none; }
+  .box { flex: 0 0 15px; height: 15px; box-sizing: border-box; display: grid; place-items: center; border-radius: 4px; box-shadow: inset 0 0 0 1.5px var(--rule); color: transparent; }
+  .fr input:checked + .box { background: var(--lamp); box-shadow: none; color: var(--onlamp); }
+  .fr input:focus-visible + .box { outline: 2px solid var(--lampline); outline-offset: 1px; }
+  .fr .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fr .fd { font-size: 12px; }
+  .fr .n { margin-left: 0; }
+  .files .more, .chips .more { margin: 4px 0 0 4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 4px; border: 0; border-radius: 6px; background: var(--chip); color: var(--ink2); font: 12.5px var(--ui); }
+  .chip .plain { padding-left: 4px; }
+  .chip .cn { font-size: 11.5px; color: var(--ink3); }
+  .chip.on { background: var(--lampsoft); box-shadow: inset 0 0 0 1.5px var(--lampline); }
+  .chip.tag.on { color: var(--lampink); }
+  .chip:focus-visible, .seg button:focus-visible, .reset:focus-visible, .more:focus-visible { outline: 2px solid var(--lampline); outline-offset: 2px; }
+  .none { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 </style>
