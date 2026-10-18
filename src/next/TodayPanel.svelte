@@ -228,7 +228,7 @@
   .cfg { align-self: flex-start; padding: 2px 6px; border: 0; background: none; color: var(--lampink); font: 12px var(--ui); }
   .cfg:hover { text-decoration: underline; }
   .foot { flex: 0 0 auto; display: flex; gap: 6px; padding: 10px 6px 12px; }
-  .foot button { flex: 1; height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: var(--chip2); color: var(--ink); font: 500 12.5px var(--ui); white-space: nowrap; }
+  .foot button { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; height: 28px; padding: 0 6px; border: 0; border-radius: 7px; background: var(--chip2); color: var(--ink); font: 500 12.5px var(--ui); white-space: nowrap; }
   .foot button:hover { background: var(--lampsoft); }
   .foot button:focus-visible { outline: 2px solid var(--lampline); outline-offset: 1px; }
 </style>

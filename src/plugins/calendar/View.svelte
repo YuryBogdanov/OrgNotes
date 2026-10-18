@@ -534,6 +534,10 @@
   .next .whead, .next .adrow { border-color: var(--rule); }
   .next .wh { border-color: var(--rule); color: var(--ink2); }
   .next .wn { min-width: 24px; height: 24px; border-radius: 12px; color: var(--ink); }
+  /* the weeks' numbers (ТЗ 51 §5): IBM Plex Mono 10.5 `ink3`, this week's `lampink`; 40 pt with a plugin's button */
+  .next .wk { font: 10.5px var(--font-mono, ui-monospace, monospace); color: var(--ink3); border-color: var(--rule); }
+  .next .wk.now > span { color: var(--lampink); font-weight: 600; }
+  .next .month:has(:global(.wkslot > [data-plugin] > *)) .wk, .next:has(:global(.wkslot > [data-plugin] > *)) .wd .wk { flex-basis: 40px; }
   .next .allday { border-color: var(--rule); }
   .next .selcol { background: var(--lampsoft); }
   .next .gut, .next .hcol span { font: 10px var(--font-mono, ui-monospace, monospace); color: var(--ink3); }
