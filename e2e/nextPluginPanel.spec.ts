@@ -43,7 +43,7 @@ test('the plugin draws its panel in the layer: the new colours, the sidebar\'s w
   expect(await panel.evaluate((e) => getComputedStyle(e).color)).toBe('rgb(138, 95, 14)'); // --acc → the lamp's ink #8a5f0e
   const side = await page.getByRole('complementary', { name: 'Боковая панель' }).boundingBox();
   const box = await panel.boundingBox();
-  expect(Math.round(box!.width)).toBe(Math.round(side!.width) - 20 - 1); // 10 pt fields each side, the sidebar's line
+  expect(Math.round(box!.width)).toBe(Math.round(side!.width) - 52 - 20 - 1); // the rail, 10 pt fields each side, the line
 });
 
 test('the panel failing: the plugin off, «Раздел плагина не загрузился» and «Подробнее» in its place', async ({ page }) => {

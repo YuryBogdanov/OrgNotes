@@ -196,11 +196,11 @@
     document.fonts?.addEventListener('loadingdone', again);
     return () => document.fonts?.removeEventListener('loadingdone', again);
   });
-  // the sidebar's width (§4.2), on this Mac
+  // the width of the sidebar's panel (ТЗ 50 §2: 260 by default, the rail aside), on this Mac
   const readWidth = () => {
     try {
-      const n = Number(localStorage.getItem('next:sideWidth'));
-      return n >= 200 && n <= 360 ? n : 236;
+      const n = Number(localStorage.getItem('next:paneWidth'));
+      return n >= 200 && n <= 360 ? n : 260;
     } catch {
       return 236;
     }
@@ -209,7 +209,7 @@
   function setWidth(w: number) {
     sideWidth = w;
     try {
-      localStorage.setItem('next:sideWidth', String(w));
+      localStorage.setItem('next:paneWidth', String(w));
     } catch {
       /* no storage */
     }

@@ -16,16 +16,18 @@ async function open(page: Page, touched: Date, next = true) {
 
 test('due matters: the number of «Пора проверить», red', async ({ page }) => {
   await open(page, new Date(2026, 8, 1));
-  const c = row(page).locator('.c');
+  const c = row(page).locator('.bd');
   await expect(c).toHaveText('2');
   await expect(c).toHaveClass(/alert/);
-  expect(await c.evaluate((e) => getComputedStyle(e).color)).toBe('rgb(196, 67, 47)'); // `todo` of «Синька»
+  // the rail's badge (ТЗ 50 §1): on `todo` of «Синька», white
+  expect(await c.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(196, 67, 47)');
+  expect(await c.evaluate((e) => getComputedStyle(e).color)).toBe('rgb(255, 255, 255)');
   await expect(row(page)).toHaveAccessibleName(/пора посмотреть/);
 });
 
 test('nothing due: how many matters, as any', async ({ page }) => {
   await open(page, new Date(2026, 9, 14));
-  const c = row(page).locator('.c');
+  const c = row(page).locator('.bd');
   await expect(c).toHaveText('2');
   await expect(c).not.toHaveClass(/alert/);
 });

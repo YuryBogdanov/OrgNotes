@@ -687,6 +687,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   for both interfaces: a plugin's view keys (`viewScope`, host.svelte.ts `inView`) are off while a plugin's sheet is
   open or the focus is in a dialog — ↩ in the choice of a workflow went to the board's command. README «Вид файла в
   новом интерфейсе» (49.6 in this PR). e2e `nextBoardDrag.spec.ts`.
+  50.1, the rail of the sections (next/Sidebar.svelte): the aside is the rail (52 pt) and the panel (`width`, 260 by
+  default, 200–360, `next:paneWidth`); the aside's width is set (52 + panel + 1 — WebKit shrank it by its content).
+  Buttons 34 pt from 58, 4 apart, the label a hidden `.sr` (the names and texts the tests and readers find), the
+  badge `.bd` («99+», alert on `todo`), the picked one `lampsoft` / `lampink` with a 2 pt `lamp` bar. What fits is
+  counted from the rail's height (`railH - 108`; the list's own height looped the ResizeObserver with «⋯»); the rest
+  in «⋯» — the window's menu (icon, name, the badge as its shortcut), lit while its section is picked. The gear in
+  the rail; the folder's line without it. The panel's head: the name and the section's key (`kbd`). e2e
+  `nextRail.spec.ts`; nextSidebar / nextWindow / nextAlertBadge / nextPluginPanel follow the new layout.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
