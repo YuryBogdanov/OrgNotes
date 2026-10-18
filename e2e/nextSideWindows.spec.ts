@@ -58,3 +58,30 @@ test('#mini: «Исходник» in Plex Mono 12.5 / 22 without line numbers wh
   await expect(mini.locator('header .path')).toHaveText(/^Work ›\s*Работа$/);
   await expect(mini.locator('.cm-plan-scheduled')).toHaveCSS('color', 'rgb(138, 95, 14)'); // `lampink`
 });
+
+// ТЗ 52.3: ⌘P of the mini window — a popover in the window 8 pt from its edges; the field with the lamp's line; rows
+// of 34 — the level in stars or the file's icon, the path without «.org»; the foot with its keys
+test('#mini ⌘P: the popover, the field, rows of 34 with their paths, the foot', async ({ page }) => {
+  await page.setViewportSize({ width: 440, height: 330 });
+  await page.addInitScript(() => { localStorage.clear(); localStorage.setItem('ui:next', '1'); });
+  await installTauriMock(page, {});
+  await page.goto('/#mini');
+  const { log } = await import('./helpers');
+  await expect.poll(async () => (await log(page)).some((e) => e[0] === 'emit' && e[2] === 'mini-hello')).toBe(true);
+  const t = '* Борис\n** 1-1 — 16 окт\n';
+  await page.evaluate((x) => (window as any).__emitEvent('mini-snapshot', { dir: '/mock', configRaw: null, note: null, files: [{ name: '1on1/boris.org', path: '/mock/1on1/boris.org', text: x, disk: x, diskRaw: x, eol: '\n' }] }), t);
+  const pal = page.getByRole('dialog', { name: 'Сменить заметку' });
+  await expect(pal).toBeVisible(); // no note yet: at once
+  await page.keyboard.type('бор');
+  const win = (await page.getByRole('application', { name: 'Мини-окно' }).boundingBox())!;
+  const b = (await pal.boundingBox())!;
+  expect(Math.round(b.x - win.x)).toBe(9); // 8 pt inside the window's line of 1 (as the mockup)
+  expect(await pal.locator('.field').evaluate((e) => getComputedStyle(e).boxShadow)).toContain('inset');
+  const rows = pal.getByRole('option');
+  await expect(rows.first()).toHaveCSS('height', '34px');
+  await expect(pal.getByRole('option', { name: /Борис/ }).first().locator('.sub')).toHaveText('1on1 / boris');
+  await pal.getByRole('textbox').fill('boris'); // the file whole: its icon, «весь файл»
+  await expect(rows.first().locator('svg.lvl')).toHaveCount(1);
+  await expect(rows.first().locator('.sub')).toHaveText('весь файл');
+  await expect(pal.locator('.foot')).toHaveText('↩ открыть здесь · ⌘↩ весь файл · ⎋ закрыть');
+});
