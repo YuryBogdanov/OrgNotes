@@ -40,6 +40,12 @@ export interface GoalReviewState {
   date: Date | null; // the day of the mark; null = today
 }
 
+/** The tab's state: the person's key (`*` — the overview), «~wheel» after it when it shows the wheel (ТЗ 47 §3.5). */
+export const WHEEL = '~wheel';
+export function splitView(state: unknown): { key: string; wheel: boolean } {
+  const s = typeof state === 'string' && state ? state : '*';
+  return s.endsWith(WHEEL) ? { key: s.slice(0, -WHEEL.length) || '*', wheel: true } : { key: s, wheel: false };
+}
 export const OVERVIEW = 'quarter-goals.overview';
 
 class Goals {
@@ -120,13 +126,15 @@ class Goals {
   }
 
   // ---- the views -----------------------------------------------------------------------------------------------
-  /** «Цели»: the overview (`*`) or one person, in the goals tab of the active pane. */
+  /** «Цели»: the overview (`*`) or one person, in the goals tab of the active pane; the overview keeps its wheel
+   *  (ТЗ 47 §3.5) when the tab shown has it. */
   openGoals(key = '*') {
-    void this.ctx.ui.open(OVERVIEW, key);
+    const wheel = key === '*' && core.active.kind === OVERVIEW && splitView(core.active.state).wheel;
+    void this.ctx.ui.open(OVERVIEW, wheel ? key + WHEEL : key);
   }
   /** The tab of ours shown: its person (the navigator marks it). */
   get shownKey(): string | null {
-    return core.active.kind === OVERVIEW ? ((core.active.state as string | undefined) ?? '*') : null;
+    return core.active.kind === OVERVIEW ? splitView(core.active.state).key : null;
   }
   /** Open the file of a source at its heading (a double click in the navigator), or at a line. */
   openGoalFile(key: string, line?: number) {
