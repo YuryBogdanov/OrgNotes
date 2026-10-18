@@ -11,13 +11,15 @@
   import AgendaPanel from './AgendaPanel.svelte';
   import TagsPanel from './TagsPanel.svelte';
   import SearchPanel from './SearchPanel.svelte';
+  import TodayPanel from './TodayPanel.svelte';
+  import { panelDate } from '../today';
 
   // The sidebar of the new interface (ТЗ 50 §1–2): the rail of the sections at the window's left edge, 52 pt — the
   // core's, a line, the plugins' (the last ones in «⋯» when they do not fit), the gear at the bottom; buttons of 34 pt
   // with their badges. By it the panel of the section picked, the whole height: its head (the name, the key), the
   // panel scrolling on its own, the line of the folder. The panel 260 pt, from 200 to 360 by dragging its edge (kept on
   // this Mac). Over the toolbar's line the rail and the panel are one surface under the window's lights.
-  // «Сегодня» is a screen: it opens its tab and keeps the panel.
+  // «Сегодня» is a section with its panel (ТЗ 50 §4); its full version is the tab «Сегодня».
   // The panel hidden (ТЗ 50 §3: `open` — `prefs.showNav`, ⌘0, the toolbar's button, a click on the section picked):
   // the rail stays, nothing lit in it; its top is the toolbar's (`bg` and its line) with the window's lights; the
   // width goes in 180 ms, as the column at the right.
@@ -48,18 +50,17 @@
 
   function pick(s: Section) {
     // the section picked, its panel shown: hidden; any other — shown with it (setNavMode shows it)
-    if (open && s.id !== TODAY_ID && s.id === shown.id) return void (store.showNav = false);
+    if (open && s.id === shown.id) return void (store.showNav = false);
     broken = null;
-    if (s.id === TODAY_ID) return today.open();
     if (s.id === 'search') return store.openSearch();
     store.setNavMode(s.id);
   }
   const hint = (s: Section) => (s.key ? store.keyHint(s.key) : '');
   const count = (s: Section) => s.badge?.() ?? 0;
   const badge = (n: number) => (n > 99 ? '99+' : String(n));
-  const isOn = (s: Section) => (s.id === TODAY_ID ? todayOn : open && s.id === shown.id);
+  const isOn = (s: Section) => open && s.id === shown.id;
 
-  // ---- what fits in the rail: a button 34 + 4 apart; the line 1 + 8 + 8; «⋯» takes a place when some do not fit
+  // ---- what fits in the rail: a button 34 + 4 apart; the line 1 + 8 + 8 and its gap; «⋯» takes a place when some do not fit
   const STEP = 38;
   // the list's room without «⋯», from the rail's own height (which «⋯» does not change): the lights 52 + 2, the gaps,
   // the gear 34, 12 under it
@@ -69,8 +70,8 @@
     const listH = railH - 108;
     if (!ps.length || !railH) return ps.length;
     const core = groups.core.length * STEP;
-    if (core + 17 + ps.length * STEP - 4 <= listH) return ps.length;
-    return Math.max(0, Math.floor((listH - core - 17 - STEP) / STEP));
+    if (core + 21 + ps.length * STEP - 4 <= listH) return ps.length;
+    return Math.max(0, Math.floor((listH - core - 21 - STEP) / STEP));
   });
   const inRail = $derived(groups.plugins.slice(0, fit));
   const more = $derived(groups.plugins.slice(fit));
@@ -143,6 +144,7 @@
     <div class="grp head">
       <span class="pt">{broken?.label ?? shown.label}</span>
       {#if !broken && hint(shown)}<kbd>{hint(shown)}</kbd>{/if}
+      {#if !broken && shown.id === TODAY_ID}<span class="sub">{panelDate(today.day)}</span>{/if}
     </div>
     <div class="panel" role="region" aria-label="Панель: {broken?.label ?? shown.label}">
       {#if broken}
@@ -151,6 +153,7 @@
           <span>Плагин выключен: {broken.msg}</span>
           <button onclick={() => store.openSettings('Плагины')}>Подробнее</button>
         </div>
+      {:else if shown.id === TODAY_ID}<TodayPanel full={todayOn} />
       {:else if shown.id === 'files'}<FilesPanel {onmenu} />
       {:else if shown.id === 'agendas'}<AgendaPanel />
       {:else if shown.id === 'tags'}<TagsPanel />
@@ -181,23 +184,26 @@
   .lights { flex: 0 0 52px; align-self: stretch; -webkit-app-region: drag; }
   .rail { flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 12px; box-sizing: border-box; }
   .rail > .lights { margin-bottom: 2px; } /* the first button at 58 pt */
-  .list { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; overflow: hidden; }
+  /* the whole rail's width, not clipped: the badges stand out of their buttons (what does not fit is in «⋯») */
+  .list { flex: 1; min-height: 0; align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: 4px; }
   .secs { display: flex; flex-direction: column; gap: 4px; }
-  .sep { flex: 0 0 1px; width: 24px; margin: 4px 0; background: var(--rule); }
+  .sep { flex: 0 0 1px; width: 24px; margin: 8px 0; background: var(--rule); }
   .ri { position: relative; flex: 0 0 34px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink2); }
   .ri:hover:not(.on) { background: var(--chip); }
-  .ri.on { background: var(--lampsoft); color: var(--lampink); }
-  .ri.on::before { content: ''; position: absolute; left: 0; top: 9px; bottom: 9px; width: 2px; border-radius: 1px; background: var(--lamp); }
+  /* the one picked (the mockup): `lampsoft`, its icon `lampink`, the `lamp` line inside along its left edge */
+  .ri.on { background: var(--lampsoft); color: var(--lampink); box-shadow: inset 2px 0 0 var(--lamp); }
+  .ri.gear { color: var(--ink3); }
   .ri:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .bd { position: absolute; top: -3px; right: -5px; min-width: 15px; height: 15px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 0 4px; border-radius: 8px; background: var(--chip2); color: var(--ink2); font: 600 9.5px var(--ui); font-variant-numeric: tabular-nums; }
+  .bd { position: absolute; top: 1px; right: 1px; min-width: 15px; height: 15px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 0 3px; border-radius: 8px; background: var(--chip2); color: var(--ink2); font: 700 9.5px var(--ui); font-variant-numeric: tabular-nums; }
   /* an alarm (ТЗ 43 §1) */
   .bd.alert { background: var(--todo); color: #fff; }
   /* the panel: by the rail, its line from the toolbar's line to 12 pt over the bottom */
   .pane { position: relative; flex: 0 0 auto; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 0 10px; }
   .pane::before { content: ''; position: absolute; left: 0; top: 52px; bottom: 12px; width: 1px; background: var(--rule); }
-  .grp.head { flex: 0 0 auto; display: flex; align-items: baseline; gap: 8px; padding: 10px 6px; }
-  .pt { min-width: 0; font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .grp.head { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; padding: 10px 6px; }
+  .sub { flex: 1 0 100%; margin-top: 2px; font-size: 11.5px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pt { min-width: 0; font-size: 13.5px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   kbd { margin-left: auto; font: 11px var(--mono); color: var(--ink3); white-space: nowrap; }
   .broken { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px 10px; font-size: 12px; color: var(--ink2); overflow-wrap: anywhere; }
   .broken b { color: var(--todo); font-weight: 600; }

@@ -1,4 +1,4 @@
-// The sections of the new sidebar (ТЗ 43 §1): the core's on top — «Сегодня» (a tab, no panel), «Файлы», «Входящие»
+// The sections of the new sidebar (ТЗ 43 §1): the core's on top — «Сегодня» (a panel, ТЗ 50 §4), «Файлы», «Входящие»
 // (while the Inbox plugin is on), «Агенда», «Теги», «Поиск»; then the plugins' sections in the old navigator's order.
 // The section picked is the window's `navMode` (kept on this Mac); one that is gone shows «Файлы».
 
@@ -11,7 +11,7 @@ export interface Section {
   icon: string;
   vb: 16 | 20;
   key?: string;
-  /** false: a screen, not a list — «Сегодня» opens its tab. */
+  /** false: a screen, not a list (none since ТЗ 50: «Сегодня» has its panel). */
   panel: boolean;
   badge?: () => number;
   /** The number is an alarm: red (a plugin's `setBadge(…, { tone: 'alert' })`). */
@@ -34,7 +34,7 @@ const ICONS = {
 export function sectionsOf(navs: NavSpec[], files: number): { core: Section[]; plugins: Section[] } {
   const inbox = navs.find((n) => n.id === INBOX);
   const core: Section[] = [
-    { id: TODAY_ID, label: 'Сегодня', icon: ICONS.today, vb: 20, key: 'today', panel: false },
+    { id: TODAY_ID, label: 'Сегодня', icon: ICONS.today, vb: 20, key: 'today', panel: true },
     { id: 'files', label: 'Файлы', icon: ICONS.files, vb: 20, key: 'navFiles', panel: true, badge: () => files },
     ...(inbox ? [{ id: INBOX, label: 'Входящие', icon: ICONS.inbox, vb: 16 as const, key: inbox.key, panel: true, badge: inbox.badge, alert: inbox.alert }] : []),
     { id: 'agendas', label: 'Агенда', icon: ICONS.agendas, vb: 16, key: 'navAgendas', panel: true },

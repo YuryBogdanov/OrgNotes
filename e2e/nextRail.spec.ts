@@ -32,13 +32,13 @@ test('the rail: 52 pt; buttons 34 × 34 from 58 pt, 4 apart; the line 24 × 1; t
   await expect(core(page).getByRole('button', { name: /Поиск/ })).toHaveAttribute('title', 'Поиск (⌃⌘6)');
 });
 
-test('the one picked: `lampsoft`, its icon `lampink`, the bar of `lamp`; the panel\'s head — the name and its key', async ({ page }) => {
+test('the one picked: `lampsoft`, its icon `lampink`, the `lamp` line inside its left edge; the panel\'s head — the name and its key', async ({ page }) => {
   await open(page);
   const files = core(page).getByRole('button', { name: /Файлы/ });
   await expect(files).toHaveAttribute('aria-current', 'true');
   expect(await files.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgba(227, 170, 60, 0.17)');
   expect(await files.evaluate((e) => getComputedStyle(e).color)).toBe('rgb(138, 95, 14)');
-  expect(await files.evaluate((e) => getComputedStyle(e, '::before').backgroundColor)).toBe('rgb(227, 170, 60)');
+  expect(await files.evaluate((e) => getComputedStyle(e).boxShadow)).toBe('rgb(227, 170, 60) 2px 0px 0px 0px inset'); // the `lamp` line along its left edge
   const head = page.locator('aside.side .grp.head');
   await expect(head.locator('.pt')).toHaveText('Файлы');
   await expect(head.locator('kbd')).toHaveText('⌃⌘1');
@@ -58,6 +58,10 @@ test('a badge: 15 pt at the button\'s corner; over 99 — «99+»', async ({ pag
   await expect(b).toHaveText('99+');
   await expect(b).toHaveAttribute('aria-label', 'Файлы: 120');
   expect(Math.round((await box(b)).height)).toBe(15);
+  // inside the button's corner, 1 pt in (the mockup)
+  const btn = await box(core(page).getByRole('button', { name: /Файлы/ }));
+  const bb = await box(b);
+  expect([Math.round(btn.x + btn.width - (bb.x + bb.width)), Math.round(bb.y - btn.y)]).toEqual([1, 1]);
 });
 
 test('a low window: the last plugins in «⋯» over the gear; its menu opens a section; «⋯» lit while it is picked', async ({ page }) => {

@@ -391,8 +391,11 @@ export function dropMissing(L: Layout, exists: (path: string) => boolean) {
   if (L.active >= L.panes.length) L.active = L.panes.length - 1;
 }
 
-/** A tab that stays first in the left pane («Сегодня», ТЗ 32): its kind says so (views.ts). */
-export const isPinned = (t: Tab) => !!viewOf(t.kind)?.pinned;
+/** A tab that stays first in the left pane («Сегодня», ТЗ 32): its kind says so (views.ts). The new interface has none
+ *  (ТЗ 50 §4: «Сегодня» is a tab as any) — its shell turns the pinning off. */
+let pinning = true;
+export const setPinning = (on: boolean) => void (pinning = on);
+export const isPinned = (t: Tab) => pinning && !!viewOf(t.kind)?.pinned;
 
 /** The pinned tab is the first one of the left pane, whatever was done to the panes (a swap, a merge). */
 export function pinFirst(L: Layout) {

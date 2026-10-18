@@ -12,6 +12,7 @@
   import { parentOf } from '../navTree';
   import { focusedEditor } from '../editorKeys';
   import Sidebar from './Sidebar.svelte';
+  import { TODAY_ID } from './sections';
   import { lsGet, lsSet } from '../storage';
   import Toolbar from './Toolbar.svelte';
   import Tabs from './Tabs.svelte';
@@ -23,7 +24,7 @@
   import PluginEditor from './PluginEditor.svelte';
   import { AGENDA_EDIT } from '../store.svelte';
   import { registerView } from '../views';
-  import { openView } from '../layout';
+  import { openView, setPinning } from '../layout';
   import Capture from './Capture.svelte';
   import InboxPicker from './InboxPicker.svelte';
   import { lists } from '../taskLists.svelte';
@@ -95,7 +96,8 @@
     searchAll: () => store.togglePalette(), // «Искать везде» ⌘K (§4.1)
     nav: () => (store.showNav = !store.showNav),
     // the sidebar's sections (ТЗ 43 §1, §6): the old navigator's keys; the plugins' come as their actions (actionOf)
-    today: () => today.open(),
+    // ⇧⌘H (ТЗ 50 §4): the panel «Сегодня»; pressed again while it is shown — the full one, its tab
+    today: () => (store.showNav && store.navMode === TODAY_ID ? today.open() : store.setNavMode(TODAY_ID)),
     navFiles: () => store.setNavMode('files'),
     navAgendas: () => store.setNavMode('agendas'),
     navTags: () => store.setNavMode('tags'),
@@ -197,6 +199,8 @@
     document.fonts?.addEventListener('loadingdone', again);
     return () => document.fonts?.removeEventListener('loadingdone', again);
   });
+  // no pinned tab in the new interface (ТЗ 50 §4): «Сегодня» is a tab as any — off before the layout is restored
+  setPinning(false);
   // the width of the sidebar's panel (ТЗ 50 §2: 260 by default, the rail aside), on this Mac
   const readWidth = () => {
     try {

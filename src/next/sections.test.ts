@@ -18,11 +18,11 @@ describe('the sidebar\'s sections (ТЗ 43 §1)', () => {
     expect(s.core.map((x) => x.id)).toEqual(['today', 'files', 'agendas', 'tags', 'search']);
     expect(s.plugins).toEqual([]);
   });
-  it('the panel shown: the one picked; «Сегодня» or a section gone — «Файлы»', () => {
+  it('the panel shown: the one picked, «Сегодня» too (its panel, ТЗ 50 §4); a section gone — «Файлы»', () => {
     const s = sectionsOf([nav('calendar', 50)], 1);
     expect(shownSection('calendar', s).id).toBe('calendar');
     expect(shownSection('tags', s).id).toBe('tags');
-    expect(shownSection('today', s).id).toBe('files');
+    expect(shownSection('today', s).id).toBe('today');
     expect(shownSection('quarter-goals', s).id).toBe('files'); // its plugin off
   });
 });
