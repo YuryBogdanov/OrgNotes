@@ -1,6 +1,15 @@
 // Bridges (ТЗ 42 §2): the old interface's components the new shell still draws, until their own come. The only file
 // of `src/next/` allowed to import them (eslint.config.js); one line each, with what takes its place.
 
-export { default as Settings } from '../Settings.svelte'; // the settings stay old (ТЗ 42 §1, §11)
-// «Сегодня», the tab «Тег», the Inbox review, the plugins' views and reviews come through the views' registry
-// (views.ts) and are drawn in the compatibility layer (EditorArea) → each a screen in the new style, its own ТЗ.
+// the settings' sections (ТЗ 54): the sheet is new (next/Settings.svelte), the sections come one by one (54.2–54.7)
+export { default as SettingsGeneral } from '../SettingsGeneral.svelte'; // 54.3
+export { default as AppearanceSettings } from '../AppearanceSettings.svelte'; // 54.3
+export { default as ThemeEditor } from '../ThemeEditor.svelte'; // 54.3
+export { default as KeysSettings } from '../KeysSettings.svelte'; // 54.4
+export { default as StatusesSettings } from '../StatusesSettings.svelte'; // 54.6
+export { default as TagsSettings } from '../TagsSettings.svelte'; // 54.7
+export { default as SettingsAgendas } from '../SettingsAgendas.svelte'; // 54.7
+export { default as SettingsInbox } from '../SettingsInbox.svelte'; // 54.7
+export { default as Picker } from '../Picker.svelte'; // 54.7, Inbox's «Выбрать…»
+export { default as SchemaSettings } from '../SchemaSettings.svelte'; // 54.2, the features' and the plugins' schemas
+export { default as RemovePlugin } from '../RemovePlugin.svelte'; // 54.5
