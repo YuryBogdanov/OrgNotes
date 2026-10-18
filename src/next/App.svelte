@@ -16,7 +16,8 @@
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { Settings, StartScreen } from './bridges';
+  import { Settings } from './bridges';
+  import StartScreen from './StartScreen.svelte';
   import AgendaBuilderTab from './AgendaBuilder.svelte';
   import { AGENDA_EDIT } from '../store.svelte';
   import { registerView } from '../views';
@@ -250,7 +251,8 @@
 </script>
 
 <div class="next" data-ui="next" data-font={nextPrefs.font} style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--text:{textFont};--title:{FONTS.title};--mono:{FONTS.mono};--col:{nextPrefs.col};--capc:{capc}">
-  <div class="win" inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
+  <!-- the first start has the window to itself (ТЗ 48 §6): no sidebar, no tabs under it -->
+  <div class="win" style:display={store.start ? "none" : undefined} inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
   {#if store.showNav}<Sidebar width={sideWidth} onwidth={setWidth} onmenu={(at, items) => (menu = { ...at, items })} />{/if}
   <div class="main">
   <Toolbar onnew={newFile} />
@@ -282,12 +284,13 @@
     {/key}
   {/if}
   {#if store.pickInbox}{#key store.pickInbox}<InboxPicker onclose={() => (store.pickInbox = 0)} />{/key}{/if}
+  <!-- the first start, the folder (ТЗ 48 §6) -->
+  {#if store.start}<StartScreen />{/if}
   <!-- the bridged sheets and menus in the compatibility layer (ТЗ 43 §5) -->
   <Compat>
-    <!-- a note, the task lists' menu and tags (the new look, ТЗ 48); the start: a bridge yet -->
+    <!-- a note, the task lists' menu and tags (the new look, ТЗ 48) -->
     {#if notePop.req}{#key notePop.req.n}<NotePop req={notePop.req} onclose={closeNote} />{/key}{/if}
     <TaskListHost />
-    {#if store.start}<StartScreen />{/if}
   </Compat>
   {#if store.toast}<div class="toast" role="status">{store.toast.text}{#each store.toast.actions ?? [] as a (a.label)}<button onclick={() => { store.toast = null; a.run(); }}>{a.label}</button>{/each}</div>{/if}
   <Compat>

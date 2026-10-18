@@ -5,5 +5,3 @@ export { default as Settings } from '../Settings.svelte'; // the settings stay o
 export { default as PluginFileView } from '../PluginFileView.svelte'; // a plugin's view of a file (the board, the canvas) → the new host
 // «Сегодня», the tab «Тег», the Inbox review, the plugins' views and reviews come through the views' registry
 // (views.ts) and are drawn in the compatibility layer (EditorArea) → each a screen in the new style, its own ТЗ.
-// what the old window has over it and the new one had not yet (found in ТЗ 44.4) → each its own new look
-export { default as StartScreen } from '../StartScreen.svelte'; // no notes folder yet

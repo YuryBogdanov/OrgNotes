@@ -639,6 +639,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   в агенде «…»?» / «Сохранить агенду»; «Не сохранять» → `closeBuilder`; «Сохранить» → `store.builderSaveFn` (the
   tab's checks may stop the closing). In the new interface `sheetOpen` leaves the builder out and the window is not
   inert. e2e `nextAgendaBuilder.spec.ts`. The bridge `AgendaBuilder` is gone.
+  48.5, the first start: `next/StartScreen.svelte` (the old one's workings: the slow «Считаем файлы…», the poll of
+  a missing folder, ↩ the main button, ⎋ back from «Папка найдена») — `bg` with the grid, 620 pt in the middle;
+  «ПЕРВЫЙ ЗАПУСК», the title in `--title` 44; «Папка найдена» (the icon 72, a card 440 with the folder, its path
+  in mono, three figures in `--title` 28 with their words), «Папка пустая» when it has no org files, «Папка
+  недоступна» (the warning on `wait`). While it shows, next/App hides its window (`display: none`: no sidebar, no
+  tabs). `src/next/bridges.ts` keeps `Settings` and `PluginFileView` only (boundary.test.ts checks it). e2e
+  `nextStart.spec.ts`. ТЗ 48 is done.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
