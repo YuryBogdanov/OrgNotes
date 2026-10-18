@@ -737,6 +737,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   -1): ↩ on one folds it, → ← unfold and fold it, ← on a result folds its file and chooses its row; ⌥⌘G from a
   file's row goes to its first result (`searchStep`). e2e `nextSearchLines.spec.ts` (25 rows in a window of 900 pt);
   nextPanels follows.
+  51, «Неделя» in the new interface — its look is the outside repo's (panopticon-week PRs #3–#7: `week.next` by
+  `ui.look`, the tab on the grid, the overview, the review, the plan, «Сегодня» with its summaries, the calendar's
+  buttons and card; the card mounts inside `[data-ui="next"]` for its tokens). Here: the calendar's column of the
+  weeks' numbers in the new look (40 pt with a plugin's button, Plex Mono 10.5 `ink3`, this week `lampink`); the panel
+  «Сегодня»'s foot buttons shrink with an ellipsis (they ran out of 260 pt). e2e weekPlugin.spec.ts runs every
+  scenario of ТЗ 36 in both shells (`UI`, a describe per shell; the plugin's block by `.ptb[data-block]` — the new
+  screen wraps its blocks in a place of the same name) and «the new look (ТЗ 51)»: fonts, the lamp, the grid, the
+  compact day's rows «можно» / «1 из 3» / «нет плана», the column of 40 and the button of 24. It needs
+  ../panopticon-week built from its latest branch.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
