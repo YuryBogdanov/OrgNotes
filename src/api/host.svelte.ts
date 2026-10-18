@@ -24,7 +24,7 @@ import type { Values } from '../settingsSchema';
 import { builtinEntries, declareKeys, entries, viewScope, installedEntries, readChoices, saveChoice, saveInstalled, undeclareKeys, type Entry, type Listed } from './declare';
 import PluginsSettings from '../PluginsSettings.svelte';
 import { iconOf, type Manifest } from './manifest';
-import type { MenuItem as ApiMenuItem, Ctx, Dispose, FileCardSpec, SheetSpec, FormSpec, HeadingRef, Place, Plugin, Render, ReviewResult, ReviewSpec, Store, ViewSpec } from './index';
+import type { MenuItem as ApiMenuItem, Ctx, Dispose, FileCardSpec, SheetSpec, FormSpec, HeadingRef, Place, Plugin, Render, ReviewResult, ReviewSpec, Store, TodayBlockHandle, ViewSpec } from './index';
 import PluginView from '../PluginView.svelte';
 import PluginInspector from '../PluginInspector.svelte';
 import PluginNav from '../PluginNav.svelte';
@@ -99,8 +99,10 @@ class Host {
   fileCards = new SvelteMap<string, { plugin: string; spec: FileCardSpec }>();
   views = new SvelteMap<string, ViewEntry>();
   /** The blocks of «Сегодня» (ТЗ 32): their drawings, the ones left out now; what the plugins add to a card of 1-1. */
-  todayRenders = new SvelteMap<string, { plugin: string; render: (el: HTMLElement, block: { setHidden(hidden: boolean): void }) => Dispose | void }>();
+  todayRenders = new SvelteMap<string, { plugin: string; render: (el: HTMLElement, block: TodayBlockHandle) => Dispose | void }>();
   todayHidden = new SvelteMap<string, true>();
+  /** A block's summary for the panel «Сегодня» (ТЗ 50 §6, `setSummary`). */
+  todaySummary = new SvelteMap<string, { text: string; tone?: 'alert' | 'wait' }>();
   oneOnOnes = new SvelteMap<string, Parameters<Ctx['ui']['oneOnOne']>[0]>();
   /** The pieces the plugins put into the places other plugins declare (API 1.8): by place, in the order they came. */
   slots = new SvelteMap<string, SlotPiece[]>();
@@ -551,7 +553,7 @@ class Host {
     this.disposers.delete(id);
     for (const [k, v] of this.views) if (v.plugin === id) this.views.delete(k);
     for (const [k, v] of this.navs) if (v.plugin === id) this.navs.delete(k);
-    for (const [k, v] of this.todayRenders) if (v.plugin === id) (this.todayRenders.delete(k), this.todayHidden.delete(k));
+    for (const [k, v] of this.todayRenders) if (v.plugin === id) (this.todayRenders.delete(k), this.todayHidden.delete(k), this.todaySummary.delete(k));
     this.oneOnOnes.delete(id);
     for (const [k, v] of this.fileViews) if (v.plugin === id) this.fileViews.delete(k);
     setLineLink(id, null);
@@ -765,6 +767,7 @@ class Host {
             if (this.todayRenders.get(blk)?.render !== render) return;
             this.todayRenders.delete(blk);
             this.todayHidden.delete(blk);
+            this.todaySummary.delete(blk);
           });
         },
         slot: (place, render) => {

@@ -6,7 +6,7 @@ import { definePlugin, type Ctx } from '@panopticon/api';
 import { mount, unmount } from 'svelte';
 import { core } from './core.svelte';
 import { goals, OVERVIEW, splitView } from './state.svelte';
-import { GOALS_WORKFLOW, GOAL_STATES, goalsIn, isDone, oneOnOneLine, quarterOf, todayPerson } from './goals';
+import { GOALS_WORKFLOW, GOAL_STATES, goalsIn, goalsSummary, isDone, oneOnOneLine, quarterOf, todayPerson } from './goals';
 import Card from './Card.svelte';
 import { openAdd, openForm, startReview } from './actions';
 import Overview from './Overview.svelte';
@@ -92,7 +92,17 @@ export default definePlugin({
     // «Сегодня» (ТЗ 32): the block of goals; the goals' line and «Разбор целей» on a card of 1-1
     ctx.ui.todayBlock('quarter-goals.today', (el, block) => {
       const app = mount(Today, { target: el, props: { hide: (h: boolean) => block.setHidden(h) } });
-      return () => void unmount(app);
+      // the panel «Сегодня» (API 1.15): the person longest without a mark — «Борис · 5 нед.»
+      const off = $effect.root(() => {
+        $effect(() => {
+          const people = goals.goalPeople.filter((p) => p.found).map((p) => ({ name: p.name, me: p.src.me, data: p.data }));
+          block.setSummary(goalsSummary(people, quarterOf(new Date()), new Date(), goals.goalSettings.silent));
+        });
+      });
+      return () => {
+        off();
+        void unmount(app);
+      };
     });
     const personOf = (path: string) => goals.goalPeople.find((p) => p.found && !p.src.me && p.src.file === path);
     ctx.ui.oneOnOne({

@@ -432,3 +432,17 @@ export function oneOnOneLine(p: TodayPerson, threshold = SILENT_DAYS): string {
   const k = p.silent.length;
   return `Цели: ${act}` + (k ? `, ${k} ${plural(k, 'молчит', 'молчат', 'молчат')} больше ${days(threshold)}` : '');
 }
+/** The panel «Сегодня» (ТЗ 50 §6): the person longest without a mark of their active goals and for how long —
+ *  «Борис · 5 нед.»; `alert` past the section's threshold, else `wait`; null when nobody has active goals. */
+export function goalsSummary(people: { name: string; me?: boolean; data: SourceGoals }[], q: Quarter, now = new Date(), threshold = SILENT_DAYS): { text: string; tone: 'alert' | 'wait' } | null {
+  let best: { name: string; d: number } | null = null;
+  for (const p of people) {
+    if (p.me) continue;
+    const t = todayPerson(p.data, q, now, threshold);
+    if (!t.active || t.last === null) continue;
+    if (!best || t.last > best.d) best = { name: p.name, d: t.last };
+  }
+  if (!best) return null;
+  const span = best.d >= 7 ? `${Math.floor(best.d / 7)} нед.` : best.d <= 0 ? 'сегодня' : `${best.d} дн.`;
+  return { text: `${best.name} · ${span}`, tone: best.d > threshold ? 'alert' : 'wait' };
+}

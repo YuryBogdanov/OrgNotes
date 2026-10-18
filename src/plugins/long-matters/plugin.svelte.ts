@@ -89,7 +89,17 @@ export default definePlugin({
     // «Сегодня» (§7): what is due, up to three
     ctx.ui.todayBlock('long-matters.today', (el, block) => {
       const app = mount(Today, { target: el, props: { hide: (h: boolean) => block.setHidden(h) } });
-      return () => void unmount(app);
+      // the panel «Сегодня» (API 1.15): how many are «Пора проверить», red; none due — no row
+      const off = $effect.root(() => {
+        $effect(() => {
+          const due = long.groups.due.length;
+          block.setSummary(due ? { text: String(due), tone: 'alert' } : null);
+        });
+      });
+      return () => {
+        off();
+        void unmount(app);
+      };
     });
 
     // §9: «Проверить через…», «Ждём…», «Осмотрено» in the palette and the heading's menu, on a long matter only

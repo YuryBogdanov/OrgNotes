@@ -721,6 +721,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   wrapped in `.bw[data-block]`, `display: contents`; the screen's child selectors follow), the block highest still
   seen at the top lit; «Настроить блоки…». e2e `nextTodayPanel.spec.ts`. Tests fixed with it: nextScreens («Сегодня»
   a tab as any) and narrowing (the strip's coming read from its animation — a CI runner had too few frames).
+  50.5, API 1.15: `block.setSummary({ text, tone? } | null)` on the handle of `ui.todayBlock` (index.ts
+  `TodayBlockHandle`; PluginTodayBlock trims it to 40, `plugins.todaySummary`, cleared with its block and plugin). The
+  panel «Сегодня»: «Из плагинов» in the compact day — a row a plugin's block with a summary, in the screen's order (a
+  click: the full version at it); the contents take it as the number (alert red bold, wait `wait`). With no screen
+  open the panel draws the plugins' blocks that are on out of sight (as the screen its resting ones), so the summaries
+  keep coming. «Долгие дела»: the due ones, alert; «Цели» (goals.ts `goalsSummary`): the person longest without a
+  mark of their active goals — «Борис · 5 нед.», alert past the section's threshold, else wait; their manifests ask
+  `^1.15`. The surface snapshot (apiSurface.json) has the ctx only — the handle is not in it, so it is the same.
+  README: `ui.todayBlock`. e2e `nextTodaySummary.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

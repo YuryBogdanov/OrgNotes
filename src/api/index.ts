@@ -2,7 +2,14 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.14.0';
+export const API_VERSION = '1.15.0';
+
+/** The handle of a block of «Сегодня» (`ui.todayBlock`). */
+export interface TodayBlockHandle {
+  setHidden(hidden: boolean): void;
+  /** Since 1.15. */
+  setSummary(s: { text: string; tone?: 'alert' | 'wait' } | null): void;
+}
 
 export type Dispose = () => void;
 export type Values = Record<string, unknown>;
@@ -535,8 +542,11 @@ export interface Ctx {
     /** The review shown now (its parts move and redraw it); null when there is none of the plugin's. */
     currentReview(): ReviewHandle | null;
     /** A block of «Сегодня» the manifest declares (`todayBlocks`): the core gives the card, the plugin draws its
-     *  content; `setHidden(true)` leaves it out (nothing to show), the others take its place. Since 1.4. */
-    todayBlock(id: string, render: (el: HTMLElement, block: { setHidden(hidden: boolean): void }) => Dispose | void): Dispose;
+     *  content; `setHidden(true)` leaves it out (nothing to show), the others take its place. Since 1.4.
+     *  `setSummary` (since 1.15): a few words for the panel «Сегодня» of the new interface — a row in «Из плагинов»
+     *  of the compact day and the number in the screen's contents («3», «Борис · 5 нед.», up to ~24 characters);
+     *  `tone` 'alert' — `todo` bold, 'wait' — `wait`; null — no row. The old interface does not show it. */
+    todayBlock(id: string, render: (el: HTMLElement, block: TodayBlockHandle) => Dispose | void): Dispose;
     /** What the plugin adds to a card of «1-1 сегодня» (the person's file, relative): a line under the person («Цели:
      *  3 активных») and a button. Since 1.4. */
     oneOnOne(spec: { line?(path: string): string | null | Promise<string | null>; action?: { label: string; available?(path: string): boolean | Promise<boolean>; run(path: string): void } }): Dispose;
