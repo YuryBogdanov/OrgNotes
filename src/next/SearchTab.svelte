@@ -93,10 +93,61 @@
       void store.runSearch();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      list?.focus();
+      toList();
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      list?.focus();
+      toList();
+    }
+  }
+  // ---- the keys of the list (§5): ↑↓ over the blocks shown (an open group's head is passed by, a folded one is a
+  // stop), ← → fold and unfold the group, ↩ opens (beside the tab: `openFile` puts a file after the active tab) ----
+  const stops = $derived(
+    shownGroups.flatMap(({ g, gi, keep }) => {
+      if (!g.open) return [{ g: gi, i: -1 }];
+      const bs = blocksOf(g, keep);
+      return (g.all ? bs : bs.slice(0, SHOWN)).map((b) => ({ g: gi, i: b.hits[0] }));
+    }),
+  );
+  const stopAt = () => {
+    const c = s.sel;
+    if (!c) return -1;
+    if (c.i < 0) return stops.findIndex((x) => x.g === c.g && x.i < 0);
+    const g = s.groups[c.g];
+    // the block the chosen match is in
+    const b = g?.open ? blocksOf(g, kept[c.g] ?? []).find((x) => x.hits.includes(c.i)) : undefined;
+    return stops.findIndex((x) => x.g === c.g && (b ? x.i === b.hits[0] : x.i < 0));
+  };
+  async function scrollSel() {
+    await tick();
+    list?.querySelector('.blk.sel, .file.sel')?.scrollIntoView({ block: 'nearest' });
+  }
+  function toList() {
+    if (stopAt() < 0 && stops.length) s.sel = stops[0];
+    list?.focus();
+    void scrollSel();
+  }
+  function listKey(e: KeyboardEvent) {
+    const at = stopAt();
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (e.key === 'ArrowUp' && at <= 0) return input?.focus();
+      const n = stops[Math.min(stops.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))];
+      if (n) s.sel = n;
+      void scrollSel();
+    } else if (e.key === 'Enter' && s.sel) {
+      e.preventDefault();
+      if (s.sel.i < 0) s.groups[s.sel.g].open = !s.groups[s.sel.g].open;
+      else store.openHit(s.sel.g, s.sel.i);
+    } else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && s.sel) {
+      e.preventDefault();
+      const g = s.groups[s.sel.g];
+      g.open = e.key === 'ArrowRight';
+      if (!g.open) s.sel = { g: s.sel.g, i: -1 };
+      else if (s.sel.i < 0) {
+        const b = blocksOf(g, kept[s.sel.g] ?? [])[0];
+        if (b) s.sel = { g: s.sel.g, i: b.hits[0] };
+      }
+      void scrollSel();
     }
   }
   const SHOWN = 4; // blocks of a group before «Ещё N в …» (as the panel)
@@ -155,11 +206,11 @@
       <span class="cnt" aria-live="polite">{count}{#if s.capped} · первые 1000{/if}</span>
     </div>
     <div class="body">
-    <div class="list" bind:this={list} role="listbox" tabindex="0" aria-label="Результаты поиска">
+    <div class="list" bind:this={list} role="listbox" tabindex="0" aria-label="Результаты поиска" onkeydown={listKey}>
       {#if s.capped}<div class="capped">Показаны первые 1000 совпадений — уточните запрос</div>{/if}
       {#each shownGroups as { g, gi, keep } (g.path)}
         <section class="grp" aria-label={displayName(g.name)}>
-          <button class="file" aria-expanded={g.open} onclick={() => (g.open = !g.open)}>
+          <button class="file" class:sel={s.sel?.g === gi && s.sel.i < 0} aria-expanded={g.open} tabindex="-1" onclick={() => ((g.open = !g.open), (s.sel = { g: gi, i: -1 }))}>
             <svg class="chev" class:open={g.open} width="10" height="10" viewBox="0 0 8 8" aria-hidden="true"><path d="M2.5 1.2 5.8 4 2.5 6.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
             <svg class="fi" width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M5 2.5h6l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1zM11 2.5v4h4" /></svg>
             <span class="fn">{displayName(g.name.split('/').pop() ?? g.name)}</span>
@@ -275,6 +326,7 @@
   .stale { font-size: 11.5px; color: var(--wait); white-space: nowrap; cursor: default; }
   .stale:hover { text-decoration: underline; }
   .n { margin-left: auto; font-size: 12px; color: var(--ink3); }
+  .file.sel { box-shadow: inset 0 -1.5px 0 var(--lampline); color: var(--lampink); }
   .file:focus-visible { outline: 2px solid var(--lampline); outline-offset: -2px; }
   /* a match: its heading's status and path over its lines, the line numbers in a column of 30 */
   .blk { padding: 8px 12px; border-radius: 9px; cursor: default; }

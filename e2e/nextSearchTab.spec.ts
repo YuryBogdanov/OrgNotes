@@ -162,3 +162,65 @@ test('filters: files, statuses (ИЛИ), tags (И, inherited), the count «N и�
   await expect(fl.getByRole('radio', { name: 'Заголовки' })).toHaveAttribute('aria-checked', 'true');
   await expect(chips).toHaveText(['без статуса1']);
 });
+
+// ТЗ 53.4: the keys of the tab, a match opened beside it, ⌥⌘G over the filtered results, ⌘F, the panel meanwhile.
+test('keys: ↓ from the field, ↑↓ over the blocks, ← → fold, ↩ opens beside the tab; «из глобального поиска»', async ({ page }) => {
+  await open(page);
+  await searchInPanel(page, 'переезд');
+  await field(page).press('Meta+Enter');
+  const st = page.locator('.stab');
+  const q = st.getByRole('textbox', { name: 'Запрос' });
+  await expect(q).toBeFocused();
+  await q.press('ArrowDown');
+  const list = st.getByRole('listbox', { name: 'Результаты поиска' });
+  await expect(list).toBeFocused();
+  await expect(st.locator('.blk.sel')).toHaveCount(1);
+  await expect(st.locator('.blk').first()).toHaveClass(/sel/);
+  await page.keyboard.press('ArrowDown');
+  await expect(st.locator('.blk').nth(1)).toHaveClass(/sel/);
+  await page.keyboard.press('ArrowLeft'); // its group folds, its head chosen
+  await expect(st.locator('.file').first()).toHaveAttribute('aria-expanded', 'false');
+  await expect(st.locator('.file').first()).toHaveClass(/sel/);
+  await page.keyboard.press('ArrowDown'); // the next group's first block
+  await expect(st.locator('.blk.sel .ln.m .tx').first()).toContainText('План переезда');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowRight');
+  await expect(st.locator('.file').first()).toHaveAttribute('aria-expanded', 'true');
+  await expect(st.locator('.blk').first()).toHaveClass(/sel/);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  // the file opens in a tab beside the search tab; that one stays
+  await expect(tab(page)).toHaveCount(1);
+  await expect(tab(page)).toHaveAttribute('aria-selected', 'false');
+  const names = await page.getByRole('tab').evaluateAll((ts) => ts.map((t) => t.getAttribute('aria-label') ?? t.textContent?.trim()));
+  const at = names.findIndex((n) => n?.startsWith('Поиск'));
+  expect(names[at + 1] ?? names[at - 1]).toContain('Midterm');
+  await expect(page.getByRole('search', { name: 'Поиск в файле' })).toContainText('из глобального поиска');
+});
+
+test('⌥⌘G over the filtered results; ⌘F in the tab — its query; the panel meanwhile: the plate and the recent', async ({ page }) => {
+  await open(page);
+  await searchInPanel(page, 'переезд');
+  await field(page).press('Meta+Enter');
+  const st = page.locator('.stab');
+  await st.getByRole('complementary', { name: 'Фильтры' }).getByRole('group', { name: 'Статус' }).getByRole('button', { name: /TODO/ }).click();
+  await expect(st.locator('.cnt')).toHaveText('2 из 5 — с фильтрами');
+  // ⌘F in the tab: its own field
+  await st.getByRole('listbox', { name: 'Результаты поиска' }).focus();
+  await page.keyboard.press('Meta+f');
+  await expect(st.getByRole('textbox', { name: 'Запрос' })).toBeFocused();
+  // the panel, while the tab is active: no results there — the plate and the recent queries
+  const sp = page.locator('.sp');
+  await expect(sp.locator('.plate')).toHaveText('Результаты — во вкладке «Поиск: переезд»');
+  await expect(sp.locator('.list')).toHaveCount(0);
+  await expect(sp.locator('.rt .q').first()).toHaveText('переезд');
+  await sp.locator('.plate').click();
+  await expect(st.getByRole('listbox', { name: 'Результаты поиска' })).toBeFocused();
+  // ⌥⌘G: the TODO ones only (plan.org), from file to file
+  await page.keyboard.press('Alt+Meta+g');
+  await expect(page.getByRole('tab', { selected: true })).toContainText('plan');
+  await expect(sp.locator('.list')).toBeVisible(); // another tab active: the panel's results again
+  await page.keyboard.press('Alt+Meta+g');
+  await page.keyboard.press('Alt+Meta+g');
+  await expect(page.getByRole('tab', { selected: true })).toContainText('plan');
+});
