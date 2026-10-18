@@ -10,5 +10,4 @@ export { default as AgendaBuilder } from '../AgendaBuilder.svelte'; // the agend
 export { default as Capture } from '../Capture.svelte'; // the quick entry into the Inbox, ⇧⌘I
 export { default as InboxPicker } from '../Picker.svelte'; // the Inbox's file chosen
 export { default as NotePop } from '../NotePop.svelte'; // «Добавить заметку…», ⌃C ⌃Z
-export { default as TaskListHost } from '../TaskListHost.svelte'; // the sheets of a task in the lists (ТЗ 34)
 export { default as StartScreen } from '../StartScreen.svelte'; // no notes folder yet

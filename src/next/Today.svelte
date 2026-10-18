@@ -9,7 +9,6 @@
   import { LATE_CAP, TodayCtl } from '../todayCtl.svelte';
   import { MeetingsCtl } from '../meetingsCtl.svelte';
   import Compat from './Compat.svelte';
-  import ListToast from './ListToast.svelte';
 
   // «Сегодня» in the new interface (ТЗ 45 §2): on `bg` with the grid; the kicker in IBM Plex Mono, the title in Yeseva
   // One; «⇧⌘H», «Завершить день…», the gear. The blocks as ТЗ 32 lays them out, each a card — `card`, `rule`, 12 pt;
@@ -66,7 +65,6 @@
     {/if}
   </div>
 </div>
-<ListToast list={c.listId} />
 </div>
 
 {#snippet head(title: string, sub?: string, link?: { label: string; run: () => void })}
