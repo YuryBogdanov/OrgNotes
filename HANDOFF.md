@@ -612,6 +612,11 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   gone) — `lead`, `value` bold, `title` («Запланировано на **завтра** · …», words set per action in `lists.words`),
   4 s (6 in the old one), `holdToast` while the pointer is over it. e2e `nextTaskMenu.spec.ts`. The bridge
   `TaskListHost` is gone.
+  48.2, «Добавить заметку…»: `next/NotePop.svelte` on `ui/Popover`, 440 pt under the line (over it with no room
+  below: the height measured once mounted); «Заметка», the status capsule, the title; the field in `--text`
+  (Cormorant) 17, `field`, `lampline` in focus, to 5 lines; the two last notes, no block with none; ↩ with an
+  empty field does nothing (the old one closed). The plugins' `heading.note` (long matters' «Статус…») opens it
+  too. e2e `nextNotePop.spec.ts`. The bridge `NotePop` is gone.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
