@@ -361,3 +361,36 @@ export function noteLines(text: string): { item: boolean; depth: number; html: s
       return m ? { item: true, depth: Math.floor(m[1].length / 2), html: inlineHtml(m[2]) } : { item: false, depth: 0, html: inlineHtml(l.trim()) };
     });
 }
+
+// ---- the panel «Сегодня» of the new sidebar (ТЗ 50 §4.1) -------------------------------------------------------------
+
+/** «Сделано N из M»: the tasks of the day — «Главное» and the agenda's tasks of the day (and those of them closed
+ *  today: the agenda leaves a finished one out); N — the ones closed. */
+export function dayProgress(focus: FocusRow[], agenda: AgendaRow[], files: TFile[], day: Date): { done: number; total: number } {
+  const all = new Map<string, boolean>();
+  for (const f of focus) if (f.task) all.set(f.task.path + '#' + f.task.line, f.task.done);
+  for (const a of agenda) if (a.kind !== 'event') all.set(a.path + '#' + a.line, all.get(a.path + '#' + a.line) ?? false);
+  const on = (d?: OrgDate) => !!d && days(toDate(d), day) === 0;
+  for (const f of files)
+    for (const h of f.headings)
+      if (h.keyword && f.wf.done.includes(h.keyword) && on(h.closed) && (on(h.scheduled) || on(h.deadline))) all.set(f.path + '#' + h.line, true);
+  let done = 0;
+  for (const v of all.values()) if (v) done++;
+  return { done, total: all.size };
+}
+/** «до 18:00 — 3 ч» (the reminder to end the day), null when it is off or past. */
+export function untilRemind(o: { remind: boolean; remindAt: string }, now: Date): string | null {
+  if (!o.remind) return null;
+  const [h, m] = o.remindAt.split(':').map(Number);
+  const left = h * 60 + m - (now.getHours() * 60 + now.getMinutes());
+  if (left <= 0) return null;
+  const at = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  return `до ${at} — ${left >= 60 ? `${Math.round(left / 60)} ч` : `${left} мин`}`;
+}
+/** An event's row is going on now: «10:00–10:30» with the time between. */
+export function isNow(time: string, now: Date): boolean {
+  const m = /^(\d{1,2}:\d{2})[–-](\d{1,2}:\d{2})$/.exec(time);
+  if (!m) return false;
+  const hm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  return m[1].padStart(5, '0') <= hm && hm < m[2].padStart(5, '0');
+}

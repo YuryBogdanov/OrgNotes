@@ -3,7 +3,7 @@ import { parseHeadings, DEFAULT_WORKFLOW } from './org';
 import { entriesIn } from './calIndex';
 import {
   agendaRows, dateTitle, dayOf, doneStatus, focusRows, inlineHtml, journalDays, kicker, lastDay, noteLines, overdue, overdueWords, readFolder,
-  readLocal, remindDue, shouldShow, taskGroups, whenChosen, type TFile,
+  readLocal, remindDue, shouldShow, taskGroups, whenChosen, dayProgress, untilRemind, isNow, type TFile,
 } from './today';
 import { arrange, withNew } from './todayBlocks';
 
@@ -156,5 +156,34 @@ describe('the journal', () => {
     const saved = ['note', 'focus', 'agenda'].map((id) => ({ id, on: true }));
     const all = [{ id: 'banner', title: '', before: 'note' }, { id: 'week', title: '', after: 'focus' }, { id: 'x', title: '', after: 'nope' }];
     expect(withNew(saved, all).map((b) => b.id)).toEqual(['banner', 'note', 'focus', 'week', 'agenda', 'x']);
+  });
+});
+
+describe('the panel «Сегодня» (ТЗ 50 §4.1)', () => {
+  const day = new Date(2026, 9, 16);
+  it('the progress: «Главное» and the agenda\'s tasks, the ones closed today among them counted done', () => {
+    const f = file('a.org', [
+      '* TODO Открытая', 'SCHEDULED: <2026-10-16 Пт>',
+      '* DONE Закрытая сегодня', 'CLOSED: [2026-10-16 Пт 10:00] SCHEDULED: <2026-10-16 Пт>',
+      '* DONE Закрытая вчера', 'CLOSED: [2026-10-15 Чт 10:00] SCHEDULED: <2026-10-16 Пт>',
+      '',
+    ].join('\n'));
+    const agenda = [{ key: 'k', time: 'весь день', kind: 'task' as const, title: 'Открытая', kw: 'TODO', meeting: false, past: false, path: f.path, line: 0, sort: '' },
+      { key: 'e', time: '10:00–10:30', kind: 'event' as const, title: 'Встреча', kw: null, meeting: false, past: false, path: f.path, line: 9, sort: '' }];
+    const focus = [{ id: 'x', title: 'Открытая', task: { key: '', file: 'a.org', path: f.path, line: 0, title: 'Открытая', kw: 'TODO', prio: null, done: false, meta: '', late: false } }];
+    expect(dayProgress(focus, agenda, [f], day)).toEqual({ done: 1, total: 2 }); // the event not a task, yesterday's not today's
+  });
+  it('the time to the reminder: hours or minutes; off or past — none', () => {
+    const at = new Date(2026, 9, 16, 15, 0);
+    expect(untilRemind({ remind: true, remindAt: '18:00' }, at)).toBe('до 18:00 — 3 ч');
+    expect(untilRemind({ remind: true, remindAt: '15:40' }, at)).toBe('до 15:40 — 40 мин');
+    expect(untilRemind({ remind: false, remindAt: '18:00' }, at)).toBeNull();
+    expect(untilRemind({ remind: true, remindAt: '14:00' }, at)).toBeNull();
+  });
+  it('a meeting going on now', () => {
+    const at = new Date(2026, 9, 16, 10, 15);
+    expect(isNow('10:00–10:30', at)).toBe(true);
+    expect(isNow('9:00–10:00', at)).toBe(false);
+    expect(isNow('весь день', at)).toBe(false);
   });
 });

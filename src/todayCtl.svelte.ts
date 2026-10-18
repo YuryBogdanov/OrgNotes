@@ -23,7 +23,8 @@ export type Row = { path: string; line: number; title: string; kw: string | null
 export const LATE_CAP = 6;
 
 export class TodayCtl {
-  constructor(private pane: () => number, private el: () => HTMLElement | undefined) {}
+  /** `list`: the name of its list of tasks — the screen's «today», the sidebar's panel its own (ТЗ 50 §4.1). */
+  constructor(private pane: () => number, private el: () => HTMLElement | undefined, private list = 'today') {}
 
   readonly cfg = $derived(today.folder);
   readonly day = $derived(today.day);
@@ -117,7 +118,7 @@ export class TodayCtl {
       b?.scrollIntoView({ block: 'nearest' });
     });
   }
-  readonly listId = $derived.by(() => 'today:' + this.pane());
+  readonly listId = $derived.by(() => this.list + ':' + this.pane());
   keydown(e: KeyboardEvent) {
     if ((e.key !== 'ArrowDown' && e.key !== 'ArrowUp') || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) {
       if (e.code === 'KeyZ' && e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey && lists.canUndo) {
@@ -233,7 +234,7 @@ export class TodayCtl {
       };
     });
     $effect(() => {
-      const id = 'today:' + this.pane();
+      const id = this.listId;
       return untrack(() =>
         lists.register({
           id,

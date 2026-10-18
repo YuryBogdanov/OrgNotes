@@ -710,6 +710,17 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   50.4), the date under its head (today.ts `panelDate`). ⇧⌘H: the panel, again while shown — the tab (next/App
   `today`). The palette: `todayPanel` «Сегодня» (⇧⌘H) and `todayFull` «Сегодня — полная версия»; the old `today`
   only in the old shell. e2e `nextTodayTab.spec.ts`.
+  50.4, the panel «Сегодня» (next/TodayPanel.svelte): its own TodayCtl (`list` 'todayPanel' — its list of tasks
+  apart from the screen's, the pane the active one), so the data are the screen's. By another tab — the compact day:
+  «Сделано N из M» (today.ts `dayProgress`: «Главное» and the agenda's tasks of the day, the ones closed today with
+  them) and «до 18:00 — 3 ч» (`untilRemind`), a bar of 4 pt; the screen's blocks in its order — «Главное» (none:
+  the first of «Задачи»), «Встречи» (the agenda's events, the time in a 34 pt column, the past struck, the one going
+  on lit with «сейчас», `isNow`), «Просрочено» with «N дн.»; five rows, the fifth «Ещё N ›» to the full version at
+  that block. «Из плагинов» comes with 50.5. By the tab «Сегодня» — its contents: a row a block (`c.layout`), the
+  numbers («1 из 3», the agenda's count, «23:30», the overdue red), a click scrolls (the screen's blocks are
+  wrapped in `.bw[data-block]`, `display: contents`; the screen's child selectors follow), the block highest still
+  seen at the top lit; «Настроить блоки…». e2e `nextTodayPanel.spec.ts`. Tests fixed with it: nextScreens («Сегодня»
+  a tab as any) and narrowing (the strip's coming read from its animation — a CI runner had too few frames).
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

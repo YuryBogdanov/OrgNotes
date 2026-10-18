@@ -51,12 +51,12 @@
 
     {#each c.layout.rows as r, ri (ri)}
       {#if r.kind === 'top'}
-        <div class="row top">{#each r.ids as id (id)}{@render block(id)}{/each}</div>
+        <div class="row top">{#each r.ids as id (id)}<div class="bw" data-block={id}>{@render block(id)}</div>{/each}</div>
       {:else if r.kind === 'full'}
-        <div class="row full">{@render block(r.id)}</div>
+        <div class="row full"><div class="bw" data-block={r.id}>{@render block(r.id)}</div></div>
       {:else}
         <div class="row cols">
-          {#each r.cols as col (col.join())}<div class="col">{#each col as id (id)}{@render block(id)}{/each}</div>{/each}
+          {#each r.cols as col (col.join())}<div class="col">{#each col as id (id)}<div class="bw" data-block={id}>{@render block(id)}</div>{/each}</div>{/each}
         </div>
       {/if}
     {/each}
@@ -195,6 +195,8 @@
 {/snippet}
 
 <style>
+  /* a block's place, for the sidebar's contents (ТЗ 50 §4.2): no box of its own */
+  .bw { display: contents; }
   .host { position: relative; height: 100%; container-type: inline-size; }
   .today { height: 100%; overflow: auto; color: var(--ink); font: 13px/1.45 var(--ui); background-color: var(--bg);
     background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; background-position: -1px -1px; }
@@ -211,9 +213,9 @@
   .btn:focus-visible, .ico:focus-visible, .link:focus-visible, .b:focus-visible, .chip:focus-visible, .box:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
 
   .row { display: flex; gap: 16px; flex-wrap: wrap; }
-  .row.top > :global(.card:first-child) { flex: 1.4 1 420px; }
-  .row.top > :global(.card) { flex: 1 1 360px; }
-  .row.full > :global(.card) { flex: 1 1 100%; }
+  .row.top > .bw:first-child > :global(.card) { flex: 1.4 1 420px; }
+  .row.top > .bw:not(:first-child) > :global(.card) { flex: 1 1 360px; }
+  .row.full > .bw > :global(.card) { flex: 1 1 100%; }
   .row.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; }
   .col { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 
