@@ -35,6 +35,9 @@ class SearchAll {
   /** The search in every file: its query, where, the results (kept until the app quits). */
   state = $state<SearchState>({ q: '', ran: '', scope: 'all', re: false, ranRe: false, running: false, groups: [], total: 0, capped: false, scanned: 0, sel: null, focusN: 0 });
   private runs = 0;
+  /** The new interface's panel (ТЗ 50 §5): every file's results shown — past 40 results the files after the third
+   *  folded; the old one shows the first five files. */
+  dense = false;
   recent(): { q: string; t: number }[] {
     try {
       const v = JSON.parse(lsGet(SEARCH_RECENT) ?? '[]');
@@ -62,7 +65,7 @@ class SearchAll {
       Number(open.has(b.path)) - Number(open.has(a.path)) || b.hits.length - a.hits.length || a.name.localeCompare(b.name, 'ru');
     const show = () => {
       const g = [...groups].sort(order);
-      g.forEach((x, i) => (x.open = i < 5));
+      g.forEach((x, i) => (x.open = this.dense ? total <= 40 || i < 3 : i < 5));
       Object.assign(this.state, { groups: g, total, capped });
     };
     for (let i = 0; i < files.length; i++) {
