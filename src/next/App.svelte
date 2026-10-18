@@ -16,7 +16,8 @@
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { AgendaBuilder, Capture, InboxPicker, NotePop, Settings, StartScreen } from './bridges';
+  import { AgendaBuilder, Capture, InboxPicker, Settings, StartScreen } from './bridges';
+  import NotePop from './NotePop.svelte';
   import TaskListHost from './TaskListHost.svelte';
   import PluginSheets from './PluginSheets.svelte';
   import EndDay from './EndDay.svelte';
