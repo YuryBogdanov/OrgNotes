@@ -9,7 +9,7 @@
   // «Агенда» of the new sidebar (ТЗ 43 §2.2): the built-in agenda, then «Мои агенды»; 28 pt rows — the agenda's dot
   // (its first block's colour), its name. A click opens it in the agenda's tab (or switches the one open); the one
   // shown is marked. A right click on one of mine: «Редактировать…», «Удалить агенду…»; a double click edits it.
-  // «Новая агенда…» at the bottom: the builder (a bridge).
+  // «Новая агенда…» at the bottom: the builder.
   // the built-in ones (ТЗ 45 §3.1): «Агенда» the day and its 30 days, then «Неделя», «Сегодня», «Все задачи»
   const BUILTIN = [
     { id: '', name: 'Агенда', dot: 'var(--lampink)', sub: '30 дней' },

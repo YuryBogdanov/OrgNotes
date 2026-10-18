@@ -14,7 +14,7 @@
   import './editor.css';
 
   // The new interface's editor (ТЗ 42 §2, 42.5): the same Org editor as the old one (cm/orgEditor.ts — the engine,
-  // keys, folding, undo, the file followed), its own component; the menu and the tags' popover are bridges yet.
+  // keys, folding, undo, the file followed), its own component with the new menu and the tags' popover.
   let { text, fileKey, path = '', wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, rich = false, richNumbers = false, gutter = true, onrich, eyebrow, narrow = null, onnarrow, onnarrowTo, onwiden, find = null, onfound, onapi, onchange, oncursor, onfollow }: {
     text: string; fileKey: string; path?: string; wf: Workflow;
     reveal: { line: number; n: number; focus?: boolean; col?: number } | null | undefined;

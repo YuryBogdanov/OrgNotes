@@ -868,6 +868,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   plugins' blocks). «Файлы» stays not made (disabled), as before. Only the theme's editor is bridged now; a feature's
   own settings component (none of the core's) would draw in Compat. e2e nextSettingsRest.spec.ts, nextCompat via the
   theme's editor.
+  54.8, no bridges: the theme's editor is `next/SetThemeEditor.svelte` (the old one's logic, the groups as cards of
+  rows, the example in next/Editor, «Исходник / Оформление» segments, the level menu a next Menu) with
+  `next/ColorPop.svelte` (the old picker on the new tokens, not portalled — the sheet has no transform). `next/bridges.ts`
+  is gone; eslint forbids an old component in `src/next/` with no exception; boundary.test checks the file is gone.
+  The compatibility layer stays for what plugins draw the old way (their panels, tabs, sheets, own fields). The old
+  sheet (src/Settings.svelte and its sections) stays for the old interface till it goes. e2e nextThemeEditor.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

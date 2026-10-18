@@ -89,8 +89,8 @@
       }
     });
   });
-  // The new shell (ТЗ 42): the store, the plugins, the window's keys and the menu, the old sheets through
-  // `bridges.ts` (42.1); the sidebar with the files and the toolbar (42.3); the tabs (42.4); the editor (42.5).
+  // The new shell (ТЗ 42): the store, the plugins, the window's keys and the menu, no old component (the
+  // bridges of 42.1 gone in ТЗ 54.8); the sidebar with the files and the toolbar (42.3); the tabs (42.4); the editor (42.5).
   /** «Открыть» of «Добавлено в Inbox»: the Inbox's file, at its end (where the entry went). */
   const openInbox = () => {
     const f = store.inboxFile;
@@ -317,7 +317,7 @@
   {#if store.pickInbox}{#key store.pickInbox}<InboxPicker onclose={() => (store.pickInbox = 0)} />{/key}{/if}
   <!-- the first start, the folder (ТЗ 48 §6) -->
   {#if store.start}<StartScreen />{/if}
-  <!-- the bridged sheets and menus in the compatibility layer (ТЗ 43 §5) -->
+  <!-- a note, the task lists' menu: in the compatibility layer for the plugins' parts in them (ТЗ 43 §5) -->
   <Compat>
     <!-- a note, the task lists' menu and tags (the new look, ТЗ 48) -->
     {#if notePop.req}{#key notePop.req.n}<NotePop req={notePop.req} onclose={closeNote} />{/key}{/if}

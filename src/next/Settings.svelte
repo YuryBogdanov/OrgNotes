@@ -20,7 +20,7 @@
   import PluginRemoveSheet from './PluginRemoveSheet.svelte';
   import { plugins } from '../api/host.svelte';
   import { pluginUpdates as up } from '../pluginUpdates.svelte';
-  import { ThemeEditor } from './bridges';
+  import SetThemeEditor from './SetThemeEditor.svelte';
 
   // The settings of the new interface (ТЗ 54 §1): the same sheet over the window — the head (the gear, «Настройки» and
   // the section, «Изменения применяются сразу», «Готово»), the column of the sections (the core's by `order`, «Настройки
@@ -97,7 +97,7 @@
     </div>
     <div class="content" class:fill bind:this={contentEl}>
       {#if fill}
-        <Compat><ThemeEditor name={store.themeEditing ?? ''} /></Compat>
+        <SetThemeEditor name={store.themeEditing ?? ''} />
       {:else}
         <div class="col" class:wide>
           <h1>{tab}</h1>
