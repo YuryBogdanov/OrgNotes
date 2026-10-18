@@ -28,6 +28,7 @@
   import SessionCard from './SessionCard.svelte';
   import ReviewQueue from './ReviewQueue.svelte';
   import ReviewCalendar from './ReviewCalendar.svelte';
+  import ListToast from './ListToast.svelte';
   import Menu from './ui/Menu.svelte';
   import type { MenuItem } from '../menuItems';
 
@@ -237,13 +238,15 @@
   {:else}
     <div class="word" role="status"><b class="title">Нет открытых вкладок</b><span>Откройте файл в сайдбаре или создайте новый.</span></div>
   {/if}
+  <!-- the toast after a change in a list (ТЗ 48 §1): one, at the bottom of the tab's area -->
+  <ListToast />
 </div>
 {#snippet queue()}<ReviewQueue />{/snippet}
 {#if menu}<Menu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
 {#if richPick}<StatusMenu pick={richPick.pick} path={richPick.path} onclose={() => (richPick = null)} />{/if}
 
 <style>
-  .area { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .area { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .ed, .view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .ed { position: relative; min-width: 0; }
   /* §7.1: the editor scrolls up to the window's edge, its bar there; «Структура» lies over the right part of it, the

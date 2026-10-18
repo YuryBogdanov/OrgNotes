@@ -5,7 +5,6 @@
   import { isPreset } from '../builtinAgendas';
   import { displayName } from '../names';
   import { AgendaListCtl } from '../agendaListCtl.svelte';
-  import ListToast from './ListToast.svelte';
 
   // An agenda of blocks in the new interface (ТЗ 45 §3.3): a custom one of the builder, or one of the built-in
   // «Неделя», «Сегодня», «Все задачи». The kicker «МОЯ АГЕНДА · 9 ЗАДАЧ · ВСЕ ФАЙЛЫ», the name in Yeseva One,
@@ -62,7 +61,6 @@
     {/each}
   </div>
 </div>
-<ListToast list={c.listId} />
 </div>
 
 <style>

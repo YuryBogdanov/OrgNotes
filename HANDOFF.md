@@ -603,6 +603,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   3–18 % by the share of the fresh; the frames drawn over the sectors (silent `todo`, chosen `lampink`); the hub —
   «ЦЕЛИ Q4», the silent ones in `--font-display` 44 `todo`. A sector: chosen (a ray, the column of 340 pt with the
   person's goals, «Разобрать цели», «Открыть файл»); a dot: `openGoalFile`. ТЗ 47 is done.
+- **ТЗ 48 (the small bridges), 48.1 — a task in the lists:** `next/TaskListHost.svelte` — the menu of ТЗ 44
+  (`ui/Menu`, 260 pt, `label="Задача"`) and «Теги…» as `TagsPop` (its changes kept, applied by `lists.tags` when it
+  closes). `taskLists.menuItems` in the new interface (`store.nextUi`): «Открыть во второй панели» off (no second
+  pane yet), «Статус ›» soft (capsules on `lampsoft`), the date submenus with the days grey on the right («пт 16»),
+  «Снять дату» `danger`, «Копировать ссылку» with ⌃C L; the old interface's menu as it was. The toast: one
+  `next/ListToast.svelte` in EditorArea (`.area` relative) for every list, the plugins' too (the screens' own are
+  gone) — `lead`, `value` bold, `title` («Запланировано на **завтра** · …», words set per action in `lists.words`),
+  4 s (6 in the old one), `holdToast` while the pointer is over it. e2e `nextTaskMenu.spec.ts`. The bridge
+  `TaskListHost` is gone.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

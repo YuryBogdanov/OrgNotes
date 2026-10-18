@@ -53,6 +53,12 @@ const PRIO: Record<string, string> = { A: '--tl:var(--todo)', B: '--tl:var(--wai
 const MONTHS = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 const WD = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 const dayLabel = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+const WD2 = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+/** «сегодня», «завтра», «вчера», else «16 окт»: the day in the new interface's toast. */
+function relDay(d: Date): string {
+  const n = Math.round((+new Date(d.getFullYear(), d.getMonth(), d.getDate()) - +midnight()) / 86_400_000);
+  return n === 0 ? 'сегодня' : n === 1 ? 'завтра' : n === -1 ? 'вчера' : dayLabel(d);
+}
 const midnight = () => {
   const n = new Date();
   return new Date(n.getFullYear(), n.getMonth(), n.getDate());
@@ -86,7 +92,9 @@ class TaskLists {
   /** The list the focus was in last (the palette, a menu, the tags field keep it); null when it went elsewhere. */
   active = $state<string | null>(null);
   /** «„X“ — DONE · скроется при обновлении · Отменить ⌘Z» at the bottom of the list that made the change. */
-  toast = $state<{ list: string; text: string; n: number } | null>(null);
+  /** The toast after a change: `text` as the old interface says it; `lead`, `value` (bold), `title` — the new one's
+   *  «Запланировано на **завтра** · План переезда» (ТЗ 48 §1). */
+  toast = $state<{ list: string; text: string; n: number; lead?: string; value?: string; title?: string } | null>(null);
   /** The context menu of a task, and the tags field. */
   menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   tagsReq = $state<{ list: string; task: ListTask; x: number; y: number } | null>(null);
@@ -175,13 +183,20 @@ class TaskLists {
     }
     this.stack.push(step);
     if (this.stack.length > 100) this.stack.shift();
-    this.say(list, `«${bare(t.title)}» — ${what}`);
+    this.say(list, `«${bare(t.title)}» — ${what}`, { ...(this.words ?? { lead: what }), title: bare(t.title) });
+    this.words = null;
     return true;
   }
-  private say(list: string, text: string) {
-    this.toast = { list, text, n: Date.now() };
+  /** The words of the new interface's toast for the change being written (set by the action before `apply`). */
+  private words: { lead: string; value?: string } | null = null;
+  private say(list: string, text: string, w?: { lead: string; value?: string; title?: string }) {
+    this.toast = { list, text, n: Date.now(), ...(w ?? {}) };
+    this.holdToast(false);
+  }
+  /** The pointer over the toast holds it (the new interface); off it — the time again: 4 s there, 6 s in the old one. */
+  holdToast(on: boolean) {
     clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => (this.toast = null), 6000);
+    if (!on && this.toast) this.toastTimer = setTimeout(() => (this.toast = null), store.nextUi ? 4000 : 6000);
   }
   /** ⌘Z in a list: the last step made from the lists, if it can still be taken back. False: none here. */
   async undo(): Promise<boolean> {
@@ -199,6 +214,7 @@ class TaskLists {
   // ---- the actions ----------------------------------------------------------------------------------------------
 
   async status(list: string, t: ListTask, kw: string | null) {
+    this.words = { lead: 'Статус', value: kw ?? 'без статуса' };
     const ok = await this.apply(list, t, 'Статус задачи', kw ?? 'без статуса', (tx, ref) => tx.update(ref.path, (text, wf) => {
       const h = tx.heading(ref);
       return h ? setKeyword(text, h, kw, wf) : null;
@@ -206,7 +222,7 @@ class TaskLists {
     // a repeating task done: its date moved on and its status came back (as in Org)
     const r = ok && kw ? resolve(t) : null;
     const d = r && r.h.keyword !== kw ? (r.h.scheduled ?? r.h.deadline) : undefined;
-    if (d) this.say(list, `«${bare(t.title)}» — ${kw}, следующий раз ${dayLabel(toJs(d))}`);
+    if (d) this.say(list, `«${bare(t.title)}» — ${kw}, следующий раз ${dayLabel(toJs(d))}`, { lead: `${kw}, следующий раз`, value: relDay(toJs(d)), title: bare(t.title) });
     return ok;
   }
   /** ⇧→ / ⇧←: the next or the previous status of the task's set, as in the text. */
@@ -215,6 +231,7 @@ class TaskLists {
     if (r) return this.status(list, t, rotateStatus(r.f.wf, r.h.keyword, dir));
   }
   priority(list: string, t: ListTask, p: string | null) {
+    this.words = p ? { lead: 'Приоритет', value: '#' + p } : { lead: 'Приоритет снят' };
     return this.apply(list, t, 'Приоритет задачи', p ? `приоритет ${p}` : 'без приоритета', (tx, ref) => tx.update(ref.path, (text) => {
       const h = tx.heading(ref);
       return h ? setPriority(text, h, p) : null;
@@ -226,6 +243,7 @@ class TaskLists {
   }
   date(list: string, t: ListTask, kind: 'SCHEDULED' | 'DEADLINE', d: Date | null) {
     const what = d ? `${kind === 'SCHEDULED' ? 'перенесено на' : 'дедлайн'} ${dayLabel(d)}` : kind === 'SCHEDULED' ? 'дата снята' : 'дедлайн снят';
+    this.words = d ? { lead: kind === 'SCHEDULED' ? 'Запланировано на' : 'Дедлайн', value: relDay(d) } : { lead: kind === 'SCHEDULED' ? 'Дата снята' : 'Дедлайн снят' };
     return this.apply(list, t, kind === 'SCHEDULED' ? 'Запланировать' : 'Дедлайн', what, (tx, ref) => tx.setPlanning(ref, kind, d));
   }
   /** ⌥⇧← →: the date the row stands by, ±1 day (a task with one date: that one; none: from today). */
@@ -237,6 +255,7 @@ class TaskLists {
       : h.scheduled ? 'SCHEDULED' : h.deadline ? 'DEADLINE' : h.event ? 'event' : 'SCHEDULED';
     if (kind === 'event') {
       const to = plus(toJs(h.event!), n);
+      this.words = { lead: 'Событие перенесено на', value: relDay(to) };
       return this.apply(list, t, 'Дата события', `перенесено на ${dayLabel(to)}`, (tx, ref) => tx.update(ref.path, (text) => {
         const x = tx.heading(ref);
         return x ? shiftEvent(text, x, n) : null;
@@ -246,6 +265,7 @@ class TaskLists {
     return this.date(list, t, kind, plus(cur ? toJs(cur) : midnight(), n));
   }
   tags(list: string, t: ListTask, tags: string[]) {
+    this.words = tags.length ? { lead: 'Теги', value: tags.join(', ') } : { lead: 'Теги сняты' };
     return this.apply(list, t, 'Теги задачи', tags.length ? `теги: ${tags.join(', ')}` : 'без тегов', (tx, ref) => tx.update(ref.path, (text) => {
       const h = tx.heading(ref);
       return h ? setTags(text, h, tags) : null;
@@ -348,16 +368,17 @@ class TaskLists {
     const none = () => {};
     return [
       { label: 'Открыть', shortcut: hint('taskOpen'), action: () => spec.open(false) },
-      { label: spec.otherLabel ?? 'Открыть во второй панели', shortcut: hint('taskOpenOther'), action: () => spec.open(true) },
+      // the new interface has no second pane yet (ТЗ 48 §1): the row is there, off
+      { label: spec.otherLabel ?? 'Открыть во второй панели', shortcut: hint('taskOpenOther'), disabled: store.nextUi && !spec.otherLabel, action: () => spec.open(true) },
       'sep',
-      { label: 'Статус', action: none, sub: this.statusItems(L, t, r), subWidth: 200 },
+      { label: 'Статус', action: none, sub: this.statusItems(L, t, r), subWidth: store.nextUi ? 230 : 200, soft: store.nextUi },
       { label: 'Приоритет', action: none, sub: this.prioItems(L, t, r.h), subWidth: 200 },
       { label: 'Запланировать', action: none, sub: this.dateItems(L, t, r.h, 'SCHEDULED'), subWidth: 250 },
       { label: 'Дедлайн', action: none, sub: this.dateItems(L, t, r.h, 'DEADLINE'), subWidth: 250 },
       { label: 'Теги…', shortcut: hint('taskTags'), action: () => this.openTags(L, t) },
       'sep',
       { label: 'Перенести в другой файл…', shortcut: hint('taskRefile'), action: () => this.refile(t) },
-      { label: 'Копировать ссылку', action: () => void this.copyLink(L, t) },
+      { label: 'Копировать ссылку', shortcut: store.nextUi ? hint('copyLink') : undefined, action: () => void this.copyLink(L, t) },
       ...this.pluginItems(t),
       ...(spec.more?.(t) ?? []),
     ];
@@ -397,15 +418,18 @@ class TaskLists {
     const today = midnight();
     const mon = nextMonday(today);
     const set = (d: Date | null) => () => void this.date(L, t, kind, d);
+    // the new interface (ТЗ 48 §1): the days with their dates grey on the right, «Снять дату» in `todo`
+    const next = store.nextUi;
+    const short = (d: Date) => `${WD2[d.getDay()]} ${d.getDate()}`;
     const items: MenuItem[] = [
-      { label: 'Сегодня', action: set(today) },
-      { label: 'Завтра', shortcut: kind === 'SCHEDULED' ? store.keyHint('taskDateNext') || undefined : undefined, action: set(plus(today, 1)) },
+      { label: 'Сегодня', shortcut: next ? short(today) : undefined, action: set(today) },
+      { label: 'Завтра', shortcut: next ? short(plus(today, 1)) : kind === 'SCHEDULED' ? store.keyHint('taskDateNext') || undefined : undefined, action: set(plus(today, 1)) },
       { label: '+1 неделя', action: set(plus(cur ? toJs(cur) : today, 7)) },
       { label: `${WD[mon.getDay()]}, ${dayLabel(mon)}`, action: set(mon) },
       'sep',
       { label: 'Выбрать дату…', shortcut: store.keyHint(kind === 'SCHEDULED' ? 'taskSchedule' : 'taskDeadline') || undefined, action: () => this.pickDate(L, t, kind) },
     ];
-    if (cur) items.push('sep', { label: 'Снять дату', action: set(null) });
+    if (cur) items.push('sep', { label: 'Снять дату', danger: next, action: set(null) });
     return items;
   }
 }

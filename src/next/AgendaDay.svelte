@@ -11,7 +11,6 @@
   import { displayName } from '../names';
   import { today } from '../todayState.svelte';
   import { lists, type DateKind } from '../taskLists.svelte';
-  import ListToast from './ListToast.svelte';
 
   // The built-in «Агенда» in the mode «День» (ТЗ 45 §3.2), in place of the list of the next 30 days: the day chosen —
   // its kicker, its title in Yeseva One 40; ‹ ›, «Сегодня», «День / Неделя / Месяц» (the last two the calendar's views,
@@ -211,7 +210,6 @@
     </aside>
   </div>
 </div>
-<ListToast list={listId} />
 </div>
 
 <style>
