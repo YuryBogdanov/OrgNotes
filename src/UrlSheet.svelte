@@ -1,83 +1,14 @@
 <script lang="ts">
   import Segmented from './Segmented.svelte';
-  import { plugins, RIGHTS } from './api/host.svelte';
-  import { parseManifest, incompatible, type Manifest } from './api/manifest';
-  import { API_VERSION } from './api/index';
-  import { APP_VERSION } from './api/declare';
-  import { store } from './store.svelte';
+  import { RIGHTS } from './api/host.svelte';
+  import { LinkInstall } from './pluginLink.svelte';
   import { portal } from './portal';
 
   // «Установить плагин по ссылке» (ТЗ 37 §8): a git repository of the organisation (https or ssh, the keys of this
-  // Mac) — «Проверить» reads its tags and the plugin in the newest one (or the default branch); its rights, whether
-  // it fits; installed with its link kept for updates.
+  // Mac); the logic is pluginLink.svelte.ts.
   let { onclose }: { onclose: () => void } = $props();
 
-  interface Probe {
-    refs: { head: string | null; tags: [string, string][]; branches: [string, string][] };
-    ref: string;
-    track: 'tag' | 'branch';
-    commit: string;
-    manifest: string;
-  }
-  async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-    const { invoke } = await import('@tauri-apps/api/core');
-    return invoke<T>(cmd, args);
-  }
-
-  let url = $state('');
-  let checked = $state('');
-  let probing = $state(false);
-  let error = $state<string | null>(null);
-  let probe = $state<Probe | null>(null);
-  let updates = $state(true);
-  let busy = $state(false);
-  const m = $derived.by((): Manifest | null => {
-    if (!probe) return null;
-    try {
-      const r = parseManifest(JSON.parse(probe.manifest));
-      return r.ok ? r.manifest : null;
-    } catch {
-      return null;
-    }
-  });
-  const fits = $derived(m ? incompatible(m, API_VERSION, APP_VERSION) : null);
-  const latestTag = $derived(probe?.refs.tags.find(([t]) => !t.includes('-'))?.[0] ?? null);
-  const head = $derived(probe?.refs.head ?? null);
-  const builtin = $derived(m ? plugins.entries.some((e) => e.builtin && e.manifest?.id === m.id) : false);
-
-  async function check(ref?: string) {
-    const u = url.trim();
-    if (!u || probing) return;
-    probing = true;
-    error = null;
-    if (!ref) probe = null;
-    try {
-      probe = await invoke<Probe>('git_probe', { url: u, ref: ref ?? null });
-      checked = u;
-      if (!m) error = 'manifest.json не разобран: проверьте его поля';
-    } catch (err) {
-      error = String(err);
-      if (!ref) probe = null;
-    } finally {
-      probing = false;
-    }
-  }
-  async function install() {
-    if (!probe || !m || fits || busy || builtin) return;
-    busy = true;
-    try {
-      await invoke('plugin_install_git', { url: checked, ref: probe.ref, track: probe.track, checkUpdates: updates });
-      plugins.allow(m);
-      await plugins.refreshInstalled();
-      const section = m.contributes.settings.find((s) => s.section)?.section;
-      store.note(`«${m.name}» установлен и включён · команды — в палитре`, section ? [{ label: 'Настройки плагина', run: () => store.showSection(section as never) }] : undefined, 6000);
-      onclose();
-    } catch (err) {
-      error = String(err);
-    } finally {
-      busy = false;
-    }
-  }
+  const ln = new LinkInstall();
   function key(ev: KeyboardEvent) {
     if (ev.key === 'Escape') {
       ev.preventDefault();
@@ -95,19 +26,21 @@
       <span class="lb">Ссылка на git-репозиторий</span>
       <span class="in">
         <!-- svelte-ignore a11y_autofocus -->
-        <input bind:value={url} autofocus placeholder="https://git.company.local/team/panopticon-okr.git" spellcheck="false" aria-label="Ссылка на git-репозиторий"
-          onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void check(); } }} oninput={() => { if (probe && url.trim() !== checked) probe = null; }} />
-        <button class="b" disabled={!url.trim() || probing} onclick={() => void check()}>{probing && !probe ? 'Проверяем…' : 'Проверить'}</button>
+        <input bind:value={ln.url} autofocus placeholder="https://git.company.local/team/panopticon-okr.git" spellcheck="false" aria-label="Ссылка на git-репозиторий"
+          onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void ln.check(); } }} oninput={() => ln.typed()} />
+        <button class="b" disabled={!ln.url.trim() || ln.probing} onclick={() => void ln.check()}>{ln.probing && !ln.probe ? 'Проверяем…' : 'Проверить'}</button>
       </span>
-      {#if error}<span class="err" role="alert">{error}</span>{:else}<span class="hint">HTTPS или SSH. Доступ — через git и ключи на этом Mac, как при обычном git clone.</span>{/if}
+      {#if ln.error}<span class="err" role="alert">{ln.error}</span>{:else}<span class="hint">HTTPS или SSH. Доступ — через git и ключи на этом Mac, как при обычном git clone.</span>{/if}
     </label>
 
-    {#if probe && m}
-      {#if latestTag || head}
+    {#if ln.probe && ln.m}
+      {@const m = ln.m}
+      {@const probe = ln.probe}
+      {#if ln.latestTag || ln.head}
         <div class="ver">
           <span class="lb">Версия</span>
-          <Segmented label="Версия" size="large" disabled={probing} value={probe.ref} onchange={(r) => void check(r)}
-            options={[...(latestTag ? [{ value: latestTag, label: `Последний тег · ${latestTag}` }] : []), ...(head ? [{ value: head, label: `Ветка ${head}` }] : [])]} />
+          <Segmented label="Версия" size="large" disabled={ln.probing} value={probe.ref} onchange={(r) => void ln.check(r)}
+            options={[...(ln.latestTag ? [{ value: ln.latestTag, label: `Последний тег · ${ln.latestTag}` }] : []), ...(ln.head ? [{ value: ln.head, label: `Ветка ${ln.head}` }] : [])]} />
         </div>
       {/if}
       <div class="found" aria-label="Найденный плагин">
@@ -115,15 +48,15 @@
         <div class="fi">
           <div class="fn"><b>{m.name}</b><span>v{m.version} · manifest.json найден</span></div>
           <span class="rights">Права: {#if m.permissions.length}{#each m.permissions as p, i (p)}{i ? ', ' : ''}<span class:net={p === 'net'}>{RIGHTS[p] ?? p}{p === 'net' && m.net.length ? `: ${m.net.join(', ')}` : ''}</span>{/each}{:else}никаких{/if}</span>
-          {#if builtin}<span class="bad">id «{m.id}» занят встроенным плагином</span>{:else if fits}<span class="bad">{fits}</span>{:else}<span class="ok">Подходит вашей версии приложения</span>{/if}
+          {#if ln.builtin}<span class="bad">id «{m.id}» занят встроенным плагином</span>{:else if ln.fits}<span class="bad">{ln.fits}</span>{:else}<span class="ok">Подходит вашей версии приложения</span>{/if}
         </div>
       </div>
-      <label class="chk"><input type="checkbox" bind:checked={updates} /> Проверять обновления в этом репозитории</label>
+      <label class="chk"><input type="checkbox" bind:checked={ln.updates} /> Проверять обновления в этом репозитории</label>
       <p class="warn">Плагин не из каталога: его код никто, кроме автора, не смотрел. Ставьте плагины только из источников, которым доверяете.</p>
     {/if}
     <div class="row">
       <button class="b" onclick={onclose}>Отмена</button>
-      <button class="b pri" disabled={!probe || !m || !!fits || builtin || busy || probing} onclick={() => void install()}>{busy ? 'Устанавливаем…' : 'Установить'}</button>
+      <button class="b pri" disabled={!ln.canInstall} onclick={() => void ln.install().then((ok) => ok && onclose())}>{ln.busy ? 'Устанавливаем…' : 'Установить'}</button>
     </div>
   </div>
 </div>

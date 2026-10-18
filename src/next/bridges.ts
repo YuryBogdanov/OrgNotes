@@ -8,4 +8,3 @@ export { default as TagsSettings } from '../TagsSettings.svelte'; // 54.7
 export { default as SettingsAgendas } from '../SettingsAgendas.svelte'; // 54.7
 export { default as SettingsInbox } from '../SettingsInbox.svelte'; // 54.7
 export { default as Picker } from '../Picker.svelte'; // 54.7, Inbox's «Выбрать…»
-export { default as RemovePlugin } from '../RemovePlugin.svelte'; // 54.5
