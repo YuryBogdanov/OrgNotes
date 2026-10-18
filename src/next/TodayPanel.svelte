@@ -4,11 +4,15 @@
   import { todayBlockOf } from '../todayBlocks';
   import { dayProgress, isNow, untilRemind } from '../today';
   import { TodayCtl } from '../todayCtl.svelte';
+  import { plugins } from '../api/host.svelte';
+  import Compat from './Compat.svelte';
 
   // The panel «Сегодня» of the sidebar (ТЗ 50 §4). By any other tab — the compact day: the progress of the day, the
   // screen's blocks in its order (meetings, «Главное», the overdue), five rows each; by the tab «Сегодня» — its
   // contents: a row a block, a click scrolls the screen to it, the one at the screen's top lit. The data are the
   // screen's (TodayCtl): the panel and the screen never differ. The rows are a list of tasks (ТЗ 34) of their own.
+  // The plugins' blocks give their summaries (`setSummary`, API 1.15): «Из плагинов», the numbers of the contents;
+  // with no screen open their blocks are drawn here out of sight, so the summaries keep coming.
   let { full }: { full: boolean } = $props();
   let el: HTMLDivElement | undefined = $state();
   const c = new TodayCtl(() => store.layout.active, () => el, 'todayPanel');
@@ -27,7 +31,13 @@
   const order = $derived(c.layout.rows.flatMap((r) => (r.kind === 'top' ? r.ids : r.kind === 'full' ? [r.id] : r.cols.flat())));
   const TITLES: Record<string, string> = { note: 'Записка со вчера', focus: 'Главное', agenda: 'Агенда на сегодня', tasks: 'Задачи', overdue: 'Просрочено', oneOnOne: '1-1 сегодня' };
   const titleOf = (id: string) => TITLES[id] ?? todayBlockOf(id)?.title ?? id;
-  function numOf(id: string): { text: string; alert?: boolean } | null {
+  const isPlugin = (id: string) => !!todayBlockOf(id)?.component;
+  const fromPlugins = $derived(order.filter((id) => isPlugin(id) && plugins.todaySummary.has(id)));
+  // every plugin's block that is on, drawn out of sight while no screen draws it
+  const drawn = $derived(today.blocks.filter((o) => o.on && isPlugin(o.id)).map((o) => o.id));
+  function numOf(id: string): { text: string; alert?: boolean; wait?: boolean } | null {
+    const sum = plugins.todaySummary.get(id);
+    if (sum) return { text: sum.text, alert: sum.tone === 'alert', wait: sum.tone === 'wait' };
     if (id === 'focus') return focus.length ? { text: `${focus.filter((t) => t.done).length} из ${focus.length}` } : null;
     if (id === 'agenda') return c.agenda.length ? { text: String(c.agenda.length) } : null;
     if (id === 'tasks') return c.tasksTotal ? { text: String(c.tasksTotal) } : null;
@@ -103,7 +113,7 @@
       {#each order as id (id)}
         {@const n = numOf(id)}
         <button class="trow" class:on={atTop === id} onclick={() => toBlock(id)}>
-          <span class="tn">{titleOf(id)}</span>{#if n}<span class="tc" class:alert={n.alert}>{n.text}</span>{/if}
+          <span class="tn">{titleOf(id)}</span>{#if n}<span class="tc" class:alert={n.alert} class:wait={n.wait}>{n.text}</span>{/if}
         </button>
       {/each}
       <div class="sep"></div>
@@ -154,7 +164,21 @@
           </section>
         {/if}
       {/each}
+      {#if fromPlugins.length}
+        <section class="grp" aria-label="Из плагинов">
+          <div class="gh"><span>Из плагинов</span></div>
+          {#each fromPlugins as id (id)}
+            {@const n = numOf(id)}
+            <button class="row" onclick={() => more(id)}>
+              <span class="t">{titleOf(id)}</span>{#if n}<span class="sum" class:alert={n.alert} class:wait={n.wait}>{n.text}</span>{/if}
+            </button>
+          {/each}
+        </section>
+      {/if}
     </div>
+    {#if drawn.length}
+      <div hidden><Compat>{#each drawn as id (id)}{@const b = todayBlockOf(id)}{#if b?.component}<b.component id={b.id} />{/if}{/each}</Compat></div>
+    {/if}
   {/if}
   <div class="foot">
     {#if !full}<button onclick={() => today.open()}>Полная версия</button>{/if}
@@ -197,6 +221,9 @@
   .tn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .tc { flex: 0 0 auto; font-size: 11.5px; color: var(--ink3); font-variant-numeric: tabular-nums; }
   .tc.alert { color: var(--todo); font-weight: 600; }
+  .tc.wait, .sum.wait { color: var(--wait); }
+  .sum { flex: 0 0 auto; max-width: 60%; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; color: var(--ink3); }
+  .sum.alert { color: var(--todo); font-weight: 600; }
   .sep { flex: 0 0 1px; margin: 8px 6px; background: var(--rule); }
   .cfg { align-self: flex-start; padding: 2px 6px; border: 0; background: none; color: var(--lampink); font: 12px var(--ui); }
   .cfg:hover { text-decoration: underline; }
