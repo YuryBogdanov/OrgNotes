@@ -17,9 +17,10 @@
       {:else}
         <span class="tx">{t.text}</span>
       {/if}
-      {#if t.action}
-        {@const a = t.action}
-        <button onclick={() => { lists.toast = null; a.run(); }}>{a.label}</button>
+      {#if t?.action}
+        <!-- read while it is shown: the toast is cleared before its action runs (the block goes after) -->
+        {@const a = t?.action}
+        <button onclick={() => { const run = a?.run; lists.toast = null; run?.(); }}>{a?.label}</button>
       {:else}
         <button onclick={() => void lists.undo()}>Отменить <span class="k">⌘Z</span></button>
       {/if}

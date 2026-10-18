@@ -85,3 +85,48 @@ test('#mini ⌘P: the popover, the field, rows of 34 with their paths, the foot'
   await expect(rows.first().locator('.sub')).toHaveText('весь файл');
   await expect(pal.locator('.foot')).toHaveText('↩ открыть здесь · ⌘↩ весь файл · ⎋ закрыть');
 });
+
+// ТЗ 52.4: the quick entry over another program — the same box as ⇧⌘I, the interface's font; added — a strip of
+// 64 pt «Добавлено в Inbox» with the task and «Открыть» (the main window opens the Inbox), then it hides; not added —
+// a red line, the text kept
+async function capture(page: Page) {
+  await page.addInitScript(() => { localStorage.setItem('ui:next', '1'); localStorage.setItem('capture:file', 'inbox.org'); });
+  await installTauriMock(page, {});
+  await page.goto('/#capture');
+  const { log } = await import('./helpers');
+  const box = page.getByRole('dialog', { name: 'Новая задача в Inbox' });
+  await expect(box).toHaveCount(1);
+  const title = box.getByRole('textbox', { name: 'Заголовок задачи' });
+  await title.focus();
+  return { box, title, sent: async () => (await log(page)).filter((e) => e[0] === 'emit' && e[2] === 'capture-submit').at(-1) as unknown[] | undefined, log };
+}
+const answer = (page: Page, id: number, result: string) => page.evaluate(([i, r]) => (window as any).__emitEvent('capture-result', { id: i, result: r }), [id, result] as const);
+
+test('#capture: the box in the interface\'s font; added — the strip with «Открыть» to the main window', async ({ page }) => {
+  const { box, title, sent, log } = await capture(page);
+  expect(await title.evaluate((e) => getComputedStyle(e).fontFamily)).toContain('-apple-system');
+  await expect(title).toHaveCSS('font-size', '19px');
+  await expect(box.locator('.to')).toHaveText('→ inbox'); // the Inbox's name without «.org» (ТЗ 44 §11)
+  await expect(box.locator('.foot')).toHaveCSS('background-color', 'rgb(239, 236, 228)'); // `side`
+  await page.keyboard.type('Ответить типографии про тираж');
+  await page.keyboard.press('Enter');
+  await expect.poll(sent).toBeTruthy();
+  await answer(page, ((await sent())![3] as { id: number }).id, 'ok');
+  const strip = box.getByRole('status');
+  await expect(strip).toContainText('Добавлено в Inbox');
+  await expect(strip).toContainText('Ответить типографии про тираж');
+  await expect(strip).toHaveCSS('height', '64px');
+  await strip.getByRole('button', { name: 'Открыть' }).click();
+  await expect.poll(async () => (await log(page)).some((e) => e[0] === 'emit' && e[1] === 'main' && e[2] === 'capture-open-inbox')).toBe(true);
+});
+
+test('#capture: not added — the red line under the title, the text kept', async ({ page }) => {
+  const { box, title, sent } = await capture(page);
+  await page.keyboard.type('Позвонить в банк');
+  await page.keyboard.press('Enter');
+  await expect.poll(sent).toBeTruthy();
+  await answer(page, ((await sent())![3] as { id: number }).id, 'error');
+  await expect(box.getByRole('alert')).toContainText('Не удалось добавить');
+  await expect(box.getByRole('alert')).toHaveCSS('color', 'rgb(196, 67, 47)');
+  await expect(title).toHaveValue('Позвонить в банк');
+});

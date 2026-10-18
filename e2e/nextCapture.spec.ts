@@ -16,7 +16,7 @@ async function open(page: Page, files: Record<string, string>) {
   await expect.poll(() => page.evaluate(async () => (await import('/src/store.svelte.ts' as string)).store.loaded)).toBe(true);
 }
 
-test('⇧⌘I: the box — 600 pt, 150 pt from the top, the title in Cormorant, «→ inbox»; Tab the details; ↩ adds, the toast «Открыть»', async ({ page }) => {
+test('⇧⌘I: the box — 600 pt, 150 pt from the top, the title in the interface\'s font 19 (ТЗ 52 §4), «→ inbox»; Tab the details; ↩ adds, the toast «Открыть»', async ({ page }) => {
   await open(page, { '/mock/inbox.org': '#+TITLE: Inbox\n', '/mock/work.org': '* A\n', '/mock/.orgnotes/config.json': CFG });
   await page.keyboard.press('Shift+Meta+i');
   await expect(cap(page)).toBeVisible();
@@ -25,7 +25,8 @@ test('⇧⌘I: the box — 600 pt, 150 pt from the top, the title in Cormorant, 
   expect(Math.round(b.y)).toBe(150);
   const title = cap(page).getByRole('textbox', { name: 'Заголовок задачи' });
   await expect(title).toHaveAttribute('placeholder', 'Что записать?');
-  expect(await title.evaluate((e) => getComputedStyle(e).fontFamily)).toContain('Cormorant');
+  expect(await title.evaluate((e) => getComputedStyle(e).fontFamily)).toContain('-apple-system'); // a field, not a file's text
+  await expect(title).toHaveCSS('font-size', '19px');
   await expect(cap(page).locator('.dhint')).toHaveText('Tab — детали');
   await expect(cap(page).locator('.to')).toHaveText('→ inbox');
   await page.keyboard.type('Позвонить в типографию');
