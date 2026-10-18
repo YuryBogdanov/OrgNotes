@@ -13,13 +13,14 @@
   import SetMini from './SetMini.svelte';
   import SetPlugins from './SetPlugins.svelte';
   import SetStatuses from './SetStatuses.svelte';
+  import SetToday from './SetToday.svelte';
+  import SetTags from './SetTags.svelte';
+  import SetAgendas from './SetAgendas.svelte';
+  import SetInbox from './SetInbox.svelte';
   import PluginRemoveSheet from './PluginRemoveSheet.svelte';
   import { plugins } from '../api/host.svelte';
   import { pluginUpdates as up } from '../pluginUpdates.svelte';
-  import {
-    Picker, SettingsAgendas, SettingsInbox,
-    TagsSettings, ThemeEditor,
-  } from './bridges';
+  import { ThemeEditor } from './bridges';
 
   // The settings of the new interface (ТЗ 54 §1): the same sheet over the window — the head (the gear, «Настройки» and
   // the section, «Изменения применяются сразу», «Готово»), the column of the sections (the core's by `order`, «Настройки
@@ -34,13 +35,12 @@
   const wide = $derived(tab === 'Статусы' || tab === 'Клавиши');
   const fill = $derived(tab === 'Оформление' && !!store.themeEditing);
 
-  let pickFile = $state(false); // Inbox's «Выбрать…»
   let confirmAgenda = $state<{ id: string; name: string } | null>(null);
 
   function key(e: KeyboardEvent) {
     if (e.defaultPrevented || store.keyRecording) return;
     if (e.key === 'Escape') {
-      if (confirmAgenda || pickFile || up.removing || layerOpen()) return; // theirs
+      if (confirmAgenda || up.removing || layerOpen()) return; // theirs
       e.preventDefault();
       store.closeSettings();
       return;
@@ -107,6 +107,10 @@
           {:else if tab === 'Мини-окно'}<SetMini />
           {:else if tab === 'Плагины'}<SetPlugins />
           {:else if tab === 'Статусы'}<SetStatuses />
+          {:else if tab === 'Сегодня'}<SetToday />
+          {:else if tab === 'Теги'}<SetTags />
+          {:else if tab === 'Агенды'}<SetAgendas onremove={(a) => (confirmAgenda = a)} />
+          {:else if tab === 'Inbox'}<SetInbox />
           {:else if settingsOf(tab)?.schema}
             <!-- a feature's or a plugin's schema, in the new rows (ТЗ 54 §2) -->
             {@const spec = settingsOf(tab)!}
@@ -115,19 +119,10 @@
             {#if spec.plugin && plugins.entry(spec.plugin) && !plugins.entry(spec.plugin)!.builtin}
               <Button kind="danger" onclick={() => (up.removing = plugins.entry(spec.plugin!) ?? null)}>Удалить плагин…</Button>
             {/if}
-          {:else}
-          <!-- the sections' own look is to come (ТЗ 54.2–54.7): the old ones in the compatibility layer meanwhile -->
-          <div class="old">
-            <Compat>
-              {#if tab === 'Inbox'}<SettingsInbox onpick={() => (pickFile = true)} />
-              {:else if tab === 'Теги'}<TagsSettings />
-              {:else if settingsOf(tab)}
-                {@const spec = settingsOf(tab)!}
-                {#if spec.component}<spec.component />{/if}
-              {:else if tab === 'Агенды'}<SettingsAgendas onremove={(a) => (confirmAgenda = a)} />
-              {/if}
-            </Compat>
-          </div>
+          {:else if settingsOf(tab)?.component}
+            <!-- a feature's own component (none of the core's left): in the compatibility layer -->
+            {@const C = settingsOf(tab)!.component!}
+            <Compat><C /></Compat>
           {/if}
         </div>
       {/if}
@@ -136,9 +131,6 @@
 </div>
 <!-- «Удалить плагин…» of a plugin's own section (the «Плагины» section has its own) -->
 {#if tab !== 'Плагины'}<PluginRemoveSheet />{/if}
-<Compat>
-  {#if pickFile}<Picker onclose={() => (pickFile = false)} />{/if}
-</Compat>
 {#if confirmAgenda}
   {@const id = confirmAgenda.id}
   <ConfirmSheet label="Удаление агенды" title="Удалить агенду «{confirmAgenda.name}»?" onclose={() => (confirmAgenda = null)} actions={[{ label: 'Удалить', kind: 'danger', run: () => void store.deleteAgenda(id) }]}>
@@ -183,7 +175,6 @@
   .col { max-width: 720px; margin: 0 auto; }
   .col.wide { max-width: 960px; }
   h1 { margin: 0 4px 18px; font: 400 30px/1.05 var(--title); color: var(--ink); }
-  .old { display: flex; flex-direction: column; min-height: 0; }
   /* a narrow window: the sections go to a strip on top */
   @media (max-width: 820px) {
     .main { flex-direction: column; }
