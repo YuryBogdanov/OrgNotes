@@ -668,6 +668,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   next/App (the old code may not import src/next). No `reveal`: an async one moved the caret after the first click.
   FileView's draw effect reads `path` through a `$derived` — the parent's file object is new at every edit, and the
   view drawn anew lost the board's open card. e2e `nextPluginEditor.spec.ts`.
+  49.4, the board's look in the new interface (kanban Board.svelte by `ctx.ui.look`, styles.css by
+  `[data-ui='next']`): the header — the kicker «work/platform.org · доска» (Plex Mono 11 `ink3`), the name without
+  «.org» in Yeseva One 34, on the right «Workflow: … ▾» 28 pt, the filter 200 pt (`lampline` in focus), «Не на доске»;
+  no «Текст» (the view switch). The columns 272 on the host's grid (`.kanban` transparent), `chip`, radius 12, as
+  tall as their cards; the folded one — the count, the name bottom to top, no capsule. The cards `card` / `rule` /
+  radius 9, the title in `--font-text` 18/600, the chips (`kb-chip`): the priority, `Card.dates` (board.ts
+  `cardDates`: «⚑ ср 21» — the weekday within a week, else «⚑ 21 окт», red today or past; «◷ 19 окт»; «закрыта 12
+  окт» on a finished one), the progress, the tags; chosen — `lamp` with a 3 pt `lampsoft` ring; finished — 0.55.
+  The old interface unchanged. e2e `nextBoard.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
