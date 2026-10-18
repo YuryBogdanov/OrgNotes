@@ -617,6 +617,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   (Cormorant) 17, `field`, `lampline` in focus, to 5 lines; the two last notes, no block with none; ↩ with an
   empty field does nothing (the old one closed). The plugins' `heading.note` (long matters' «Статус…») opens it
   too. e2e `nextNotePop.spec.ts`. The bridge `NotePop` is gone.
+  48.3, the quick entry and the Inbox's file: `next/Capture.svelte` (the old one's workings and draft
+  `capture:draft`; a box 600 pt at 150 pt over `dim`, the Inbox's icon `lampink`, the title in `--text` 600 24,
+  «Tab — детали», the details 1–8 lines, the foot «→ inbox» (a click: the picker), the keys, ⇧⌘I); «Добавлено в
+  Inbox» is the window's toast — `lists.tell({lead, action})` (ListToast draws the action's button in place of
+  «Отменить»), «Открыть» goes to the Inbox's end. `next/InboxPicker.svelte` — Sheet 460 «Куда складывать
+  входящие?», Field «Найти файл…», the org files (not archives; inbox.org first) with their number of headings,
+  ↑↓ ↩, «+ Создать inbox.org в корне папки» while there is none. The quick window outside the app (`CaptureWindow`)
+  stays old till the ТЗ of the other windows. e2e `nextCapture.spec.ts`. The bridges `Capture` and `InboxPicker`
+  are gone.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

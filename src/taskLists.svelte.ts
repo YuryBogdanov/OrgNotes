@@ -94,7 +94,7 @@ class TaskLists {
   /** «„X“ — DONE · скроется при обновлении · Отменить ⌘Z» at the bottom of the list that made the change. */
   /** The toast after a change: `text` as the old interface says it; `lead`, `value` (bold), `title` — the new one's
    *  «Запланировано на **завтра** · План переезда» (ТЗ 48 §1). */
-  toast = $state<{ list: string; text: string; n: number; lead?: string; value?: string; title?: string } | null>(null);
+  toast = $state<{ list: string; text: string; n: number; lead?: string; value?: string; title?: string; action?: { label: string; run: () => void } } | null>(null);
   /** The context menu of a task, and the tags field. */
   menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   tagsReq = $state<{ list: string; task: ListTask; x: number; y: number } | null>(null);
@@ -191,6 +191,12 @@ class TaskLists {
   private words: { lead: string; value?: string } | null = null;
   private say(list: string, text: string, w?: { lead: string; value?: string; title?: string }) {
     this.toast = { list, text, n: Date.now(), ...(w ?? {}) };
+    this.holdToast(false);
+  }
+  /** The same toast for something else of the window (ТЗ 48 §3: «Добавлено в Inbox» with «Открыть»): its own button
+   *  in place of «Отменить». */
+  tell(w: { lead: string; value?: string; title?: string; action?: { label: string; run: () => void } }) {
+    this.toast = { list: '*', text: w.lead, n: Date.now(), ...w };
     this.holdToast(false);
   }
   /** The pointer over the toast holds it (the new interface); off it — the time again: 4 s there, 6 s in the old one. */

@@ -16,7 +16,10 @@
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { AgendaBuilder, Capture, InboxPicker, Settings, StartScreen } from './bridges';
+  import { AgendaBuilder, Settings, StartScreen } from './bridges';
+  import Capture from './Capture.svelte';
+  import InboxPicker from './InboxPicker.svelte';
+  import { lists } from '../taskLists.svelte';
   import NotePop from './NotePop.svelte';
   import TaskListHost from './TaskListHost.svelte';
   import PluginSheets from './PluginSheets.svelte';
@@ -41,6 +44,12 @@
   fileReview.effects();
   // The new shell (ТЗ 42): the store, the plugins, the window's keys and the menu, the old sheets through
   // `bridges.ts` (42.1); the sidebar with the files and the toolbar (42.3); the tabs (42.4); the editor (42.5).
+  /** «Открыть» of «Добавлено в Inbox»: the Inbox's file, at its end (where the entry went). */
+  const openInbox = () => {
+    const f = store.inboxFile;
+    const i = f ? store.files.indexOf(f) : -1;
+    if (i >= 0) store.open(i, Math.max(0, f!.text.split('\n').length - 1));
+  };
   const newFile = () => {
     if (!store.canManageFiles) return;
     store.showNav = true;
@@ -237,20 +246,18 @@
   {#if store.refile}{#key store.refile.n}<Refile />{/key}{/if}
   <!-- the window's menus (a tab's, the files' tree): the new menu (ТЗ 44 §3.4) -->
   {#if menu}<Menu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />{/if}
+  <!-- the quick entry ⇧⌘I and the Inbox's file in the new look (ТЗ 48 §3, §4); «Добавлено в Inbox» — the window's toast -->
+  {#if store.capture}
+    {#key store.capture.n}
+      <Capture file={store.inboxFile ? nameOf(store.inboxFile.name) : null} onsubmit={(t, d) => store.addToInbox(t, d)}
+        onpick={() => { store.capture = null; store.pickInbox = Date.now(); }}
+        onclose={(added) => { store.capture = null; if (added && store.inboxCfg.confirm) lists.tell({ lead: 'Добавлено в Inbox', action: { label: 'Открыть', run: () => openInbox() } }); }} />
+    {/key}
+  {/if}
+  {#if store.pickInbox}{#key store.pickInbox}<InboxPicker onclose={() => (store.pickInbox = 0)} />{/key}{/if}
   <!-- the bridged sheets and menus in the compatibility layer (ТЗ 43 §5) -->
   <Compat>
-    <!-- the quick entry, the Inbox's file, a note, the task lists' sheets, the start: bridges yet -->
-    {#if store.capture}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="capscrim" onmousedown={(e) => { if (e.target === e.currentTarget) store.capture = null; }}>
-        {#key store.capture.n}
-          <Capture file={store.inboxFile ? nameOf(store.inboxFile.name) + '.org' : null} onsubmit={(t, d) => store.addToInbox(t, d)}
-            onpick={() => { store.capture = null; store.pickInbox = Date.now(); }}
-            onclose={(added) => { store.capture = null; if (added && store.inboxCfg.confirm) store.note('Добавлено в Inbox', undefined, 1600); }} />
-        {/key}
-      </div>
-    {/if}
-    {#if store.pickInbox}{#key store.pickInbox}<InboxPicker onclose={() => (store.pickInbox = 0)} />{/key}{/if}
+    <!-- a note, the task lists' menu and tags (the new look, ТЗ 48); the start: a bridge yet -->
     {#if notePop.req}{#key notePop.req.n}<NotePop req={notePop.req} onclose={closeNote} />{/key}{/if}
     <TaskListHost />
     {#if store.start}<StartScreen />{/if}
@@ -265,7 +272,6 @@
 
 <style>
   .next { position: fixed; inset: 0; display: flex; background: var(--bg); color: var(--ink); font: 13px/1.45 var(--ui); }
-  .capscrim { position: fixed; inset: 0; z-index: 96; background: var(--dim); display: flex; align-items: flex-start; justify-content: center; padding-top: 110px; }
   .win { flex: 1; min-width: 0; display: flex; }
   .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 8px 14px; border-radius: 8px; background: var(--card); border: 1px solid var(--rule); box-shadow: var(--popshadow); }
