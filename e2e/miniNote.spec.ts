@@ -38,7 +38,7 @@ for (const ui of ['old', 'next'] as const)
 
     test('the heading narrowed: its subtree only, no gutter; the header; typing goes to the main window', async ({ page }) => {
       await open(page);
-      await expect(mini(page).locator('header .path')).toHaveText(/Work\.org ›\s*Созвон/);
+      await expect(mini(page).locator('header .path')).toHaveText(/Work(\.org)? ›\s*Созвон/);
       await expect(lines(page)).toHaveText(['* Созвон', '** Что показали', '- миграция биллинга']);
       await expect(mini(page).locator('.cm-lineNumbers')).toHaveCount(0);
       await page.keyboard.type(' и тарифов'); // the caret is at the end of the subtree
@@ -79,7 +79,7 @@ for (const ui of ['old', 'next'] as const)
       await page.keyboard.press('Meta+p');
       await page.keyboard.type('покуп');
       await page.keyboard.press('Meta+Enter');
-      await expect(mini(page).locator('header .path')).toHaveText('Дом.org'); // the file whole
+      await expect(mini(page).locator('header .path')).toHaveText(/^Дом(\.org)?$/); // the file whole (the new look: no «.org»)
       await expect(lines(page)).toHaveText(['* Покупки', '']);
       await page.keyboard.press('Meta+p');
       await page.keyboard.press('Escape');

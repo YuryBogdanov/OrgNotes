@@ -24,7 +24,8 @@
   const mini = location.hash === '#mini';
 </script>
 
-<div class="side-win" data-ui="next" style="{tokenVars(look)};--ui:{FONTS.ui};--mono:{FONTS.mono};--text:{FONTS.ui};--title:{FONTS.title}">
+<!-- `next`: the new editor's styles (editor.css) are the window's -->
+<div class="side-win next" data-ui="next" style="{tokenVars(look)};--ui:{FONTS.ui};--mono:{FONTS.mono};--text:{FONTS.ui};--title:{FONTS.title}">
   {#if mini}<MiniWindow />{:else}<CaptureWindow />{/if}
 </div>
 
