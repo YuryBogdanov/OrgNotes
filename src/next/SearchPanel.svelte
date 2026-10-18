@@ -6,7 +6,7 @@
   import { toneStyle } from '../colors';
   import { displayName } from '../names';
   import { summary } from '../search';
-  import { openSearchTab } from './searchTabState.svelte';
+  import { openSearchTab, searchTabActive, searchTabLabel, tabFocus } from './searchTabState.svelte';
 
   // «Поиск» of the new sidebar (ТЗ 43 §2.4, ТЗ 21, ⇧⌘F): the field on top, «Aa», «.*» and «только заголовки» under it;
   // ↩ runs it in every file. The results by file (ТЗ 50 §5): a file's row of 24 pt — the chevron, its icon, its name,
@@ -76,6 +76,17 @@
   }
   /** The options change what is found: run again what is shown. */
   const rerun = () => s.ran && void store.runSearch();
+  /** «14:20» today, «вчера», else «12 окт». */
+  function when(t: number) {
+    const d = new Date(t);
+    const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const n = Math.round((day(new Date()) - day(d)) / 864e5);
+    if (n <= 0) return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+    if (n === 1) return 'вчера';
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '');
+  }
+  // the tab of the results active (ТЗ 53 §6): the field and the options, a plate pointing there, the recent queries
+  const inTab = $derived(searchTabActive());
   const recent = $derived.by(() => {
     void s.focusN;
     void s.ran;
@@ -96,7 +107,19 @@
       <button class="tg" aria-pressed={headsOnly} class:on={headsOnly} onclick={() => ((s.scope = headsOnly ? 'all' : 'headings'), rerun())}>только заголовки</button>
     </div>
   </div>
-  {#if s.ran}
+  {#if inTab}
+    <!-- the results are in the tab: a click — its list in focus -->
+    <button class="plate" onclick={() => tabFocus.list++}>Результаты — во вкладке «{searchTabLabel()}»</button>
+    {#if recent.length}
+      <div class="cap">Недавние запросы</div>
+      {#each recent.slice(0, 8) as r (r.q)}
+        <button class="rq rt" onclick={() => { s.q = r.q; void store.runSearch(); }}>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
+          <span class="q">{r.q}</span><span class="t">{when(r.t)}</span>
+        </button>
+      {/each}
+    {/if}
+  {:else if s.ran}
     <div class="sum" aria-live="polite">{#if s.running}Ищу… {s.scanned}{:else if !s.total}Ничего не найдено{:else}{summary(s.total, s.groups.length)}{/if}{#if s.capped} · первые 1000{/if}</div>
     <div class="list" bind:this={list} role="listbox" tabindex="0" aria-label="Результаты поиска" onkeydown={listKey}>
       {#each s.groups as g, gi (g.path)}
@@ -163,5 +186,12 @@
   .cap { padding: 6px 10px 4px; font-size: 11px; font-weight: 600; color: var(--ink3); }
   .rq { flex: 0 0 26px; display: block; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink2); font: 12.5px var(--ui); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rq:hover { background: var(--chip); }
+  .plate { flex: 0 0 auto; margin: 2px 0 8px; padding: 8px 10px; border: 0; border-radius: 7px; background: var(--lampsoft); color: var(--lampink); font: 12px/1.4 var(--ui); text-align: left; }
+  .plate:hover { text-decoration: underline; }
+  .plate:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
+  .rt { display: flex; align-items: center; gap: 8px; color: var(--ink2); }
+  .rt svg { flex: 0 0 12px; color: var(--ink3); }
+  .rt .q { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rt .t { flex: 0 0 auto; font-size: 11px; color: var(--ink3); font-variant-numeric: tabular-nums; }
   .tg:focus-visible, .file:focus-visible, .rq:focus-visible, .more:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
 </style>

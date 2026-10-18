@@ -798,6 +798,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   built on the kept matches and mapped back to the group's indices (`openHit`). The tab: the results and the 268 pt
   column scroll apart; «Файлы» top 5 + «Ещё N файлов ›», «Статус» with «без статуса» last, «Теги» top 12 + «Ещё N ›»
   (the chosen first); «N из M — с фильтрами»; «С фильтрами ничего не найдено» + «Сбросить фильтры».
+  53.4, the keys and the panel: the tab's list — ↑↓ over the blocks shown (an open group's head passed by, a folded
+  one a stop, `sel.i` -1), ← → fold and unfold, ↩ `openHit` (openFile puts the file after the active tab, or uses its
+  tab there); ⌘F in the tab — its field (`find` action), ⎋ in the field — the list. ⌥⌘G with the tab open goes over
+  the kept matches: `store.searchKept`, set by next/App to `keptForStep`. The find panel shows «из глобального
+  поиска» after a jump (`fb.global`, off when the query is changed). While the tab is active the panel shows the
+  field, a plate «Результаты — во вкладке «…»» (a click — `tabFocus.list`) and up to 8 recent queries with the time.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

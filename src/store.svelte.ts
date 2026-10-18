@@ -1500,9 +1500,12 @@ class Store {
     this.open(idx, hit.line, false);
     this.findReq = { kind: 'jump', pane: this.layout.active, n: Date.now() + Math.random(), q: this.search.ran, re: this.search.ranRe, at: { path: grp.path, line: hit.line, col: hit.col } };
   }
+  /** The results that ⌥⌘G goes over, per group (the new shell's tab of the results with its filters); null — all. */
+  searchKept: (() => number[][] | null) | null = null;
   /** ⌥⌘G / ⇧⌥⌘G: the next / previous result, from file to file. */
   searchStep(dir: 1 | -1) {
-    const flat = this.search.groups.flatMap((g, gi) => g.hits.map((_, i) => ({ g: gi, i })));
+    const kept = this.searchKept?.() ?? null;
+    const flat = this.search.groups.flatMap((g, gi) => (kept?.[gi] ?? g.hits.map((_, i) => i)).map((i) => ({ g: gi, i })));
     if (!flat.length) return;
     const s = this.search.sel;
     // a file's row chosen (the new panel, ТЗ 50 §5): as if just before its first result

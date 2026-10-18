@@ -4,7 +4,7 @@
 import { store } from '../store.svelte';
 import { openView } from '../layout';
 import { summary } from '../search';
-import { noFilters, passes, type Facet, type Filters } from '../searchFilters';
+import { anyFilter, noFilters, passes, type Facet, type Filters } from '../searchFilters';
 import { tagsOf, type TagFile } from '../tags';
 import { tagsState } from '../tagsState.svelte';
 import { DEFAULT_WORKFLOW, parseHeadings, type Heading } from '../org';
@@ -80,3 +80,10 @@ export function facetsOf(groups: SearchGroup[]): Facet[][] {
 }
 /** Per group, the indices of its matches that pass the filters. */
 export const keptOf = (facets: Facet[][], f: Filters): number[][] => facets.map((fs) => fs.flatMap((x, i) => (passes(x, f) ? [i] : [])));
+
+/** ⌥⌘G with the tab open (in any pane): over the matches its filters keep (ТЗ 53 §5). */
+export function keptForStep(): number[][] | null {
+  if (!store.layout.panes.some((p) => p.tabs.some((t) => t.kind === SEARCH_TAB))) return null;
+  const f = liveFilters();
+  return anyFilter(f) ? keptOf(facetsOf(store.search.groups), f) : null;
+}

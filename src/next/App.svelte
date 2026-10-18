@@ -16,7 +16,7 @@
   import { lsGet, lsSet } from '../storage';
   import SearchTab from './SearchTab.svelte';
   import { register as registerCommand, commandIds } from '../commands';
-  import { SEARCH_ICON, SEARCH_TAB, openSearchTab, searchTabActive, searchTabLabel, searchTabSub } from './searchTabState.svelte';
+  import { SEARCH_ICON, SEARCH_TAB, keptForStep, openSearchTab, searchTabActive, searchTabLabel, searchTabSub, tabFocus } from './searchTabState.svelte';
   import Toolbar from './Toolbar.svelte';
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
@@ -137,7 +137,7 @@
     // ⌥⌘0: the old inspector's keys show «Структура» here (§8)
     insp: () => nextPrefs.setStructure(!nextPrefs.structure),
     // ⌘F, ⌘G, ⇧⌘G, ⌘E, ⌥⌘F (§5.7)
-    find: () => store.askFind('open'),
+    find: () => (searchTabActive() ? void tabFocus.n++ : store.askFind('open')), // in the tab of the results: its query (ТЗ 53 §5)
     findNext: () => store.askFind('next'),
     findPrev: () => store.askFind('prev'),
     useSelection: () => store.askFind('useSel'),
@@ -248,6 +248,7 @@
   // the appearance and the editor theme (by default «Синька» here, §3.2), macOS's dark followed
   $effect(() => applyAppearance(store.appearanceChoice, store.appearance, store.theme));
   onMount(() => {
+    store.searchKept = keptForStep; // ⌥⌘G over the tab's filtered results (ТЗ 53 §5)
     const mq = matchMedia('(prefers-color-scheme: dark)');
     const sys = () => (store.systemDark = mq.matches);
     mq.addEventListener('change', sys);

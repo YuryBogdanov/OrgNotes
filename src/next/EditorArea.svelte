@@ -54,7 +54,7 @@
     if (tab?.narrow && file && !narrowed) store.widenTab(tab);
   });
   // ⌘F (§5.7): the query, its steps, the replacements; ⌥⌘F opens it with «Заменить на…»
-  let fb = $state({ open: false, q: '', re: false, go: 0, dir: 1 as 1 | -1, at: null as number | null, focusN: 0, replacing: false, rep: null as { text: string; all: boolean; n: number } | null });
+  let fb = $state({ global: false, open: false, q: '', re: false, go: 0, dir: 1 as 1 | -1, at: null as number | null, focusN: 0, replacing: false, rep: null as { text: string; all: boolean; n: number } | null });
   let found = $state<{ total: number; cur: number; folded: number; wrapped: boolean } | null>(null);
   let api: { selection: () => string } | null = null;
   let lastReq = 0;
@@ -65,7 +65,7 @@
   };
   function openFind(replacing = false) {
     const s = oneLine();
-    if (s) fb.q = s;
+    if (s && s !== fb.q) Object.assign(fb, { q: s, global: false });
     fb.at = null;
     fb.open = true;
     fb.replacing = fb.replacing || replacing;
@@ -99,7 +99,7 @@
       const lines = f.text.split('\n');
       let pos = 0;
       for (let k = 0; k < r.at.line; k++) pos += lines[k].length + 1;
-      Object.assign(fb, { q: r.q, re: !!r.re, at: pos + r.at.col, open: true });
+      Object.assign(fb, { q: r.q, re: !!r.re, at: pos + r.at.col, open: true, global: true });
     }
   });
   // the strip's moves (ТЗ 46 §2), none with «Уменьшить движение»
@@ -208,7 +208,7 @@
     <!-- the review's summary: typing in the text is done with it (ТЗ 46 §5); a change from outside is not -->
     <div class="ed" onkeydown={(e) => { if (session && session.cur < 0 && !e.metaKey && !e.ctrlKey && (e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace')) fileReview.finish(); }} role="presentation">
       {#if fb.open}
-        <FindPanel bind:q={() => fb.q, (v) => { fb.q = v; fb.at = null; }} bind:re={() => fb.re, (v) => (fb.re = v)} replacing={fb.replacing} info={found} focusN={fb.focusN}
+        <FindPanel bind:q={() => fb.q, (v) => { if (v !== fb.q) fb.global = false; fb.q = v; fb.at = null; }} global={fb.global} bind:re={() => fb.re, (v) => (fb.re = v)} replacing={fb.replacing} info={found} focusN={fb.focusN}
           onnext={() => step(1)} onprev={() => step(-1)} onreplace={(text, all) => (fb.rep = { text, all, n: (fb.rep?.n ?? 0) + 1 })} onclose={closeFind} />
       {/if}
       <Editor text={file.text} fileKey={tab.id + '|' + file.path + (narrowed ? '|n:' + narrowed.title : '')}

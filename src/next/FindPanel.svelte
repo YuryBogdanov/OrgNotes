@@ -5,10 +5,11 @@
   // ⌘F of the new interface (ТЗ 42 §5.7): a floating panel of 420 pt in the editor's upper right corner — the field
   // and «2 из 5», ↑ ↓ (⌘G / ⇧⌘G), «Aa», «.*» (a regular expression), ⎋; ⌥⌘F adds «Заменить на…» with «Заменить»
   // and «Все» (one edit for the file, ⌘Z takes it back whole).
-  let { q = $bindable(''), re = $bindable(false), replacing = false, info, focusN = 0, onnext, onprev, onreplace, onclose }: {
+  let { q = $bindable(''), re = $bindable(false), global = false, replacing = false, info, focusN = 0, onnext, onprev, onreplace, onclose }: {
     q: string;
     re: boolean;
     replacing?: boolean;
+    global?: boolean; // the query came from the search in every file
     info: { total: number; cur: number; folded: number; wrapped: boolean } | null;
     focusN?: number;
     onnext: () => void;
@@ -86,6 +87,7 @@
     <button class="tg mono" title="Регулярное выражение" aria-pressed={re} class:on={re} onclick={() => (re = !re)}>.*</button>
     <button class="ib" aria-label="Закрыть поиск" title="Закрыть (⎋)" onclick={onclose}><svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 2l6 6M8 2 2 8" /></svg></button>
   </div>
+  {#if global}<div class="note">из глобального поиска</div>{/if}
   {#if replacing}
     <div class="row">
       <div class="fld"><input bind:this={repInput} bind:value={rep} onkeydown={repKey} aria-label="Заменить на" placeholder="Заменить на…" spellcheck="false" autocomplete="off" /></div>
@@ -109,6 +111,7 @@
   .ib:hover, .tg:hover { background: var(--chip); color: var(--ink); }
   .tg.on { background: var(--lampsoft); color: var(--lampink); }
   .mono { font-family: var(--mono); }
+  .note { padding: 0 2px; font-size: 11.5px; color: var(--ink3); }
   .btn { flex: 0 0 auto; height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--chip2); color: var(--ink); font: 12.5px var(--ui); }
   .btn:disabled { opacity: 0.45; }
   button:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
