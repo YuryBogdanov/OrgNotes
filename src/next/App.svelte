@@ -19,6 +19,7 @@
   import { Settings } from './bridges';
   import StartScreen from './StartScreen.svelte';
   import AgendaBuilderTab from './AgendaBuilder.svelte';
+  import PluginEditor from './PluginEditor.svelte';
   import { AGENDA_EDIT } from '../store.svelte';
   import { registerView } from '../views';
   import { openView } from '../layout';
@@ -48,6 +49,8 @@
 
   // a review in the file (ТЗ 41 §1): the tab follows its cards
   fileReview.effects();
+  // `ui.editor` gives the new editor here (ТЗ 49 §7)
+  plugins.editorComponent = PluginEditor;
   // the agenda builder is a tab here (ТЗ 48 §5): «<Агенда> — правка», a dot while unsaved; it opens with the builder
   // and the builder goes with its tab
   registerView({

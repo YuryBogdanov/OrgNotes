@@ -74,9 +74,11 @@ export const COMPAT: Record<string, string | null> = {
 /** The named colours (`--p-red` … `--p-gray`) of «Синька» in this appearance (ТЗ 42 §3.2). */
 export const compatPalette = (a: Appearance) => BUILTIN.find((t) => t.name === NEXT_THEME[a])!.colors.palette;
 
-/** The layer's variables for an appearance: an inline style. */
+/** The layer's variables for an appearance: an inline style. `--font-text` — the font of the file's text as the
+ *  editor has it (the settings' choice, the window's `--text`): the board's cards, a canvas's nodes (ТЗ 49 §7). */
 export const compatVars = (a: Appearance) =>
   [
+    '--font-text:var(--text)',
     ...Object.entries(COMPAT).flatMap(([k, v]) => (v === null ? [] : [`--${k}:${v}`])),
     ...Object.entries(compatPalette(a)).map(([k, v]) => `--p-${k}:${v}`),
   ].join(';');
