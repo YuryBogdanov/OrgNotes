@@ -759,6 +759,11 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   text «Исходник» always (`rich={false}`, no `gutter`) in Plex Mono 12.5 on lines of 22, 14 pt on top and 16 at the
   sides on the lines (the caret's line on `lampsoft` the whole width), headings 13; on the grid. «Заголовок удалён» with
   a button of ТЗ 44; «Доступно в главном окне» a popover; ⌘F the new editor's panel across the top.
+  52.3, ⌘P of the mini window (next/MiniPalette.svelte): a popover of ТЗ 44 in the window, 8 pt inside its line, on
+  `card`, radius 10, 6 inside; the field 34 on `field` with an inset 1.5 of `lampline`; rows 34, radius 7 — the
+  level in stars (Plex Mono 11 `ink3`, a column of 22) or the file's icon, the title, the path without «.org» with
+  « / » or «весь файл»; the one chosen on `lampsoft` bold; five in sight; the foot «↩ открыть здесь · ⌘↩ весь файл ·
+  ⎋ закрыть». The workings as ТЗ 31 §4.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

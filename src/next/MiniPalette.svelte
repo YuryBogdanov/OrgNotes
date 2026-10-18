@@ -32,7 +32,7 @@
   const rowOf = (n: MiniNote): Row =>
     n.whole
       ? { key: 'f:' + n.path, level: '▤', title: base(n.path), sub: 'весь файл', note: n }
-      : { key: 'h:' + n.path + '#' + n.line + n.title, level: '*'.repeat(store.files.find((f) => f.name === n.path)?.headings.find((h) => h.line === n.line)?.level ?? 1), title: n.title, sub: n.path, note: n };
+      : { key: 'h:' + n.path + '#' + n.line + n.title, level: '*'.repeat(store.files.find((f) => f.name === n.path)?.headings.find((h) => h.line === n.line)?.level ?? 1), title: n.title, sub: base(n.path).replace(/\//g, ' / '), note: n };
   const all = $derived.by((): Row[] => {
     const out: Row[] = [];
     for (const f of store.files) {
@@ -90,35 +90,41 @@
 
 <div class="mpal" role="dialog" aria-label="Сменить заметку">
   <label class="field">
-    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5" /><path d="M13.2 13.2L17 17" /></svg>
-    <input bind:this={input} bind:value={q} onkeydown={key} placeholder="" aria-label="Заголовок или файл" spellcheck="false" autocomplete="off" />
-    <span class="hint">заголовки и файлы</span>
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
+    <input bind:this={input} bind:value={q} onkeydown={key} placeholder="Заголовок или файл" aria-label="Заголовок или файл" spellcheck="false" autocomplete="off" />
   </label>
   <div class="list" bind:this={list} role="listbox" aria-label="Заметки">
     {#each rows as r, i (r.key)}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="row" class:on={i === sel} role="option" aria-selected={i === sel} tabindex="-1" onmousemove={(e) => moved(e) && (sel = i)} onclick={(e) => pick(r, e.metaKey)}>
-        <span class="lvl">{r.level}</span><span class="t">{r.title}</span><span class="sub">{r.sub}</span>
+        {#if r.note.whole}
+          <svg class="lvl" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 2h6l3 3v9h-9z" /></svg>
+        {:else}
+          <span class="lvl">{r.level}</span>
+        {/if}
+        <span class="t">{r.title}</span><span class="sub">{r.sub}</span>
       </div>
     {:else}
       <div class="none">Ничего не найдено</div>
     {/each}
   </div>
-  <div class="foot"><span>↩ открыть здесь</span><span>⌘↩ весь файл</span><span>⎋ закрыть</span></div>
+  <div class="foot">↩ открыть здесь · ⌘↩ весь файл · ⎋ закрыть</div>
 </div>
 
 <style>
-  .mpal { position: absolute; left: 8px; right: 8px; top: 6px; z-index: 20; display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--rule); border-radius: 9px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28); overflow: hidden; font-size: 12.5px; }
-  .field { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px; border-bottom: 1px solid var(--rule); color: var(--ink2); }
-  .field input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--ink); font-size: 12.5px; }
-  .hint { font-size: 11px; color: var(--ink3); white-space: nowrap; }
-  .list { max-height: calc(34px * 5); overflow: auto; }
-  .row { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; cursor: default; }
+  /* a popover of ТЗ 44 in the window (ТЗ 52 §3): under the header, 8 pt from the window's edges, its whole width */
+  .mpal { position: absolute; left: 8px; right: 8px; top: 8px; z-index: 20; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; padding: 6px; border: 1px solid var(--rule); border-radius: 10px; background: var(--card); box-shadow: var(--popshadow); color: var(--ink); font-size: 13px; }
+  .field { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border-radius: 7px; background: var(--field); box-shadow: inset 0 0 0 1.5px var(--lampline); color: var(--ink3); }
+  .field input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--ink); font: 13px var(--ui); caret-color: var(--lamp); }
+  .field input::placeholder { color: var(--ink3); }
+  .list { max-height: calc(34px * 5); overflow: auto; display: flex; flex-direction: column; }
+  .row { flex: 0 0 34px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: 7px; cursor: default; }
   .row.on { background: var(--lampsoft); }
   .row.on .t { font-weight: 600; }
-  .lvl { flex: 0 0 auto; color: var(--ink3); font-family: var(--mono, ui-monospace, Menlo, monospace); font-size: 11px; }
+  .lvl { flex: 0 0 22px; width: 22px; color: var(--ink3); font: 11px var(--mono); }
+  svg.lvl { flex: 0 0 15px; width: 15px; margin-right: 7px; }
   .t { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .sub { color: var(--ink3); font-size: 11px; white-space: nowrap; }
+  .sub { flex: 0 0 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; color: var(--ink3); font-size: 11.5px; white-space: nowrap; }
   .none { padding: 10px; color: var(--ink2); }
-  .foot { display: flex; gap: 12px; height: 26px; align-items: center; padding: 0 10px; border-top: 1px solid var(--rule); font-size: 11px; color: var(--ink3); }
+  .foot { padding: 6px 10px 2px; font-size: 11px; color: var(--ink3); }
 </style>
