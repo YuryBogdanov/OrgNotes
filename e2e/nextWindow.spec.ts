@@ -19,7 +19,8 @@ async function open(page: Page) {
 
 test('the tree: folders first and folded, a click opens a file (the toolbar says which), ⌥-click — a tab of its own', async ({ page }) => {
   await open(page);
-  await expect(page.getByLabel('Боковая панель').locator('.grp.head')).toContainText('Файлы4');
+  await expect(page.getByLabel('Боковая панель').locator('.grp.head .pt')).toHaveText('Файлы');
+  await expect(page.getByRole('navigation', { name: 'Разделы', exact: true }).getByRole('button', { name: /Файлы/ }).locator('.bd')).toHaveText('4');
   await expect(tree(page).getByRole('treeitem')).toHaveText(['1on1', 'inbox', 'Midterm']);
   await item(page, '1on1').click();
   await expect(item(page, '1on1')).toHaveAttribute('aria-expanded', 'true');
@@ -61,22 +62,25 @@ test('the toolbar: ⌘K and «Искать везде» open the palette; ⌘0 a
   await expect(tree(page)).toBeHidden();
   await page.getByRole('button', { name: 'Боковая панель' }).click();
   await expect(tree(page)).toBeVisible();
-  // the edge: 236 → 300, kept after a reload; never under 200
-  const box = (await page.locator('aside.side').boundingBox())!;
-  expect(Math.round(box.width)).toBe(236);
+  // the panel's edge (ТЗ 50 §2): 260 → 300, kept after a reload; never under 200; the rail 52 aside
+  const pane = page.locator('aside.side .pane');
+  const box = (await pane.boundingBox())!;
+  expect(Math.round(box.width)).toBe(260);
+  expect(Math.round((await page.locator('aside.side .rail').boundingBox())!.width)).toBe(52);
   await page.mouse.move(box.x + box.width - 1, box.y + 300);
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width + 63, box.y + 300, { steps: 4 });
+  await page.mouse.move(box.x + box.width + 39, box.y + 300, { steps: 4 });
   await page.mouse.up();
-  await expect.poll(async () => Math.round((await page.locator('aside.side').boundingBox())!.width)).toBe(300);
+  await expect.poll(async () => Math.round((await pane.boundingBox())!.width)).toBe(300);
   await page.reload();
-  await expect.poll(async () => Math.round((await page.locator('aside.side').boundingBox())!.width)).toBe(300);
+  await expect.poll(async () => Math.round((await pane.boundingBox())!.width)).toBe(300);
 });
 
-test('the folder\'s line: the folder and its gear opens the settings', async ({ page }) => {
+test('the folder\'s line: the folder; the gear in the rail opens the settings', async ({ page }) => {
   await open(page);
   const line = page.locator('aside.side .folder');
   await expect(line).toContainText('/mock');
-  await line.getByRole('button', { name: 'Настройки' }).click();
+  await expect(line.getByRole('button')).toHaveCount(0);
+  await page.locator('aside.side .rail').getByRole('button', { name: 'Настройки' }).click();
   await expect(page.getByRole('dialog', { name: 'Настройки' })).toBeVisible();
 });
