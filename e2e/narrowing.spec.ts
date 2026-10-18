@@ -62,29 +62,25 @@ for (const motion of ['no-preference', 'reduce'] as const)
     await page.addInitScript(() => localStorage.setItem('ui:next', '1'));
     await openApp(page, { files: { '/mock/a.org': DOC }, ready: false, viewport: { width: 1440, height: 820 } });
     await page.getByRole('tree', { name: 'Файлы' }).getByRole('treeitem', { name: 'a' }).click();
-    // the strip's height through its coming: sampled on each frame
+    // its coming: the animation the strip gets as it comes in (a CI runner's frames are too few to sample its height)
     await page.evaluate(() => {
-      (window as any).__h = [];
-      const tick = () => {
-        const el = document.querySelector<HTMLElement>('[data-ui="next"] .narrow');
-        if (el) (window as any).__h.push(Math.round(el.getBoundingClientRect().height));
-        if ((window as any).__h.length < 30) requestAnimationFrame(tick);
-      };
-      // from the frame it comes in
+      (window as any).__anim = null;
       const mo = new MutationObserver(() => {
-        if (!document.querySelector('[data-ui="next"] .narrow')) return;
+        const el = document.querySelector<HTMLElement>('[data-ui="next"] .narrow');
+        if (!el) return;
         mo.disconnect();
-        tick();
+        // Svelte starts it on the next frame
+        requestAnimationFrame(() => ((window as any).__anim = el.getAnimations().map((a) => Number((a.effect as KeyframeEffect | null)?.getTiming().duration ?? 0))));
       });
       mo.observe(document.body, { childList: true, subtree: true });
     });
     await narrowAt(page, 'Бенчмарк');
     const strip = page.getByRole('status', { name: 'Сужено' });
     await expect(strip).toBeVisible();
-    await expect.poll(() => page.evaluate(() => (window as any).__h.length)).toBeGreaterThan(20);
-    const hs: number[] = await page.evaluate(() => (window as any).__h);
-    if (motion === 'reduce') expect(hs.every((h) => h >= 40)).toBe(true);
-    else expect(hs.some((h) => h > 0 && h < 39)).toBe(true); // it came out, not at once
+    await expect.poll(() => page.evaluate(() => (window as any).__anim)).not.toBeNull();
+    const ds: number[] = await page.evaluate(() => (window as any).__anim);
+    if (motion === 'reduce') expect(ds.every((d) => d === 0)).toBe(true); // at once
+    else expect(ds).toContain(180); // it comes out in 180 ms
     const b = (await strip.boundingBox())!;
     expect(Math.round(b.x + b.width)).toBe(1440); // to the window's right edge, over the column too
     const col = (await page.getByRole('complementary', { name: 'Структура' }).boundingBox())!;

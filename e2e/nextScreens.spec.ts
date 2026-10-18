@@ -29,18 +29,19 @@ const foreign = (page: Page, sel: string) =>
 const bar = (page: Page) => page.locator('.next[data-ui="next"] header.bar');
 const mode = (page: Page) => page.getByRole('radiogroup', { name: 'Вид текста' });
 
-test('«Сегодня»: the pinned first tab, its icon alone; the toolbar — «Сегодня» and the day; its own screen (ТЗ 45), no old colours', async ({ page }) => {
+test('«Сегодня»: a tab as any after the active one, with its name (ТЗ 50.3); the toolbar — «Сегодня» and the day; its own screen (ТЗ 45), no old colours', async ({ page }) => {
   await open(page);
   await page.getByRole('tree', { name: 'Файлы' }).getByRole('treeitem', { name: 'work' }).click();
   await expect(mode(page)).toBeVisible();
-  await page.keyboard.press('Shift+Meta+h');
+  await page.keyboard.press('Shift+Meta+h'); // the panel «Сегодня»
+  await page.keyboard.press('Shift+Meta+h'); // again: the full version
   const today = page.locator('.today[role="region"][aria-label="Сегодня"]');
   await expect(today).toBeVisible();
   expect(await today.evaluate((e) => !e.closest('.compat'))).toBe(true); // drawn by the new interface now (ТЗ 45.1)
-  const first = page.getByRole('tablist', { name: 'Вкладки' }).getByRole('tab').first();
-  await expect(first).toHaveAttribute('aria-label', 'Сегодня');
-  await expect(first).toHaveAttribute('aria-selected', 'true');
-  await expect(first.locator('.lbl')).toHaveCount(0);
+  const tab = page.getByRole('tablist', { name: 'Вкладки' }).getByRole('tab', { name: 'Сегодня' });
+  await expect(tab).toHaveAttribute('aria-selected', 'true');
+  await expect(tab.locator('.lbl')).toHaveText('Сегодня');
+  await expect(page.getByRole('tablist', { name: 'Вкладки' }).getByRole('tab').last()).toHaveAttribute('aria-label', 'Сегодня');
   await expect(bar(page).locator('.name')).toHaveText('Сегодня');
   await expect(bar(page).locator('.path')).toHaveText('пятница, 16 октября');
   await expect(mode(page)).toHaveCount(0);
