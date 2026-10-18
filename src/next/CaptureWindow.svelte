@@ -35,6 +35,14 @@
       }).then(() => emitTo('main', 'capture-submit', { id, title, details }));
     });
   }
+  /** «Открыть» of «Добавлено в Inbox» (ТЗ 52 §4): the Inbox in the main window at the new entry, the app in front. */
+  async function openInbox() {
+    const { emitTo } = await import('@tauri-apps/api/event');
+    const { invoke } = await import('@tauri-apps/api/core');
+    await hide();
+    await invoke('show_main_window');
+    await emitTo('main', 'capture-open-inbox');
+  }
   async function pick() {
     const { emitTo } = await import('@tauri-apps/api/event');
     const { invoke } = await import('@tauri-apps/api/core');
@@ -70,7 +78,7 @@
 </script>
 
 <div class="panel" bind:this={box}>
-  {#key n}<Capture {file} standalone onsubmit={submit} onpick={pick} onclose={() => void hide()} />{/key}
+  {#key n}<Capture {file} standalone onsubmit={submit} onpick={pick} onopen={() => void openInbox()} onclose={() => void hide()} />{/key}
 </div>
 
 <style>

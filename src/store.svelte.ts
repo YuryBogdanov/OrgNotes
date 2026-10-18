@@ -1417,6 +1417,12 @@ class Store {
       const result = await this.addToInbox(e.payload.title, e.payload.details);
       await emitTo('capture', 'capture-result', { id: e.payload.id, result });
     });
+    // «Открыть» of «Добавлено в Inbox» over another program (ТЗ 52 §4): the Inbox's file at its end, the new entry
+    await listen('capture-open-inbox', () => {
+      const f = this.inboxFile;
+      const i = f ? this.files.indexOf(f) : -1;
+      if (i >= 0) this.open(i, Math.max(0, f!.text.split('\n').length - 1));
+    });
     await listen('capture-pick', () => {
       if (navOf('inbox')) this.setNavMode('inbox'); // the Inbox section, when it is on
       this.pickInbox = Date.now();

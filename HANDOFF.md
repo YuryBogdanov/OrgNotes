@@ -764,6 +764,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   level in stars (Plex Mono 11 `ink3`, a column of 22) or the file's icon, the title, the path without «.org» with
   « / » or «весь файл»; the one chosen on `lampsoft` bold; five in sight; the foot «↩ открыть здесь · ⌘↩ весь файл ·
   ⎋ закрыть». The workings as ТЗ 31 §4.
+  52.4, the quick entry (next/Capture.svelte, one for ⇧⌘I and #capture): the interface's font — the title 19 / 600
+  (was Cormorant 24), the details 14 / 1.5, 1–8 lines, 48 pt in under a line of `rule`; the foot on `side` with «→ inbox»
+  (no «.org»), the keys, the key. Over another program (`standalone`): no `dim`, no shadow (native); added — a strip
+  of 64 pt (a check in a circle of `done`, «Добавлено в Inbox», the task, «Открыть») for 1.5 s, then hidden; «Открыть»
+  emits `capture-open-inbox` to the main window (store.listen opens the Inbox's file at its end) after
+  `show_main_window`; not added — «Не удалось добавить…» `todo` under the title, the text kept. «Inbox пока не
+  настроен» with the buttons of ТЗ 44. ListToast reads its action guarded (the toast is cleared before the action
+  runs — it threw). e2e nextSideWindows.spec.ts, nextCapture.spec.ts follows.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
