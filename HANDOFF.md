@@ -772,6 +772,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   `show_main_window`; not added — «Не удалось добавить…» `todo` under the title, the text kept. «Inbox пока не
   настроен» with the buttons of ТЗ 44. ListToast reads its action guarded (the toast is cleared before the action
   runs — it threw). e2e nextSideWindows.spec.ts, nextCapture.spec.ts follows.
+  53.1, the results of the search in a tab (next/SearchTab.svelte, next/searchTabState.svelte.ts — not «searchTab»:
+  the Mac's file system takes it for SearchTab.svelte): the view `search` registered by next/App (transient, single,
+  no inspector), «Поиск: <запрос>» (cut to 24), its crumbs the count. One a window: `openSearchTab()` makes the one
+  there active or opens it after the active tab, runs a query typed and not run, focuses its field (`tabFocus` — the
+  panel's `focusN` would take the focus to the panel). From the panel ⌘↩ (field or list) and «Открыть все во вкладке
+  ⌘↩» at its foot; ⇧⌘F with the panel shown; the palette's «Поиск: открыть результаты во вкладке» (registered from
+  next/App — commands.ts may not import next; `commandIds`, a «search» icon). The header of ТЗ 47, the field up to 560
+  with ×, «Aa» «.*» «Слово» (the panel's options), the count. The results are a plain list yet (53.2). e2e
+  nextSearchTab.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

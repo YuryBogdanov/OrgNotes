@@ -15,6 +15,7 @@ import type { Heading, OrgDate } from './org';
 
 export const ICONS = {
   status: 'M3 10h14M12.5 6l4 4-4 4',
+  search: 'M8.5 3.5a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM12.2 12.2 16.5 16.5',
   sched: 'M3 4h14v13H3zM3 8h14M7 2.5v3M13 2.5v3',
   dead: 'M5 17V3M5 4h10l-2 3 2 3H5',
   tag: 'M3 3h6.5l7.5 7.5-6 6L3.5 9.5zM6.8 6.8h.01',
@@ -194,6 +195,8 @@ const weight = (u: Uses, id: string) => (u[id] ? u[id].n * Math.pow(0.5, (Date.n
 
 export const commands: Command[] = [];
 export const register = (c: Command) => commands.push(c);
+/** The ids registered (a shell registering its own once). */
+export const commandIds = () => commands.map((c) => c.id);
 const onHeading = (c: Ctx) => !!c.heading;
 
 register({

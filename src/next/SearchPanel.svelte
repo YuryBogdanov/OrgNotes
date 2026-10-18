@@ -6,6 +6,7 @@
   import { toneStyle } from '../colors';
   import { displayName } from '../names';
   import { summary } from '../search';
+  import { openSearchTab } from './searchTabState.svelte';
 
   // «Поиск» of the new sidebar (ТЗ 43 §2.4, ТЗ 21, ⇧⌘F): the field on top, «Aa», «.*» and «только заголовки» under it;
   // ↩ runs it in every file. The results by file (ТЗ 50 §5): a file's row of 24 pt — the chevron, its icon, its name,
@@ -34,7 +35,11 @@
     list?.querySelector('.hit.sel, .file.sel')?.scrollIntoView({ block: 'nearest' });
   }
   function fieldKey(e: KeyboardEvent) {
-    if (e.key === 'Enter') {
+    // ⌘↩: the results in a tab of their own (ТЗ 53 §1)
+    if (e.key === 'Enter' && e.metaKey) {
+      e.preventDefault();
+      openSearchTab();
+    } else if (e.key === 'Enter') {
       e.preventDefault();
       void store.runSearch();
     } else if (e.key === 'ArrowDown' && flat.length) {
@@ -55,6 +60,9 @@
       const n = flat[Math.min(flat.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))];
       if (n) s.sel = n;
       void scrollSel();
+    } else if (e.key === 'Enter' && e.metaKey) {
+      e.preventDefault();
+      openSearchTab();
     } else if (e.key === 'Enter' && s.sel) {
       e.preventDefault();
       if (s.sel.i < 0) s.groups[s.sel.g].open = !s.groups[s.sel.g].open;
@@ -111,6 +119,7 @@
         {/if}
       {/each}
     </div>
+    {#if s.total}<button class="all" onclick={() => openSearchTab()}>Открыть все во вкладке<span class="k">⌘↩</span></button>{/if}
   {:else if recent.length}
     <div class="cap">Недавние</div>
     {#each recent as r (r.q)}
@@ -148,6 +157,9 @@
   .frag mark { padding: 0 1px; border-radius: 2px; background: var(--lampsoft); color: var(--ink); font-weight: 600; }
   .kw { flex: 0 0 auto; display: inline-flex; align-items: center; height: 15px; padding: 0 4px; border-radius: 3px; font: 700 9px var(--ui); letter-spacing: 0.02em; color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); }
   .more { align-self: flex-start; margin: 2px 0 4px 20px; padding: 0; border: 0; background: none; color: var(--lampink); font: 12px var(--ui); }
+  .all { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 10px 6px; border: 0; border-top: 1px solid var(--rule); background: none; color: var(--lampink); font: 12px var(--ui); text-align: left; }
+  .all:hover { text-decoration: underline; }
+  .all .k { margin-left: auto; font: 11px var(--mono); color: var(--ink3); }
   .cap { padding: 6px 10px 4px; font-size: 11px; font-weight: 600; color: var(--ink3); }
   .rq { flex: 0 0 26px; display: block; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink2); font: 12.5px var(--ui); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rq:hover { background: var(--chip); }
