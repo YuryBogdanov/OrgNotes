@@ -781,6 +781,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   next/App — commands.ts may not import next; `commandIds`, a «search» icon). The header of ТЗ 47, the field up to 560
   with ×, «Aa» «.*» «Слово» (the panel's options), the count. The results are a plain list yet (53.2). e2e
   nextSearchTab.spec.ts.
+  53.2, the results with their context (src/searchContext.ts `contextBlocks`, pure, tested): a match with the line
+  before and after — a neighbour left out when missing, empty, a heading's line or in a drawer, or under another
+  heading; matches two lines apart or nearer under one heading — one block, the lines shared once; a heading's line
+  without its stars and status (the block's capsule), the marks moved by what is cut. The tab draws the blocks of the
+  open groups from the text searched (`g.stamp`, its headings parsed when the file changed since; cached): the
+  group's head sticky — chevron, icon, the name, the folder («корень»), «изменён — ↩ обновить» `wait` (runs again),
+  the count; a block — the capsule and the path 42 pt in, the lines with their numbers (Plex Mono 10.5 in 30, the
+  match's `lampink`), 13.5 / 1.55, three lines at most, the marks on `lampsoft` with a `lampline` ring; four blocks,
+  then «Ещё N в <файл> ›»; «Ничего не найдено»; «Показаны первые 1000…» `wait`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

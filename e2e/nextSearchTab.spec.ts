@@ -71,3 +71,36 @@ test('a new query run in the tab updates the same tab', async ({ page }) => {
   await expect(page.locator('.stab h1')).toHaveText('«ноябр»');
   await expect(tab(page)).toHaveCount(1);
 });
+
+// ТЗ 53.2: the results with their context — the line before and after, numbered; neighbours under one heading in one
+// block; the heading's status and path over it; four blocks, then «Ещё N в <файл> ›»; a file changed since; nothing found
+const MANY = ['* NEXT Переезд', ...Array.from({ length: 6 }, (_, i) => [`** Шаг ${i + 1}`, `переезд, этап ${i + 1}`]).flat(), ''].join('\n');
+test('a block: its status and path, the lines around the match numbered; near matches one block; «Ещё N»; changed; nothing', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.addInitScript(() => localStorage.setItem('ui:next', '1'));
+  await openApp(page, { files: { ...F, '/mock/many.org': MANY }, ready: false, viewport: { width: 1400, height: 860 } });
+  await expect(page.getByRole('tree', { name: 'Файлы' })).toBeVisible();
+  await searchInPanel(page, 'переезд');
+  await field(page).press('Meta+Enter');
+  const mid = page.locator('.stab').getByRole('region', { name: 'Midterm' });
+  const blocks = mid.getByRole('option');
+  await expect(blocks).toHaveCount(2); // the heading with its line after; the match under «Риски»
+  await expect(blocks.first().locator('.cap')).toHaveText('NEXT');
+  await expect(blocks.first().locator('.ln .no')).toHaveText(['1', '2']);
+  await expect(blocks.first().locator('.ln.hd .tx')).toHaveText('Переезд хранилища');
+  await expect(blocks.nth(1).locator('.wh')).toHaveText('Переезд хранилища › Риски');
+  await expect(mid.locator('.file .fd')).toHaveText('корень');
+  await expect(page.locator('.stab').getByRole('region', { name: 'plan' }).locator('.file .fd')).toHaveText('work');
+  // six matches, one a heading's: four blocks first
+  const many = page.locator('.stab').getByRole('region', { name: 'many' });
+  await expect(many.getByRole('option')).toHaveCount(4);
+  await many.getByRole('button', { name: /^Ещё \d+ в many ›$/ }).click();
+  await expect(many.getByRole('option')).toHaveCount(7);
+  // the file changed since: «изменён — ↩ обновить»
+  await page.evaluate(async () => { const { store } = await import('/src/store.svelte.ts' as string); store.setText('* NEXT Переезд хранилища\nновая строка\n', '/mock/Midterm.org'); });
+  await expect(mid.locator('.stale')).toHaveText('изменён — ↩ обновить');
+  const q = page.locator('.stab').getByRole('textbox', { name: 'Запрос' });
+  await q.fill('нетнигде');
+  await q.press('Enter');
+  await expect(page.locator('.stab .none')).toHaveText('Ничего не найдено');
+});
