@@ -815,6 +815,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   the theme editor across; the whole window under `dim`; under 820 the column is a strip on top. The sections' bodies
   still old, through bridges.ts in Compat — each replaced by 54.2–54.7, bridges.ts gone in 54.8. e2e
   nextSettingsSheet.spec.ts.
+  54.2, the rows: `next/SetGroup.svelte` (the caption in capitals with its note, a card), `SetRow.svelte` (from 46,
+  the name and hint, the control right or `wide` under them, the dot `lamp` of a changed value, a link row), and in
+  `next/ui/` `Toggle` (36 × 22), `Segments`, `MenuButton` (28 pt «value ▾», a menu of ТЗ 44; it says its layer to
+  settingsNav so ⎋ closes it first). `SetSchema.svelte` draws any schema with them (the long fields by FormFields
+  `bare` — no label of its own; a file — the value and «Выбрать…» with the palette's files). `Field.default` (and
+  `changedOf`, JSON-compared) gives the dot; a plugin's manifest fields have it already. `SetPluginHead.svelte`: the icon
+  in a square of 30 on 14 % `plug`, the name, version · source, «включён». FormFields' plugin field is an attachment
+  now — drawn again when its `render` comes after the plugin starts. The sheet is centred without a transform (a menu
+  inside it is fixed to the window). e2e nextSettingsRows.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

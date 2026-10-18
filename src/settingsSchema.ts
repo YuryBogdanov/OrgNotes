@@ -20,6 +20,8 @@ interface Base {
   where: Where;
   /** Off while the values say so (the time of a reminder that is off). */
   disabled?: (v: Values) => boolean;
+  /** The value by default: the new settings mark a changed one with a dot (ТЗ 54 §2). */
+  default?: unknown;
 }
 export type Field =
   /** Buttons in a row (a few short options) or a menu. */
@@ -98,3 +100,5 @@ export const optionsOf = (f: Extract<Field, { type: 'choice' }>, v: Values) => (
 export const optValue = (value: unknown) => (value == null ? '' : String(value));
 /** The option's value for a menu's: back to its own type. */
 export const optOf = (opts: Opt[], s: string) => opts.find((o) => optValue(o.value) === s)?.value ?? null;
+/** The value is not the default (a field that knows its default only). */
+export const changedOf = (f: Field, v: Values) => f.default !== undefined && JSON.stringify(v[f.key] ?? null) !== JSON.stringify(f.default);

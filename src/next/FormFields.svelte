@@ -13,7 +13,8 @@
   // palette's calendar; a switch as a check; a choice as segments or a menu; a file from the palette's files; a file and
   // its heading in two columns; the plugin's own field in the compatibility layer. `wrong` — the form's reason, under
   // the first field in `todo`.
-  let { schema, wrong = '' }: { schema: Schema; wrong?: string } = $props();
+  let { schema, wrong = '', bare = false }: { schema: Schema; wrong?: string; bare?: boolean } = $props();
+  // `bare`: the label is drawn by the host (a row of the settings, ТЗ 54 §2) with the same id; the field only
   const v = $derived(schema.values());
   const set = (key: string, value: unknown) => void schema.set({ [key]: value });
   const id = (f: Field) => `${schema.id}-${f.key}`;
@@ -92,7 +93,9 @@
     const x = v;
     for (const l of listeners) l(x);
   });
-  function own(node: HTMLElement, field: Extract<Field, { type: 'custom' }>) {
+  /** The plugin draws its field (an attachment: drawn again when its `render` comes later — a plugin gives it after
+   *  its start). */
+  const own = (field: Extract<Field, { type: 'custom' }>) => (node: HTMLElement) => {
     const ctrl: FieldCtrl = {
       value: () => schema.values()[field.key],
       values: () => schema.values(),
@@ -108,17 +111,15 @@
     } catch (err) {
       node.textContent = 'Поле не нарисовалось: ' + (err instanceof Error ? err.message : String(err));
     }
-    return {
-      destroy() {
-        try {
-          done?.();
-        } catch {
-          /* gone anyway */
-        }
-        node.replaceChildren();
-      },
+    return () => {
+      try {
+        done?.();
+      } catch {
+        /* gone anyway */
+      }
+      node.replaceChildren();
     };
-  }
+  };
   const NEW = '\u0000new';
 </script>
 
@@ -137,7 +138,7 @@
       <!-- a widget's only (ТЗ 28): nothing in a form -->
     {:else}
       <div class="fld">
-        <span class="lbl" id={id(f)}>{f.label}</span>
+        {#if !bare}<span class="lbl" id={id(f)}>{f.label}</span>{/if}
         {#if f.type === 'text'}
           {@const list = open === f.key ? sugs(f) : []}
           <span class="sugw">
@@ -158,11 +159,11 @@
               </div>
             {/if}
           </span>
-          {#if hint}<span class="hint">{hint}</span>{/if}
+          {#if hint && !bare}<span class="hint">{hint}</span>{/if}
         {:else if f.type === 'textarea'}
           <textarea class="f ta" class:bad={!!why} aria-labelledby={id(f)} rows="2" placeholder={f.placeholder} value={(v[f.key] as string) ?? ''}
             oninput={(e) => { set(f.key, e.currentTarget.value); grow(e.currentTarget); }} onkeydown={(e) => listKey(e, f.key)} use:grow></textarea>
-          {#if hint}<span class="hint">{hint}</span>{/if}
+          {#if hint && !bare}<span class="hint">{hint}</span>{/if}
         {:else if f.type === 'date'}
           {@const d = day(v[f.key])}
           <span class="row">
@@ -183,7 +184,7 @@
               {#each opts as o, i (i)}<option value={optValue(o.value)} disabled={o.disabled}>{o.label}</option>{/each}
             </select>
           {/if}
-          {#if hint}<span class="hint">{hint}</span>{/if}
+          {#if hint && !bare}<span class="hint">{hint}</span>{/if}
         {:else if f.type === 'pair'}
           {@const both = f.options(v)}
           <span class="row" role="group" aria-labelledby={id(f)}>
@@ -194,13 +195,13 @@
               </select>
             {/each}
           </span>
-          {#if hint}<span class="hint">{hint}</span>{/if}
+          {#if hint && !bare}<span class="hint">{hint}</span>{/if}
         {:else if f.type === 'file'}
           <span class="row">
             <button class="f dv" aria-labelledby={id(f)} data-testid={id(f)} onclick={() => (picking = f)}>{f.show((v[f.key] as string | null) ?? null)}</button>
             {#if v[f.key] && f.clear}<button class="x" aria-label="{f.label}: {f.clear}" onclick={() => set(f.key, null)}>×</button>{/if}
           </span>
-          {#if hint}<span class="hint">{hint}</span>{/if}
+          {#if hint && !bare}<span class="hint">{hint}</span>{/if}
         {:else if f.type === 'place'}
           {@const place = (v[f.key] ?? null) as PlaceValue | null}
           {@const created = place?.path && f.create ? f.create(place.path) : null}
@@ -211,10 +212,10 @@
               onfile={(rel) => set(f.key, { path: rel, heading: null })}
               onhead={(h) => set(f.key, h === NEW ? { path: place!.path, heading: null, create: true } : { path: place!.path, heading: h })} />
           </div>
-          {#if hint}<span class="hint">{hint}</span>{/if}
+          {#if hint && !bare}<span class="hint">{hint}</span>{/if}
         {:else if f.type === 'custom'}
-          <Compat><div class="own" role="group" aria-labelledby={id(f)} use:own={f}></div></Compat>
-          {#if hint}<span class="hint">{hint}</span>{/if}
+          <Compat><div class="own" role="group" aria-labelledby={id(f)} {@attach own(f)}></div></Compat>
+          {#if hint && !bare}<span class="hint">{hint}</span>{/if}
         {/if}
         {#if why}<span class="why" role="alert">{why}</span>{/if}
       </div>

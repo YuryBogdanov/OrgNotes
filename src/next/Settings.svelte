@@ -5,8 +5,12 @@
   import Button from './ui/Button.svelte';
   import Compat from './Compat.svelte';
   import ConfirmSheet from './ConfirmSheet.svelte';
+  import SchemaGroups from './SetSchema.svelte';
+  import PluginHead from './SetPluginHead.svelte';
+  import { plugins } from '../api/host.svelte';
+  import { pluginUpdates as up } from '../pluginUpdates.svelte';
   import {
-    AppearanceSettings, KeysSettings, Picker, RemovePlugin, SchemaSettings, SettingsAgendas, SettingsGeneral, SettingsInbox, StatusesSettings,
+    AppearanceSettings, KeysSettings, Picker, RemovePlugin, SettingsAgendas, SettingsGeneral, SettingsInbox, StatusesSettings,
     TagsSettings, ThemeEditor,
   } from './bridges';
 
@@ -90,6 +94,15 @@
       {:else}
         <div class="col" class:wide>
           <h1>{tab}</h1>
+          {#if settingsOf(tab)?.schema}
+            <!-- a feature's or a plugin's schema, in the new rows (ТЗ 54 §2) -->
+            {@const spec = settingsOf(tab)!}
+            {#if spec.plugin}<PluginHead id={spec.plugin} />{/if}
+            <SchemaGroups schema={spec.schema!} />
+            {#if spec.plugin && plugins.entry(spec.plugin) && !plugins.entry(spec.plugin)!.builtin}
+              <Button kind="danger" onclick={() => (up.removing = plugins.entry(spec.plugin!) ?? null)}>Удалить плагин…</Button>
+            {/if}
+          {:else}
           <!-- the sections' own look is to come (ТЗ 54.2–54.7): the old ones in the compatibility layer meanwhile -->
           <div class="old">
             <Compat>
@@ -99,12 +112,13 @@
               {:else if tab === 'Теги'}<TagsSettings />
               {:else if settingsOf(tab)}
                 {@const spec = settingsOf(tab)!}
-                {#if spec.schema}<SchemaSettings schema={spec.schema} plugin={spec.plugin} />{:else if spec.component}<spec.component />{/if}
+                {#if spec.component}<spec.component />{/if}
               {:else if tab === 'Агенды'}<SettingsAgendas onremove={(a) => (confirmAgenda = a)} />
               {:else if tab === 'Основные'}<SettingsGeneral />
               {:else}<StatusesSettings />{/if}
             </Compat>
           </div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -125,7 +139,8 @@
   /* the whole window dimmed, the sections' strip and the sidebar too; clicks on it do nothing */
   .dim { position: fixed; inset: 0; z-index: 70; background: var(--dim); }
   .sheet {
-    position: fixed; z-index: 71; left: 50%; top: 36px; bottom: 36px; transform: translateX(-50%); width: min(1100px, calc(100% - 72px));
+    position: fixed; z-index: 71; left: 0; right: 0; top: 36px; bottom: 36px; margin: 0 auto; width: min(1100px, calc(100% - 72px));
+    /* no transform: a menu inside it is fixed to the window */
     display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; background: var(--card); box-shadow: var(--popshadow);
     color: var(--ink); font: 13px/1.45 var(--ui);
   }
