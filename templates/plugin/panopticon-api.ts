@@ -469,6 +469,10 @@ export interface Ctx {
     run(id: string, arg?: unknown): Promise<void>;
   };
   ui: {
+    /** The interface the window has (1.14): `'next'` — the new one (ТЗ 42–47: the plugin's panels and tabs are drawn
+     *  in `data-ui="next"`, the new tokens and `--font-display`, `--font-mono` there), `'old'`. It does not change
+     *  while the window is open (switching the interface reloads it). */
+    readonly look: 'next' | 'old';
     /** The section of the navigator the manifest declares. */
     navSection(id: string, render: Render): Dispose;
     /** A kind of tab the manifest declares. */

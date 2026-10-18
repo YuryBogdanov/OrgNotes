@@ -690,6 +690,7 @@ class Host {
         },
       },
       ui: {
+        look: store.nextUi ? 'next' : 'old',
         fileView: (fv, spec) => {
           declared('вида файла', m.contributes.fileViews.some((x) => x.id === fv), fv);
           this.fileViews.set(fv, { plugin: id, spec });
