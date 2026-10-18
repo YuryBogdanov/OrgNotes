@@ -59,6 +59,7 @@ export interface Card {
   tags: string[];
   done: boolean;
   date: { text: string; late: boolean } | null;
+  dates: { text: string; late: boolean }[]; // the new interface's chips (ТЗ 49 §4): «⚑ ср 21», «◷ 19 окт», «закрыта 12 окт»
   progress: string | null; // «2/5»
   closed: Date | null;
 }
@@ -80,6 +81,7 @@ const toDate = (d: OrgDate) => new Date(d.y, d.m - 1, d.d);
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const days = (a: Date, b: Date) => Math.round((+day0(a) - +day0(b)) / 86400000);
 const short = (d: Date) => `${d.getDate()} ${MON[d.getMonth()]}`;
+const WD = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 const COOKIE = /\s*\[(\d+%|\d+\/\d+)\]/;
 
 /** The date a card tells: CLOSED of a finished one; else the deadline (red when today or past); else SCHEDULED. */
@@ -90,6 +92,19 @@ export function cardDate(h: Heading, done: boolean, today: Date): Card['date'] {
     return { text: `дедлайн ${short(d)}`, late: days(d, today) <= 0 };
   }
   return h.scheduled ? { text: short(toDate(h.scheduled)), late: false } : null;
+}
+/** The new interface's date chips: CLOSED of a finished one; else the deadline «⚑ ср 21» (its weekday within a week
+ *  of today, else «⚑ 21 окт»; red when today or past) and SCHEDULED «◷ 19 окт». */
+export function cardDates(h: Heading, done: boolean, today: Date): Card['dates'] {
+  if (done) return h.closed ? [{ text: `закрыта ${short(toDate(h.closed))}`, late: false }] : [];
+  const out: Card['dates'] = [];
+  if (h.deadline) {
+    const d = toDate(h.deadline);
+    const n = days(d, today);
+    out.push({ text: `⚑ ${Math.abs(n) < 7 ? `${WD[d.getDay()]} ${d.getDate()}` : short(d)}`, late: n <= 0 });
+  }
+  if (h.scheduled) out.push({ text: `◷ ${short(toDate(h.scheduled))}`, late: false });
+  return out;
 }
 /** «2/5»: the cookie of the title; else the checkboxes and the tasks under the heading. */
 export function progressOf(lines: string[], hs: Heading[], i: number, doneWords: string[]): string | null {
@@ -141,7 +156,7 @@ export function boardFor(text: string, hs: Heading[], set: StatusSet, o: { filte
     const done = doneWords.includes(h.keyword);
     byKw.get(h.keyword)!.push({
       key: `${h.line}:${h.title}`, line: h.line, title: h.title.replace(COOKIE, '').trim(), heading: h.title, keyword: h.keyword, priority: h.priority, tags: h.tags, done,
-      date: cardDate(h, done, today), progress: progressOf(lines, hs, i, doneWords), closed: h.closed ? toDate(h.closed) : null,
+      date: cardDate(h, done, today), dates: cardDates(h, done, today), progress: progressOf(lines, hs, i, doneWords), closed: h.closed ? toDate(h.closed) : null,
     });
   });
   const columns = set.states.map((s): Column => {

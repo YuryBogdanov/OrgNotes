@@ -23,6 +23,9 @@
   const board = $derived(file && set ? boardFor(file.text, file.headings, set, { filter, doneDays: kanban.doneDays, showOld }) : null);
   const firstDone = $derived(set?.states.find((s) => s.done)?.name ?? null);
   const textKey = $derived(kanban.ctx.commands.keyOf('kanban.toggle'));
+  // the new interface (ТЗ 49 §3–4): its header — the kicker, the name in Yeseva One, the controls on the right, no
+  // «Текст» (the tabs' view switch is it); the columns and the cards by `[data-ui="next"]` in styles.css
+  const next = kanban.ctx.ui.look === 'next';
 
   let choosing = $state(false);
   let had = false; // the file has had «#+BOARD» while shown
@@ -331,8 +334,12 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="kanban" class:dragging={!!drag} tabindex="0" bind:this={root} onkeydown={keys} role="application" aria-label="Доска {name}">
-  <div class="kb-head">
-    <span class="kb-name">{name}</span>
+  <div class="kb-head" class:nx={next}>
+    {#if next}
+      <div class="kb-ttl"><div class="kb-kick">{path} · доска</div><h1 class="kb-h1">{name.replace(/\.org$/i, '')}</h1></div>
+    {:else}
+      <span class="kb-name">{name}</span>
+    {/if}
     {#if file && wfName}
       <button class="kb-hb" title="Сменить workflow" onclick={wfMenu}><span class="kb-dim">Workflow:</span><b>{wfName}</b>
         <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="var(--fg3)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5l4 4 4-4" /></svg></button>
@@ -343,13 +350,15 @@
         <input bind:this={filterEl} bind:value={filter} onkeydown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); filter = ''; root?.focus({ preventScroll: true }); } }} placeholder="Фильтр: текст, :тег:" aria-label="Фильтр карточек" spellcheck="false" autocomplete="off" />
       </label>
     {/if}
-    <span class="kb-gap"></span>
+    {#if !next}<span class="kb-gap"></span>{/if}
     {#if board?.off.length}
       <button class="kb-off" title="Заголовки 1-го уровня без статуса или со статусом из другого workflow" onclick={offMenu}>Не на доске: {headingsWord(board.off.length)} ›</button>
     {/if}
-    <button class="kb-hb" title="Вернуться к тексту файла" onclick={showText}>
-      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 5h12M4 9h12M4 13h8" /></svg>Текст{#if textKey}<span class="kb-dim kb-k">{textKey}</span>{/if}
-    </button>
+    {#if !next}
+      <button class="kb-hb" title="Вернуться к тексту файла" onclick={showText}>
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 5h12M4 9h12M4 13h8" /></svg>Текст{#if textKey}<span class="kb-dim kb-k">{textKey}</span>{/if}
+      </button>
+    {/if}
   </div>
 
   {#if file && wfName && !set}
@@ -389,7 +398,16 @@
                   oncontextmenu={(e) => { e.preventDefault(); select(k.key); root?.focus({ preventScroll: true }); tasks?.menu({ x: e.clientX, y: e.clientY }); }}>
                   <!-- eslint-disable-next-line svelte/no-at-html-tags -- the title escaped by board.ts titleHtml -->
                   <div class="kb-t">{@html titleHtml(k.title)}</div>
-                  {#if k.priority || k.date || k.progress || k.tags.length}
+                  {#if next}
+                    {#if k.priority || k.dates.length || k.progress || k.tags.length}
+                      <div class="kb-chips">
+                        {#if k.priority}<span class="kb-chip pr" style:--c={PRIO[k.priority] ?? 'var(--ink2)'}>#{k.priority}</span>{/if}
+                        {#each k.dates as d (d.text)}<span class="kb-chip" class:late={d.late}>{d.text}</span>{/each}
+                        {#if k.progress}<span class="kb-chip">{k.progress}</span>{/if}
+                        {#if k.tags.length}<span class="kb-chip tg">:{k.tags.join(':')}:</span>{/if}
+                      </div>
+                    {/if}
+                  {:else if k.priority || k.date || k.progress || k.tags.length}
                     <div class="kb-meta">
                       {#if k.priority}<span class="kb-pr" style:--c={PRIO[k.priority] ?? 'var(--fg2)'}>#{k.priority}</span>{/if}
                       {#if k.date}<span class="kb-date" class:late={k.date.late}><svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 4h14v13H3zM3 8h14" /></svg>{k.date.text}</span>{/if}

@@ -53,11 +53,14 @@ describe('the board', () => {
     expect(dc).toMatchObject({ title: 'Переезд в новый ДЦ', priority: 'A', tags: ['infra', 'dc'], progress: '2/5', date: { text: '12 окт', late: false } });
     const load = col('TODO').cards[1];
     expect(load).toMatchObject({ date: { text: 'дедлайн 14 окт', late: true }, progress: '2/4' });
+    // the new interface's chips: the deadline by its weekday within a week, SCHEDULED by its date
+    expect(dc.dates).toEqual([{ text: '◷ 12 окт', late: false }]);
+    expect(load.dates).toEqual([{ text: '⚑ ср 14', late: true }]);
   });
   it('finished columns: closed in the last days, the ones without CLOSED always; the old counted', () => {
     expect(col('DONE').cards.map((c) => c.title)).toEqual(['Свежее', 'Без даты']);
     expect(col('DONE').older).toBe(1);
-    expect(col('DONE').cards[0]).toMatchObject({ done: true, date: { text: '10 окт' } });
+    expect(col('DONE').cards[0]).toMatchObject({ done: true, date: { text: '10 окт' }, dates: [{ text: 'закрыта 10 окт', late: false }] });
     expect(boardFor(TEXT, hs, DEV, { doneDays: 14, today: TODAY, showOld: new Set(['DONE']) }).columns[4].cards).toHaveLength(3);
     expect(boardFor(TEXT, hs, DEV, { doneDays: 0, today: TODAY }).columns[4].cards).toHaveLength(3);
   });
