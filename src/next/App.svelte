@@ -14,6 +14,9 @@
   import Sidebar from './Sidebar.svelte';
   import { TODAY_ID } from './sections';
   import { lsGet, lsSet } from '../storage';
+  import SearchTab from './SearchTab.svelte';
+  import { register as registerCommand, commandIds } from '../commands';
+  import { SEARCH_ICON, SEARCH_TAB, openSearchTab, searchTabActive, searchTabLabel, searchTabSub } from './searchTabState.svelte';
   import Toolbar from './Toolbar.svelte';
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
@@ -54,6 +57,15 @@
   fileReview.effects();
   // `ui.editor` gives the new editor here (ТЗ 49 §7)
   plugins.editorComponent = PluginEditor;
+  // the results of the search in every file as a tab (ТЗ 53 §1): one per window, not kept after a restart
+  registerView({
+    kind: SEARCH_TAB, icon: SEARCH_ICON, component: SearchTab, transient: true, single: true, hasInspector: () => false,
+    label: () => searchTabLabel(),
+    crumbs: () => [searchTabLabel(), searchTabSub()].filter(Boolean),
+  });
+  // the palette's «Поиск: открыть результаты во вкладке» (the new interface's only)
+  if (!commandIds().includes('searchTab'))
+    registerCommand({ id: 'searchTab', title: 'Поиск: открыть результаты во вкладке', icon: 'search', group: 'general', keyId: '', synonyms: ['поиск', 'результаты', 'вкладка', 'найти'], when: () => !!store.dir || store.files.length > 0, run: () => void setTimeout(() => openSearchTab()) });
   // the agenda builder is a tab here (ТЗ 48 §5): «<Агенда> — правка», a dot while unsaved; it opens with the builder
   // and the builder goes with its tab
   registerView({
@@ -103,7 +115,9 @@
     navAgendas: () => store.setNavMode('agendas'),
     navTags: () => store.setNavMode('tags'),
     navSearch: () => store.openSearch(),
-    findAll: () => store.openSearch(window.getSelection()?.toString() ?? ''),
+    // ⇧⌘F (ТЗ 53 §1): the panel; pressed again while it is shown — the tab of the results
+    findAll: () => (store.showNav && store.navMode === 'search' && !searchTabActive() ? openSearchTab() : store.openSearch(window.getSelection()?.toString() ?? '')),
+    searchTab: () => openSearchTab(),
     searchNext: () => store.searchStep(1),
     searchPrev: () => store.searchStep(-1),
     newFile,
