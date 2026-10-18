@@ -20,7 +20,7 @@
   import { FileCardsCtl, caretHeading } from './fileCards.svelte';
   import FindPanel from './FindPanel.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { PluginFileView } from './bridges';
+  import FileView from './FileView.svelte';
   import StatusMenu from './StatusMenu.svelte';
   import Compat from './Compat.svelte';
   import { fileReview } from './fileReview.svelte';
@@ -39,6 +39,14 @@
   const tab = $derived(pane?.tabs[pane.active]);
   const file = $derived(store.fileOf(tab));
   const fview = $derived(tab?.kind === 'file' ? store.viewOf(tab) : '');
+  // a view chosen whose plugin stopped (ТЗ 49 §1): its host says so in its place, «Показать текст»
+  const stopped = $derived.by(() => {
+    if (fview || tab?.kind !== 'file') return '';
+    const w = store.wantedView(tab);
+    if (!w) return '';
+    const owner = plugins.entries.find((e) => e.manifest?.contributes.fileViews.some((f) => f.id === w))?.manifest?.id;
+    return owner && plugins.failed.has(owner) ? w : '';
+  });
   let richPick = $state<{ pick: RichPick; path: string } | null>(null);
   // ⌃X N S (§5.8): the lines of the heading the tab is narrowed to; the heading gone, the narrowing goes
   const narrowed = $derived(file && tab?.narrow ? narrowRangeOf(file.headings, tab.narrow) : null);
@@ -171,8 +179,8 @@
         {#if pe?.manifest && !pe.problems.length && !plugins.failed.has(pe.manifest.id)}<button onclick={() => void plugins.setEnabled(pe.manifest!.id, true)}>Включить</button>{/if}
       </div>
     {/if}
-  {:else if tab && file && (fileViewOf(fview) || fileTypeOf(tab.path))}
-    <div class="view"><Compat><PluginFileView id={fview} path={file.name} {tab} pane={0} /></Compat></div>
+  {:else if tab && file && (fileViewOf(fview) || fileTypeOf(tab.path) || stopped)}
+    <div class="view"><FileView id={fview || stopped} path={file.name} {tab} /></div>
   {:else if file && tab}
     {#if narrowed}
       <!-- it comes out from the top in 180 ms, goes in 150; the column and the text move down and up with it (ТЗ 46 §2) -->

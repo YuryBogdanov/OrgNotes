@@ -1609,6 +1609,16 @@ class Store {
     if (f.name in this.viewMemory) return ok(this.viewMemory[f.name]);
     return allFileViews().find((v) => v.defaultFor?.(f))?.id ?? '';
   }
+  /** The view the tab was set to show (its own choice, the file's last one, its file type's), even one not there now —
+   *  its plugin stopped (the new interface says so in its place, ТЗ 49 §1). '' the text, null none chosen. */
+  wantedView(tab: Tab | undefined): string | null {
+    if (!tab || tab.kind !== 'file') return null;
+    const ft = fileTypeOf(tab.path);
+    if (ft) return ft.view;
+    if (tab.view !== undefined) return tab.view;
+    const f = this.fileOf(tab);
+    return f && f.name in this.viewMemory ? this.viewMemory[f.name] : null;
+  }
   /** «Показать как ›»: the tab shows the file so; remembered for the file. */
   showAs(tab: Tab, view: string) {
     const f = this.fileOf(tab);

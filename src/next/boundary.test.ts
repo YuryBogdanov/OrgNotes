@@ -19,11 +19,11 @@ describe('the boundary of src/next', () => {
   });
 });
 
-// ТЗ 48: after the small bridges only the settings and a plugin's view of a file are old in the new window
+// ТЗ 48, 49: after the small bridges and the file view's host only the settings are old in the new window
 describe('the bridges left', () => {
-  it('are «Settings» and «PluginFileView» only', async () => {
+  it('are «Settings» only', async () => {
     const { readFileSync } = await import('node:fs');
     const src = readFileSync(new URL('./bridges.ts', import.meta.url), 'utf8');
-    expect([...src.matchAll(/export \{ default as (\w+) \}/g)].map((m) => m[1])).toEqual(['Settings', 'PluginFileView']);
+    expect([...src.matchAll(/export \{ default as (\w+) \}/g)].map((m) => m[1])).toEqual(['Settings']);
   });
 });
