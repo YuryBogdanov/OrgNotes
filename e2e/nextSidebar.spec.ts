@@ -44,14 +44,14 @@ test('a click picks the panel; kept after a reload; the keys of the old navigato
   await expect(head(page)).toHaveText('Поиск');
 });
 
-test('«Сегодня» opens its tab and keeps the panel; its row marked while that tab is on', async ({ page }) => {
+test('«Сегодня» is a section with its panel (ТЗ 50.3): the date under its head, ⇧⌘H in its title', async ({ page }) => {
   await open(page);
-  await secs(page).getByRole('button', { name: /Агенда/ }).click();
   const today = secs(page).getByRole('button', { name: /Сегодня/ });
   await today.click();
-  await expect(head(page)).toHaveText('Агенда');
+  await expect(head(page)).toHaveText('Сегодня');
   await expect(today).toHaveAttribute('aria-current', 'true');
   await expect(today).toHaveAttribute('title', /⇧⌘H/);
+  await expect(page.locator('aside.side .grp.head .sub')).toHaveText(/^[а-я]+, \d+ [а-я]+ · неделя \d+$/);
 });
 
 test('a plugin turned off while its section is picked: «Файлы»; on again — its section is back', async ({ page }) => {

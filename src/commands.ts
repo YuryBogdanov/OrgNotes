@@ -285,9 +285,18 @@ register({
   id: 'miniShow', title: 'Мини-окно: показать', icon: 'window', group: 'general', synonyms: ['мини', 'поверх', 'созвон', 'zoom'],
   when: () => '__TAURI_INTERNALS__' in window, hint: () => '⌃⌥⌘M', run: () => void setTimeout(() => store.toggleMini()),
 });
+// the new interface (ТЗ 50 §4): «Сегодня» — its panel, «Сегодня — полная версия» — its tab
 register({
   id: 'today', title: 'Открыть «Сегодня»', icon: 'sun', group: 'general', synonyms: ['сегодня', 'утро', 'обзор', 'день'],
-  when: () => !!store.dir || store.files.length > 0, run: () => void setTimeout(() => today.open()),
+  when: () => !store.nextUi && (!!store.dir || store.files.length > 0), run: () => void setTimeout(() => today.open()),
+});
+register({
+  id: 'todayPanel', title: 'Сегодня', icon: 'sun', group: 'general', keyId: 'today', synonyms: ['сегодня', 'утро', 'день', 'панель'],
+  when: () => store.nextUi && (!!store.dir || store.files.length > 0), run: () => void setTimeout(() => store.setNavMode('today')),
+});
+register({
+  id: 'todayFull', title: 'Сегодня — полная версия', icon: 'sun', group: 'general', synonyms: ['сегодня', 'утро', 'обзор', 'день', 'экран'],
+  when: () => store.nextUi && (!!store.dir || store.files.length > 0), run: () => void setTimeout(() => today.open()),
 });
 register({
   id: 'endDay', title: 'Завершить день…', icon: 'moon', group: 'general', synonyms: ['вечер', 'журнал', 'итоги', 'на завтра'],

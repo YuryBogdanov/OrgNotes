@@ -31,6 +31,8 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 /** «СРЕДА · 42 НЕДЕЛЯ». */
 export const kicker = (day: Date) => `${WD[day.getDay()].toUpperCase()} · ${weekNumber(day)} НЕДЕЛЯ`;
+/** «пятница, 16 октября · неделя 42» — the second line of the panel «Сегодня» (ТЗ 50 §4.1). */
+export const panelDate = (day: Date) => `${WD[day.getDay()]}, ${day.getDate()} ${MON_GEN[day.getMonth()]} · неделя ${weekNumber(day)}`;
 /** «Доброе утро. Среда, 14 октября» till noon (and in the small hours of the day before), then «Среда, 14 октября». */
 export function dateTitle(day: Date, now: Date): string {
   const d = `${cap(WD[day.getDay()])}, ${day.getDate()} ${MON_GEN[day.getMonth()]}`;

@@ -702,6 +702,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   motion), the pane `inert` and `visibility: hidden` after the ease; nothing lit; the rail's top is the toolbar's —
   `bg` and its line on `.lights`, the 1 pt over the line by `::before`, the rail's line from 52 (`::after`); the
   toolbar's content 32 pt in (`.bar.lights`, the lights over it). e2e `nextHidePanel.spec.ts`.
+  50.3, «Сегодня» a section and a tab as any in the new interface: layout.ts `setPinning(false)` from next/App
+  (before the layout is restored) — `isPinned` false, so no `pinFirst`, a «×», dragging; `today.open()` with
+  `store.nextUi` makes the tab there active or puts a new one after the active tab (by its index: the state holds a
+  proxy of the tab, `indexOf` of the tab itself is -1); the start of the day opens it so. The section has its panel
+  (`sections.ts` panel true; next/TodayPanel.svelte — its foot «Полная версия» / «Завершить день», the body comes in
+  50.4), the date under its head (today.ts `panelDate`). ⇧⌘H: the panel, again while shown — the tab (next/App
+  `today`). The palette: `todayPanel` «Сегодня» (⇧⌘H) and `todayFull` «Сегодня — полная версия»; the old `today`
+  only in the old shell. e2e `nextTodayTab.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

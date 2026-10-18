@@ -152,9 +152,25 @@ class TodayState {
     if (!store.loaded || !store.dir || store.mirror) return;
     if (shouldShow(this.local.show, this.lastShown(), this.now, launch)) this.open(true);
   }
-  /** ⇧⌘H, the palette, the menu, or by itself: the pinned tab first in the left pane, active. */
+  /** ⇧⌘H, the palette, the menu, or by itself: the pinned tab first in the left pane, active. The new interface
+   *  (ТЗ 50 §4): a tab as any — the one there is made active, else a new one after the active tab. */
   open(auto = false) {
     const L = store.layout;
+    if (store.nextUi) {
+      const has = () => L.panes.findIndex((p) => p.tabs.some((t) => t.kind === TODAY));
+      if (has() < 0 && auto && !this.local.overTabs) closeYesterday(L);
+      let pi = has();
+      if (pi < 0) {
+        pi = Math.max(0, Math.min(L.active, L.panes.length - 1));
+        const p = L.panes[pi];
+        const at = p.tabs.length ? Math.min(p.active + 1, p.tabs.length) : 0;
+        p.tabs.splice(at, 0, newTab(TODAY)); // (the state's proxy of it is in the list, not the tab itself)
+        p.active = at;
+      } else L.panes[pi].active = L.panes[pi].tabs.findIndex((t) => t.kind === TODAY);
+      L.active = pi;
+      this.markShown();
+      return;
+    }
     const where = L.panes.findIndex((p) => p.tabs.some(isPinned));
     if (where < 0 && auto && !this.local.overTabs) closeYesterday(L);
     if (where < 0) {
