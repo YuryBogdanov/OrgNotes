@@ -753,6 +753,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   the main window writes it). next/MiniWindow (the old one's workings: the new Editor with `rich={false}` and the new
   `gutter` prop, FindPanel), next/MiniPalette, next/CaptureWindow (next/Capture with `standalone` — no `dim`); their
   look comes in 52.2–52.4. e2e miniNote.spec.ts runs in both shells; nextSideWindows.spec.ts.
+  52.2, the mini window's look (next/MiniWindow.svelte): the side window's root has the class `next`, so editor.css
+  is its; 12 pt corners, a line of `rule`; the header of 32 on `side` — the dot, the file's name without «.org» (`displayName`)
+  ` ›` `ink3` and the heading `ink` 600, the palette's key as a `kbd` on `chip`, «Открыть в главном окне» `ink3`; the
+  text «Исходник» always (`rich={false}`, no `gutter`) in Plex Mono 12.5 on lines of 22, 14 pt on top and 16 at the
+  sides on the lines (the caret's line on `lampsoft` the whole width), headings 13; on the grid. «Заголовок удалён» with
+  a button of ТЗ 44; «Доступно в главном окне» a popover; ⌘F the new editor's panel across the top.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

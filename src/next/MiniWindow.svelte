@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Editor from './Editor.svelte';
+  import { displayName } from '../names';
   import MiniPalette from './MiniPalette.svelte';
   import FindPanel from './FindPanel.svelte';
   import { store, type MiniNote } from '../store.svelte';
@@ -201,14 +202,14 @@
   <header data-tauri-drag-region>
     <button class="close" aria-label="Скрыть мини-окно" title="Скрыть мини-окно · ⌘W" onclick={() => call('mini_hide')}></button>
     <span class="path" data-tauri-drag-region title={note && !note.whole ? `${path} › ${found?.h.title ?? note.title}` : path}>
-      {#if note && !note.whole}<span class="file">{path} ›</span> <b>{found?.h.title || note.title || 'Без названия'}</b>{:else if note}<b>{path}</b>{:else}<span class="file">Заметка не выбрана</span>{/if}
+      {#if note && !note.whole}<span class="file">{displayName(path)} ›</span> <b>{found?.h.title || note.title || 'Без названия'}</b>{:else if note}<b>{displayName(path)}</b>{:else}<span class="file">Заметка не выбрана</span>{/if}
     </span>
-    <button class="pk" title="Сменить заметку · ⌘P" onclick={() => (palette = true)}>⌘P</button>
+    <button class="pk" aria-label="Сменить заметку" title="Сменить заметку · {store.keyHint('miniPalette') || '⌘P'}" onclick={() => (palette = true)}>{store.keyHint('miniPalette') || '⌘P'}</button>
     <button class="om" aria-label="Открыть в главном окне" title="Открыть в главном окне" disabled={!note} onclick={openInMain}>
       <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3h6v6M17 3l-7 7M8 4H4v12h12v-4" /></svg>
     </button>
   </header>
-  <div class="body">
+  <div class="body grid">
     {#if fb.open}
       <FindPanel bind:q={() => fb.q, (v) => (fb.q = v)} bind:re={() => fb.re, (v) => (fb.re = v)} info={hits} focusN={fb.focusN} onnext={() => findStep(1)} onprev={() => findStep(-1)} onreplace={() => {}} onclose={closeFind} />
     {/if}
@@ -230,7 +231,7 @@
           onfollow={() => say('Доступно в главном окне')} />
       {/key}
     {:else if gone}
-      <div class="gone"><span>Заголовок удалён</span><button onclick={() => (palette = true)}>Выбрать заметку · ⌘P</button></div>
+      <div class="gone"><span>Заголовок удалён</span><button onclick={() => (palette = true)}>Выбрать заметку · {store.keyHint('miniPalette') || '⌘P'}</button></div>
     {/if}
     {#if palette}<MiniPalette onpick={open} onclose={() => (palette = false)} />{/if}
   </div>
@@ -240,22 +241,36 @@
 
 <style>
   :global(html), :global(body) { background: transparent !important; }
-  .mini { position: fixed; inset: 0; display: flex; flex-direction: column; border-radius: 11px; overflow: hidden; background: var(--bg); border: 1px solid var(--rule); color: var(--ink); }
-  header { flex: 0 0 30px; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 10px; background: var(--side); border-bottom: 1px solid var(--rule); font-size: 12px; user-select: none; -webkit-user-select: none; }
+  /* the new interface (ТЗ 52 §2): 12 pt corners, a line of `rule`; the window's shadow and fading are native */
+  .mini { position: fixed; inset: 0; display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; background: var(--bg); border: 1px solid var(--rule); color: var(--ink); font: 13px var(--ui); }
+  header { flex: 0 0 32px; display: flex; align-items: center; gap: 8px; padding: 0 10px; background: var(--side); border-bottom: 1px solid var(--rule); font-size: 12px; user-select: none; -webkit-user-select: none; }
   .close { flex: 0 0 11px; width: 11px; height: 11px; padding: 0; border: 0; border-radius: 6px; background: #ff5f57; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18); }
-  .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
   .path b { font-weight: 600; }
-  .file { color: var(--ink2); }
-  .pk { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 0; border-radius: 5px; background: transparent; color: var(--ink2); font-size: 11px; }
-  .om { display: inline-flex; align-items: center; padding: 2px; border: 0; background: transparent; color: var(--ink2); }
-  .pk:hover, .om:hover:not(:disabled) { background: var(--chip); color: var(--ink); }
+  .file { color: var(--ink3); }
+  .pk { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border: 0; border-radius: 4px; background: var(--chip); color: var(--ink3); font: 11px var(--mono); }
+  .pk:hover { background: var(--chip2); color: var(--ink); }
+  .om { display: inline-flex; align-items: center; padding: 2px; border: 0; border-radius: 4px; background: transparent; color: var(--ink3); }
+  .om:hover:not(:disabled) { color: var(--ink); }
   .om:disabled { opacity: 0.4; }
+  .pk:focus-visible, .om:focus-visible, .close:focus-visible { outline: 2px solid var(--lampline); outline-offset: 1px; }
   .body { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  /* the text 12 pt from the edge, no gutter (ТЗ 31 §2) */
-  .body :global(.cm-editor) { flex: 1; min-height: 0; }
-  .body :global(.cm-content) { padding-left: 12px; padding-right: 12px; }
-  .gone { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--ink2); font-size: 12.5px; }
-  .gone button { border: 0; background: none; color: var(--lampink); font-size: 12.5px; }
-  .hint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 30; padding: 5px 12px; border-radius: 7px; background: var(--ink); color: var(--bg); font-size: 12px; white-space: nowrap; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); }
-  .grip { position: absolute; right: 3px; bottom: 3px; color: var(--ink3); pointer-events: none; }
+  /* the ground of the editor: `bg` with the grid of 24 pt */
+  .grid { background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; background-position: -1px -1px; }
+  /* «Исходник» always (ТЗ 52 §2): IBM Plex Mono 12.5 on lines of 22, 14 pt on top, 16 at the sides, no gutter; the
+     caret's line on `lampsoft` the whole width */
+  .body :global(.cm-editor) { flex: 1; min-height: 0; background: transparent; }
+  .body :global(.cm-editor:not(.cm-rich) .cm-scroller) { font: 12.5px/22px var(--mono); }
+  .body :global(.cm-editor:not(.cm-rich) .cm-content) { max-width: none; padding: 14px 0 60px; }
+  .body :global(.cm-editor:not(.cm-rich) .cm-line) { line-height: 22px; padding: 0 16px; }
+  .body :global(.cm-editor:not(.cm-rich) :is(.cm-h1, .cm-h2, .cm-h3, .cm-h4, .cm-h5, .cm-h6, .cm-h7, .cm-h8, .cm-h9)) { font-size: 13px; }
+  .body :global(.cm-editor:not(.cm-rich) .cm-foldPlaceholder) { height: 16px; font-size: 10.5px; line-height: 16px; }
+  /* ⌘F: the search of the new editor, compact, at the top of the text */
+  .body :global(.find) { top: 6px; right: 8px; left: 8px; width: auto; max-width: none; }
+  .gone { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--ink3); font-size: 13px; }
+  .gone button { height: 30px; padding: 0 14px; border: 0; border-radius: 7px; background: var(--chip2); color: var(--ink); font: 13px var(--ui); }
+  .gone button:focus-visible { outline: 2px solid var(--lampline); outline-offset: 2px; }
+  /* «Доступно в главном окне»: a popover of ТЗ 44 at the bottom, in the middle, 2 seconds */
+  .hint { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 30; padding: 6px 12px; border: 1px solid var(--rule); border-radius: 8px; background: var(--card); color: var(--ink); font-size: 12.5px; white-space: nowrap; box-shadow: var(--popshadow); }
+  .grip { position: absolute; right: 5px; bottom: 5px; color: var(--ink3); pointer-events: none; }
 </style>
