@@ -595,6 +595,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   цель» on `lamp`), the tiles (`card`, 12 pt, the figures in `--font-display` 30, the filter on `lampsoft`), the
   groups unboxed (avatar 30, «Квартальные задачи · Работа/Тимлиды/petrov»), the rows a grid 84 pt | title | deadline
   | 150 pt, the closed at 60 %. e2e `nextGoals.spec.ts`.
+  47.5, the wheel (`Wheel.svelte`, the overview only, «Список / Колесо» in its header): the tab's state is the key
+  with «~wheel» after it (`splitView`, `WHEEL` in state.svelte.ts; `openGoals('*')` keeps it; old tabs read as
+  before). An SVG of 600: a sector per person found (me first, «Я», then the team), the dots — the active goals, the
+  radius by `quietDays` to 5 weeks; «молчит» is the list's `goalSilent` (the setting's threshold, 14 days → «2+
+  недели»; ТЗ 47 says 3 weeks, the list and the wheel must agree — the dashed ring is that threshold); the fill `lamp`
+  3–18 % by the share of the fresh; the frames drawn over the sectors (silent `todo`, chosen `lampink`); the hub —
+  «ЦЕЛИ Q4», the silent ones in `--font-display` 44 `todo`. A sector: chosen (a ray, the column of 340 pt with the
+  person's goals, «Разобрать цели», «Открыть файл»); a dot: `openGoalFile`. ТЗ 47 is done.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

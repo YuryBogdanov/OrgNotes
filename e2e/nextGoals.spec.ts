@@ -56,3 +56,32 @@ test('the tab: the kicker of the quarter, «Цели квартала» in Yesev
   // a closed goal at 60%
   expect(await view(page).locator('.row.closed > .tt').first().evaluate((e) => getComputedStyle(e).opacity)).toBe('0.6');
 });
+
+// ТЗ 47.5: the wheel — the same people and the same silent goals as the list; a segment chooses the person (their
+// goals on the right, «Разобрать цели», «Открыть файл»), a dot opens its goal; the view is kept with the tab.
+test('«Колесо»: the silent ones as the list counts them; a segment — the person\'s goals; a dot opens the goal; kept with the tab', async ({ page }) => {
+  await open(page);
+  const silent = await view(page).locator('.tile').nth(3).locator('b').textContent();
+  await view(page).getByRole('tab', { name: 'Колесо' }).click();
+  const wheel = view(page).locator('.wheel');
+  await expect(wheel).toBeVisible();
+  await expect(view(page).locator('.tile')).toHaveCount(0);
+  await expect(wheel.locator('.hn')).toHaveText(silent!);
+  await expect(wheel.locator('.dot.silent')).toHaveCount(Number(silent));
+  await expect(wheel.locator('.seg')).toHaveCount(4); // «Я» and the team
+  await expect(wheel.locator('text.name')).toContainText(['Я']);
+  await expect(wheel.locator('.col')).toContainText('Нажмите на сегмент');
+  await wheel.getByRole('button', { name: /^Петров Алексей:/ }).click();
+  await expect(wheel.locator('.col .who b')).toHaveText('Петров Алексей');
+  await expect(wheel.locator('.col').getByRole('button', { name: 'Разобрать цели' })).toBeVisible();
+  await expect(wheel.locator('.ray')).toHaveCount(1);
+  // the tab keeps the wheel
+  expect(await page.evaluate(async () => {
+    const { store } = await import('/src/store.svelte.ts' as string);
+    const p = store.layout.panes[0];
+    return p.tabs[p.active].data;
+  })).toBe('*~wheel');
+  // a dot: its goal in the file
+  await wheel.locator('.dot.silent').first().click();
+  await expect(page.locator('.cm-content')).toBeVisible();
+});

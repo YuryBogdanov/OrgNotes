@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goals, type GoalPerson } from './state.svelte';
   import { openAdd, openCarry, openForm, openReport, startReview } from './actions';
+  import Wheel from './Wheel.svelte';
   import {
     GOAL_STATES, GOAL_TONES, goalNote, goalsIn, isDone, quarterLabel, quarterOf, cmpQuarter, quarterSub, quarterTitle, resultLine, shiftQuarter, shortDay,
     qEnd, days, activeWord, type Goal,
@@ -8,7 +9,14 @@
 
   // «Цели» in a pane (ТЗ 23): «Обзор квартала» (every source) or the goals of one person. A summary of four tiles
   // (a click filters), a group per person, a row per goal: status, title and «Результат: …», deadline, last mark.
-  let { who }: { who: string | null } = $props();
+  // `wheel` (ТЗ 47 §3.5): the overview as the wheel, the tab keeps it (`setWheel`)
+  let { who, wheel: wheelAt = false, setWheel }: { who: string | null; wheel?: boolean; setWheel?: (on: boolean) => void } = $props();
+  // svelte-ignore state_referenced_locally
+  let wheel = $state(wheelAt);
+  function showWheel(on: boolean) {
+    wheel = on;
+    setWheel?.(on);
+  }
 
   const key = $derived(who ?? '*');
   const q = $derived(goals.goalsQuarter);
@@ -80,6 +88,12 @@
           <span class="cur" class:now={isNow}>{quarterLabel(q)}</span>
           <button aria-label="Следующий квартал" onclick={() => (goals.goalsQuarter = shiftQuarter(q, 1))}>Q{shiftQuarter(q, 1).q} ›</button>
         </div>
+        {#if !person}
+          <div class="vseg" role="tablist" aria-label="Вид">
+            <button role="tab" aria-selected={!wheel} class:on={!wheel} onclick={() => showWheel(false)}>Список</button>
+            <button role="tab" aria-selected={wheel} class:on={wheel} onclick={() => showWheel(true)}>Колесо</button>
+          </div>
+        {/if}
         {#if person}<button class="chip2" disabled={!person.found} onclick={() => startReview(person.key)}>Разобрать цели</button>{/if}
         {#if past && openLeft}<button class="chip2" onclick={() => openCarry(person?.key ?? '*')}>Перенести незакрытые в {quarterLabel(shiftQuarter(q, 1))}</button>{/if}
         <button class="chip2" disabled={!goals.goalPeople.length} onclick={() => openReport(person?.key ?? '*')}>Отчёт за квартал</button>
@@ -110,6 +124,8 @@
       <button class="pri" onclick={() => openAdd({ me: true })}>Указать, где мои цели</button>
       <button onclick={() => openAdd()}>Добавить цели человека</button>
     </div>
+  {:else if next && wheel && !person}
+    <Wheel />
   {:else}
     <div class="tiles">
       {#each tiles as t (t.f)}
@@ -226,6 +242,9 @@
   .nq button, .nq .cur { height: 28px; padding: 0 10px; display: inline-flex; align-items: center; border: 0; border-radius: 7px; background: var(--chip2); color: var(--ink); font: 12.5px var(--ui); }
   .nq .cur { background: var(--chip); font-weight: 600; }
   .nq .cur.now { background: var(--lampsoft); color: var(--lampink); }
+  .vseg { display: flex; padding: 2px; gap: 2px; border-radius: 8px; background: var(--chip); }
+  .vseg button { height: 24px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--ink2); font: 12.5px var(--ui); }
+  .vseg button.on { background: var(--segon); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18); }
   .tools .chip2, .tools .main { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; font: 12.5px var(--ui); }
   .tools .chip2 { background: var(--chip2); color: var(--ink); }
   .tools .main { background: var(--lamp); color: var(--onlamp); font-weight: 600; }
