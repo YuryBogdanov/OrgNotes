@@ -250,6 +250,8 @@ class Host {
   get reviewActing() {
     return this.reviews.acting > 0;
   }
+  /** `ui.editor`'s component of the new interface (next/PluginEditor), set by its shell; none — the old one. */
+  editorComponent: Component<{ path: string; line: number; title: string; onref?: (r: HeadingRef) => void }> | null = null;
   /** The new interface's side of a review in the file (next/fileReview). */
   set reviewFile(h: FileReviewHooks | null) {
     this.reviews.file = h;
@@ -926,7 +928,8 @@ class Host {
         },
         widget: (el, field, value, onChange) => mountWidget(id, el, field, value, onChange, (err) => this.fail(id, err)),
         editor: (el, h, o = {}) => {
-          const app = mount(PluginEditor, { target: el, props: { path: h.path, line: h.line, title: h.title, onref: (r: HeadingRef) => this.guard(id, () => o.onRef?.(r), undefined) } });
+          // the new interface gives its own editor (ТЗ 49 §7, set by next/App), the old one PluginEditor
+          const app = mount(this.editorComponent ?? PluginEditor, { target: el, props: { path: h.path, line: h.line, title: h.title, onref: (r: HeadingRef) => this.guard(id, () => o.onRef?.(r), undefined) } });
           const off = () => {
             void unmount(app);
           };

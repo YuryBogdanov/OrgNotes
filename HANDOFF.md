@@ -661,6 +661,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   the text). One view with a key — its `kbd` by the switch (⌥⌘B); more — the keys in the segments' titles. A file of
   its own type (`.canvas`) has no switch. ⌃⌘E (`rich`) on a view: back to the text in its mode. e2e
   `nextViewSwitch.spec.ts`.
+  49.3, the plugins' fonts and editor: `--font-text` (the file's text's font — Cormorant, Lora, the system's) is the
+  first of `compatVars` (`var(--text)`: COMPAT may name tokens only). `ui.editor` in the new interface mounts
+  `next/PluginEditor.svelte` — the new Editor narrowed to the heading (`narrow`, `onnarrow`), «Оформление», the
+  store's levels / drawers / numbers, edits by `store.setText`; the host's `plugins.editorComponent` is set by
+  next/App (the old code may not import src/next). No `reveal`: an async one moved the caret after the first click.
+  FileView's draw effect reads `path` through a `$derived` — the parent's file object is new at every edit, and the
+  view drawn anew lost the board's open card. e2e `nextPluginEditor.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

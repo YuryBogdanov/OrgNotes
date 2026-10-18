@@ -20,6 +20,9 @@
   const owner = $derived(v?.plugin ?? plugins.entries.find((e) => e.manifest?.contributes.fileViews.some((f) => f.id === id))?.manifest?.id);
   const off = $derived(owner ? plugins.failed.get(owner) : undefined);
   const tabId = $derived(tab.id);
+  // the props come as getters of the parent's file (a new object at each edit): a derived stops the redraw when the
+  // value is the same, else the view would be drawn anew at every key typed in it (the board's card at the side)
+  const thePath = $derived(path);
   const vars = $derived(`${tokenVars(store.appearance)};${compatVars(store.appearance)}`);
   const ownType = $derived(!!fileTypeOf(path));
 
@@ -34,7 +37,7 @@
   $effect(() => {
     const node = el;
     const entry = v;
-    const p = path;
+    const p = thePath;
     void tabId; // the tab, not its object: the layout may give the same tab anew
     if (!node || !entry || off) return;
     const ctl = {
