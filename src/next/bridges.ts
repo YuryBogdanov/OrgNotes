@@ -2,9 +2,7 @@
 // of `src/next/` allowed to import them (eslint.config.js); one line each, with what takes its place.
 
 // the settings' sections (ТЗ 54): the sheet is new (next/Settings.svelte), the sections come one by one (54.2–54.7)
-export { default as SettingsGeneral } from '../SettingsGeneral.svelte'; // 54.3
-export { default as AppearanceSettings } from '../AppearanceSettings.svelte'; // 54.3
-export { default as ThemeEditor } from '../ThemeEditor.svelte'; // 54.3
+export { default as ThemeEditor } from '../ThemeEditor.svelte'; // 54.8
 export { default as KeysSettings } from '../KeysSettings.svelte'; // 54.4
 export { default as StatusesSettings } from '../StatusesSettings.svelte'; // 54.6
 export { default as TagsSettings } from '../TagsSettings.svelte'; // 54.7
