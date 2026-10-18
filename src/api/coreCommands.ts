@@ -44,8 +44,13 @@ export function coreCommand(cmd: string, arg: unknown) {
       if (!store.files.some((f) => f.name === a.path)) throw new Error(`нет файла «${a.path}»`);
       return store.revealEntry(String(a.path));
     }
-    case 'agenda.open':
+    case 'agenda.open': {
+      // `here` (1.14): «‹ К агенде» of the calendar (ТЗ 47 §1.6) — this tab becomes «Агенда» in «День» on `date`
+      const o = (arg ?? {}) as { date?: unknown; here?: unknown };
+      const date = typeof o.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.date) ? o.date : undefined;
+      if (o.here) return store.agendaInTab(date);
       return store.showAgendaHere();
+    }
     case 'settings.open':
       return store.openSettings(typeof (arg as { section?: unknown })?.section === 'string' ? ((arg as { section: string }).section as never) : undefined);
     case 'capture.open':

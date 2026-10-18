@@ -15,7 +15,7 @@ export { relevel, place, moveTo, moveWithin } from '../refile';
 export { archiveTarget, archivePath, archiveEntry, categoryOf, readLocation } from '../archive';
 // the index of dated entries (ТЗ 24): what the calendar shows, by day — the core's month under a review's card too
 export {
-  LAYERS, isoDay, fromIso, hasDated, entriesIn, sortDay, byDay, undated, monthWeeks, weekDays, weekNumber, monthTitle, monthSub, weekSub,
+  LAYERS, isoDay, fromIso, hasDated, datedCount, entriesIn, sortDay, byDay, undated, monthWeeks, weekDays, weekNumber, monthTitle, monthSub, weekSub,
   dayTitle, dayShort, weekdayShort, entriesWord, layoutEvents, type Layer, type CalFile, type CalEntry,
 } from '../calIndex';
 

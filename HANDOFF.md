@@ -571,6 +571,17 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   Mono) in the compatibility layer (`COMPAT`, not in app.css: old screens fall back), `ctx.ui.look` `'next' | 'old'`
   (API 1.14, `store.nextUi`; fixed while the window is open). The guide's «В новом интерфейсе» says them and the
   tokens a plugin's own new screen draws with. The PRs of ТЗ 47 are stacked: each on the one before.
+  47.2, «Календарь» (`ui.look === 'next'`, the same workings): View.svelte — the header of the new screens (`.nh`: the
+  range as the kicker in `--font-mono`, the title in `--font-display` 38, «‹ Сегодня ›» `chip2` 28 pt, «Месяц /
+  Неделя»; «‹ К агенде» when `CalState.back === 'agenda'`), the month in `.frame` (8 pt corners), `.next` styles
+  for the cells (past 75 %, weekends `chip`, the chosen `lampsoft` + `lampline`, today `lamp`), the chips (events
+  `lampink`), the week (heads, «весь день», hours in mono, events with a 3 pt stripe — `box-shadow: inset`, the line of
+  now `lamp`); the chosen day is a column of the tab (`aside.side` 268 pt, `Day.svelte next`: «Выбранный день» and
+  «Впереди» fold, kept in localStorage `calendar:fold:*`). Panel.svelte `next`: ticks of 14 pt (`appearance: none`, on
+  — `lamp`), the layers' dots by the new tokens, the files with `datedCount` (`@panopticon/api/org`), «БЕЗ ДАТЫ · N».
+  DayList is the ТЗ 44 popover under `[data-ui=next]`. «Агенда» ⇄ calendar: AgendaDay's «Неделя» / «Месяц» put
+  `back: 'agenda'`; the core command `agenda.open {date, here}` → `store.agendaInTab(date)` (the tab becomes the
+  agenda, `data.date`); AgendaDay opens on `tab.data.date`. e2e `nextCalendar.spec.ts`.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

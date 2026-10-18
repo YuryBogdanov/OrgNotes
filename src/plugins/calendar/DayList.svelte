@@ -87,4 +87,9 @@
   .w { font-size: 11px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   svg { flex: 0 0 13px; }
   .foot { padding: 6px 8px 2px; border-top: 1px solid var(--line); margin-top: 4px; font-size: 11px; color: var(--fg3); }
+  /* the new interface (ТЗ 47 §1.3): the popover of ТЗ 44 — `card`, `rule`, 12 pt corners, its shadow */
+  :global([data-ui='next']) .daylist { background: var(--card); border-color: var(--rule); border-radius: 12px; box-shadow: var(--popshadow); color: var(--ink); font-family: var(--ui); }
+  :global([data-ui='next']) .daylist button.on { background: var(--chip); }
+  :global([data-ui='next']) .daylist .k { font-family: var(--font-mono, ui-monospace, monospace); }
+  :global([data-ui='next']) .daylist .foot { border-color: var(--rule); color: var(--ink3); }
 </style>
