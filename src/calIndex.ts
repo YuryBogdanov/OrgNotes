@@ -100,6 +100,8 @@ function rawsOf(f: CalFile) {
 }
 /** The file has something dated (the «ФАЙЛЫ» of the calendar). */
 export const hasDated = (f: CalFile) => rawsOf(f).length > 0;
+/** How many dated entries a file has (the number by it in the calendar's panel, ТЗ 47 §1.1). */
+export const datedCount = (f: CalFile) => rawsOf(f).length;
 const clean = (t: string) => t.replace(/<\d{4}-\d{2}-\d{2}[^>]*>(--<[^>]*>)?/g, '').replace(/\s+/g, ' ').trim();
 
 /** The entries of the files between two days (both included), unordered. */

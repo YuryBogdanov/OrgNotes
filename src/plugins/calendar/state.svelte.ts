@@ -15,6 +15,8 @@ const DEFAULT_LAYERS: Layer[] = ['task', 'deadline', 'event', 'done']; // «Ож
 export interface CalState {
   view: 'month' | 'week';
   date: string;
+  /** Opened from «Агенда» («Неделя», «Месяц» of its switch, ТЗ 47 §1.6): «‹ К агенде» goes back there. */
+  back?: 'agenda';
 }
 
 class Calendar {

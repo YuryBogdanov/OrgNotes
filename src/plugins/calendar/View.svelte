@@ -2,6 +2,7 @@
   import { cal as calendar } from './state.svelte';
   import { onMount } from 'svelte';
   import CalDayList from './DayList.svelte';
+  import Day from './Day.svelte';
   import {
     fromIso, isoDay, layoutEvents, monthSub, monthTitle, monthWeeks, toneVars, weekDays, weekNumber, weekSub, weekdayShort, type CalEntry,
   } from '@panopticon/api/org';
@@ -9,10 +10,16 @@
 
   // «Календарь» (ТЗ 24): a month or a week of every dated entry. The layers and the files are in the navigator, the
   // chosen day in the inspector. A cell shows what fits (three at least), the rest is behind «… ещё N».
+  // The new interface (ТЗ 47 §1, `ui.look`): the header of the new screens — the range in IBM Plex Mono, the title in
+  // Yeseva One 38, «‹ Сегодня ›» and «Месяц / Неделя» (from «Агенда»: «‹ К агенде» too) —, the month framed, the
+  // chosen day in a column of 268 pt on the right (Day, its sections fold); the same workings.
   // the tab's state is ours: drawn once by the core, changed here and kept with the layout (`setState`)
   let { initial, setState }: { initial: CalState; setState: (s: CalState) => void } = $props();
   // svelte-ignore state_referenced_locally
   let cal = $state<CalState>(initial);
+  const next = calendar.ctx.ui.look === 'next';
+  /** «‹ К агенде»: the agenda's «День» on the day chosen, in this tab (ТЗ 47 §1.6). */
+  const toAgenda = () => void calendar.ctx.commands.run('agenda.open', { date: cal.date, here: true });
   const sel = $derived(fromIso(cal.date));
   const today = $derived(isoDay(new Date()));
   const cfg = $derived(calendar.cfg);
@@ -251,7 +258,29 @@
 {/snippet}
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-<div class="cal" bind:this={root} tabindex="0" role="application" aria-label="Календарь" onkeydown={key}>
+<div class="cal" class:next bind:this={root} tabindex="0" role="application" aria-label="Календарь" onkeydown={key}>
+  <div class="main">
+  {#if next}
+    <header class="nh">
+      <div class="ttl">
+        <div class="kick">{cal.view === 'month' ? monthSub(sel) : weekSub(allWeek)}</div>
+        <div class="tline">
+          <h1>{cal.view === 'month' ? monthTitle(sel) : `Неделя ${weekNumber(sel)}`}</h1>
+          {#if cal.view === 'week'}<div class="hslot" use:weekCell={cellOf(sel, 'week')}></div>{/if}
+        </div>
+      </div>
+      <div class="nav">
+        {#if cal.back === 'agenda'}<button class="back" onclick={toAgenda}>‹ К агенде</button>{/if}
+        <button aria-label="Назад" onclick={() => step(-1)}>‹</button>
+        <button class="today" onclick={() => pick(new Date())}>Сегодня</button>
+        <button aria-label="Вперёд" onclick={() => step(1)}>›</button>
+      </div>
+      <div class="seg" role="tablist" aria-label="Вид">
+        <button role="tab" aria-selected={cal.view === 'month'} class:on={cal.view === 'month'} onclick={() => set({ view: 'month' })}>Месяц</button>
+        <button role="tab" aria-selected={cal.view === 'week'} class:on={cal.view === 'week'} onclick={() => set({ view: 'week' })}>Неделя</button>
+      </div>
+    </header>
+  {:else}
   <header>
     <div class="ttl">
       <div class="tline">
@@ -270,8 +299,10 @@
       <button role="tab" aria-selected={cal.view === 'week'} class:on={cal.view === 'week'} onclick={() => set({ view: 'week' })}>Неделя</button>
     </div>
   </header>
+  {/if}
 
   {#if cal.view === 'month'}
+    <div class="frame">
     <div class="wd">{#if cfg.weekNumbers}<i class="wk"></i>{/if}{#each shownDays(weeks[0]) as d (d.getDay())}<span>{weekdayShort(d.getDay())}</span>{/each}</div>
     <div class="month">
       {#each weeks as w, wi (wi)}
@@ -287,6 +318,7 @@
           </div>
         {/if}
       {/each}
+    </div>
     </div>
   {:else}
     <div class="week">
@@ -338,6 +370,11 @@
       </div>
     </div>
   {/if}
+  </div>
+  {#if next}
+    <!-- the chosen day (ТЗ 47 §1.5): the inspector of the old interface, here a column of the tab -->
+    <aside class="side" aria-label="Выбранный день"><Day shown={cal} next /></aside>
+  {/if}
 </div>
 
 {#snippet cell(d: Date)}
@@ -345,7 +382,7 @@
   {@const list = at(d)}
   {@const shown = list.length > fits ? list.slice(0, fits - 1) : list}
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-  <div class="cell" class:sel={k === cal.date} class:other={d.getMonth() !== sel.getMonth()} class:we={d.getDay() === 0 || d.getDay() === 6} class:over={over === k} data-day={k}
+  <div class="cell" class:sel={k === cal.date} class:past={k < today} class:other={d.getMonth() !== sel.getMonth()} class:we={d.getDay() === 0 || d.getDay() === 6} class:over={over === k} data-day={k}
     onclick={() => pick(d)} ondblclick={(ev) => dbl(ev, d)} ondragover={(ev) => dragOver(ev, k)} ondragleave={() => (over = null)} ondrop={(ev) => drop(ev, d)}>
     <span class="num" class:today={k === today}>{d.getDate()}</span>
     {#each shown as e (e.path + e.line + e.layer + (e.time ?? ''))}{@render chip(e)}{/each}
@@ -377,7 +414,9 @@
 {/if}
 
 <style>
-  .cal { flex: 1; height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--bg); outline: none; } /* the whole tab of a plugin's view */
+  .cal { flex: 1; height: 100%; min-height: 0; display: flex; background: var(--bg); outline: none; } /* the whole tab of a plugin's view */
+  .main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .frame { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
   header { flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
   .ttl { display: flex; flex-direction: column; }
   .tline { display: flex; align-items: center; gap: 8px; }
@@ -453,4 +492,61 @@
   .evb.past { background: color-mix(in srgb, var(--acc) 10%, transparent); color: var(--fg3); }
   .nowline { position: absolute; left: 0; right: 0; height: 2px; background: var(--todo); pointer-events: none; }
   .nowline::before { content: ''; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 4px; background: var(--todo); }
+
+  /* ---- the new interface (ТЗ 47 §1): the new tokens, its fonts ---- */
+  .cal.next { color: var(--ink); font-family: var(--ui); }
+  .next .main { padding: 26px 0 18px 32px; }
+  .nh { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px 14px; padding: 0 0 18px; border: 0; }
+  .nh .ttl { flex: 1 1 auto; min-width: 0; gap: 4px; }
+  .kick { font: 500 11px var(--font-mono, ui-monospace, monospace); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
+  .nh h1 { font: 400 38px/1.05 var(--font-display, Georgia, serif); letter-spacing: 0; color: var(--ink); }
+  .nh .nav { margin: 0; gap: 6px; }
+  .nh .nav button { width: 28px; height: 28px; border-radius: 7px; background: var(--chip2); color: var(--ink); font: 15px var(--ui); }
+  .nh .nav .today, .nh .nav .back { width: auto; padding: 0 12px; font-size: 12.5px; }
+  .nh .nav .back { background: none; color: var(--lampink); padding: 0 6px; }
+  .nh .seg { margin: 0; background: var(--chip); border-radius: 8px; }
+  .nh .seg button { height: 24px; color: var(--ink2); }
+  .nh .seg button.on { background: var(--segon); color: var(--ink); }
+  .next .frame { border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--bg); }
+  .next .wd { border-color: var(--rule); }
+  .next .wd span { font-size: 11px; font-weight: 600; color: var(--ink3); text-transform: none; }
+  .next .row { border-color: var(--rule); }
+  .next .row:last-child { border-bottom: 0; }
+  .next .cell { border-color: var(--rule); }
+  .next .cell:last-child { border-right: 0; }
+  .next .cell.we { background: var(--chip); }
+  .next .cell.other { background: none; opacity: 0.75; }
+  .next .cell.other .num { color: var(--ink3); }
+  .next .cell.past:not(.other) { opacity: 0.75; }
+  .next .cell.past .num { color: var(--ink3); }
+  .next .cell.sel { background: var(--lampsoft); box-shadow: inset 0 0 0 1.5px var(--lampline); opacity: 1; }
+  .next .num { font-size: 12px; }
+  .next .num.today, .next .wn.today { background: var(--lamp); color: var(--onlamp); }
+  .next .ch { background: color-mix(in srgb, var(--tc) 14%, transparent); color: var(--ink); }
+  .next .ch.event { --tc: var(--lampink); background: color-mix(in srgb, var(--lampink) 14%, transparent); }
+  .next .ch.event.past { opacity: 0.55; color: var(--ink); background: color-mix(in srgb, var(--lampink) 14%, transparent); }
+  .next .ch.deadline { color: var(--todo); }
+  .next .ch.done { opacity: 0.55; color: var(--ink); }
+  .next .tm { color: var(--lampink); }
+  .next .more { font-size: 11px; color: var(--lampink); font-weight: 500; }
+  .next .more:hover, .next .more.open { background: var(--chip); }
+  .next .week { border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+  .next .whead, .next .adrow { border-color: var(--rule); }
+  .next .wh { border-color: var(--rule); color: var(--ink2); }
+  .next .wn { min-width: 24px; height: 24px; border-radius: 12px; color: var(--ink); }
+  .next .allday { border-color: var(--rule); }
+  .next .selcol { background: var(--lampsoft); }
+  .next .gut, .next .hcol span { font: 10px var(--font-mono, ui-monospace, monospace); color: var(--ink3); }
+  .next .dcol { border-color: var(--rule); background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 47px, var(--rule) 47px, var(--rule) 48px); }
+  .next .dcol.we:not(.selcol) { background-color: var(--chip); }
+  .next .evb { --ec: var(--lampink); background: color-mix(in srgb, var(--ec) 18%, var(--bg)); box-shadow: inset 3px 0 0 var(--ec); padding-left: 9px; color: var(--ink); }
+  .next .evb b { font-size: 11.5px; color: var(--ec); }
+  .next .evb span { font-size: 11.5px; }
+  .next .evb.past { opacity: 0.55; background: color-mix(in srgb, var(--ec) 18%, var(--bg)); color: var(--ink); }
+  .next .nowline { background: var(--lamp); }
+  .next .nowline::before { background: var(--lamp); }
+  .next :is(.ch, .evb).picked { box-shadow: inset 0 0 0 1.5px var(--lampink); }
+  .next .evb.picked { box-shadow: inset 3px 0 0 var(--ec), inset 0 0 0 1.5px var(--lampink); }
+  .side { flex: 0 0 268px; min-height: 0; overflow: auto; box-sizing: border-box; padding: 26px 18px 18px 22px; scrollbar-width: none; }
+  .side::-webkit-scrollbar { display: none; }
 </style>

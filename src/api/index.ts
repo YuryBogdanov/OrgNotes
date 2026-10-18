@@ -461,7 +461,7 @@ export interface Ctx {
     /** A command of the plugin, or of the core: `file.open` {path, line?, beside?, focus?, neighbour?, newTab?}
      *  (`neighbour`: in the other pane, made on the left when there is none, as from an agenda; `newTab`: a tab of its
      *  own, the one shown stays, 1.12), `heading.reveal` {ref},
-     *  `agenda.open`, `settings.open` {section?}, `file.reveal` {path} (the file in Finder, 1.11), `heading.note` {ref, x?, y?} (the popover «Добавить заметку…»
+     *  `agenda.open` {date?, here?} (`here`: this tab becomes «Агенда» on `date`, 1.14), `settings.open` {section?}, `file.reveal` {path} (the file in Finder, 1.11), `heading.note` {ref, x?, y?} (the popover «Добавить заметку…»
      *  at this point of the window, else at its top; 1.12), `heading.status` / `heading.schedule` / `heading.deadline` / `heading.tags` / `heading.priority`
      *  {ref} (the palette's step for it; the heading's file is the one shown), `capture.open` (the quick entry),
      *  `inbox.pickFile`, `inbox.createFile`, `heading.archive` {ref, note?} (the core's «Архивировать поддерево», one
