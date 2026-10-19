@@ -7,7 +7,8 @@
   import { installMenu, type AppMenu } from '../menu';
   import { toAccelerator } from '../keys';
   import { applyAppearance } from '../appearance';
-  import { tokenVars, FONTS } from './tokens';
+  import { tokenVars, fontCss } from './tokens';
+  import { fontKind, textFontOf } from './fontList.svelte';
   import './fonts';
   import { parentOf } from '../navTree';
   import { focusedEditor } from '../editorKeys';
@@ -195,8 +196,11 @@
     notePop.req = null;
     back?.();
   }
-  // «Шрифт текста» (§10): Cormorant, the system's or IBM Plex Mono — the text of «Оформление»
-  const textFont = $derived(nextPrefs.font === 'system' ? FONTS.ui : nextPrefs.font === 'mono' ? FONTS.mono : FONTS.text);
+  // the theme's fonts (ТЗ 57 §6): the screens' titles, the text of «Оформление» (the old «Шрифт текста» on a built-in
+  // theme, fontList), the interface, the monospace
+  const textName = $derived(textFontOf(store.theme));
+  const textFont = $derived(fontCss(textName, 'text'));
+  const fonts = $derived(store.theme.app.fonts);
   // half the cap height of that font (ТЗ 44 §12): the capsules beside a heading centre on its capitals; measured, not
   // written down — Cormorant ≈ 0.63 em, SF Pro and IBM Plex Mono ≈ 0.70; again once the fonts are loaded
   let capc = $state(0.315);
@@ -294,7 +298,7 @@
   let mainEl: HTMLDivElement | undefined = $state();
 </script>
 
-<div class="next" class:theming data-ui="next" data-font={nextPrefs.font} style="{tokenVars(store.theme.app)};--ui:{FONTS.ui};--text:{textFont};--title:{FONTS.title};--mono:{FONTS.mono};--col:{nextPrefs.col};--capc:{capc}">
+<div class="next" class:theming data-ui="next" data-font={fontKind(textName)} style="{tokenVars(store.theme.app)};--ui:{fontCss(fonts.ui, 'ui')};--text:{textFont};--title:{fontCss(fonts.title, 'title')};--mono:{fontCss(fonts.mono, 'mono')};--col:{nextPrefs.col};--capc:{capc}">
   <!-- the first start has the window to itself (ТЗ 48 §6): no sidebar, no tabs under it -->
   <div class="win" style:display={store.start ? "none" : undefined} inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
   <!-- the rail always; ⌘0 hides and shows its panel (ТЗ 50 §3) -->

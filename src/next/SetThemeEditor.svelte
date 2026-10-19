@@ -9,6 +9,8 @@
   import Button from './ui/Button.svelte';
   import Segments from './ui/Segments.svelte';
   import ThemePreview from './ThemePreview.svelte';
+  import FontMenu from './FontMenu.svelte';
+  import type { FontRole } from './fontList.svelte';
 
   // The theme's editor (ТЗ 57 §5), in place of the gallery of «Оформление»: «‹ Все темы», «Тема «…»»; on the left
   // 380 pt of settings — the name with «светлая / тёмная — по фону», «Основа» (the ground, the text, the accent with
@@ -80,6 +82,14 @@
   ];
   /** The contrast with the ground: the text's for the ground and the text, `lampink`'s for the accent. */
   const contrastFor = (k: 'bg' | 'ink' | 'accent') => (app && tk ? contrastOf(k === 'accent' ? tk.lampink : app.base.ink, app.base.bg) : 0);
+
+  // ---- the fonts (ТЗ 57 §6) ------------------------------------------------------------------------------------------
+  const FONT_ROWS: { role: FontRole; t: string; hint: string }[] = [
+    { role: 'title', t: 'Заголовки экранов', hint: '«Сегодня», «Агенда», крупные числа' },
+    { role: 'text', t: 'Текст файла', hint: '«Оформление», карточки доски' },
+    { role: 'ui', t: 'Интерфейс', hint: 'Всё остальное' },
+    { role: 'mono', t: 'Моноширинный', hint: '«Исходник», даты, пути, терминал' },
+  ];
 
   // ---- the palette and the user's statuses ----------------------------------------------------------------------------
   const SHORT: Record<Named, string> = { red: 'Красн.', orange: 'Оранж.', yellow: 'Жёлт.', green: 'Зелён.', teal: 'Голуб.', blue: 'Синий', purple: 'Фиол.', gray: 'Серый' };
@@ -167,6 +177,17 @@
                 {/each}
               </div>
             {/if}
+          </div>
+        </section>
+        <section class="grp" aria-label="Шрифты">
+          <div class="cap">Шрифты</div>
+          <div class="card">
+            {#each FONT_ROWS as r (r.role)}
+              <div class="row">
+                <div class="rl"><span class="rt">{r.t}</span><span class="rh">{r.hint}</span></div>
+                <FontMenu value={app.fonts[r.role]} role={r.role} label={r.t} onchange={(f) => put((a) => ({ ...a, fonts: { ...a.fonts, [r.role]: f } }))} />
+              </div>
+            {/each}
           </div>
         </section>
       </div>

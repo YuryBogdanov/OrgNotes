@@ -1,6 +1,6 @@
 <script lang="ts">
   import { applyStored, effective, readChoice, storedTheme } from '../appearance';
-  import { tokenVars, FONTS } from './tokens';
+  import { tokenVars, fontCss } from './tokens';
   import MiniWindow from './MiniWindow.svelte';
   import CaptureWindow from './CaptureWindow.svelte';
 
@@ -26,7 +26,7 @@
 </script>
 
 <!-- `next`: the new editor's styles (editor.css) are the window's -->
-<div class="side-win next" data-ui="next" style="{tokenVars(theme.app)};--ui:{FONTS.ui};--mono:{FONTS.mono};--text:{FONTS.ui};--title:{FONTS.title}">
+<div class="side-win next" data-ui="next" style="{tokenVars(theme.app)};--ui:{fontCss(theme.app.fonts.ui, 'ui')};--mono:{fontCss(theme.app.fonts.mono, 'mono')};--text:{fontCss(theme.app.fonts.ui, 'ui')};--title:{fontCss(theme.app.fonts.title, 'title')}">
   {#if mini}<MiniWindow />{:else}<CaptureWindow />{/if}
 </div>
 
