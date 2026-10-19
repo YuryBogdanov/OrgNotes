@@ -7,6 +7,8 @@ import UserNotifications
 final class Notify: NSObject, UNUserNotificationCenterDelegate {
     static let shared = Notify()
     var onClick: (@convention(c) () -> Void)?
+    /// A plugin's notification clicked (ТЗ 55 §4): its tag.
+    var onTag: (@convention(c) (UnsafePointer<CChar>) -> Void)?
     var ready = false
 
     // shown while the app is in front too
@@ -16,7 +18,13 @@ final class Notify: NSObject, UNUserNotificationCenterDelegate {
     }
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler done: @escaping () -> Void) {
-        if response.notification.request.identifier.hasPrefix("end-day") { onClick?() }
+        let id = response.notification.request.identifier
+        if id.hasPrefix("end-day") { onClick?() }
+        else if id.hasPrefix("tag:"), let cb = onTag {
+            // «tag:<tag>|<time>»
+            let tag = String(id.dropFirst(4).split(separator: "|", maxSplits: 1).first ?? "")
+            tag.withCString { cb($0) }
+        }
         done()
     }
 }
@@ -49,6 +57,26 @@ public func notifyEndDay() -> Bool {
     content.body = "Запишите заметку на завтра"
     content.sound = .default
     let id = "end-day-\(Int(Date().timeIntervalSince1970))"
+    UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
+    return true
+}
+
+/// Who hears the clicks of the plugins' notifications (ТЗ 55 §4).
+@_cdecl("notify_on_tag")
+public func notifyOnTag(_ cb: @convention(c) (UnsafePointer<CChar>) -> Void) {
+    Notify.shared.onTag = cb
+}
+
+/// A notification with a title and a text, its click told by its tag (a plugin's: «agent ждёт ответа»); false — not
+/// shown (no bundle, the permission not asked yet).
+@_cdecl("notify_text")
+public func notifyText(_ title: UnsafePointer<CChar>, _ body: UnsafePointer<CChar>, _ tag: UnsafePointer<CChar>) -> Bool {
+    guard notifyAvailable(), Notify.shared.ready else { return false }
+    let content = UNMutableNotificationContent()
+    content.title = String(cString: title)
+    content.body = String(cString: body)
+    content.sound = .default
+    let id = "tag:\(String(cString: tag))|\(Int(Date().timeIntervalSince1970 * 1000))"
     UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     return true
 }

@@ -509,6 +509,9 @@ export interface Ctx {
      *  true` in the manifest also has a button in «Открыть в панели»: the second pane, or out of it. */
     open<S>(viewId: string, state: S, where?: 'here' | 'beside'): Promise<void>;
     notify(text: string, actions?: { label: string; run(): void }[]): void;
+    /** A notification of macOS (when the window is not in front: «agent ждёт ответа»); a click brings the window
+     *  forward and runs `onClick`. False — not shown (no app bundle: `tauri dev`; no permission). Since 1.16. */
+    systemNotify(n: { title: string; body: string }, onClick?: () => void): Promise<boolean>;
     /** The core's sheet with the fields; null: cancelled. */
     form(spec: FormSpec): Promise<Values | null>;
     /** The choice of a file and a heading in it (or the file alone). */

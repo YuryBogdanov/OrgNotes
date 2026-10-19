@@ -13,6 +13,8 @@ pub(crate) mod notify_native {
         pub fn notify_available() -> bool;
         pub fn notify_setup(on_click: extern "C" fn());
         pub fn notify_end_day() -> bool;
+        pub fn notify_on_tag(cb: extern "C" fn(*const std::os::raw::c_char));
+        pub fn notify_text(title: *const std::os::raw::c_char, body: *const std::os::raw::c_char, tag: *const std::os::raw::c_char) -> bool;
     }
 }
 pub(crate) static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
@@ -26,6 +28,39 @@ extern "C" fn end_day_clicked() {
         let _ = w.set_focus();
     }
     let _ = app.emit_to("main", "end-day", ());
+}
+/// A plugin's notification clicked: the window forward, the page told its tag (`notify-click`).
+#[cfg(target_os = "macos")]
+extern "C" fn tag_clicked(tag: *const std::os::raw::c_char) {
+    let Some(app) = APP.get() else { return };
+    let tag = unsafe { std::ffi::CStr::from_ptr(tag) }.to_string_lossy().into_owned();
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+    let _ = app.emit_to("main", "notify-click", tag);
+}
+/// A notification of macOS for a plugin (`ui.systemNotify`, ТЗ 55 §4); false — not shown (no bundle: `tauri dev`).
+#[tauri::command]
+pub(crate) fn notify_system(app: AppHandle, title: String, body: String, tag: String) -> bool {
+    let _ = APP.set(app.clone());
+    #[cfg(target_os = "macos")]
+    {
+        let c = |s: &str| std::ffi::CString::new(s.replace('\0', "")).unwrap_or_default();
+        let (t, b, g) = (c(&title), c(&body), c(&tag));
+        return on_main(&app, move || unsafe {
+            notify_native::notify_setup(end_day_clicked);
+            notify_native::notify_on_tag(tag_clicked);
+            notify_native::notify_text(t.as_ptr(), b.as_ptr(), g.as_ptr())
+        })
+        .unwrap_or(false);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, title, body, tag);
+        false
+    }
 }
 /// The reminder is on: the notifications' delegate and the permission (asked once). Whether they can be shown.
 #[tauri::command]

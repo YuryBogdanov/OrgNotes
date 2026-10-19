@@ -200,6 +200,7 @@ pub fn run() {
             mini::mini_options,
             system::remind_prepare,
             system::remind_end_day,
+            system::notify_system,
             system::clipboard_text,
             show_main_window,
             themes::list_themes,

@@ -905,6 +905,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   ⌘F's bar). The core: `keyDispatch` — an element with `data-own-keys` gets every non-⌘ press and the ⌘ ones it names
   (the press marked run by keys, so the menu leaves it); `url.open` and an absolute / «~/» path in `file.open`.
   The old interface: the commands say «Терминал — в новом интерфейсе» (the tab comes in 55.5). e2e terminal.spec.ts.
+  55.4, the states: `Session.mood` (busy within 2 s of output, idle, bell, ended) and `moodText` («ждёт ввода»,
+  «ждёт ответа», «завершена · код N»); xterm's `onBell` marks a session that is not in sight (`terms.inSight`: its
+  panel shown, it active, `document.hasFocus()`), the mark cleared once it is; the section «Терминал» in the strip
+  (manifest `navSections`, `Section.svelte` — «Сессии», the foot «Новая сессия ⌃⇧`») with `setBadge(n, alert)` for
+  the ones that rang unseen. A notification of macOS when the window is not in front: API 1.16 `ui.systemNotify({
+  title, body }, onClick)` → Rust `notify_system` → Swift `notify_text` (the id «tag:<plugin:n>|<ms>»; a click →
+  `notify_on_tag`'s callback → the window forward, `notify-click` {tag} to the page, the host runs its `onClick`).
+  Without a bundle (`tauri dev`, e2e) it is not shown (false); the mock logs it. e2e terminalMoods.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
