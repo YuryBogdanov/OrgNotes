@@ -978,6 +978,19 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   transform — the board's `.kb-setup` here, the week's plan there (not reproduced in WebKit's tests: centred there
   both ways); the week's goals on «Сегодня» up to 3 lines in tiles of one height. weekPlugin.spec.ts checks both.
   In a worktree the week's e2e runs when `.claude/worktrees/panopticon-week` links to the plugin's repo.
+- **No «Оформление», the view switch in the file's corner (`docs/fix-49-pereklyuchatel-vida.md`)** — `src/nextFlags.ts`
+  `RICH_ENABLED = false` (the core's menu and palette read it too): the new interface's editor always «Исходник»
+  (EditorArea, PluginEditor `rich={RICH_ENABLED && …}`), ⌃⌘E does nothing (App's `rich`), no «Вид → Оформление»
+  (menu.ts), no palette «Оформленный текст» (commands.ts `when`), no row in «Клавиши» (SetKeys `shownGroups`); `--text`
+  (and the plugins' `--font-text`) the interface's font, ThemePreview too; «Шрифт текста» (SetLook) and «Текст файла»
+  (the theme's editor) hidden — the theme keeps the value. The old interface untouched. `next/ViewSwitch.svelte` +
+  `viewSwitch.ts` (`otherViews(tab)`: the plugins' file views, none for a file type's own): a popover at the area's
+  top right (14 / 18), icons only (the text, then each view's manifest icon), the one shown on `segon` / `lampink`,
+  the title «Доска ⌥⌘B»; none when the file has no other view. The tabs' strip lost its «Оформление / Исходник /
+  views». Room for it: `--vs-top` (the find panel goes under it), `--st-top: 60px` («Структура» starts under it),
+  `--vsw: 140px` (the text's right padding with no column), the plugin's view `--fv-corner: 140px` (FileView) — the
+  board's head and its card's head keep it clear. The board's file card lost «Открыть доской». The tests of
+  «Оформление» skip by `RICH_ENABLED` (nextRich, nextBlocks, nextCapsule, single tests elsewhere). e2e nextViewSwitch.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.

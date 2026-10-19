@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openApp, palette, settingsSheet } from './helpers';
+import { RICH_ENABLED } from '../src/nextFlags';
 
 // ТЗ 42.11 (§8, §10), ТЗ 54.3: «Основные → Экспериментальное» (the old interface; the new one's in «Оформление → Текст») — «Шрифт текста», «Ширина текста», «Структура справа»: shown
 // always, active with the new interface only, kept on this Mac; ⌃⌘E — «Оформление / Исходник»; ⌘K — «Искать везде»,
@@ -39,6 +40,7 @@ test('the old interface: the three settings shown, off', async ({ page }) => {
 });
 
 test('the new interface: the font, the width and the column change at once and stay after a reload', async ({ page }) => {
+  test.skip(!RICH_ENABLED, '«Оформление» выключено (fix-49)');
   await page.addInitScript(() => {
     if (sessionStorage.getItem('set')) return;
     sessionStorage.setItem('set', '1');
@@ -77,18 +79,19 @@ test('the new interface: the font, the width and the column change at once and s
   await expect(g.getByRole('switch', { name: 'Новый интерфейс' })).toHaveAttribute('aria-checked', 'true');
 });
 
-test('the new interface: ⌃⌘E switches «Оформление» and «Исходник»; ⌘K opens the palette', async ({ page }) => {
+test('the new interface: ⌃⌘E does nothing — always «Исходник», no «Оформление» in the palette (fix-49); ⌘K opens the palette', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('ui:next', '1'));
   await openApp(page, { files: { '/mock/a.org': DOC }, ready: false });
   await expect(content(page)).toBeVisible();
   const editor = page.locator('[data-ui="next"] .cm-editor');
-  const rich = await editor.evaluate((e) => e.classList.contains('cm-rich'));
+  expect(await editor.evaluate((e) => e.classList.contains('cm-rich'))).toBe(false);
   await page.locator('.cm-line', { hasText: 'текст' }).click();
   await page.keyboard.press('Control+Meta+e');
-  await expect.poll(() => editor.evaluate((e) => e.classList.contains('cm-rich'))).toBe(!rich);
-  await page.keyboard.press('Control+Meta+e');
-  await expect.poll(() => editor.evaluate((e) => e.classList.contains('cm-rich'))).toBe(rich);
+  await page.waitForTimeout(200);
+  expect(await editor.evaluate((e) => e.classList.contains('cm-rich'))).toBe(false);
   await page.keyboard.press('Meta+k');
   await expect(palette(page)).toBeVisible();
   await expect(page.locator('[data-ui="next"] header')).toContainText('⌘K');
+  await page.keyboard.type('оформлен');
+  await expect(palette(page).getByRole('option', { name: /Оформленный текст/ })).toHaveCount(0);
 });

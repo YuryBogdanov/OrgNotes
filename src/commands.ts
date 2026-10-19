@@ -2,6 +2,7 @@
 // group, when it is available (does it need a heading under the cursor, a file, the notes folder), a hint with
 // the current state and a shortcut. A command either runs at once or returns the next step, shown in the same
 // palette window (a list to pick from, or a text to type).
+import { RICH_ENABLED } from './nextFlags';
 import { store, type NoteFile } from './store.svelte';
 import { today } from './todayState.svelte';
 import { fuzzy, better, type Match } from './fuzzy';
@@ -270,7 +271,7 @@ register({
 
 register({
   id: 'rich', title: 'Оформленный текст', icon: 'head', group: 'general', synonyms: ['оформление', 'вид', 'org-modern', 'красиво'],
-  when: () => true, hint: () => (store.rich ? 'включён' : 'выключен'), run: () => store.setRich(!store.rich),
+  when: () => RICH_ENABLED || !store.nextUi, hint: () => (store.rich ? 'включён' : 'выключен'), run: () => store.setRich(!store.rich),
 });
 register({
   id: 'navCollapse', title: 'Навигатор: свернуть всё', icon: 'folder', group: 'general', synonyms: ['дерево', 'папки', 'свернуть'],

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { diskFile as disk, openApp } from './helpers';
 
 // ТЗ 48.2: «Добавить заметку…» ⌃C ⌃Z in the new interface — the popover of ТЗ 44, 440 pt, under the heading's line;
-// «Заметка», the status capsule and the title; the field in Cormorant; the two last notes (none — no block); ↩ writes
+// «Заметка», the status capsule and the title; the field in the interface's font (fix-49); the two last notes (none — no block); ↩ writes
 // it into :LOGBOOK: and closes, an empty field does nothing; ⎋ closes.
 
 const WORK = [
@@ -33,7 +33,7 @@ async function note(page: Page, line: string) {
   await expect(pop(page)).toBeVisible();
 }
 
-test('the popover: 440 pt under the line, «Заметка», the capsule and the title, Cormorant, the two last notes; ↩ writes and closes', async ({ page }) => {
+test('the popover: 440 pt under the line, «Заметка», the capsule and the title, the interface font, the two last notes; ↩ writes and closes', async ({ page }) => {
   await open(page);
   await note(page, 'Миграция биллинга');
   expect(Math.round((await pop(page).boundingBox())!.width)).toBeGreaterThanOrEqual(440);
@@ -42,7 +42,7 @@ test('the popover: 440 pt under the line, «Заметка», the capsule and th
   await expect(pop(page).locator('.hd b')).toHaveText('Заметка');
   await expect(pop(page).locator('.capsule')).toHaveText('NEXT');
   await expect(pop(page).locator('.ti')).toHaveText('Миграция биллинга');
-  expect(await pop(page).getByRole('textbox', { name: 'Новый статус' }).evaluate((e) => getComputedStyle(e).fontFamily)).toContain('Cormorant');
+  expect(await pop(page).getByRole('textbox', { name: 'Новый статус' }).evaluate((e) => getComputedStyle(e).fontFamily)).toContain('apple-system'); // the interface's font (fix-49)
   await expect(pop(page).locator('.note .tx')).toHaveText(['ждём бизнес', 'черновик у Глеба']);
   await expect(pop(page).locator('.foot')).toContainText('↩ записать · ⇧↩ строка · ⎋');
   // an empty field: ↩ does nothing

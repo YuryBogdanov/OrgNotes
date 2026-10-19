@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { RICH_ENABLED } from '../nextFlags';
   import { tick } from 'svelte';
   import { store } from '../store.svelte';
   import { defaultThemes } from '../appearance';
@@ -168,9 +169,12 @@
   </div>
 </Group>
 <Group caption="Текст">
-  <Row label="Шрифт текста" hint="Шрифт текста темы «{store.theme.name}»: заголовки, текст файла, карточки доски">
-    <FontMenu value={textFontOf(store.theme)} role="text" label="Шрифт текста" onchange={setTextFont} />
-  </Row>
+  <!-- the text's font belongs to «Оформление»: hidden while it is off (fix-49) -->
+  {#if RICH_ENABLED}
+    <Row label="Шрифт текста" hint="Шрифт текста темы «{store.theme.name}»: заголовки, текст файла, карточки доски">
+      <FontMenu value={textFontOf(store.theme)} role="text" label="Шрифт текста" onchange={setTextFont} />
+    </Row>
+  {/if}
   <Row label="Ширина текста" id="set-width">
     <Segments value={nextPrefs.width} options={TEXT_WIDTHS.map((w) => ({ value: w.id, label: w.name }))} labelledby="set-width" onchange={(v) => nextPrefs.setWidth(v)} />
   </Row>

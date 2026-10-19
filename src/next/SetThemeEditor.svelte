@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { RICH_ENABLED } from '../nextFlags';
   import { untrack } from 'svelte';
   import { store } from '../store.svelte';
   import { namedFor, resolveWorkflow } from '../org';
@@ -182,7 +183,7 @@
         <section class="grp" aria-label="Шрифты">
           <div class="cap">Шрифты</div>
           <div class="card">
-            {#each FONT_ROWS as r (r.role)}
+            {#each FONT_ROWS.filter((r) => RICH_ENABLED || r.role !== 'text') as r (r.role)}
               <div class="row">
                 <div class="rl"><span class="rt">{r.t}</span><span class="rh">{r.hint}</span></div>
                 <FontMenu value={app.fonts[r.role]} role={r.role} label={r.t} onchange={(f) => put((a) => ({ ...a, fonts: { ...a.fonts, [r.role]: f } }))} />

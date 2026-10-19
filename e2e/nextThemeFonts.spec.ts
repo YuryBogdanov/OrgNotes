@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openApp } from './helpers';
+import { RICH_ENABLED } from '../src/nextFlags';
 
 // ТЗ 57.5: a theme's four fonts — the menu (the bundled ones, a rule, the families of the Mac with a field, each in
 // its own font, «нет кириллицы»); the window takes them; «Шрифт текста» is the theme's text font, a built-in theme
@@ -21,7 +22,8 @@ test('the editor\'s «Шрифты»: the Mac\'s families in the menu, found by 
   const s = await open(page);
   await s.getByRole('button', { name: '+ Новая тема' }).click();
   const fonts = s.getByRole('region', { name: 'Шрифты' });
-  await expect(fonts.locator('.row')).toHaveCount(4);
+  await expect(fonts.locator('.row')).toHaveCount(3); // «Текст файла» hidden with «Оформление» (fix-49)
+  await expect(fonts.getByRole('button', { name: /^Текст файла:/ })).toHaveCount(0);
   const title = fonts.getByRole('button', { name: /^Заголовки экранов:/ });
   await expect(title).toHaveAccessibleName('Заголовки экранов: Yeseva One');
   await title.click();
@@ -45,6 +47,7 @@ test('the editor\'s «Шрифты»: the Mac\'s families in the menu, found by 
 });
 
 test('«Шрифт текста»: a built-in theme is copied first; an own theme takes it at once', async ({ page }) => {
+  test.skip(!RICH_ENABLED, '«Оформление» выключено (fix-49)');
   const s = await open(page);
   const row = s.getByRole('button', { name: /^Шрифт текста:/ });
   await expect(row).toHaveAccessibleName('Шрифт текста: Cormorant Garamond');

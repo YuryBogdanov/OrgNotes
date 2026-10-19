@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { RICH_ENABLED } from '../nextFlags';
   import { deriveTokens, type AppTheme } from '../appTheme';
   import { fontCss, tokenVars } from './tokens';
 
@@ -9,7 +10,7 @@
   const tk = $derived(deriveTokens(theme));
   const lv = $derived(theme.details.headings === 'levels' && theme.details.levels ? theme.details.levels : null);
   const style = $derived(
-    `${tokenVars(theme)};--pt:${fontCss(theme.fonts.title, 'title')};--px:${fontCss(theme.fonts.text, 'text')};--pu:${fontCss(theme.fonts.ui, 'ui')};--pm:${fontCss(theme.fonts.mono, 'mono')}`,
+    `${tokenVars(theme)};--pt:${fontCss(theme.fonts.title, 'title')};--px:${RICH_ENABLED ? fontCss(theme.fonts.text, 'text') : fontCss(theme.fonts.ui, 'ui')};--pu:${fontCss(theme.fonts.ui, 'ui')};--pm:${fontCss(theme.fonts.mono, 'mono')}`,
   );
 </script>
 

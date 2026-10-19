@@ -232,15 +232,15 @@ test.describe('the new look (ТЗ 51)', () => {
     const view = page.locator('.wk-view.nx');
     await expect(view).toBeVisible();
     expect(await font(view.locator('h1'))).toContain('Yeseva');
-    expect(await font(view.locator('.wk-gtitle').first())).toContain('Cormorant');
-    expect(await font(view.locator('.wk-note').first())).toContain('Cormorant');
+    expect(await font(view.locator('.wk-gtitle').first())).toContain('apple-system'); // the interface's font (fix-49)
+    expect(await font(view.locator('.wk-note').first())).toContain('apple-system'); // the interface's font (fix-49)
     expect(await font(view.locator('.wk-kick'))).toContain('Plex Mono');
     await expect(view.getByRole('button', { name: 'Подвести итоги…' })).toHaveCSS('background-color', 'rgb(227, 170, 60)');
     expect(await page.locator('.wk-tab.nx').evaluate((e) => getComputedStyle(e).backgroundImage)).toContain('linear-gradient');
     await view.getByRole('button', { name: 'Подвести итоги…' }).click();
     const rv = page.getByRole('region', { name: 'Итоги 42 недели' });
-    expect(await font(rv.locator('.wk-rgt').first())).toContain('Cormorant');
-    expect(await font(rv.locator('textarea').first())).toContain('Cormorant');
+    expect(await font(rv.locator('.wk-rgt').first())).toContain('apple-system'); // the interface's font (fix-49)
+    expect(await font(rv.locator('textarea').first())).toContain('apple-system'); // the interface's font (fix-49)
     expect(await font(rv.locator('.wk-stats b').first())).toContain('Yeseva');
   });
 
@@ -248,7 +248,7 @@ test.describe('the new look (ТЗ 51)', () => {
     await open(page, { '/mock/weeks.org': W42 }, '2026-10-16T16:30:00');
     const ban = block(page, 'week.banner').locator('.wk-ban.nx');
     await expect(ban).toContainText('Итоги 42 недели — можно подвести');
-    expect(await font(block(page, 'week.goals').locator('.wk-tt').first())).toContain('Cormorant');
+    expect(await font(block(page, 'week.goals').locator('.wk-tt').first())).toContain('apple-system'); // the interface's font (fix-49)
     await expect(block(page, 'week.goals').locator('.wk-plug')).toHaveText('Неделя');
     // fix #294: a goal's title up to three lines, the tiles of a row one height
     const tiles = block(page, 'week.goals').locator('.wk-tile');

@@ -3,6 +3,7 @@
 // item's accelerator, none for a chord (macOS menus cannot show one). Built again when a shortcut changes.
 // Returns null when there is no native menu (a plain browser, tests): the app handles the same keys anyway.
 
+import { RICH_ENABLED } from './nextFlags';
 import { nextOn } from './uiFlag';
 
 export type MenuActions = Record<string, () => void>;
@@ -95,7 +96,8 @@ export async function installMenu(actions: MenuActions, accel: (id: string) => s
             it('today', 'Сегодня'),
             it('jumpBar', 'Строка пути'),
             it('structure', 'Структурный вид'),
-            rich,
+            // «Оформление» not in the new interface while it is off (fix-49)
+            ...(next && !RICH_ENABLED ? [] : [rich]),
             sep,
             it('splitRight', 'Разделить вправо'),
             it('splitDown', 'Разделить вниз', 'Alt+CmdOrCtrl+Backslash', false),

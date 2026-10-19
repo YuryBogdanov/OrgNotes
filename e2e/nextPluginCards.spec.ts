@@ -3,7 +3,7 @@ import { diskFile as disk, openApp } from './helpers';
 
 // ТЗ 44.7 (§5): the cards of the built-in plugins — «Долгие дела» on a file of its sources (the groups, «Открыть
 // список», under the caret the matter and its actions with their keys, off on a heading that is not one), not on a
-// file outside them; «Канбан» on a file with statuses — one line and «Открыть доской ⌥⌘B».
+// file outside them; «Канбан» on a file with statuses — one line (the board by the view switch, fix-49).
 
 const NOW = new Date(2026, 9, 16, 11, 0);
 const MID = [
@@ -69,7 +69,7 @@ test('«Долгие дела» on Midterm: the groups, «Открыть спи�
   expect(await disk(page, MIDTERM)).toContain('* NEXT Переезд хранилища');
 });
 
-test('a file outside the sources: no card of «Долгие дела»; «Канбан» on a file with statuses: «Открыть доской ⌥⌘B»', async ({ page }) => {
+test('a file outside the sources: no card of «Долгие дела»; «Канбан» on a file with statuses: its line, the board by the view switch', async ({ page }) => {
   await open(page);
   await tree(page, 'Work').click();
   await expect(col(page)).toBeVisible();
@@ -82,11 +82,11 @@ test('a file outside the sources: no card of «Долгие дела»; «Кан
   const head = k.locator('[aria-expanded="false"]');
   if (await head.count()) await head.first().click();
   await expect(k.locator('.kb-fcard > span')).toHaveText('Колонки — статусы файла');
-  const open_ = k.getByRole('button', { name: /Открыть доской/ });
-  await expect(open_).toHaveText('Открыть доской⌥⌘B');
+  // no «Открыть доской» (fix-49): the file's view switch at the area's corner shows the board
+  await expect(k.getByRole('button', { name: /Открыть доской/ })).toHaveCount(0);
   // the cards in the sidebar's order: «Долгие дела» before «Канбан»
   const [a, b] = await Promise.all([card(page, 'Долгие дела').boundingBox(), k.boundingBox()]);
   expect(a!.y).toBeLessThan(b!.y);
-  await open_.click();
+  await page.getByRole('radiogroup', { name: 'Вид файла' }).getByRole('radio', { name: 'Доска' }).click();
   await expect(page.getByRole('application', { name: /^Доска/ })).toBeVisible();
 });

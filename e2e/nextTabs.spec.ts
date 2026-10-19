@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openApp } from './helpers';
+import { RICH_ENABLED } from '../src/nextFlags';
 
 // ТЗ 42.4: the tabs of the new interface — a tab per open file (its name without `.org`, ТЗ 44 §11), the active one; «×»
 // closes, an unsaved one has a dot and is asked about; «+» an untitled tab; «Оформление / Исходник» is the old
@@ -53,6 +54,7 @@ test('unsaved: a dot; ⌘W closes the active tab, an untitled one with text is a
 });
 
 test('«Оформление / Исходник» is the shared flag of the rich text', async ({ page }) => {
+  test.skip(!RICH_ENABLED, '«Оформление» выключено (fix-49)');
   await open(page);
   const mode = page.getByRole('radiogroup', { name: 'Вид текста' });
   await mode.getByRole('radio', { name: 'Оформление' }).click();

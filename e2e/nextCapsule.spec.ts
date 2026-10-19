@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openApp, settingsSheet } from './helpers';
+import { RICH_ENABLED } from '../src/nextFlags';
+// fix-49: «Оформление» is off in the new interface — these come back with it
+test.skip(!RICH_ENABLED, '«Оформление» выключено (fix-49)');
 
 // ТЗ 44.10 (§12): a heading's status capsule (and its priority, its tags) centred on the middle of its capitals — the
 // gaps above and below the same within 1 pt — at every level, in each «Шрифт текста»; the line's height unchanged.

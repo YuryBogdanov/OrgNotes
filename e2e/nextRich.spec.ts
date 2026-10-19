@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openApp, diskFile as disk } from './helpers';
+import { RICH_ENABLED } from '../src/nextFlags';
+// fix-49: «Оформление» is off in the new interface — these come back with it
+test.skip(!RICH_ENABLED, '«Оформление» выключено (fix-49)');
 
 // ТЗ 42.6: «Оформление» of the new interface — the column with Cormorant, no stars or dots, a status capsule, tags
 // `:dev:`, chips for dates, a cookie and folded drawers («⋯ 1 свойство»), the caret's line keeps its font and size

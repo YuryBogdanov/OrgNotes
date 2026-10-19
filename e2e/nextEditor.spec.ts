@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openApp, diskFile as disk } from './helpers';
+import { RICH_ENABLED } from '../src/nextFlags';
 
 // ТЗ 42.5: the editor of the new interface — the same engine as the old one (cm/orgEditor.ts): typing goes to the
 // file and is saved, ⌘Z, the keys of the editor, folding, a change on disk followed; an untitled tab; «Оформление»
@@ -39,6 +40,7 @@ test('the editor\'s keys: a status by ⇧→ on a heading; ⌥↩ a new heading;
 });
 
 test('a change on the disk is followed; an untitled tab is an editor too; «Оформление» draws the text', async ({ page }) => {
+  test.skip(!RICH_ENABLED, '«Оформление» выключено (fix-49)');
   await open(page);
   await page.evaluate(() => (window as any).__setDisk('/mock/Midterm.org', '* TODO Роадмап Q4\nС диска.\n* NEXT Переезд\n'));
   await expect(page.locator('.cm-line', { hasText: 'С диска.' })).toBeVisible();
