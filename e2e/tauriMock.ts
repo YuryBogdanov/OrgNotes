@@ -351,6 +351,8 @@ export async function installTauriMock(page: Page, files: Record<string, string>
         // the windows, the mini window, the shortcuts
         'plugin:window|hide': () => void w.__log.push(['hide']),
         'plugin:window|set_fullscreen': (a) => void w.__log.push(['fullscreen', a.value]),
+        'plugin:window|start_dragging': () => void w.__log.push(['drag']),
+        'plugin:window|toggle_maximize': () => void w.__log.push(['zoom']),
         'plugin:window|get_all_windows': () => (w.__windows as string[]) ?? ['main'],
         'plugin:webview|create_webview_window': (a) => {
           w.__log.push(['window', a.options]);
