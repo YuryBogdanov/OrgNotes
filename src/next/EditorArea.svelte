@@ -11,6 +11,7 @@
   import { touches } from '../touchIndex.svelte';
   import { narrowRangeOf } from '../narrowTab';
   import Editor from './Editor.svelte';
+  import BesideSplit from './BesideSplit.svelte';
   import Structure from './Structure.svelte';
   import Today from './Today.svelte';
   import AgendaDay from './AgendaDay.svelte';
@@ -164,12 +165,12 @@
 <div class="area">
   {#if tab?.kind === TODAY}
     <!-- «Сегодня» in the new style (ТЗ 45 §2) -->
-    <div class="view"><Today pane={0} /></div>
+    <div class="view"><BesideSplit tabId={tab.id}><Today pane={0} /></BesideSplit></div>
   {:else if tab && !isCore(tab.kind)}
     {@const v = viewOf(tab.kind)}
     {#if v}
       <!-- «Сегодня», «Тег», a review, a plugin's view: old screens in the compatibility layer (ТЗ 43 §4) -->
-      <div class="view"><Compat><v.component {tab} pane={0} /></Compat></div>
+      <div class="view"><BesideSplit tabId={tab.id}><Compat><v.component {tab} pane={0} /></Compat></BesideSplit></div>
     {:else}
       {@const pe = plugins.pluginOfView(tab.kind)}
       <div class="word" role="status">
@@ -239,10 +240,10 @@
     </div>
   {:else if tab?.kind === 'agenda' && !store.agendaOf(tab)}
     <!-- the built-in «Агенда» in the mode «День» (ТЗ 45 §3.2) -->
-    <div class="view"><AgendaDay pane={0} /></div>
+    <div class="view"><BesideSplit tabId={tab.id}><AgendaDay pane={0} /></BesideSplit></div>
   {:else if tab?.kind === 'agenda'}
     <!-- a custom agenda, «Неделя», «Сегодня», «Все задачи»: blocks in the new style (ТЗ 45 §3.3) -->
-    <div class="view"><AgendaBlocks pane={0} /></div>
+    <div class="view"><BesideSplit tabId={tab.id}><AgendaBlocks pane={0} /></BesideSplit></div>
   {:else}
     <div class="word" role="status"><b class="title">Нет открытых вкладок</b><span>Откройте файл в сайдбаре или создайте новый.</span></div>
   {/if}

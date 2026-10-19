@@ -173,3 +173,9 @@
 .next[data-font='system'] .cm-rich .cm-n-cell, .next[data-font='mono'] .cm-rich .cm-n-cell { font-size: 13.5px; font-weight: 400; }
 .next[data-font='system'] .lc-title, .next[data-font='mono'] .lc-title { --hfs: 17px; font-size: 17px; }
 .next[data-font='system'] .lc-body, .next[data-font='mono'] .lc-body { font-size: 13.5px; font-weight: 400; }
+
+/* the subtree of the heading beside a list (ТЗ 56 §4): a bar of 3 of the lamp left of its lines */
+.next .cm-sub { position: relative; }
+.next .cm-sub::before { content: ''; position: absolute; left: -10px; top: 0; bottom: 0; width: 3px; background: var(--lamp); }
+.next .cm-sub.top::before { top: 0.3em; border-radius: 2px 2px 0 0; }
+.next .cm-sub.last::before { bottom: 0.2em; border-radius: 0 0 2px 2px; }
