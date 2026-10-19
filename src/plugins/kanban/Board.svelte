@@ -277,7 +277,7 @@
     const el = peekEl;
     const at = opened;
     if (!el || !at) return;
-    const ed = untrack(() => kanban.ctx.ui.editor(el, { path, line: at.line, title: at.title }, { onRef: (r) => (peek = { line: r.line, title: r.title }) }));
+    const ed = untrack(() => kanban.ctx.ui.editor(el, { path, line: at.line, title: at.title }, { onRef: (r) => (peek = { line: r.line, title: r.title }), source: true }));
     queueMicrotask(() => ed.focus());
     return () => ed.dispose();
   });

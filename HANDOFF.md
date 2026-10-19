@@ -978,6 +978,9 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   transform — the board's `.kb-setup` here, the week's plan there (not reproduced in WebKit's tests: centred there
   both ways); the week's goals on «Сегодня» up to 3 lines in tiles of one height. weekPlugin.spec.ts checks both.
   In a worktree the week's e2e runs when `.claude/worktrees/panopticon-week` links to the plugin's repo.
+- **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
+  1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
+  (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.
 - **A plugin's bare sheet:** the core's layer `.bare` (both shells' PluginSheets) is a column centred across the
   window under the toolbar (52 / 40 pt): a sheet that places itself (`position: absolute`, as the board's setup, the
   week's plan since panopticon-week#8) is not moved; one that does not (the week's release 0.3.0 the app has
