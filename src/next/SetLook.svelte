@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { store } from '../store.svelte';
+  import { defaultThemes } from '../appearance';
   import { nextPrefs, TEXT_FONTS, TEXT_WIDTHS } from '../nextPrefs.svelte';
   import { setLayer } from '../settingsNav.svelte';
   import type { MenuItem } from '../menuItems';
@@ -147,7 +148,7 @@
 {#if confirmDel}
   {@const t = confirmDel}
   <ConfirmSheet label="Удаление темы" title="Удалить тему «{t.name}»?" onclose={() => (confirmDel = null)} actions={[{ label: 'Удалить', kind: 'danger', run: () => void store.deleteTheme(t) }]}>
-    Файл темы удаляется из папки тем. {store.themeFor(t.appearance).name === t.name ? `Редактор вернётся к теме «${t.appearance === 'dark' ? 'Panopticon тёмная' : 'Panopticon светлая'}».` : ''}
+    Файл темы удаляется из папки тем. {store.themeFor(t.appearance).name === t.name ? `Редактор вернётся к теме «${defaultThemes()[t.appearance]}».` : ''}
   </ConfirmSheet>
 {/if}
 

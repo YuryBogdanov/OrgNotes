@@ -976,6 +976,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   the built-in «Бумага» / «Синька» (`PAPER`, `BLUEPRINT`, their sidebars set)). `TOKENS` is now derived from them:
   tokens.test.ts keeps the concept's old values and compares, laid on the ground, ±2 per channel; the palette of
   «Бумага»: yellow is the old `wait` (#a2700c), orange a new #a8541b.
+  57.2, the old themes: every `Theme` has `app` (its AppTheme) and `v` (2: the new file format, `colors` derived by
+  `editorColors`; missing: the old format — the file's own colours kept for the editor, `app` read from them by
+  `fromV1`: the accent is the cursor, or the link when the cursor is the text's colour as Nord's and Dracula's; the
+  headings by levels when h1…h4 differ). `parseTheme` reads both (`"v": 2`: base, palette, details, fonts — what is
+  missing from «Бумага» / «Синька»), `themeJson` writes each in its own format, so an old file stays old till the new
+  editor changes it (`store.setThemeApp`; the old editor's `setThemeColors` keeps v1). The built-ins: «Классическая
+  светлая / тёмная» (were «Panopticon …»), «Бумага», «Синька» (were «Синька — светлая / тёмная», now `fromApp(PAPER /
+  BLUEPRINT)`); `themeAlias` reads the old names (the choice on this Mac, `basedOn`). `defaultThemes()` — the shell's
+  defaults: a deleted or gone theme gives way to «Бумага» / «Синька» in the new interface.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

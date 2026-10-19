@@ -80,10 +80,10 @@ test('the menu of a card: duplicate («(2)» on a clash), rename (the file follo
   await menuOn(page, 'Сумерки');
   await page.getByRole('menuitem', { name: 'Удалить' }).click();
   const dlg = page.getByRole('alertdialog', { name: 'Удаление темы' });
-  await expect(dlg).toContainText('Редактор вернётся к теме «Panopticon тёмная»');
+  await expect(dlg).toContainText('Редактор вернётся к теме «Классическая тёмная»');
   await dlg.getByRole('button', { name: 'Удалить' }).click();
   await expect(dark(page).getByRole('radio', { name: 'Сумерки' })).toHaveCount(0);
-  await expect(dark(page).getByRole('radio', { name: 'Panopticon тёмная' })).toHaveAttribute('aria-checked', 'true');
+  await expect(dark(page).getByRole('radio', { name: 'Классическая тёмная' })).toHaveAttribute('aria-checked', 'true');
   keys = Object.keys(await disk(page)).filter((k) => k.startsWith('/config/themes/'));
   expect(keys).toEqual(['/config/themes/Ночная.json']);
 });

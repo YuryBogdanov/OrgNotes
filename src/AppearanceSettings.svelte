@@ -3,6 +3,7 @@
   import { portal } from './portal';
   import { tick } from 'svelte';
   import { store } from './store.svelte';
+  import { defaultThemes } from './appearance';
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte';
   import type { Appearance, AppearanceChoice, Theme } from './themes';
 
@@ -161,7 +162,7 @@
 {#if confirmDel}
   {@const t = confirmDel}
   <ConfirmDialog label="Удаление темы" title="Удалить тему «{t.name}»?" onclose={() => (confirmDel = null)} actions={[{ label: 'Удалить', kind: 'danger', run: () => void store.deleteTheme(t) }]}>
-    Файл темы удаляется из папки тем. {store.themeFor(t.appearance).name === t.name ? `Редактор вернётся к теме «${t.appearance === 'dark' ? 'Panopticon тёмная' : 'Panopticon светлая'}».` : ''}
+    Файл темы удаляется из папки тем. {store.themeFor(t.appearance).name === t.name ? `Редактор вернётся к теме «${defaultThemes()[t.appearance]}».` : ''}
   </ConfirmDialog>
 {/if}
 
