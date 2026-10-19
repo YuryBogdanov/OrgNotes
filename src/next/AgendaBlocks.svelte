@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { capColumn } from './capColumn';
   import { draggedHeading, setDragged } from '../dragData';
   import { store } from '../store.svelte';
   import { tasksCount } from '../agendas';
@@ -24,7 +25,7 @@
 <div class="host">
 <!-- the screen is a list of tasks: ↑↓ move in its rows (ТЗ 34) -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<div class="ablocks" role="region" aria-label={c.custom?.name ?? 'Агенда'} tabindex="-1" bind:this={list} onkeydown={(e) => c.keydown(e)} onclick={(e) => c.clickEmpty(e, '.row')}>
+<div class="ablocks" use:capColumn={48} role="region" aria-label={c.custom?.name ?? 'Агенда'} tabindex="-1" bind:this={list} onkeydown={(e) => c.keydown(e)} onclick={(e) => c.clickEmpty(e, '.row')}>
   <div class="wrap">
     <header>
       <div class="ttl"><div class="kick">{kicker}</div><h1>{c.custom?.name}</h1></div>
@@ -93,7 +94,7 @@
   .row.stale { opacity: 0.55; }
   .row.done .t { text-decoration: line-through; }
   .time { flex: 0 0 86px; font: 11.5px var(--mono); color: var(--ink3); white-space: nowrap; }
-  .kc { flex: 0 0 48px; display: flex; }
+  .kc { flex: 0 0 var(--kc, 48px); display: flex; }
   .cap { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 4px; font: 700 10.5px var(--ui); letter-spacing: 0.02em; white-space: nowrap; color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); }
   .cap.ev { color: var(--lampink); background: var(--lampsoft); }
   .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
