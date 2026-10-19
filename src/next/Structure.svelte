@@ -14,7 +14,32 @@
   // A narrowed tab (§5.8): only the subtree it shows.
   // `cards`: the plugins' cards over it (ТЗ 44 §6), the column then `width` wide; `queue`: a review's queue in its
   // place, «Связи» not shown (ТЗ 41 §1.2)
-  let { range = null, width = 220, cards, queue }: { range?: { line: number; end: number } | null; width?: number; cards?: Snippet; queue?: Snippet } = $props();
+  let { range = null, width = 220, cards, queue, onsqueeze }: { range?: { line: number; end: number } | null; width?: number; cards?: Snippet; queue?: Snippet; onsqueeze?: (on: boolean) => void } = $props();
+
+  // fix #296: the cards stay at the column's top, «Структура» scrolls under them in the rest of its height; the cards
+  // higher than 45 % of the column — all but the first folded to their heads (`onsqueeze`). Their full height is the
+  // one last measured unfolded: unfolded again when the column has room for it.
+  let aside: HTMLElement | undefined = $state();
+  let cardsEl: HTMLDivElement | undefined = $state();
+  let squeezed = false;
+  let fullH = 0;
+  $effect(() => {
+    if (!aside || !cardsEl || !onsqueeze) return;
+    const look = () => {
+      const room = aside!.clientHeight * 0.45;
+      const h = cardsEl!.offsetHeight;
+      if (!squeezed) fullH = h;
+      const want = fullH > room;
+      if (want !== squeezed) {
+        squeezed = want;
+        onsqueeze!(want);
+      }
+    };
+    const ro = new ResizeObserver(look);
+    ro.observe(aside);
+    ro.observe(cardsEl);
+    return () => ro.disconnect();
+  });
   const file = $derived(store.fileOf(store.tab));
   const fi = $derived(file ? store.files.indexOf(file) : -1);
   const line = $derived(store.tab?.cursor.line ?? 0);
@@ -65,8 +90,8 @@
   });
 </script>
 
-<aside class="struct" aria-label="Структура" style:width="{width}px">
-  {#if cards}<div class="cards">{@render cards()}</div>{/if}
+<aside class="struct" aria-label="Структура" style:width="{width}px" bind:this={aside}>
+  {#if cards}<div class="cards" bind:this={cardsEl}>{@render cards()}</div>{/if}
   {#if queue}{@render queue()}{:else}
   <button class="lbl head" aria-expanded={!nextPrefs.structFolded} onclick={() => nextPrefs.toggleStructFolded()}>Структура<span class="chev" aria-hidden="true">{nextPrefs.structFolded ? '›' : '⌄'}</span></button>
   {#if !nextPrefs.structFolded}
@@ -103,15 +128,15 @@
   .struct { position: absolute; top: 0; right: 0; bottom: 0; z-index: 2; width: 220px; min-height: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 46px 22px 16px 0; overflow: hidden; pointer-events: none; }
   .struct > * { pointer-events: auto; }
   /* the cards as the mockup has them: 4 pt off the editor, 18 off the window's edge (the column's own 22 less 4) */
-  .cards { flex: 0 1 auto; min-height: 0; overflow: auto; margin: 0 -4px 8px 4px; scrollbar-width: none; }
-  .cards::-webkit-scrollbar { display: none; }
+  /* fix #296: they do not scroll, nor give way; «Структура» does under them */
+  .cards { flex: 0 0 auto; margin: 0 -4px 8px 4px; }
   .lbl { padding-left: 22px; margin-bottom: 12px; font-size: 11px; font-weight: 600; color: var(--ink3); }
   /* a head that folds its part (§10): the whole row, the chevron at the right */
   .head { display: flex; align-items: center; gap: 6px; width: 100%; padding-top: 0; padding-bottom: 0; padding-right: 2px; border: 0; background: none; text-align: left; font-family: var(--ui); cursor: default; }
   .head:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; border-radius: 4px; }
   .head .n { font-weight: 400; font-size: 11px; color: var(--ink3); }
   .head .chev { margin-left: auto; font-size: 10px; }
-  .list { position: relative; min-height: 0; overflow: auto; padding-left: 22px; scrollbar-width: none; }
+  .list { position: relative; flex: 0 1 auto; min-height: 0; overflow: auto; padding-left: 22px; scrollbar-width: none; }
   .list::-webkit-scrollbar { display: none; }
   .list.ft { -webkit-mask-image: linear-gradient(transparent, #000 24px); mask-image: linear-gradient(transparent, #000 24px); }
   .list.fb { -webkit-mask-image: linear-gradient(#000 calc(100% - 24px), transparent); mask-image: linear-gradient(#000 calc(100% - 24px), transparent); }
@@ -129,7 +154,7 @@
   .row.on .dot { left: -21px; width: 9px; height: 9px; border-radius: 5px; background: var(--lamp); opacity: 1; box-shadow: 0 0 0 4px var(--lampsoft); }
   .row:focus-visible, .bl:focus-visible, .more:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
   .none { margin: 0; color: var(--ink3); font-size: 12px; }
-  .back { margin: 30px 0 0 22px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .back { flex: 0 0 auto; margin: 30px 0 0 22px; padding-top: 14px; border-top: 1px solid var(--rule); }
   .back .lbl { padding-left: 0; margin-bottom: 10px; }
   .back.tight { margin-top: 2px; } /* under the folded «Структура»: no list to keep off */
   .bl, .more { display: block; width: 100%; padding: 3px 0; border: 0; background: none; color: var(--ink2); font: 12px var(--ui); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
