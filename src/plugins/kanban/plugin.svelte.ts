@@ -34,9 +34,8 @@ export default definePlugin({
       run: () => void ctx.ui.showAs(VIEW),
     });
 
-    // the card of a file (ТЗ 44 §5): what the columns are — the whole width, wrapped, never cut (fix #299) — and under it
-    // the row of buttons, «Открыть доской» with its key (a plain one, not the main); on a file whose level-1 headings
-    // have statuses (they would be on the board)
+    // the card of a file (ТЗ 44 §5): what the columns are — the whole width, wrapped, never cut (fix #299); «Открыть
+    // доской» is the core's view switch now (fix-49). On a file whose level-1 headings have statuses (on the board)
     ctx.ui.fileCard('kanban.card', {
       match: async (path) => (await ctx.index!.outline(path)).some((h) => h.level === 1 && !!h.keyword),
       render: (el, c) => {
@@ -44,13 +43,7 @@ export default definePlugin({
         void ctx.files!.read(c.path).then((text) => {
           const name = boardOf(text);
           const line = Object.assign(document.createElement('div'), { className: 'kb-fcard' });
-          const what = Object.assign(document.createElement('span'), { textContent: name ? `Колонки — статусы «${name}»` : 'Колонки — статусы файла' });
-          const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'fc-btn', textContent: 'Открыть доской', onclick: () => void ctx.ui.showAs(VIEW) });
-          const k = ctx.commands.keyOf('kanban.toggle');
-          if (k) btn.append(Object.assign(document.createElement('kbd'), { textContent: k }));
-          const btns = Object.assign(document.createElement('div'), { className: 'fc-btns' });
-          btns.append(btn);
-          line.append(what, btns);
+          line.append(Object.assign(document.createElement('span'), { textContent: name ? `Колонки — статусы «${name}»` : 'Колонки — статусы файла' }));
           el.replaceChildren(line);
         });
       },

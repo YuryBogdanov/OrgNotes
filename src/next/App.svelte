@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { RICH_ENABLED } from '../nextFlags';
   import FullscreenLights from './FullscreenLights.svelte';
   import { onMount } from 'svelte';
   import { store } from '../store.svelte';
@@ -137,7 +138,8 @@
     closeWindow: () => store.hideWindow(),
     splitRight: () => store.splitRight(),
     // ⌃⌘E on a file's view: back to its text in the mode it has (ТЗ 49 §2); on the text — the other mode
-    rich: () => (store.tab?.kind === 'file' && store.viewOf(store.tab) && !fileTypeOf(store.tab.path) ? store.showAs(store.tab, '') : store.setRich(!store.rich)),
+    // («Оформление» off, fix-49: the key does nothing here — the old interface keeps it)
+    rich: () => (RICH_ENABLED ? (store.tab?.kind === 'file' && store.viewOf(store.tab) && !fileTypeOf(store.tab.path) ? store.showAs(store.tab, '') : store.setRich(!store.rich)) : false),
     // ⌥⌘0: the old inspector's keys show «Структура» here (§8)
     insp: () => nextPrefs.setStructure(!nextPrefs.structure),
     // ⌘F, ⌘G, ⇧⌘G, ⌘E, ⌥⌘F (§5.7)
@@ -200,8 +202,9 @@
   // the theme's fonts (ТЗ 57 §6): the screens' titles, the text of «Оформление» (the old «Шрифт текста» on a built-in
   // theme, fontList), the interface, the monospace
   const textName = $derived(textFontOf(store.theme));
-  const textFont = $derived(fontCss(textName, 'text'));
+  // «Оформление» off (fix-49): the file's text font nowhere — `--text` (and the plugins' `--font-text`) the interface's
   const fonts = $derived(store.theme.app.fonts);
+  const textFont = $derived(RICH_ENABLED ? fontCss(textName, 'text') : fontCss(fonts.ui, 'ui'));
   // half the cap height of that font (ТЗ 44 §12): the capsules beside a heading centre on its capitals; measured, not
   // written down — Cormorant ≈ 0.63 em, SF Pro and IBM Plex Mono ≈ 0.70; again once the fonts are loaded
   let capc = $state(0.315);
@@ -299,7 +302,7 @@
   let mainEl: HTMLDivElement | undefined = $state();
 </script>
 
-<div class="next" class:theming data-ui="next" data-font={fontKind(textName)} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px" style="{tokenVars(store.theme.app)};--ui:{fontCss(fonts.ui, 'ui')};--text:{textFont};--title:{fontCss(fonts.title, 'title')};--mono:{fontCss(fonts.mono, 'mono')};--col:{nextPrefs.col};--capc:{capc}">
+<div class="next" class:theming data-ui="next" data-font={RICH_ENABLED ? fontKind(textName) : 'system'} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px" style="{tokenVars(store.theme.app)};--ui:{fontCss(fonts.ui, 'ui')};--text:{textFont};--title:{fontCss(fonts.title, 'title')};--mono:{fontCss(fonts.mono, 'mono')};--col:{nextPrefs.col};--capc:{capc}">
   <!-- the first start has the window to itself (ТЗ 48 §6): no sidebar, no tabs under it -->
   <div class="win" style:display={store.start ? "none" : undefined} inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
   <!-- the window's buttons in full screen, the page's own (fix #298) -->

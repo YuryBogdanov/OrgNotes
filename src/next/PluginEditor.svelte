@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { RICH_ENABLED } from '../nextFlags';
   import { store } from '../store.svelte';
   import { headingAt } from '../org';
   import Editor from './Editor.svelte';
@@ -29,7 +30,7 @@
 {#if file && h}
   <div class="ped">
     <Editor text={file.text} fileKey={'peek|' + path + '|' + line} path={file.name} wf={file.wf} reveal={null} narrow={{ line: h.line, end: h.end }} onnarrow={moved}
-      levels={store.levels} drawers={store.foldDrawers} rich={!source} richNumbers={store.richNumbers}
+      levels={store.levels} drawers={store.foldDrawers} rich={RICH_ENABLED && !source} richNumbers={store.richNumbers}
       onchange={(t) => store.setText(t, file.path)} oncursor={() => {}} onfollow={(l) => store.follow(l)} />
   </div>
 {:else}

@@ -27,10 +27,8 @@ test('the cards do not scroll with «Структура»; the board\'s card wra
   expect((await cards.boundingBox())!.y).toBe(top);
   const kb = col(page).locator('.kb-fcard');
   await expect(kb).toBeVisible();
-  const text = (await kb.locator('> span').boundingBox())!;
-  const btn = (await kb.getByRole('button', { name: /Открыть доской/ }).boundingBox())!;
-  expect(btn.y).toBeGreaterThanOrEqual(text.y + text.height - 1);
-  await expect(kb.getByRole('button', { name: /Открыть доской/ })).not.toHaveClass(/main/);
+  await expect(kb.locator('> span')).toContainText('Колонки — статусы');
+  await expect(kb.getByRole('button')).toHaveCount(0); // «Открыть доской» is the view switch now (fix-49)
 });
 
 test('a short window: the cards over 45 % of the column — all but the first folded', async ({ page }) => {

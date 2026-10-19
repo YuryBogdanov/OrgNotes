@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openApp, diskFile as disk } from './helpers';
+import { RICH_ENABLED } from '../src/nextFlags';
+// fix-49: «Оформление» is off in the new interface — these come back with it
+test.skip(!RICH_ENABLED, '«Оформление» выключено (fix-49)');
 
 // ТЗ 42.7: tables and blocks in the new «Оформление» — a table framed with its columns in one width, the head on a
 // chip, the rule line gone; the caret in a cell shows only its row's text, the rows around stay where they were;

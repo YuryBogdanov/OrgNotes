@@ -22,7 +22,7 @@ async function open(page: Page) {
 test('--font-text on the view\'s element is the editor\'s font; the card at the side — the new editor, narrowed, in «Исходник» (`source`, API 1.18); an edit goes to the file', async ({ page }) => {
   await open(page);
   const font = await page.locator('.fview .host').evaluate((e) => getComputedStyle(e).getPropertyValue('--font-text').trim());
-  expect(font).toContain('Cormorant'); // the editor's, resolved
+  expect(font).toContain('apple-system'); // the interface's, «Оформление» off (fix-49)
   await page.locator('.kanban .kb-card', { hasText: 'Переезд в новый ДЦ' }).dblclick();
   const peek = page.locator('.kanban').getByRole('dialog', { name: 'Карточка' });
   await expect(peek).toBeVisible();

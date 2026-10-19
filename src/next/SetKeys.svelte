@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { RICH_ENABLED } from '../nextFlags';
   import { tick } from 'svelte';
   import { store } from '../store.svelte';
   import { FIXED_KEYS, type KeyCommand } from '../keys';
@@ -47,6 +48,8 @@
       ed.q = '';
     }
   }
+  // «Оформление» off (fix-49): its key ⌃⌘E is not shown here
+  const shownGroups = $derived(ed.groups.map((g) => ({ ...g, rows: g.rows.filter((c) => RICH_ENABLED || c.id !== 'rich') })).filter((g) => g.rows.length));
 </script>
 
 <svelte:window onkeydowncapture={(e) => ed.key(e)} onmousedowncapture={down} />
@@ -60,7 +63,7 @@
   <Button disabled={!ed.changed} title="Изменено: {ed.changed}" onclick={() => (confirmReset = true)}>Сбросить все</Button>
 </div>
 
-{#each ed.groups as g (g.id)}
+{#each shownGroups as g (g.id)}
   <Group caption={g.title} note={g.note}>
     {#each g.rows as c (c.id)}
       {@const ks = ed.keysOf(c.id)}

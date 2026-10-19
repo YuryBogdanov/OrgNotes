@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { diskAll as disk, openApp } from './helpers';
+import { RICH_ENABLED } from '../src/nextFlags';
 
 // ТЗ 44.3 (§3): the new interface's menus — the heading's (§3.1: its items in order, «Сменить статус ›» as capsules,
 // a plugin's section under its name, «Удалить заголовок»), the status menu behind a capsule (§3.2: rows of 30 pt, the
@@ -54,6 +55,7 @@ test('«Удалить заголовок»: the subtree goes in one step; ⌘Z 
 });
 
 test('a drawn capsule: the status menu — rows of 30 pt, the chosen on `lampsoft`; ↓ ↩ writes', async ({ page }) => {
+  test.skip(!RICH_ENABLED, '«Оформление» выключено (fix-49)');
   await open(page, true);
   await page.locator('.cm-line', { hasText: 'План найма' }).locator('.cm-r-status').click();
   const m = page.getByRole('menu', { name: 'Статус' });

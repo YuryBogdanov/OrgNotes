@@ -125,7 +125,7 @@
   /* §7.1: over the right part of the editor's scroller (EditorArea), no ground, no line between; the editor's bar at
      the window's edge, under the right padding. Only the column's content takes the pointer: a wheel over the air
      scrolls the text. */
-  .struct { position: absolute; top: 0; right: 0; bottom: 0; z-index: 2; width: 220px; min-height: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 46px 22px 16px 0; overflow: hidden; pointer-events: none; }
+  .struct { position: absolute; top: 0; right: 0; bottom: 0; z-index: 2; width: 220px; min-height: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: var(--st-top, 46px) 22px 16px 0; overflow: hidden; pointer-events: none; }
   .struct > * { pointer-events: auto; }
   /* the cards as the mockup has them: 4 pt off the editor, 18 off the window's edge (the column's own 22 less 4) */
   /* fix #296: they do not scroll, nor give way; «Структура» does under them */

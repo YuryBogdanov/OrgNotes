@@ -32,7 +32,8 @@ const mode = (page: Page) => page.getByRole('radiogroup', { name: 'Вид тек
 test('«Сегодня»: a tab as any after the active one, with its name (ТЗ 50.3); the toolbar — «Сегодня» and the day; its own screen (ТЗ 45), no old colours', async ({ page }) => {
   await open(page);
   await page.getByRole('tree', { name: 'Файлы' }).getByRole('treeitem', { name: 'work' }).click();
-  await expect(mode(page)).toBeVisible();
+  await expect(page.locator('.cm-content')).toBeVisible();
+  await expect(mode(page)).toHaveCount(0); // fix-49: no «Оформление / Исходник» in the tabs' strip
   await page.keyboard.press('Shift+Meta+h'); // the panel «Сегодня»
   await page.keyboard.press('Shift+Meta+h'); // again: the full version
   const today = page.locator('.today[role="region"][aria-label="Сегодня"]');
