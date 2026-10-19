@@ -55,6 +55,7 @@
     } else if (e.key === 'Enter' && i >= 0) {
       e.preventDefault();
       if (e.metaKey) long.beside(visible[i].m);
+      else if (e.altKey) long.aside(visible[i].m);
       else long.reveal(visible[i].m);
     } else if (i >= 0 && !e.metaKey && !e.ctrlKey && !e.altKey && ACTIONS[e.code]) {
       // S R W O, by the key's place (a Russian layout too)
@@ -172,7 +173,7 @@
           {#each g.rows as r (r.m.key)}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <div class="row" class:on={long.sel === r.m.key} class:dim={g.id === 'ok'} role="row" tabindex="-1" aria-selected={long.sel === r.m.key} title={tipOf(r.m, r.s)}
-              data-key={r.m.key} onclick={() => void select(r.m.key)} ondblclick={() => long.reveal(r.m)} oncontextmenu={(e) => menu(e, r)}>
+              data-key={r.m.key} onclick={(e) => (void select(r.m.key), e.altKey && long.aside(r.m))} ondblclick={() => long.reveal(r.m)} oncontextmenu={(e) => menu(e, r)}>
               <div class="what" role="gridcell">
                 <div class="l1">
                   {#if r.m.keyword}<span class="kw tone-chip" style={r.m.tone}>{r.m.keyword}</span>{/if}

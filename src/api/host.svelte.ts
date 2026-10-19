@@ -31,6 +31,7 @@ import PluginNav from '../PluginNav.svelte';
 import PluginReview from '../PluginReview.svelte';
 import { mountWidget } from './widgets.svelte';
 import { lists } from '../taskLists.svelte';
+import { openBeside } from '../beside.svelte';
 import { RIGHTS, rightsText, trust, trusted } from './trust';
 import { apiRef, coreRef, fileOf, findHeading, infoOf } from './refs';
 import { coreCommand } from './coreCommands';
@@ -743,6 +744,17 @@ class Host {
           L.active = pi;
           return true;
         },
+        // the file beside the plugin's tab (ТЗ 56 §6): the new interface, the active tab one of its views
+        openBeside: (at) => {
+          const t = store.tab;
+          if (!store.nextUi || !t || !m.contributes.views.some((v) => v.id === t.kind) || !document.querySelector(`[data-beside="${CSS.escape(t.id)}"]`)) return false;
+          const f = fileOf(String(at?.path ?? ''));
+          if (!f) return false;
+          const line = Number(at.line);
+          const h = 'title' in at && typeof at.title === 'string' ? findHeading(f.headings, { path: f.path, line, title: at.title }) : undefined;
+          if ('title' in at && !h) return false;
+          return openBeside(t.id, { path: f.path, line: h ? h.line : line }, { keepPin: true });
+        },
         selectedLines: () => {
           const r = focusedEditor()?.lines?.();
           const f = store.fileOf(store.tab);
@@ -912,7 +924,8 @@ class Host {
             id: lid,
             el: () => el,
             // the inspector shows its task while the tab it is in is the active one
-            tab: () => (document.querySelector('section.pane.active')?.contains(el) ? store.tab : undefined),
+            // (the new interface has one area: the tab whose split holds it, ТЗ 56)
+            tab: () => (store.nextUi ? (store.tab && el.closest(`[data-beside="${CSS.escape(store.tab.id)}"]`) ? store.tab : undefined) : document.querySelector('section.pane.active')?.contains(el) ? store.tab : undefined),
             selected: () => {
               const s = this.guard(id, () => spec.selected(), null);
               return s ? { ...coreRef(s.ref), dk: s.date ?? null } : null;

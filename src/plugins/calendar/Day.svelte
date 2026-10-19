@@ -51,6 +51,7 @@
   function choose(ev: MouseEvent, e: CalEntry) {
     if (ev.metaKey) return calendar.openEntry(e, true);
     calendar.pick(e);
+    calendar.aside(ev);
   }
   const wfOf = (e: CalEntry) => calendar.files.find((f) => f.path === e.path)?.wf;
   const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];

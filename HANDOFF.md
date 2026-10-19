@@ -961,6 +961,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   edits; OrgEditor's `hit` prop shares the compartment of `mark`); no find bar (no `findReq`); ⎋ in the list closes it;
   it follows ↑↓ (`followBeside` in beside.svelte.ts, BesideSplit uses it too); «Фильтры» `data-beside-hide`;
   ⌃⌘← focuses the results' own list (`[tabindex="0"]` in the split's list) when no list of tasks is there.
+  56.5, the plugins, API 1.17.0: `ui.taskList` without `otherLabel` gets ⌥↩ «Открыть сбоку» from the core in the new
+  interface (`open(true)` not called; the board keeps «Открыть в тексте файла»); the host's list `tab()` in the new
+  interface is the active tab whose split holds the element. `ui.openBeside(ref | { path, line })` — false unless the
+  new interface and the active tab one of the plugin's views. «Долгие дела» ⌥↩ / ⌥-click and the calendar's ⌥-click
+  use it (their manifests ask ^1.17); the calendar's column «Выбранный день» `data-beside-hide`. README, apiSurface.
+  e2e nextBesidePlugins.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

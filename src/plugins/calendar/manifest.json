@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Месяц и неделя всех записей с датами: слои и файлы в навигаторе, выбранный день в инспекторе, перенос мышью, «+ Задача» и «+ Событие».",
   "author": "Panopticon",
-  "api": "^1.8",
+  "api": "^1.17",
   "minAppVersion": "1.1.0",
   "main": "main.js",
   "permissions": ["index.read", "files.edit"],
