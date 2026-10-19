@@ -1,6 +1,6 @@
 // `commands.run` of the core's commands (tech sprint 3.1, from the host).
 
-import { store } from '../store.svelte';
+import { openExternal, store } from '../store.svelte';
 import { openFile, openFromAgenda } from '../layout';
 import { viewOf } from '../views';
 import type { HeadingRef } from './index';
@@ -12,7 +12,9 @@ export function coreCommand(cmd: string, arg: unknown) {
   const a = (arg ?? {}) as { path?: string; ref?: HeadingRef };
   switch (cmd) {
     case 'file.open': {
-      const i = store.files.findIndex((f) => f.name === a.path);
+      // the path from the folder, or (1.16) an absolute one inside it — «~/…» too (a terminal's output)
+      const abs = (p: string) => (p.startsWith('~/') && store.dir ? store.dir.replace(/^(\/Users\/[^/]+).*$/, '$1') + p.slice(1) : p);
+      const i = store.files.findIndex((f) => f.name === a.path || (!!a.path && f.path === abs(a.path)));
       if (i < 0) throw new Error(`нет файла «${a.path}»`);
       const o = (arg ?? {}) as { line?: number; beside?: boolean; focus?: boolean; neighbour?: boolean; newTab?: boolean };
       const line = Math.max(0, Number(o.line) || 0);
@@ -39,6 +41,12 @@ export function coreCommand(cmd: string, arg: unknown) {
       const h = i >= 0 && a.ref ? findHeading(store.files[i].headings, a.ref) : undefined;
       if (!h) throw new Error('заголовок не найден');
       return store.open(i, h.line);
+    }
+    case 'url.open': {
+      // an address in the browser (1.16): http, https, mailto only
+      const url = String((arg as { url?: unknown })?.url ?? '');
+      if (!/^(https?:\/\/|mailto:)/i.test(url)) throw new Error('адрес — http, https или mailto');
+      return void openExternal(url);
     }
     case 'file.reveal': {
       if (!store.files.some((f) => f.name === a.path)) throw new Error(`нет файла «${a.path}»`);

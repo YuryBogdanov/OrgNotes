@@ -484,7 +484,9 @@ export interface Ctx {
     when(id: string, fn: () => boolean): Dispose;
     /** The first shortcut of a command as set now («⌘↩»), '' none: for the plugin's own hints. */
     keyOf(id: string): string;
-    /** A command of the plugin, or of the core: `file.open` {path, line?, beside?, focus?, neighbour?, newTab?}
+    /** A command of the plugin, or of the core: `file.open` {path, line?, beside?, focus?, neighbour?, newTab?} (`path`
+     *  from the folder, or absolute inside it, «~/…» too, 1.16), `url.open` {url} (http, https, mailto in the browser,
+     *  1.16),
      *  (`neighbour`: in the other pane, made on the left when there is none, as from an agenda; `newTab`: a tab of its
      *  own, the one shown stays, 1.12), `heading.reveal` {ref},
      *  `agenda.open` {date?, here?} (`here`: this tab becomes «Агенда» on `date`, 1.14), `settings.open` {section?}, `file.reveal` {path} (the file in Finder, 1.11), `heading.note` {ref, x?, y?} (the popover «Добавить заметку…»

@@ -1,0 +1,19 @@
+{
+  "id": "terminal",
+  "name": "Терминал",
+  "version": "1.0.0",
+  "description": "Терминал под редактором: оболочка и консольный агент рядом с заметками, сессии, профили, путь заголовка в сессию.",
+  "author": "Panopticon",
+  "api": "^1.16",
+  "minAppVersion": "1.14.0",
+  "main": "main.js",
+  "defaultEnabled": false,
+  "icon": "M3 4h14v12H3zM6 8l2.5 2L6 12M10 12.5h4",
+  "permissions": ["process", "clipboard"],
+  "contributes": {
+    "commands": [
+      { "id": "terminal.toggle", "title": "Терминал: показать или скрыть", "keys": ["⌃`"], "synonyms": ["терминал", "консоль", "shell", "оболочка"] },
+      { "id": "terminal.new", "title": "Терминал: новая сессия", "keys": ["⌃⇧`"], "synonyms": ["терминал", "консоль", "сессия"] }
+    ]
+  }
+}

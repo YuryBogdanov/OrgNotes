@@ -893,6 +893,18 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   first shown and kept (hidden by `display: none`, so the terminals live), the top edge dragged 160 … 70 % of the
   area, `next:drawerH` (330). The old interface: `show()` does nothing. ⌃` is the plugin's command (55.3). e2e
   drawerApi.spec.ts.
+  55.3, the plugin `src/plugins/terminal` (off by default; rights process, clipboard; in Rust's BUILTIN_MANIFESTS;
+  `@xterm/xterm` 6 with fit, web-links, search — the plugins' boundary test lets a plugin's own `@xterm/*` in):
+  `term.ts` (`makeTerm`: IBM Plex Mono, lines of 20; `themeOf(el)` — the tokens laid solid on `bg` through a canvas,
+  ANSI from todo/done/wait/next/plug/lampink/ink/ink3, the bright ones 15 % lighter; the file links `FILE_RE` and
+  URLs on ⌘-click; the keys — ⌃` / ⌃⇧` the plugin's, ⌃ and ⌥ to the process, ⌘C/A/F/=/−/0 its own, the other ⌘ the
+  app's), `sessions.svelte.ts` (`Session`: its own `host` element with `data-own-keys`, moved into what shows it,
+  opened and the process started on first attach, ↩ restarts an ended one, «Процесс завершён (код N)»; `Terminals`:
+  the list, the active one, `add`, `close` — a live one asks by `ui.sheet`, `toggle` — §2's rule by the focus), and
+  `Panel.svelte` (the head of 32: the sessions' tabs with the dot, «+», «Во вкладку» (55.5), ⌃`, ⌄; the body;
+  ⌘F's bar). The core: `keyDispatch` — an element with `data-own-keys` gets every non-⌘ press and the ⌘ ones it names
+  (the press marked run by keys, so the menu leaves it); `url.open` and an absolute / «~/» path in `file.open`.
+  The old interface: the commands say «Терминал — в новом интерфейсе» (the tab comes in 55.5). e2e terminal.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

@@ -63,6 +63,14 @@ export function keyHandler(window: (id: string) => boolean) {
     if (store.keyRecording) return; // the settings are recording a shortcut
     const press = pressOf(e);
     if (!press) return;
+    // a plugin's element that takes its keys itself (the terminal, ТЗ 55 §3): every ⌃ and ⌥ press goes to it (⌃C, ⌃R,
+    // ⌃C … of the app's chords too), ⌘ ones stay the app's but those it names (`data-own-keys="⌘C ⌘F"`); the menu leaves
+    // what it took
+    const own = !pending && (e.target as Element | null)?.closest?.('[data-own-keys]');
+    if (own && (!e.metaKey || own.getAttribute('data-own-keys')!.split(' ').includes(press))) {
+      byKeys = { press, t: Date.now() };
+      return;
+    }
     const features = [...store.scopeKeys].filter(([, k]) => k.active()).sort(([a], [b]) => (SCOPES.get(b)?.rank ?? 0) - (SCOPES.get(a)?.rank ?? 0));
     const c: Ctx = { features, editor: focusedEditor(), window };
     const consume = () => {
