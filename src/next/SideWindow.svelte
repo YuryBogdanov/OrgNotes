@@ -1,18 +1,19 @@
 <script lang="ts">
-  import { applyStored, effective, readChoice } from '../appearance';
+  import { applyStored, effective, readChoice, storedTheme } from '../appearance';
   import { tokenVars, FONTS } from './tokens';
   import MiniWindow from './MiniWindow.svelte';
   import CaptureWindow from './CaptureWindow.svelte';
 
   // The windows over other programs in the new interface (ТЗ 52 §1): the mini window (#mini) and the quick entry
-  // (#capture). On their root the new tokens by the app's appearance, `data-ui="next"`, the interface's fonts; no
+  // (#capture). On their root the tokens of the app's theme, `data-ui="next"`, the interface's fonts; no
   // layer of compatibility (no plugins here). The appearance follows the main window's (they share the storage).
   const mq = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
-  let look = $state(effective(readChoice(), mq?.matches));
+  // the theme of the place in effect, as the main window keeps it on this Mac (ТЗ 57 §3: changed there, at once here)
+  let theme = $state(storedTheme(effective(readChoice(), mq?.matches)));
   $effect(() => {
     const again = () => {
       applyStored();
-      look = effective(readChoice(), mq?.matches);
+      theme = storedTheme(effective(readChoice(), mq?.matches));
     };
     window.addEventListener('storage', again);
     mq?.addEventListener('change', again);
@@ -25,7 +26,7 @@
 </script>
 
 <!-- `next`: the new editor's styles (editor.css) are the window's -->
-<div class="side-win next" data-ui="next" style="{tokenVars(look)};--ui:{FONTS.ui};--mono:{FONTS.mono};--text:{FONTS.ui};--title:{FONTS.title}">
+<div class="side-win next" data-ui="next" style="{tokenVars(theme.app)};--ui:{FONTS.ui};--mono:{FONTS.mono};--text:{FONTS.ui};--title:{FONTS.title}">
   {#if mini}<MiniWindow />{:else}<CaptureWindow />{/if}
 </div>
 

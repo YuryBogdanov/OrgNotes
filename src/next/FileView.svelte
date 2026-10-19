@@ -23,7 +23,7 @@
   // the props come as getters of the parent's file (a new object at each edit): a derived stops the redraw when the
   // value is the same, else the view would be drawn anew at every key typed in it (the board's card at the side)
   const thePath = $derived(path);
-  const vars = $derived(`${tokenVars(store.appearance)};${compatVars(store.appearance)}`);
+  const vars = $derived(`${tokenVars(store.theme.app)};${compatVars(store.theme.app)}`);
   const ownType = $derived(!!fileTypeOf(path));
 
   function showText() {

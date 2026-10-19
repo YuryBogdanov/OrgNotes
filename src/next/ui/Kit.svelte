@@ -22,7 +22,7 @@
   ];
 </script>
 
-<div class="next kit" data-ui="next" style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--mono:{FONTS.mono}">
+<div class="next kit" data-ui="next" style="{tokenVars(store.theme.app)};--ui:{FONTS.ui};--mono:{FONTS.mono}">
   <div class="row">
     <Button kind="main" key="↩">Сохранить</Button>
     <Button key="esc">Отмена</Button>
