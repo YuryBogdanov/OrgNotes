@@ -19,11 +19,13 @@ describe('the boundary of src/next', () => {
   });
 });
 
-// ТЗ 48, 49: after the small bridges and the file view's host only the settings are old in the new window
+// ТЗ 54: the settings' sheet is new; its sections come through the bridges until their own (54.2–54.7), none after 54.8
 describe('the bridges left', () => {
-  it('are «Settings» only', async () => {
+  it('are the settings\' sections only', async () => {
     const { readFileSync } = await import('node:fs');
     const src = readFileSync(new URL('./bridges.ts', import.meta.url), 'utf8');
-    expect([...src.matchAll(/export \{ default as (\w+) \}/g)].map((m) => m[1])).toEqual(['Settings']);
+    const left = [...src.matchAll(/export \{ default as (\w+) \} from '\.\.\/(\w+)\.svelte'/g)].map((m) => m[2]);
+    expect(left.every((x) => /Settings|ThemeEditor|Picker|RemovePlugin/.test(x))).toBe(true);
+    expect(left).not.toContain('Settings');
   });
 });

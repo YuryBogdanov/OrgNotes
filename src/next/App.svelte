@@ -21,7 +21,7 @@
   import Tabs from './Tabs.svelte';
   import EditorArea from './EditorArea.svelte';
   import { nextPrefs } from '../nextPrefs.svelte';
-  import { Settings } from './bridges';
+  import Settings from './Settings.svelte';
   import StartScreen from './StartScreen.svelte';
   import AgendaBuilderTab from './AgendaBuilder.svelte';
   import PluginEditor from './PluginEditor.svelte';
@@ -324,10 +324,8 @@
     <TaskListHost />
   </Compat>
   {#if store.toast}<div class="toast" role="status">{store.toast.text}{#each store.toast.actions ?? [] as a (a.label)}<button onclick={() => { store.toast = null; a.run(); }}>{a.label}</button>{/each}</div>{/if}
-  <Compat>
-    <!-- the agenda builder: a sheet over the window, which takes no input under it -->
-    {#if store.settingsOpen && store.loaded}<Settings />{/if}
-  </Compat>
+  <!-- the settings: a sheet over the window, which takes no input under it (ТЗ 54) -->
+  {#if store.settingsOpen && store.loaded}<Settings />{/if}
 </div>
 
 <style>

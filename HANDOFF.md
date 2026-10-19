@@ -804,6 +804,17 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   the kept matches: `store.searchKept`, set by next/App to `keptForStep`. The find panel shows «из глобального
   поиска» after a jump (`fb.global`, off when the query is changed). While the tab is active the panel shows the
   field, a plate «Результаты — во вкладке «…»» (a click — `tabFocus.list`) and up to 8 recent queries with the time.
+  ТЗ 54 (the settings in the new look), 54.1, the sheet: `src/settingsNav.svelte.ts` (both shells) — the sections
+  and their order (`settingsSections`: own by `order`, the plugins' own, «Плагины»), which are made, the icons,
+  `stepSection` (⌘[ ⌘], ↑↓ in the column, in the shell's order), `settingsLayers`/`setLayer` (a section's popover or
+  dialog: ⎋ closes it, not the sheet). The statuses' editor moved out of the old Settings.svelte into
+  `StatusesSettings.svelte` (the same code; its draft is made when the section is shown). `next/Settings.svelte`: the
+  head 56 (the gear `lampink`, «Настройки» and the section, «Изменения применяются сразу», «Готово» with the keys in
+  its tip), the column 220 on `side` (rows 30, the chosen `lampsoft`; «Настройки плагинов»; «Плагины» at the foot past
+  a rule, the dot of updates), the section on the grid — Yeseva 30 title, a column of 720 (960 «Статусы», «Клавиши»),
+  the theme editor across; the whole window under `dim`; under 820 the column is a strip on top. The sections' bodies
+  still old, through bridges.ts in Compat — each replaced by 54.2–54.7, bridges.ts gone in 54.8. e2e
+  nextSettingsSheet.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
