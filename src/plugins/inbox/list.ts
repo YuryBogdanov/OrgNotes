@@ -12,8 +12,9 @@ export interface ListSettings {
   reviewCancel: string; // what «Отменить» writes
   reviewOrder: 'old' | 'new'; // the cards: oldest first or newest first
   stale: number; // days after which a task counts as lying too long (3, 7, 14, 30)
+  alertAfter: number; // fix-50: the badge red when the oldest entry is older (3, 7, 14 days; 0 — never)
 }
-export const DEFAULT_SETTINGS: ListSettings = { order: 'new', counter: true, details: true, reviewDone: 'DONE', reviewCancel: 'CANCELLED', reviewOrder: 'old', stale: 7 };
+export const DEFAULT_SETTINGS: ListSettings = { order: 'new', counter: true, details: true, reviewDone: 'DONE', reviewCancel: 'CANCELLED', reviewOrder: 'old', stale: 7, alertAfter: 7 };
 /** The settings as stored (checked; a default when wrong). */
 export function readSettings(v: Record<string, unknown>): ListSettings {
   const str = (k: 'reviewDone' | 'reviewCancel') => (typeof v[k] === 'string' && (v[k] as string).trim() ? (v[k] as string).trim() : DEFAULT_SETTINGS[k]);
@@ -26,6 +27,7 @@ export function readSettings(v: Record<string, unknown>): ListSettings {
     reviewCancel: str('reviewCancel'),
     reviewOrder: v.reviewOrder === 'new' ? 'new' : 'old',
     stale: [3, 7, 14, 30].includes(Number(v.stale)) ? Number(v.stale) : DEFAULT_SETTINGS.stale,
+    alertAfter: [0, 3, 7, 14].includes(Number(v.alertAfter)) && v.alertAfter !== null && v.alertAfter !== '' ? Number(v.alertAfter) : DEFAULT_SETTINGS.alertAfter,
   };
 }
 
@@ -113,3 +115,12 @@ export function ago(d: Date | null, now = new Date()): string {
   return `${d.getDate()} ${MON[d.getMonth()]}` + (d.getFullYear() !== now.getFullYear() ? ` ${d.getFullYear()}` : '');
 }
 
+
+/** The badge of «Входящие» (fix-50): how many wait to be sorted; red when the oldest of them is older than
+ *  `alertAfter` days (0: never). */
+export function inboxBadge(items: { created: Date | null }[], s: Pick<ListSettings, 'counter' | 'alertAfter'>, now = new Date()): { n: number; alert: boolean } {
+  if (!s.counter || !items.length) return { n: 0, alert: false };
+  const oldest = Math.min(...items.map((x) => (x.created ? +x.created : Infinity)));
+  const days = Number.isFinite(oldest) ? (+now - oldest) / 86_400_000 : 0;
+  return { n: items.length, alert: s.alertAfter > 0 && days > s.alertAfter };
+}

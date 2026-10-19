@@ -26,7 +26,8 @@
   // width goes in 180 ms, as the column at the right.
   let { open = true, width, onwidth, onmenu }: { open?: boolean; width: number; onwidth: (w: number) => void; onmenu: (at: { x: number; y: number }, items: MenuItem[]) => void } = $props();
 
-  const groups = $derived(sectionsOf(allNavs(), store.files.length));
+  const groups = $derived(sectionsOf(allNavs()));
+  const filesWord = (n: number) => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'файл' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'файла' : 'файлов'}`;
   const shown = $derived(shownSection(store.navMode, groups));
   const feature = $derived(navOf(shown.id));
   const todayOn = $derived(store.tab?.kind === TODAY);
@@ -146,6 +147,8 @@
       <span class="pt">{broken?.label ?? shown.label}</span>
       {#if !broken && hint(shown)}<kbd>{hint(shown)}</kbd>{/if}
       {#if !broken && shown.id === TODAY_ID}<span class="sub">{panelDate(today.day)}</span>{/if}
+      <!-- fix-50: how many files and where — the panel's line, not a badge on the bar -->
+      {#if !broken && shown.id === 'files' && store.dir}<span class="sub">{filesWord(store.files.length)} · {store.dir.replace(/^\/Users\/[^/]+/, '~')}</span>{/if}
     </div>
     <div class="panel" role="region" aria-label="Панель: {broken?.label ?? shown.label}">
       {#if broken}

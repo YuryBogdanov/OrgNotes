@@ -31,11 +31,13 @@ const ICONS = {
 };
 
 /** The core's sections and the plugins' — the latter in the order the old navigator has them. */
-export function sectionsOf(navs: NavSpec[], files: number): { core: Section[]; plugins: Section[] } {
+/** The badges (fix-50): only how many things wait for an action — none on «Файлы» (their count is the panel's line),
+ *  «Сегодня», «Агенда», «Теги», «Поиск». */
+export function sectionsOf(navs: NavSpec[]): { core: Section[]; plugins: Section[] } {
   const inbox = navs.find((n) => n.id === INBOX);
   const core: Section[] = [
     { id: TODAY_ID, label: 'Сегодня', icon: ICONS.today, vb: 20, key: 'today', panel: true },
-    { id: 'files', label: 'Файлы', icon: ICONS.files, vb: 20, key: 'navFiles', panel: true, badge: () => files },
+    { id: 'files', label: 'Файлы', icon: ICONS.files, vb: 20, key: 'navFiles', panel: true },
     ...(inbox ? [{ id: INBOX, label: 'Входящие', icon: ICONS.inbox, vb: 16 as const, key: inbox.key, panel: true, badge: inbox.badge, alert: inbox.alert }] : []),
     { id: 'agendas', label: 'Агенда', icon: ICONS.agendas, vb: 16, key: 'navAgendas', panel: true },
     { id: 'tags', label: 'Теги', icon: ICONS.tags, vb: 16, key: 'navTags', panel: true },

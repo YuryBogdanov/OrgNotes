@@ -20,7 +20,9 @@ async function open(page: Page) {
 test('the tree: folders first and folded, a click opens a file (the toolbar says which), ⌥-click — a tab of its own', async ({ page }) => {
   await open(page);
   await expect(page.getByLabel('Боковая панель').locator('.grp.head .pt')).toHaveText('Файлы');
-  await expect(page.getByRole('navigation', { name: 'Разделы', exact: true }).getByRole('button', { name: /Файлы/ }).locator('.bd')).toHaveText('4');
+  // fix-50: how many files and where — the panel's line, no badge on the bar
+  await expect(page.getByRole('navigation', { name: 'Разделы', exact: true }).getByRole('button', { name: /Файлы/ }).locator('.bd')).toHaveCount(0);
+  await expect(page.getByLabel('Боковая панель').locator('.grp.head .sub')).toHaveText('4 файла · /mock');
   await expect(tree(page).getByRole('treeitem')).toHaveText(['1on1', 'inbox', 'Midterm']);
   await item(page, '1on1').click();
   await expect(item(page, '1on1')).toHaveAttribute('aria-expanded', 'true');

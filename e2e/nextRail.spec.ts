@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openApp } from './helpers';
+import { pluginsReady } from './tauriMock';
 
 // ТЗ 50.1: the rail of the sections at the window's left edge — 52 pt, buttons of 34 from 58 pt, the core's, a line,
 // the plugins', the gear at the bottom; the badges («99+»); the last plugins in «⋯» when the window is low; the panel
@@ -51,15 +52,17 @@ test('the one picked: `lampsoft`, its icon `lampink`, the `lamp` line inside its
 });
 
 test('a badge: 15 pt at the button\'s corner; over 99 — «99+»', async ({ page }) => {
-  const many: Record<string, string> = {};
-  for (let i = 0; i < 120; i++) many[`/mock/n${i}.org`] = '* x\n';
-  await open(page, many);
-  const b = core(page).getByRole('button', { name: /Файлы/ }).locator('.bd');
+  // fix-50: «Файлы» have no badge — 120 entries of the Inbox to sort have
+  await open(page, { '/mock/inbox.org': Array.from({ length: 120 }, (_, i) => `* TODO Запись ${i}\n`).join('') });
+  await expect(core(page).getByRole('button', { name: /Файлы/ }).locator('.bd')).toHaveCount(0);
+  await pluginsReady(page);
+  await page.evaluate(async () => (await import('/src/store.svelte.ts' as string)).store.setInbox({ file: 'inbox.org' }));
+  const b = core(page).getByRole('button', { name: /Входящие/ }).locator('.bd');
   await expect(b).toHaveText('99+');
-  await expect(b).toHaveAttribute('aria-label', 'Файлы: 120');
+  await expect(b).toHaveAttribute('aria-label', 'Входящие: 120');
   expect(Math.round((await box(b)).height)).toBe(15);
   // inside the button's corner, 1 pt in (the mockup)
-  const btn = await box(core(page).getByRole('button', { name: /Файлы/ }));
+  const btn = await box(core(page).getByRole('button', { name: /Входящие/ }));
   const bb = await box(b);
   expect([Math.round(btn.x + btn.width - (bb.x + bb.width)), Math.round(bb.y - btn.y)]).toEqual([1, 1]);
 });

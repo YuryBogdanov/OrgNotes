@@ -932,6 +932,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   start; no session — one by the default profile, the text queued till it starts; the focus to it. The settings by
   the manifest's schema: the size (11 … 14), the scrollback (1 000 … 50 000), ⌥ as Meta, the notifications, the
   shell — `terms.setOpts` applies them to the open terminals. e2e terminalInsert.spec.ts.
+- **The badges of the sections' bar (`docs/fix-50-beydzhi.md`)** — a badge is how many things wait for an action,
+  nothing else: «Файлы» lost theirs (`sectionsOf(navs)` without the files' count; «N файлов · ~/folder» is the
+  files' panel's line, Sidebar); «Долгие дела» only «пора проверить» (`badgeOf` → `{ n: due, alert }`); «Входящие»
+  red when the oldest entry is older than «Красный счётчик, если запись лежит дольше» (Inbox's `alertAfter`: 3 / 7 /
+  14 days / never, 7; `inboxBadge` in inbox/list.ts). README's `ui.setBadge` says the rule. e2e nextAlertBadge,
+  nextRail (the corner's badge is the Inbox's now), nextWindow, nextSidebar.
 - **The window's title bar in the new interface:** WKWebView has no `-webkit-app-region` (the CSS stays, harmless):
   `next/windowDrag.ts` — `use:windowDrag` on the toolbar (Toolbar.svelte) and the lights' room of the rail and of the
   panel (Sidebar.svelte); a press not on a button, field or tab asks Tauri `startDragging`, a double click
