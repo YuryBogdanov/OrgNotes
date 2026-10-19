@@ -53,7 +53,8 @@
 .kb-btn:disabled { opacity: 0.5; }
 
 /* the choice of a workflow */
-.kb-setup { position: fixed; left: 50%; top: 40px; transform: translateX(-50%); width: 600px; max-width: calc(100% - 48px); box-sizing: border-box; display: flex; flex-direction: column; pointer-events: auto; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5); overflow: hidden; font: 13px var(--ui); outline: none; }
+/* fix #292: centred in the core's layer over the window (the sheet is `bare`), not by 50 % and a transform */
+.kb-setup { position: absolute; left: 0; right: 0; margin: 0 auto; top: 40px; width: 600px; max-width: calc(100% - 48px); box-sizing: border-box; display: flex; flex-direction: column; pointer-events: auto; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5); overflow: hidden; font: 13px var(--ui); outline: none; }
 .kb-sh { display: flex; flex-direction: column; gap: 3px; padding: 18px 20px 6px; }
 .kb-sh b { font-size: 15px; }
 .kb-sh span { font-size: 12.5px; color: var(--fg2); }

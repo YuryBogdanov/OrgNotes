@@ -967,6 +967,11 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   — the page's own lights in full screen (Rust hides macOS's): at 18 / 20 + `--menu`, only while `titlebar.fullscreen
   && lights`, 150 ms of opacity; the red closes (`closeFromFullscreen`), the green leaves; the new root takes `--menu`
   and `.win` goes down by it. The mock: `double_click_action` (`__dblAction`), `minimize`. e2e nextWindowDrag.spec.ts.
+  6, the sheets of the plugins (#292, #294 — «Неделя» is panopticon-week#8): a `bare` sheet is centred in the core's
+  layer (`.bare`, fixed over the window) by `position: absolute; left: 0; right: 0; margin: 0 auto`, not 50 % and a
+  transform — the board's `.kb-setup` here, the week's plan there (not reproduced in WebKit's tests: centred there
+  both ways); the week's goals on «Сегодня» up to 3 lines in tiles of one height. weekPlugin.spec.ts checks both.
+  In a worktree the week's e2e runs when `.claude/worktrees/panopticon-week` links to the plugin's repo.
 - **The window's title bar in the new interface:** WKWebView has no `-webkit-app-region` (the CSS stays, harmless):
   `next/windowDrag.ts` — `use:windowDrag` on the toolbar (Toolbar.svelte) and the lights' room of the rail and of the
   panel (Sidebar.svelte); a press not on a button, field or tab asks Tauri `startDragging`, a double click
