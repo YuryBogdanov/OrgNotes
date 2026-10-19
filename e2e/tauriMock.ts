@@ -284,6 +284,65 @@ export async function installTauriMock(page: Page, files: Record<string, string>
         },
         open_plugins_folder: () => null,
         // a plugin's net.fetch (roadmap 1.3): Rust checks the manifest; here the answer is the test's
+        // the terminal's processes (ТЗ 55): a pretend shell — a prompt, the input echoed, «echo …», «exit», ⌃C;
+        // `__ptyOut(id, text)` puts any output, `__ptys` what is alive
+        pty_spawn: (a) => {
+          const id = `pty${(w.__ptyN = (w.__ptyN ?? 0) + 1)}`;
+          (w.__ptys ??= {})[id] = { plugin: a.plugin, line: '', args: a };
+          w.__log.push(['pty_spawn', a.plugin, a.command ?? null, a.cwd ?? null, a.cols, a.rows]);
+          const out = (d: string) => setTimeout(() => w.__emitEvent('pty-data', { id, data: d }), 0);
+          w.__ptyOut = (pid: string, d: string) => w.__emitEvent('pty-data', { id: pid, data: d });
+          out(a.command ? `${a.command}\r\n$ ` : '$ ');
+          return id;
+        },
+        pty_write: (a) => {
+          const p = w.__ptys?.[a.id];
+          if (!p) throw 'нет такого процесса';
+          w.__log.push(['pty_write', a.id, a.data]);
+          const send = (d: string) => w.__emitEvent('pty-data', { id: a.id, data: d });
+          for (const ch of a.data as string) {
+            if (ch === '\r') {
+              const cmd = p.line.trim();
+              p.line = '';
+              if (cmd === 'exit') {
+                send('\r\n');
+                delete w.__ptys[a.id];
+                setTimeout(() => w.__emitEvent('pty-exit', { id: a.id, code: 0 }), 0);
+                return null;
+              }
+              send('\r\n' + (cmd.startsWith('echo ') ? cmd.slice(5) + '\r\n' : cmd ? `${cmd}: command not found\r\n` : '') + '$ ');
+            } else if (ch === '\u0003') {
+              p.line = '';
+              send('^C\r\n$ ');
+            } else if (ch === '\u007f') {
+              p.line = p.line.slice(0, -1);
+              send('\b \b');
+            } else {
+              p.line += ch;
+              send(ch);
+            }
+          }
+          return null;
+        },
+        pty_resize: (a) => (w.__log.push(['pty_resize', a.id, a.cols, a.rows]), null),
+        pty_kill: (a) => {
+          w.__log.push(['pty_kill', a.id, a.signal ?? null]);
+          if (w.__ptys?.[a.id]) {
+            delete w.__ptys[a.id];
+            setTimeout(() => w.__emitEvent('pty-exit', { id: a.id, code: null }), 0);
+          }
+          return null;
+        },
+        pty_kill_plugin: (a) => {
+          w.__log.push(['pty_kill_plugin', a.plugin]);
+          for (const [id, p] of Object.entries((w.__ptys ?? {}) as Record<string, { plugin: string }>)) {
+            if (p.plugin !== a.plugin) continue;
+            delete w.__ptys[id];
+            setTimeout(() => w.__emitEvent('pty-exit', { id, code: null }), 0);
+          }
+          return null;
+        },
+        pty_count: () => Object.keys(w.__ptys ?? {}).length,
         net_fetch: (a) => (w.__log.push(['net', a.plugin, a.method, a.url]), w.__net ?? { status: 200, headers: [['content-type', 'application/json']], text: '{"ok":true}' }),
 
         // the windows, the mini window, the shortcuts

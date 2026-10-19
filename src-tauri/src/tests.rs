@@ -247,3 +247,16 @@ fn errors_reach_the_page_as_the_words_it_checks() {
     assert_eq!(serde_json::to_string(&io).unwrap(), "\"нет доступа\"");
     assert_eq!(String::from(Error::from("no notes folder")), "no notes folder");
 }
+
+// ТЗ 55 §1: the terminal's output as UTF-8 — a character cut between two reads waits for its other bytes
+#[test]
+fn pty_output_keeps_a_cut_character_for_the_next_read() {
+    let mut carry = Vec::new();
+    let word = "ёж".as_bytes(); // 4 bytes: d1 91 d0 b6
+    assert_eq!(crate::pty::utf8_chunk(&mut carry, &word[..3]), "ё");
+    assert_eq!(carry, vec![0xd0]);
+    assert_eq!(crate::pty::utf8_chunk(&mut carry, &word[3..]), "ж");
+    assert!(carry.is_empty());
+    // not UTF-8: the replacement character, the rest goes on
+    assert_eq!(crate::pty::utf8_chunk(&mut carry, b"a\xffb"), "a\u{FFFD}b");
+}

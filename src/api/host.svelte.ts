@@ -39,6 +39,7 @@ export { REVIEW_KIND, type ReviewRun };
 import { listen } from './events.svelte';
 import { clone, watch } from './watch.svelte';
 import { clipboardApi, editApi, filesApi, indexApi, netApi } from './ctxData';
+import { processApi } from './process';
 import { put, schemaOf, settingsValues, whole, type Dynamic } from './pluginSettings';
 import { invoke, isTauri, pickSave } from '../tauri';
 export { RIGHTS, rightsText };
@@ -1055,6 +1056,11 @@ class Host {
     };
     if (can('clipboard')) ctx.clipboard = clipboardApi();
     if (can('net')) ctx.net = netApi(m);
+    if (can('process')) {
+      // its processes end with it (turned off, failed)
+      keep(() => void invoke('pty_kill_plugin', { plugin: id }).catch(() => {}));
+      ctx.process = processApi(id);
+    }
     if (can('index.read')) ctx.index = indexApi(can('index.touch'));
     if (can('files.read') || can('files.edit')) ctx.files = filesApi();
     if (can('files.edit')) ctx.edit = editApi((fn) => this.guard(id, fn, undefined));

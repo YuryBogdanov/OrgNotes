@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ConfirmDialog from './ConfirmDialog.svelte';
   import { parentOf } from './navTree';
   import './features'; // the built-in features register their tabs, sections and keys (roadmap 0.3)
   import './linkPicker'; // «Ссылка на» for the editors (ТЗ 35)
@@ -318,6 +319,12 @@
   {#if notePop.req}{#key notePop.req.n}<NotePop req={notePop.req} onclose={closeNote} />{/key}{/if}
   <TaskListHost />
   {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
+  {#if store.quitReq}
+    {@const q = store.quitReq}
+    <ConfirmDialog label="Выход" title="Завершить процессы в терминале ({q.n})?" onclose={() => q.resolve(false)} actions={[{ label: 'Завершить и выйти', kind: 'danger', run: () => q.resolve(true) }]}>
+      Процессы терминала не переживают выход из приложения.
+    </ConfirmDialog>
+  {/if}
   <!-- a start screen comes instead of the window (no toolbar, no navigator) -->
   {#if !store.start}
   <Toolbar />

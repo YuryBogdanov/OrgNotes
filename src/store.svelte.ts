@@ -1,3 +1,4 @@
+import { livePtys } from './api/process';
 import {
   activeTab, addPane, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
   openFile, openFromAgenda, pinFirst, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
@@ -478,6 +479,8 @@ class Store {
 
   /** A write failed while closing: the reason, with a single "ОК". */
   errorReq = $state<{ title: string; text: string; resolve: () => void } | null>(null);
+  /** Quitting with processes of the terminal alive (ТЗ 55 §1): «Завершить N процессов в терминале?». */
+  quitReq = $state<{ n: number; resolve: (go: boolean) => void } | null>(null);
   /** While a sheet is up the rest of the window does not react: no shortcuts, no menu commands. */
   /** Sheets of the features (registered by them): while one is open, the window's other sheets and keys wait. */
   private sheetChecks = $state.raw<(() => boolean)[]>([]);
@@ -485,7 +488,7 @@ class Store {
     this.sheetChecks = [...this.sheetChecks, open];
   }
   get sheetOpen() {
-    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.palette || this.diskReq || (this.builder && !this.nextUi) || this.capture || this.refile || this.pickInbox || this.settingsOpen || this.sheetChecks.some((f) => f()));
+    return !!(this.unsavedReq || this.saveAsReq || this.errorReq || this.quitReq || this.palette || this.diskReq || (this.builder && !this.nextUi) || this.capture || this.refile || this.pickInbox || this.settingsOpen || this.sheetChecks.some((f) => f()));
   }
   /** The command palette; `start` opens it right at a step ("Создать файл…" ⇧⌘N, "Перейти к файлу…" ⇧⌘O). */
   palette = $state<{ start?: PaletteStart; n: number } | null>(null);
@@ -1992,6 +1995,8 @@ class Store {
   }
   /** ⌘Q, ⌘⇧W, the red button: one question about the unsaved tabs of both panes. */
   async quit() {
+    const n = isTauri ? await livePtys() : 0;
+    if (n && !(await new Promise<boolean>((resolve) => (this.quitReq = { n, resolve: (go) => ((this.quitReq = null), resolve(go)) })))) return;
     if (!(await this.confirmClose(this.layout.panes.flatMap((p) => p.tabs)))) return;
     await this.flush();
     if (isTauri) await invoke('quit_app');
