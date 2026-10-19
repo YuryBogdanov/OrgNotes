@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BLUEPRINT, PAPER, contrastOf, deriveTokens, editorColors, isDarkTheme, mix, over, rgbOf, type AppTheme } from './appTheme';
-import { BUILTIN, NAMED } from './themes';
+import { NAMED } from './themes';
 
 // ТЗ 57 §1–2: a theme of a few colours; the tokens and the editor's colours derived from it.
 
@@ -16,9 +16,14 @@ describe('the app theme', () => {
     expect(isDarkTheme(theme('#fdf6e3', '#586e75', '#268bd2'))).toBe(false); // Solarized light
   });
 
-  it('«Бумага» and «Синька» give the editor the colours of «Синька — светлая / тёмная» (ТЗ 42)', () => {
-    for (const [th, name] of [[PAPER, 'Синька — светлая'], [BLUEPRINT, 'Синька — тёмная']] as const) {
-      const was = BUILTIN.find((x) => x.name === name)!.colors;
+  // the editor colours of «Синька — светлая / тёмная» before ТЗ 57 (written out)
+  const WAS = {
+    light: { bg: '#f8f6f0', fg: '#15243a', dim: '#69727d', curLine: '#e3aa3c2b', selection: '#e3aa3c5c', cursor: '#e3aa3c', h1: '#15243a', h2: '#15243a', h3: '#15243a', h4: '#15243a', date: '#1f5fbf', tag: '#69727d', link: '#8a5f0e', meta: '#69727d', code: '#495464' },
+    dark: { bg: '#101c2c', fg: '#e6edf6', dim: '#778495', curLine: '#f2c66d21', selection: '#f2c66d4d', cursor: '#f2c66d', h1: '#e6edf6', h2: '#e6edf6', h3: '#e6edf6', h4: '#e6edf6', date: '#8ab8ff', tag: '#778495', link: '#f2c66d', meta: '#778495', code: '#9ca7b5' },
+  };
+  it('«Бумага» and «Синька» give the editor the colours «Синька — светлая / тёмная» had (ТЗ 42)', () => {
+    for (const [th, a] of [[PAPER, 'light'], [BLUEPRINT, 'dark']] as const) {
+      const was = WAS[a];
       const now = editorColors(th);
       for (const k of ['bg', 'fg', 'dim', 'curLine', 'selection', 'cursor', 'h1', 'h2', 'h3', 'h4', 'date', 'tag', 'link', 'meta'] as const) expect(now[k], k).toBe(was[k]);
       // `code` is one mix for both: ±4 per channel

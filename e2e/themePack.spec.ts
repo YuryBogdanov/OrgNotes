@@ -32,10 +32,10 @@ test('the pack is a built-in plugin of data; off — its themes go and the chose
   await expect(pack.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
   await pack.getByRole('switch').click();
   await expect(pack.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
-  await expect.poll(() => bg(page)).toBe('rgb(30, 30, 34)'); // Panopticon тёмная
+  await expect.poll(() => bg(page)).toBe('rgb(30, 30, 34)'); // Классическая тёмная
   await sheet(page).getByRole('tab', { name: 'Оформление' }).click();
-  expect(await dark.getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Panopticon тёмная', 'Синька — тёмная']);
-  await expect(dark.getByRole('radio', { name: 'Panopticon тёмная' })).toHaveAttribute('aria-checked', 'true');
+  expect(await dark.getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Классическая тёмная', 'Синька']);
+  await expect(dark.getByRole('radio', { name: 'Классическая тёмная' })).toHaveAttribute('aria-checked', 'true');
   // after a restart: still off, still Panopticon
   await page.reload();
   await expect(page.locator('.cm-content').first()).toBeVisible();

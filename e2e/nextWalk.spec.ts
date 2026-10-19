@@ -115,7 +115,7 @@ test('⌘4 «В архив»: the matter with the status typed to «Midterm.org_
   await field(page).fill('отменили проект');
   await page.keyboard.press('Meta+4');
   await expect.poll(() => disk(page, '/mock/Midterm.org_archive')).toMatch(/\* NEXT Миграция биллинга\n:PROPERTIES:\n:ARCHIVE_TIME:[\s\S]*отменили проект/);
-  expect(await disk(page, MIDTERM)).not.toContain('Миграция биллинга');
+  await expect.poll(() => disk(page, MIDTERM)).not.toContain('Миграция биллинга'); // the source is written after the archive
   await expect(queue(page).locator('.row', { hasText: 'Миграция биллинга' }).locator('.note')).toHaveText('в архив');
   await queue(page).locator('.row', { hasText: 'Обновить онбординг' }).click();
   await expect(strip(page)).toContainText('Обновить онбординг');

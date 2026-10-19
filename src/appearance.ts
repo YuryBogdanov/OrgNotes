@@ -3,7 +3,7 @@
 // (App.svelte): `data-appearance` on the root switches the tokens of app.css, a <style> holds the theme's variables,
 // and the native window takes the same appearance (its vibrancy and title bar).
 
-import { BUILTIN, DEFAULT_THEME, NEXT_THEME, builtinFor, parseTheme, themeJson, themeVars, type Appearance, type AppearanceChoice, type Theme } from './themes';
+import { BUILTIN, DEFAULT_THEME, NEXT_THEME, builtinFor, parseTheme, themeAlias, themeJson, themeVars, type Appearance, type AppearanceChoice, type Theme } from './themes';
 import { isMainWindow, nextOn } from './uiFlag';
 
 const get = (k: string) => {
@@ -27,9 +27,12 @@ export const readChoice = (): AppearanceChoice => {
 };
 export const saveChoice = (c: AppearanceChoice) => set('appearance', c);
 /** The theme of each appearance: the one chosen, else the default of the shell (the new interface: «Синька»). */
+/** The themes by default of this shell: the new interface's «Бумага» / «Синька», the old one's «Классическая». */
+export const defaultThemes = () => (isMainWindow() && nextOn() ? NEXT_THEME : DEFAULT_THEME);
 export const readThemeNames = (): Record<Appearance, string> => {
-  const def = isMainWindow() && nextOn() ? NEXT_THEME : DEFAULT_THEME;
-  return { light: get('theme:light') || def.light, dark: get('theme:dark') || def.dark };
+  const def = defaultThemes();
+  // the built-in themes renamed by ТЗ 57 («Синька — светлая» → «Бумага»…) are read by their new names
+  return { light: themeAlias(get('theme:light') || def.light), dark: themeAlias(get('theme:dark') || def.dark) };
 };
 export const saveThemeName = (a: Appearance, name: string) => set('theme:' + a, name);
 
@@ -44,7 +47,8 @@ export const effective = (c: AppearanceChoice, dark = systemDark()): Appearance 
 
 /** A theme by name among `themes` for an appearance; the built-in Panopticon one when it is gone. */
 export function themeNamed(name: string, a: Appearance, themes: Theme[] = BUILTIN): Theme {
-  return themes.find((t) => t.name === name && t.appearance === a) ?? builtinFor(a);
+  const n = themeAlias(name);
+  return themes.find((t) => t.name === n && t.appearance === a) ?? builtinFor(a);
 }
 
 let styleEl: HTMLStyleElement | null = null;

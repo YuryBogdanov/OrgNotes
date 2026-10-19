@@ -435,6 +435,7 @@ class Store {
   readonly renameTheme = themes.renameTheme.bind(themes);
   readonly editTheme = themes.editTheme.bind(themes);
   readonly setThemeColors = themes.setThemeColors.bind(themes);
+  readonly setThemeApp = themes.setThemeApp.bind(themes);
   readonly resetTheme = themes.resetTheme.bind(themes);
   readonly deleteTheme = themes.deleteTheme.bind(themes);
   readonly exportTheme = themes.exportTheme.bind(themes);
