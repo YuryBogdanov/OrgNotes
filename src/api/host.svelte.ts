@@ -107,6 +107,22 @@ class Host {
   oneOnOnes = new SvelteMap<string, Parameters<Ctx['ui']['oneOnOne']>[0]>();
   /** The pieces the plugins put into the places other plugins declare (API 1.8): by place, in the order they came. */
   slots = new SvelteMap<string, SlotPiece[]>();
+  /** The plugins' notifications of macOS (1.16): what a click runs, by tag. */
+  private notifyClicks = new Map<string, () => void>();
+  private notifySeq = 0;
+  private notifyListening: Promise<void> | null = null;
+  private listenNotifyClicks() {
+    this.notifyListening ??= (async () => {
+      if (!isTauri) return;
+      const { listen } = await import('@tauri-apps/api/event');
+      await listen<string>('notify-click', (e) => {
+        const f = this.notifyClicks.get(e.payload);
+        this.notifyClicks.delete(e.payload);
+        f?.();
+      });
+    })();
+    return this.notifyListening;
+  }
   /** The panels under the tabs (`ui.drawer`, 1.16), by `plugin:id`; the one shown. */
   drawers = new SvelteMap<string, { plugin: string; title: string; render: (el: HTMLElement) => Dispose | void }>();
   drawerShown = $state<string | null>(null);
@@ -1032,6 +1048,12 @@ class Host {
             });
           }),
         notify: (text, actions) => store.note(text, actions?.map((a) => ({ label: a.label, run: () => this.guard(id, () => a.run(), undefined) })), actions?.length ? 8000 : 4000),
+        systemNotify: async (n, onClick) => {
+          const tag = `${id}:${++this.notifySeq}`;
+          if (onClick) this.notifyClicks.set(tag, () => this.guard(id, onClick, undefined));
+          await this.listenNotifyClicks();
+          return invoke<boolean>('notify_system', { title: String(n.title), body: String(n.body), tag }).catch(() => false);
+        },
       },
       exports: (fns) => {
         for (const k of Object.keys(fns)) declared('функции', m.exports.includes(k), k);

@@ -11,6 +11,7 @@
   "icon": "M3 4h14v12H3zM6 8l2.5 2L6 12M10 12.5h4",
   "permissions": ["process", "clipboard"],
   "contributes": {
+    "navSections": [{ "id": "terminal", "title": "Терминал", "icon": "M3 4h14v12H3zM6 8l2.5 2L6 12M10 12.5h4" }],
     "commands": [
       { "id": "terminal.toggle", "title": "Терминал: показать или скрыть", "keys": ["⌃`"], "synonyms": ["терминал", "консоль", "shell", "оболочка"] },
       { "id": "terminal.new", "title": "Терминал: новая сессия", "keys": ["⌃⇧`"], "synonyms": ["терминал", "консоль", "сессия"] }

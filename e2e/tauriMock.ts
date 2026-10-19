@@ -342,6 +342,7 @@ export async function installTauriMock(page: Page, files: Record<string, string>
           }
           return null;
         },
+        notify_system: (a) => (w.__log.push(['notify_system', a.title, a.body, a.tag]), true),
         pty_count: () => Object.keys(w.__ptys ?? {}).length,
         net_fetch: (a) => (w.__log.push(['net', a.plugin, a.method, a.url]), w.__net ?? { status: 200, headers: [['content-type', 'application/json']], text: '{"ok":true}' }),
 

@@ -63,13 +63,23 @@ export class Session {
       }
       this.pty?.write(d);
     });
-    this.t.term.onBell(() => (this.bell = true));
+    // a bell (\a — many agents call the human so): marked unless it is in sight
+    this.t.term.onBell(() => {
+      if (terms.inSight(this)) return;
+      this.bell = true;
+      terms.rang(this);
+    });
   }
   get term() {
     return this.t.term;
   }
   get search() {
     return this.t.search;
+  }
+  /** The line of the section's panel (§4): «ждёт ввода», «ждёт ответа», «завершена · код 0». */
+  get moodText() {
+    const m = this.mood;
+    return m === 'idle' ? 'ждёт ввода' : m === 'bell' ? 'ждёт ответа' : m === 'ended' ? `завершена${this.code === null ? '' : ` · код ${this.code}`}` : '';
   }
   get mood(): Mood {
     if (!this.alive) return 'ended';
@@ -190,6 +200,25 @@ export class Terminals {
   pick(id: string) {
     this.activeId = id;
     queueMicrotask(() => this.active?.focus());
+  }
+  /** Shown where it is now (the panel), the focus in it. */
+  reveal(s: Session) {
+    this.activeId = s.id;
+    this.drawer?.show();
+    queueMicrotask(() => s.focus());
+  }
+  /** The session is seen now: its panel shown, it the active one, the window in front. */
+  inSight(s: Session) {
+    return !!this.drawer?.shown() && this.active === s && document.hasFocus();
+  }
+  /** Notify the user on a bell when the window is not in front (the setting, on by default). */
+  notifyOn = true;
+  rang(s: Session) {
+    if (!document.hasFocus() && this.notifyOn) void this.ctx.ui.systemNotify({ title: s.name, body: 'ждёт ответа' }, () => this.reveal(s));
+  }
+  /** How many rang and are not seen: the section's badge. */
+  get ringing() {
+    return this.list.filter((s) => s.bell).length;
   }
   /** «×»: an alive one asks «Завершить процесс?» first. */
   async close(id: string) {
