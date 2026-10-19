@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { diskFile as disk, openApp } from './helpers';
 
-// ТЗ 48.1: a task in the lists in the new interface — the menu of ТЗ 44 (260 pt): «Открыть», «Открыть во второй
-// панели» off, «Статус ›» (capsules), «Приоритет ›», «Запланировать ›» / «Дедлайн ›» (the days with their dates grey,
+// ТЗ 48.1: a task in the lists in the new interface — the menu of ТЗ 44 (260 pt): «Открыть», «Открыть сбоку» (ТЗ 56),
+// «Статус ›» (capsules), «Приоритет ›», «Запланировать ›» / «Дедлайн ›» (the days with their dates grey,
 // «Снять дату» in `todo`), «Теги…», «Перенести…», «Копировать ссылку»; «Теги…» the popover of ТЗ 44; after a change
 // the one toast at the bottom — «Запланировано на завтра · …» with «Отменить ⌘Z», which brings the date back.
 
@@ -22,14 +22,14 @@ async function open(page: Page) {
   await expect(screen(page)).toBeVisible();
 }
 
-test('the menu of ТЗ 44: its items, «Открыть во второй панели» off; «Запланировать ›» — the days with their dates; the toast; «Отменить» brings it back', async ({ page }) => {
+test('the menu of ТЗ 44: its items, «Открыть сбоку»; «Запланировать ›» — the days with their dates; the toast; «Отменить» brings it back', async ({ page }) => {
   await open(page);
   await row(page, 'План переезда').click({ button: 'right' });
   await expect(menu(page)).toBeVisible();
   expect(Math.round((await menu(page).boundingBox())!.width)).toBeGreaterThanOrEqual(260); // its width, the frame on top
   const labels = (await menu(page).locator('[role=menuitem] .l1').allTextContents()).map((s) => s.trim());
-  expect(labels).toEqual(['Открыть', 'Открыть во второй панели', 'Статус', 'Приоритет', 'Запланировать', 'Дедлайн', 'Теги…', 'Перенести в другой файл…', 'Копировать ссылку']);
-  await expect(menu(page).getByRole('menuitem', { name: /Открыть во второй панели/ })).toBeDisabled();
+  expect(labels).toEqual(['Открыть', 'Открыть сбоку', 'Статус', 'Приоритет', 'Запланировать', 'Дедлайн', 'Теги…', 'Перенести в другой файл…', 'Копировать ссылку']);
+  await expect(menu(page).getByRole('menuitem', { name: /Открыть сбоку/ })).toBeEnabled();
   await menu(page).getByRole('menuitem', { name: /Запланировать/ }).hover();
   const sub = page.getByRole('menu').nth(1);
   await expect(sub.getByRole('menuitem', { name: /Сегодня/ })).toContainText('пт 16');

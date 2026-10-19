@@ -8,7 +8,8 @@ import { Tx, type HeadingRef, type Step } from './journal';
 import { firstDone, sequenceFor, setKeyword, setPriority, toJs, toneFor, type Heading } from './org';
 import { setTags, shiftEvent } from './edits';
 import { priorityAfter, rotateStatus } from './outline';
-import { bare, headingStep, setListTask, setMoreTaskCommands, taskCommands, type Ctx, type HeadingAct, type Icon, type TaskCommand, type TaskCtx } from './commands';
+import { bare, headingStep, register, setListTask, setMoreTaskCommands, taskCommands, type Ctx, type HeadingAct, type Icon, type TaskCommand, type TaskCtx } from './commands';
+import { besideNow, besideOf, closeBeside, openBeside } from './beside.svelte';
 import { toneStyle } from './colors';
 import type { MenuItem } from './ContextMenu.svelte';
 import type { NoteFile } from './store.svelte';
@@ -327,6 +328,9 @@ class TaskLists {
     if (!spec || store.sheetOpen) return false;
     if (id === 'taskRefresh') return spec.refresh(), true;
     if (id === 'taskDeselect') {
+      // ⎋ closes the file beside first (ТЗ 56 §2)
+      const tab = this.besideTab(spec);
+      if (tab && besideOf(tab.id)) return closeBeside(tab.id), true;
       if (!spec.selected()) return false;
       spec.clear();
       return true;
@@ -336,7 +340,7 @@ class TaskLists {
     const L = spec.id;
     switch (id) {
       case 'taskOpen': spec.open(false); break;
-      case 'taskOpenOther': spec.open(true); break;
+      case 'taskOpenOther': this.openOther(spec, t); break;
       case 'taskStatusNext': void this.cycleStatus(L, t, 'next'); break;
       case 'taskStatusPrev': void this.cycleStatus(L, t, 'prev'); break;
       case 'taskPrioUp': void this.cyclePriority(L, t, 'up'); break;
@@ -349,6 +353,36 @@ class TaskLists {
       case 'taskRefile': this.refile(t); break;
       default: return false;
     }
+    return true;
+  }
+
+  // ---- the file beside a list (ТЗ 56) ----------------------------------------------------------------------------
+
+  /** The list's tab, if the file beside it opens there: the new interface, a tab of a list (not a file's), and a list
+   *  that leaves ⌥↩ to the core (no `otherLabel` of its own: the board keeps «Открыть в тексте файла»). */
+  besideTab(spec: ListSpec): Tab | undefined {
+    if (!store.nextUi || spec.otherLabel) return undefined;
+    const tab = spec.tab?.();
+    if (!tab || tab.kind === 'file' || tab.kind === 'untitled' || !spec.el()?.closest('[data-beside]')) return undefined;
+    return tab;
+  }
+  /** ⌥↩, ⌥-click, «Открыть сбоку»: the row's file beside, the focus kept in the list; the same row again — the focus
+   *  into the file. Elsewhere the list's own second opening. */
+  openOther(spec: ListSpec, t: ListTask) {
+    const tab = this.besideTab(spec);
+    if (!tab) return spec.open(true);
+    const r = resolve(t);
+    if (!r) return;
+    const b = besideOf(tab.id);
+    if (b && b.path === r.f.path && b.line === r.h.line) return void focusBesideFile(tab.id);
+    openBeside(tab.id, { path: r.f.path, line: r.h.line }, { keepPin: true });
+  }
+  /** ⌃⌘←: back into the list beside the file, on its chosen row. */
+  focusList(tabId: string) {
+    const spec = this.specs.find((s) => s.tab?.()?.id === tabId && s.el()?.closest(`[data-beside="${CSS.escape(tabId)}"]`));
+    const el = spec?.el();
+    if (!el) return false;
+    (el.querySelector<HTMLElement>('[aria-selected="true"], .rb.sel') ?? el).focus();
     return true;
   }
 
@@ -374,8 +408,9 @@ class TaskLists {
     const none = () => {};
     return [
       { label: 'Открыть', shortcut: hint('taskOpen'), action: () => spec.open(false) },
-      // the new interface has no second pane yet (ТЗ 48 §1): the row is there, off
-      { label: spec.otherLabel ?? 'Открыть во второй панели', shortcut: hint('taskOpenOther'), disabled: store.nextUi && !spec.otherLabel, action: () => spec.open(true) },
+      // the new interface has no second pane: the file beside the list instead (ТЗ 56 §2), where the tab is a list's
+      { label: this.besideTab(spec) ? 'Открыть сбоку' : (spec.otherLabel ?? 'Открыть во второй панели'), shortcut: hint('taskOpenOther'),
+        disabled: store.nextUi && !spec.otherLabel && !this.besideTab(spec), action: () => this.openOther(spec, t) },
       'sep',
       { label: 'Статус', action: none, sub: this.statusItems(L, t, r), subWidth: store.nextUi ? 230 : 200, soft: store.nextUi },
       { label: 'Приоритет', action: none, sub: this.prioItems(L, t, r.h), subWidth: 200 },
@@ -484,6 +519,38 @@ task('task.open', 'Задача: открыть', 'goto', (_t, L) => void setTim
 
 // the keys of the scope «list» work while the focus is in a list (not while its menu or the tags field is open)
 store.setScopeKeys('list', { active: () => !!lists.focused() && !lists.menu && !lists.tagsReq, run: (id) => lists.run(id) });
+
+// the keys of the tab with a file beside (ТЗ 56 §5): wherever the focus is in it, the list's or the file's
+function focusBesideFile(tabId: string) {
+  const ed = document.querySelector<HTMLElement>(`[data-beside="${CSS.escape(tabId)}"] .side .cm-content`);
+  ed?.focus();
+  return !!ed;
+}
+store.setScopeKeys('beside', {
+  active: () => !!besideNow() && !store.sheetOpen && !lists.menu,
+  run: (id) => {
+    const tabId = store.tab?.id;
+    if (!tabId || !besideOf(tabId)) return false;
+    if (id === 'besideClose') return closeBeside(tabId), true;
+    if (id === 'besideFocusList') return lists.focusList(tabId);
+    if (id === 'besideFocusFile') return focusBesideFile(tabId);
+    return false;
+  },
+});
+register({
+  id: 'besideClose', title: 'Закрыть файл сбоку', icon: 'file', group: 'general', synonyms: ['сбоку', 'вторая панель'],
+  when: () => !!besideNow(), run: () => void setTimeout(() => store.tab && closeBeside(store.tab.id)),
+});
+// ⌥-click on a row of a list (ТЗ 56 §2): the row chosen by its own click, then its file beside
+if (typeof window !== 'undefined') {
+  window.addEventListener('click', (e) => {
+    if (!e.altKey || e.metaKey || e.ctrlKey || e.shiftKey || !store.nextUi) return;
+    const el = e.target as HTMLElement | null;
+    const spec = el ? lists.specs.find((s) => s.el()?.contains(el)) : undefined;
+    const t = spec?.selected();
+    if (spec && t && lists.besideTab(spec) && el?.closest('[data-k], [data-i], [role="option"], .row')) lists.openOther(spec, t);
+  });
+}
 
 // the plugins' actions in «ВЫДЕЛЕННАЯ ЗАДАЧА»: «Задача: добавить отметку…»
 setMoreTaskCommands((): TaskCommand[] => {

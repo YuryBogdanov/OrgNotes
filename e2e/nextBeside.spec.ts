@@ -23,7 +23,7 @@ async function beside(page: Page) {
   await expect(page.locator('.hz')).toBeVisible();
   await page.evaluate(async () => {
     const { store } = await import('/src/store.svelte.ts' as string);
-    const { openBeside } = await import('/src/next/besideState.svelte.ts' as string);
+    const { openBeside } = await import('/src/beside.svelte.ts' as string);
     openBeside(store.tab.id, { path: 'Midterm.org', line: 2 });
   });
 }
@@ -68,4 +68,55 @@ test('«Открыть вкладкой»: the file as a tab at its line, beside
   await expect(side(page)).toHaveCount(0);
   await expect(page.getByRole('tab', { name: /Midterm/ })).toHaveAttribute('aria-selected', 'true');
   await expect.poll(() => page.evaluate(async () => (await import('/src/store.svelte.ts' as string)).store.tab?.cursor?.line)).toBe(3);
+});
+
+// ТЗ 56.2: opening and closing from the lists, the focus, the keys
+const W = {
+  '/mock/work.org': '* NEXT План переезда хранилища\nSCHEDULED: <2026-10-16 Fri>\nПеревезти бэкапы.\n* TODO Синк платформы\nSCHEDULED: <2026-10-16 Fri>\n',
+};
+async function agenda(page: Page) {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.addInitScript(() => localStorage.setItem('ui:next', '1'));
+  await openApp(page, { files: W, local: { 'plugins:enabled': JSON.stringify({ calendar: false }) }, ready: false, now: new Date(2026, 9, 16, 10), viewport: { width: 1440, height: 860 } });
+  await expect(page.locator('.cm-content')).toBeVisible();
+  await page.evaluate(async () => (await import('/src/store.svelte.ts' as string)).store.showAgendaHere());
+  await expect(page.locator('.split .list .row').first()).toBeVisible();
+}
+const inSide = (page: Page) => page.evaluate(() => !!document.activeElement?.closest('section[aria-label="Файл сбоку"]'));
+const inList = (page: Page) => page.evaluate(() => !!document.activeElement?.closest('.split > .list'));
+
+test('⌥↩ opens beside, the focus kept in the list; ⌥↩ again — into the file; ⌃⌘← / ⌃⌘→; ⎋ in the list closes', async ({ page }) => {
+  await agenda(page);
+  const row = page.locator('.split .list .row', { hasText: 'План переезда' }).first();
+  await row.click();
+  await page.keyboard.press('Alt+Enter');
+  await expect(side(page)).toBeVisible();
+  await expect(side(page).locator('header')).toContainText('План переезда хранилища');
+  await expect(side(page).locator('.cm-sub.top')).toContainText('План переезда');
+  expect(await inList(page)).toBe(true);
+  await page.keyboard.press('Alt+Enter'); // the same row: into the file
+  await expect.poll(() => inSide(page)).toBe(true);
+  await page.keyboard.press('Control+Meta+ArrowLeft');
+  await expect.poll(() => inList(page)).toBe(true);
+  await page.keyboard.press('Control+Meta+ArrowRight');
+  await expect.poll(() => inSide(page)).toBe(true);
+  await page.keyboard.press('Escape'); // in the file: not closed
+  await expect(side(page)).toBeVisible();
+  await page.keyboard.press('Control+Meta+ArrowLeft');
+  await expect.poll(() => inList(page)).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(side(page)).toHaveCount(0);
+  // ⌥-click on another row; «Открыть сбоку» in its menu
+  await page.locator('.split .list .row', { hasText: 'Синк платформы' }).first().click({ modifiers: ['Alt'] });
+  await expect(side(page).locator('header')).toContainText('Синк платформы');
+  await side(page).getByRole('button', { name: 'Закрыть файл сбоку' }).click();
+  await row.click({ button: 'right' });
+  await page.getByRole('menu', { name: 'Задача' }).getByRole('menuitem', { name: /Открыть сбоку/ }).click();
+  await expect(side(page).locator('header')).toContainText('План переезда хранилища');
+  // the command of the palette
+  await page.evaluate(async () => {
+    const { commands } = await import('/src/commands.ts' as string);
+    commands.find((c: { id: string }) => c.id === 'besideClose').run();
+  });
+  await expect(side(page)).toHaveCount(0);
 });
