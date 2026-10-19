@@ -87,6 +87,27 @@ pub(crate) fn remind_end_day(app: AppHandle) -> bool {
     }
 }
 
+/// The font families of this Mac (ТЗ 57 §6): `[{ name, cyr }]` as JSON text — `cyr` whether the family covers Cyrillic.
+#[tauri::command]
+pub(crate) fn font_families() -> String {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        extern "C" {
+            fn font_families_json() -> *mut std::os::raw::c_char;
+            fn free(p: *mut std::ffi::c_void);
+        }
+        let p = font_families_json();
+        if p.is_null() {
+            return "[]".into();
+        }
+        let s = std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned();
+        free(p as *mut std::ffi::c_void);
+        s
+    }
+    #[cfg(not(target_os = "macos"))]
+    "[]".into()
+}
+
 /// The text of the clipboard (ТЗ 35): the page cannot read it without WebKit asking the user.
 #[tauri::command]
 pub(crate) fn clipboard_text() -> String {
@@ -106,4 +127,17 @@ pub(crate) fn clipboard_text() -> String {
     }
     #[cfg(not(target_os = "macos"))]
     String::new()
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod font_tests {
+    #[test]
+    fn the_font_families_of_this_mac_say_which_cover_cyrillic() {
+        let v: serde_json::Value = serde_json::from_str(&super::font_families()).unwrap();
+        let list = v.as_array().unwrap();
+        assert!(list.len() > 10);
+        let of = |n: &str| list.iter().find(|x| x["name"] == n).map(|x| x["cyr"].as_bool().unwrap());
+        assert_eq!(of("Helvetica Neue"), Some(true));
+        assert!(list.iter().all(|x| !x["name"].as_str().unwrap().starts_with('.')));
+    }
 }

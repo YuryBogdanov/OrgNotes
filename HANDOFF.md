@@ -1006,6 +1006,18 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   start); on the right ThemePreview `big`, «Сбросить» (`store.restoreTheme` of the theme as the editor opened it,
   format kept; renamed meanwhile — under its new name), «Экспорт…». Every change is `store.setThemeApp` (the file in
   the new format from then). A built-in theme has no «Изменить…»: «Дублировать и изменить…».
+  57.5, the fonts: the theme's four (`app.fonts`: title, text, ui, mono) are the new interface's `--title`, `--text`,
+  `--ui`, `--mono` (App), the plugins' layer's (`--ui`, `--mono`, `--font-display`, `--font-mono`, compatVars), the
+  windows over other programs' and Kit's; `fontCss` (tokens.ts) — the bundled by their stacks, «system» the
+  interface's, any other by name with its role's fallback. `next/fontList.svelte.ts`: the bundled four, the Mac's
+  families read once (Rust `system::font_families` → Swift `Fonts.swift` `font_families_json`: NSFontManager, each
+  `{ name, cyr }` — Cyrillic covered; a Rust test on this Mac), `textFontOf(theme)` (a built-in theme keeps the old
+  «Шрифт текста» of ТЗ 42 — `nextPrefs.font` system / mono — till a font is chosen anew), `fontKind` for editor.css's
+  `data-font` sizes. `FontMenu.svelte`: a button in its font; the menu — the bundled, a rule, the Mac's, a field to
+  find, ↑↓↩⎋, each in its own font, «нет кириллицы». «Оформление → Текст → Шрифт текста» sets the text font of the
+  theme in effect (a built-in one: a sheet «Дублировать и изменить» — the copy takes the font, the editor opens);
+  the editor's «Шрифты» — four rows. The mock answers `font_families` with four families (one without Cyrillic).
+  e2e nextThemeFonts.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

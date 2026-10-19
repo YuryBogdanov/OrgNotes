@@ -3,7 +3,7 @@
 // variable app.css defines has its line here (compat.test.ts): a new one there must say what it is here.
 
 import type { AppTheme } from '../appTheme';
-import { FONTS } from './tokens';
+import { FONTS, fontCss } from './tokens';
 
 /** An old variable → a value in the new tokens. `null`: the same name in both, inherited as it is. */
 export const COMPAT: Record<string, string | null> = {
@@ -79,6 +79,11 @@ export const compatVars = (t: AppTheme) =>
     '--font-text:var(--text)',
     ...Object.entries(COMPAT).flatMap(([k, v]) => (v === null ? [] : [`--${k}:${v}`])),
     ...Object.entries(t.palette).map(([k, v]) => `--p-${k}:${v}`), // the named colours of the theme (ТЗ 57)
+    // the theme's fonts (ТЗ 57 §7): the interface's, the monospace, the titles
+    `--ui:${fontCss(t.fonts.ui, 'ui')}`,
+    `--mono:${fontCss(t.fonts.mono, 'mono')}`,
+    `--font-display:${fontCss(t.fonts.title, 'title')}`,
+    `--font-mono:${fontCss(t.fonts.mono, 'mono')}`,
   ].join(';');
 
 /** The old names inside the new editor: its tooltips (the tags offered, a folded match, a line's link) are drawn by

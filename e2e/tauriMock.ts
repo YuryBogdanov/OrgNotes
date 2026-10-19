@@ -270,6 +270,8 @@ export async function installTauriMock(page: Page, files: Record<string, string>
         'plugin:opener|open_url': (a) => void w.__log.push(['open_url', a.url]),
         'plugin:opener|reveal_item_in_dir': (a) => void w.__log.push(['reveal', a.paths]),
         clipboard_text: () => w.__clipText ?? '', // the test sets what the clipboard holds
+        // the font families of the Mac (ТЗ 57 §6): a few, one without Cyrillic
+        font_families: () => JSON.stringify([{ name: 'Georgia', cyr: true }, { name: 'Helvetica Neue', cyr: true }, { name: 'Menlo', cyr: true }, { name: 'Zapfino', cyr: false }]),
 
         // the installed plugins (roadmap 1.2): folders under /config/plugins/<dir>/
         list_plugins: () => {

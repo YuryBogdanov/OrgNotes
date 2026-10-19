@@ -3,7 +3,7 @@
   import { store } from '../store.svelte';
   import { defaultThemes } from '../appearance';
   import { plugins } from '../api/host.svelte';
-  import { nextPrefs, TEXT_FONTS, TEXT_WIDTHS } from '../nextPrefs.svelte';
+  import { nextPrefs, TEXT_WIDTHS } from '../nextPrefs.svelte';
   import { setLayer } from '../settingsNav.svelte';
   import type { MenuItem } from '../menuItems';
   import type { Appearance, AppearanceChoice, Theme } from '../themes';
@@ -16,6 +16,8 @@
   import Button from './ui/Button.svelte';
   import ConfirmSheet from './ConfirmSheet.svelte';
   import ThemePreview from './ThemePreview.svelte';
+  import FontMenu from './FontMenu.svelte';
+  import { fontLabel, textFontOf } from './fontList.svelte';
 
   // «Настройки → Оформление» of the new interface (ТЗ 54 §3, ТЗ 57 §3): the appearance and the two places — the light
   // one and the dark one, any theme in either; the themes of the whole app as cards (the window in miniature, the
@@ -103,6 +105,24 @@
     queueMicrotask(() => document.querySelector<HTMLElement>(`[data-theme-card="${CSS.escape(all[i].name)}"]`)?.focus());
   }
   const options = $derived(all.map((t) => ({ value: t.name, label: t.name })));
+
+  // «Шрифт текста» (ТЗ 57 §6) is the text font of the theme in effect: an own theme takes it; a built-in one is not
+  // changed — first «Дублировать и изменить»
+  let fontAsk = $state<string | null>(null);
+  $effect(() => setLayer('lookFont', !!fontAsk));
+  function setTextFont(f: string) {
+    const t = store.theme;
+    if (t.builtin) return void (fontAsk = f);
+    store.setThemeApp(t.name, { ...t.app, fonts: { ...t.app.fonts, text: f } });
+    nextPrefs.setFont('serif'); // the old choice of ТЗ 42 gives way
+  }
+  async function copyWithFont(f: string) {
+    const c = await store.copyTheme(store.theme, `${store.theme.name} — копия`, place);
+    if (!c) return;
+    store.setThemeApp(c.name, { ...c.app, fonts: { ...c.app.fonts, text: f } });
+    nextPrefs.setFont('serif');
+    store.themeEditing = c.name;
+  }
 </script>
 
 <Group caption="Оформление">
@@ -148,8 +168,8 @@
   </div>
 </Group>
 <Group caption="Текст">
-  <Row label="Шрифт текста" hint="Заголовки, текст файла, карточки доски" changed={nextPrefs.font !== 'serif'}>
-    <MenuButton value={nextPrefs.font} options={TEXT_FONTS.map((f) => ({ value: f.id, label: f.name }))} label="Шрифт текста" width={220} onchange={(v) => nextPrefs.setFont(v)} />
+  <Row label="Шрифт текста" hint="Шрифт текста темы «{store.theme.name}»: заголовки, текст файла, карточки доски">
+    <FontMenu value={textFontOf(store.theme)} role="text" label="Шрифт текста" onchange={setTextFont} />
   </Row>
   <Row label="Ширина текста" id="set-width" changed={nextPrefs.width !== 'medium'}>
     <Segments value={nextPrefs.width} options={TEXT_WIDTHS.map((w) => ({ value: w.id, label: w.name }))} labelledby="set-width" onchange={(v) => nextPrefs.setWidth(v)} />
@@ -163,6 +183,12 @@
 </Group>
 
 {#if menu}<Menu x={menu.x} y={menu.y} items={menu.items} label="Тема" onclose={() => (menu = null)} />{/if}
+{#if fontAsk}
+  {@const f = fontAsk}
+  <ConfirmSheet label="Шрифт встроенной темы" title="Тема «{store.theme.name}» встроенная" onclose={() => (fontAsk = null)} actions={[{ label: 'Дублировать и изменить', kind: 'primary', run: () => void copyWithFont(f) }]}>
+    Встроенную тему изменить нельзя. Шрифт «{fontLabel(f)}» получит её копия «{store.theme.name} — копия».
+  </ConfirmSheet>
+{/if}
 {#if confirmDel}
   {@const t = confirmDel}
   <ConfirmSheet label="Удаление темы" title="Удалить тему «{t.name}»?" onclose={() => (confirmDel = null)} actions={[{ label: 'Удалить', kind: 'danger', run: () => void store.deleteTheme(t) }]}>
