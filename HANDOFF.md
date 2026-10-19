@@ -932,6 +932,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   start; no session — one by the default profile, the text queued till it starts; the focus to it. The settings by
   the manifest's schema: the size (11 … 14), the scrollback (1 000 … 50 000), ⌥ as Meta, the notifications, the
   shell — `terms.setOpts` applies them to the open terminals. e2e terminalInsert.spec.ts.
+- **Bugs of the new interface, batch 1 (`docs/fix-bagi-novogo-interfeysa-1.md`, issues #291–#315)** — PRs chained.
+  1, «Сегодня» and «Завершить день»: #312 the capsules' column is the list's widest capsule (`next/capColumn.ts`,
+  `use:capColumn` on Today, AgendaBlocks and «Не успел»; `.kc` and what aligns under it read `--kc`); #291 / #313
+  «Записка со вчера» and «Заметка на завтра» in the monospace of «Исходник» 13 / 1.55 (ТЗ 32, ТЗ 45 amended); #311
+  the compact day of the panel shows every block of the screen in its order (the note in a line, «Главное», «Задачи»,
+  «Агенда на сегодня» — the meetings and the day's tasks, 1-1, the overdue, a plugin's block its summary or «›»;
+  «Из плагинов» gone, rows `.plugrow`), an empty day says so with «Полная версия» once. The panel's TodayCtl had the
+  data: the day's scheduled tasks are the agenda's, not «Задачи» (those are the task files').
 - **The window's title bar in the new interface:** WKWebView has no `-webkit-app-region` (the CSS stays, harmless):
   `next/windowDrag.ts` — `use:windowDrag` on the toolbar (Toolbar.svelte) and the lights' room of the rail and of the
   panel (Sidebar.svelte); a press not on a button, field or tab asks Tauri `startDragging`, a double click

@@ -7,8 +7,9 @@
   import { plugins } from '../api/host.svelte';
   import Compat from './Compat.svelte';
 
-  // The panel «Сегодня» of the sidebar (ТЗ 50 §4). By any other tab — the compact day: the progress of the day, the
-  // screen's blocks in its order (meetings, «Главное», the overdue), five rows each; by the tab «Сегодня» — its
+  // The panel «Сегодня» of the sidebar (ТЗ 50 §4). By any other tab — the compact day: the progress of the day, every
+  // block of the screen in its order, each short (fix #311: the note in a line, «Главное», «Задачи», the meetings, 1-1,
+  // the overdue, five rows each; a plugin's block — its summary, else its name with «›»); nothing — a word; by the tab «Сегодня» — its
   // contents: a row a block, a click scrolls the screen to it, the one at the screen's top lit. The data are the
   // screen's (TodayCtl): the panel and the screen never differ. The rows are a list of tasks (ТЗ 34) of their own.
   // The plugins' blocks give their summaries (`setSummary`, API 1.15): «Из плагинов», the numbers of the contents;
@@ -23,8 +24,10 @@
   const until = $derived(untilRemind(today.local, c.now));
   const meetings = $derived(c.agenda.filter((a) => a.kind === 'event'));
   const focus = $derived(c.focusRows.flatMap((f) => (f.task ? [f.task] : [])));
-  // no «Главное»: the first tasks of «Задачи»
-  const main = $derived(focus.length ? focus : c.groups.flatMap((g) => g.rows).slice(0, MAX));
+  // «Задачи»: the first ones by the screen's groups (fix #311: always, not only with no «Главное»)
+  const tasks = $derived(c.groups.flatMap((g) => g.rows));
+  /** «Записка со вчера» in one line: its first line of text, the marks of the list off. */
+  const noteLine = $derived((c.jd?.note?.text ?? '').split('\n').map((l) => l.replace(/^\s*(?:[-+*]|\d+[.)])\s+/, '').trim()).find(Boolean) ?? '');
   const lateDays = (n: number) => `${n} дн.`;
 
   // ---- the screen's blocks, its contents ----
@@ -32,7 +35,18 @@
   const TITLES: Record<string, string> = { note: 'Записка со вчера', focus: 'Главное', agenda: 'Агенда на сегодня', tasks: 'Задачи', overdue: 'Просрочено', oneOnOne: '1-1 сегодня' };
   const titleOf = (id: string) => TITLES[id] ?? todayBlockOf(id)?.title ?? id;
   const isPlugin = (id: string) => !!todayBlockOf(id)?.component;
-  const fromPlugins = $derived(order.filter((id) => isPlugin(id) && plugins.todaySummary.has(id)));
+  /** The screen's blocks the compact day shows (fix #311: every one in its order, each short); empty ones left out. */
+  const shown = $derived(
+    order.filter((id) =>
+      id === 'note' ? !!noteLine
+      : id === 'agenda' ? c.agenda.length > 0
+      : id === 'focus' ? focus.length > 0
+      : id === 'tasks' ? tasks.length > 0
+      : id === 'oneOnOne' ? c.meetings.length > 0
+      : id === 'overdue' ? c.late.length > 0
+      : isPlugin(id),
+    ),
+  );
   // every plugin's block that is on, drawn out of sight while no screen draws it
   const drawn = $derived(today.blocks.filter((o) => o.on && isPlugin(o.id)).map((o) => o.id));
   function numOf(id: string): { text: string; alert?: boolean; wait?: boolean } | null {
@@ -99,7 +113,7 @@
   {#if kw}<span class="cap" style={c.tone(kw, path)}>{kw}</span>{/if}
 {/snippet}
 {#snippet group(title: string, n: number, alert = false)}
-  <div class="gh" class:alert><span>{title}</span><span class="gn">{n}</span></div>
+  <div class="gh" class:alert><span>{title}</span>{#if n}<span class="gn">{n}</span>{/if}</div>
 {/snippet}
 {#snippet moreRow(id: string, rest: number)}
   <button class="row more" onclick={() => more(id)}>Ещё {rest} ›</button>
@@ -127,31 +141,57 @@
           <i style:width="{progress.total ? (100 * progress.done) / progress.total : 0}%"></i>
         </div>
       </div>
-      {#each order.filter((id) => id === 'agenda' || id === 'focus' || id === 'overdue') as id (id)}
-        {#if id === 'agenda' && meetings.length}
-          <section class="grp" aria-label="Встречи">
-            {@render group('Встречи', meetings.length)}
-            {#each meetings.slice(0, meetings.length > MAX ? MAX - 1 : MAX) as a (a.key)}
-              {@const now = !a.past && isNow(a.time, c.now)}
+      {#each shown as id (id)}
+        {#if id === 'note' && noteLine}
+          <section class="grp" aria-label="Записка со вчера">
+            {@render group('Записка со вчера', 0)}
+            <button class="row nline" title={noteLine} onclick={() => more('note')}><span class="t">{noteLine}</span></button>
+          </section>
+        {:else if id === 'agenda'}
+          <!-- the day's agenda as the screen has it (fix #311): the meetings and the tasks of the day, by time -->
+          <section class="grp" aria-label="Агенда на сегодня">
+            {@render group(meetings.length === c.agenda.length ? 'Встречи' : 'Агенда', c.agenda.length)}
+            {#each c.agenda.slice(0, c.agenda.length > MAX ? MAX - 1 : MAX) as a (a.key)}
+              {@const now = a.kind === 'event' && !a.past && isNow(a.time, c.now)}
               <button class="row" class:past={a.past} class:now class:sel={c.selKey === a.slot} data-k={a.slot} title={a.title}
-                onclick={() => c.choose(a.slot)} ondblclick={() => c.openAgenda()} oncontextmenu={(e) => c.menu(e, a.slot)}>
-                <span class="tm">{a.time.split(/[–-]/)[0]}</span><span class="t">{a.title}</span>{#if now}<span class="nw">сейчас</span>{/if}
+                onclick={() => c.choose(a.slot)} ondblclick={() => (a.kind === 'event' ? c.openAgenda() : c.open(a.path, a.line))} oncontextmenu={(e) => c.menu(e, a.slot)}>
+                {#if a.kind === 'event'}<span class="tm">{a.time.split(/[–-]/)[0]}</span>{:else}{@render cap(a.kw, a.path)}{/if}<span class="t">{a.title}</span>{#if now}<span class="nw">сейчас</span>{/if}
               </button>
             {/each}
-            {#if meetings.length > MAX}{@render moreRow(id, meetings.length - (MAX - 1))}{/if}
+            {#if c.agenda.length > MAX}{@render moreRow(id, c.agenda.length - (MAX - 1))}{/if}
           </section>
-        {:else if id === 'focus' && main.length}
+        {:else if id === 'focus'}
           <section class="grp" aria-label="Главное">
-            {@render group('Главное', main.length)}
-            {#each main.slice(0, main.length > MAX ? MAX - 1 : MAX) as t (t.slot)}
+            {@render group('Главное', focus.length)}
+            {#each focus.slice(0, focus.length > MAX ? MAX - 1 : MAX) as t (t.slot)}
               <button class="row" class:done={t.done} class:sel={c.selKey === t.slot} data-k={t.slot} title={t.title}
                 onclick={() => c.choose(t.slot)} ondblclick={() => c.open(t.path, t.line)} oncontextmenu={(e) => c.menu(e, t.slot)}>
                 {@render cap(t.kw, t.path)}<span class="t">{t.title}</span>
               </button>
             {/each}
-            {#if main.length > MAX}{@render moreRow(focus.length ? id : 'tasks', main.length - (MAX - 1))}{/if}
+            {#if focus.length > MAX}{@render moreRow(id, focus.length - (MAX - 1))}{/if}
           </section>
-        {:else if id === 'overdue' && c.late.length}
+        {:else if id === 'tasks'}
+          <section class="grp" aria-label="Задачи">
+            {@render group('Задачи', c.tasksTotal || tasks.length)}
+            {#each tasks.slice(0, MAX) as t (t.slot)}
+              <button class="row" class:done={t.done} class:sel={c.selKey === t.slot} data-k={t.slot} title={t.title}
+                onclick={() => c.choose(t.slot)} ondblclick={() => c.open(t.path, t.line)} oncontextmenu={(e) => c.menu(e, t.slot)}>
+                {@render cap(t.kw, t.path)}<span class="t">{t.title}</span>
+              </button>
+            {/each}
+            {#if (c.tasksTotal || tasks.length) > MAX}{@render moreRow(id, (c.tasksTotal || tasks.length) - MAX)}{/if}
+          </section>
+        {:else if id === 'oneOnOne'}
+          <section class="grp" aria-label="1-1 сегодня">
+            {@render group('1-1 сегодня', c.meetings.length)}
+            {#each c.meetings as m (m.key)}
+              <button class="row" title={m.name} onclick={() => more('oneOnOne')}>
+                {#if m.time}<span class="tm">{m.time}</span>{/if}<span class="t">{m.name}</span>
+              </button>
+            {/each}
+          </section>
+        {:else if id === 'overdue'}
           <section class="grp" aria-label="Просрочено">
             {@render group('Просрочено', c.late.length, true)}
             {#each c.late.slice(0, c.late.length > MAX ? MAX - 1 : MAX) as r (r.slot)}
@@ -162,26 +202,25 @@
             {/each}
             {#if c.late.length > MAX}{@render moreRow(id, c.late.length - (MAX - 1))}{/if}
           </section>
+        {:else if isPlugin(id)}
+          {@const n = numOf(id)}
+          <button class="row plugrow" onclick={() => more(id)}>
+            <span class="t">{titleOf(id)}</span>{#if n}<span class="sum" class:alert={n.alert} class:wait={n.wait}>{n.text}</span>{:else}<span class="sum">›</span>{/if}
+          </button>
         {/if}
+      {:else}
+        <div class="empty">
+          <span>На сегодня ничего не запланировано</span>
+          <button onclick={() => today.open()}>Полная версия</button>
+        </div>
       {/each}
-      {#if fromPlugins.length}
-        <section class="grp" aria-label="Из плагинов">
-          <div class="gh"><span>Из плагинов</span></div>
-          {#each fromPlugins as id (id)}
-            {@const n = numOf(id)}
-            <button class="row" onclick={() => more(id)}>
-              <span class="t">{titleOf(id)}</span>{#if n}<span class="sum" class:alert={n.alert} class:wait={n.wait}>{n.text}</span>{/if}
-            </button>
-          {/each}
-        </section>
-      {/if}
     </div>
     {#if drawn.length}
       <div hidden><Compat>{#each drawn as id (id)}{@const b = todayBlockOf(id)}{#if b?.component}<b.component id={b.id} />{/if}{/each}</Compat></div>
     {/if}
   {/if}
   <div class="foot">
-    {#if !full}<button onclick={() => today.open()}>Полная версия</button>{/if}
+    {#if !full && shown.length}<button onclick={() => today.open()}>Полная версия</button>{/if}
     <button onclick={() => today.openEndDay()}>Завершить день</button>
   </div>
 </div>
@@ -212,6 +251,10 @@
   .late { flex: 0 0 auto; font-size: 11.5px; color: var(--todo); }
   .cap { flex: 0 0 auto; display: inline-flex; align-items: center; height: 15px; padding: 0 4px; border-radius: 3px; font: 700 9px var(--ui); letter-spacing: 0.02em; color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); }
   .row.more { color: var(--lampink); }
+  .nline .t { font: 12px var(--mono); color: var(--ink); }
+  .plugrow { margin-top: 6px; }
+  .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px 8px; text-align: center; font-size: 13px; color: var(--ink3); }
+  .empty button { padding: 0; border: 0; background: none; color: var(--lampink); font: 12.5px var(--ui); }
   /* the contents of the screen */
   .th { padding: 4px 6px 4px; font-size: 11px; font-weight: 600; color: var(--ink3); }
   .trow { flex: 0 0 28px; height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font: 12.5px var(--ui); text-align: left; white-space: nowrap; }

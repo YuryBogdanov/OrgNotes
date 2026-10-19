@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { capColumn } from './capColumn';
   import { onMount, tick } from 'svelte';
   import { moved } from '../pointer';
   import { displayName } from '../names';
@@ -66,7 +67,7 @@
     </section>
 
     {#if c.left.length}
-      <section aria-label="Не успел">
+      <section aria-label="Не успел" use:capColumn>
         <div class="sh"><b>Не успел</b><span>{c.left.length}</span></div>
         {#each c.left as t (t.key)}
           {@const ch = c.choice[t.key]}
@@ -140,10 +141,10 @@
   .dchip.more { color: var(--ink2); }
   .cap { flex: 0 0 auto; display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 4px; font: 700 10.5px var(--ui); letter-spacing: 0.02em; color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); }
   .row { display: flex; align-items: center; gap: 9px; min-height: 32px; border-top: 1px solid var(--rule); padding: 3px 0; box-sizing: border-box; }
-  .kc { flex: 0 0 46px; display: flex; }
+  .kc { flex: 0 0 var(--kc, 46px); display: flex; }
   .t { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13.5px; }
   .file { flex: 0 0 auto; font-size: 11.5px; color: var(--ink3); }
-  .opts { display: flex; gap: 5px; margin: 0 0 6px 55px; }
+  .opts { display: flex; gap: 5px; margin: 0 0 6px calc(var(--kc, 46px) + 9px); }
   .opts button { height: 22px; padding: 0 8px; border: 0; border-radius: 5px; background: var(--chip2); color: var(--ink); font: 11.5px var(--ui); white-space: nowrap; }
   .opts button.on { background: var(--lampsoft); color: var(--lampink); font-weight: 600; }
   .n { flex: 0 0 18px; font: 12px var(--mono); color: var(--ink3); }
@@ -159,7 +160,7 @@
   .opt { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: 5px; color: var(--ink); cursor: default; }
   .opt.on { background: var(--lamp); color: var(--onlamp); }
   .opt.on .file { color: inherit; opacity: 0.75; }
-  .note { width: 100%; box-sizing: border-box; min-height: 70px; resize: none; overflow: hidden; padding: 10px 12px; border: 0; border-radius: 8px; background: var(--field); box-shadow: inset 0 0 0 1px var(--rule); color: var(--ink); caret-color: var(--lamp); font: 500 18px/1.45 var(--text); outline: none; -webkit-user-select: text; user-select: text; }
+  .note { width: 100%; box-sizing: border-box; min-height: 70px; resize: none; overflow: hidden; padding: 10px 12px; border: 0; border-radius: 8px; background: var(--field); box-shadow: inset 0 0 0 1px var(--rule); color: var(--ink); caret-color: var(--lamp); font: 400 13px/1.55 var(--mono); outline: none; -webkit-user-select: text; user-select: text; }
   .note:focus { box-shadow: inset 0 0 0 1.5px var(--lampline); }
   .where { flex: 1; font-size: 12px; color: var(--ink3); }
 </style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { capColumn } from './capColumn';
   import { slide } from 'svelte/transition';
   import { store } from '../store.svelte';
   import { today } from '../todayState.svelte';
@@ -33,7 +34,7 @@
 <div class="host">
 <!-- the screen is a list of tasks: ↑↓ move in its rows (ТЗ 34) -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<div class="today" role="region" aria-label="Сегодня" tabindex="-1" bind:this={el} onkeydown={(e) => c.keydown(e)} onclick={(e) => c.clickEmpty(e)}>
+<div class="today" use:capColumn role="region" aria-label="Сегодня" tabindex="-1" bind:this={el} onkeydown={(e) => c.keydown(e)} onclick={(e) => c.clickEmpty(e)}>
   <div class="wrap">
     <header>
       <div class="ttl">
@@ -229,14 +230,15 @@
   .none { padding: 6px 0 4px; color: var(--ink3); }
   .count { height: 18px; min-width: 18px; box-sizing: border-box; padding: 0 6px; border-radius: 9px; background: var(--todo); color: var(--bg); font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
 
-  .ntext { display: flex; flex-direction: column; gap: 2px; font: 500 18px/1.5 var(--text); color: var(--ink); }
+  /* the journal's text as it is (fix #291): the monospace of «Исходник», 13 pt, as the mini window */
+  .ntext { display: flex; flex-direction: column; gap: 2px; font: 400 13px/1.55 var(--mono); font-style: normal; color: var(--ink); }
   .nl { display: flex; gap: 8px; }
   .mk { color: var(--ink3); }
   .ntext :global(.lnk) { color: var(--lampink); }
-  .ntext :global(code) { font: 0.8em var(--mono); }
+  .ntext :global(code) { font: inherit; }
 
   .cap { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 4px; font: 700 10.5px var(--ui); letter-spacing: 0.02em; white-space: nowrap; color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); }
-  .kc { flex: 0 0 46px; display: flex; }
+  .kc { flex: 0 0 var(--kc, 46px); display: flex; }
   .t { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; font-size: 13.5px; }
   .t .cap { margin-right: 4px; vertical-align: 1px; }
   .meta { flex: 0 0 auto; font-size: 11.5px; color: var(--ink3); white-space: nowrap; }
@@ -278,7 +280,7 @@
   .orow { padding-bottom: 6px; }
   .tt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .when { font-size: 11.5px; color: var(--todo); }
-  .chips { display: flex; gap: 5px; margin-left: 55px; }
+  .chips { display: flex; gap: 5px; margin-left: calc(var(--kc, 46px) + 9px); }
   .chip { height: 22px; display: inline-flex; align-items: center; padding: 0 8px; border: 0; border-radius: 5px; background: var(--chip2); color: var(--ink); font: 11.5px var(--ui); white-space: nowrap; }
 
   .who { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }

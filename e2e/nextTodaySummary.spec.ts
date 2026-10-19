@@ -1,9 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openApp } from './helpers';
 
-// ТЗ 50.5: a block's summary (`setSummary`, API 1.15) — «Долгие дела» give how many are due, red, in «Из плагинов»
-// of the compact day (with no screen open) and as the number of the screen's contents; a block without a summary
-// («Цели» with no goals) has no row.
+// ТЗ 50.5: a block's summary (`setSummary`, API 1.15) — «Долгие дела» give how many are due, red, in their row of
+// the compact day (with no screen open) and as the number of the screen's contents; fix #311: every plugin's block
+// has its row in the screen's order, one without a summary with «›» (a block its plugin hides has none).
 
 const NOW = new Date(2026, 9, 16, 11);
 const MID = ['* TODO Квартальный план команды', '* TODO Регламент дежурств', ''].join('\n');
@@ -17,11 +17,9 @@ async function open(page: Page, touched: Date) {
   await expect(panel(page)).toBeVisible();
 }
 
-test('due matters: «Из плагинов» — «Долгие дела» with their number, red; no row of a block without a summary', async ({ page }) => {
+test('due matters: «Долгие дела» with their number, red; a block without a summary — its name and «›»', async ({ page }) => {
   await open(page, new Date(2026, 8, 1));
-  const g = panel(page).getByRole('region', { name: 'Из плагинов' });
-  await expect(g.locator('.row')).toHaveCount(1);
-  await expect(g.locator('.row')).toContainText('Долгие дела');
+  const g = panel(page).locator('.plugrow', { hasText: 'Долгие дела' });
   await expect(g.locator('.sum')).toHaveText('2');
   await expect(g.locator('.sum')).toHaveClass(/alert/);
   // the screen's contents: the same number
@@ -31,7 +29,10 @@ test('due matters: «Из плагинов» — «Долгие дела» with 
   await expect(row.locator('.tc')).toHaveClass(/alert/);
 });
 
-test('nothing due: no summary — no «Из плагинов»', async ({ page }) => {
+test('nothing due: the block hidden by its plugin — no row; an empty day says so', async ({ page }) => {
   await open(page, new Date(2026, 9, 14));
-  await expect(panel(page).getByRole('region', { name: 'Из плагинов' })).toHaveCount(0);
+  // nothing on the day at all: the word in the middle, «Полная версия» once
+  await expect(panel(page).locator('.empty')).toContainText('На сегодня ничего не запланировано');
+  await expect(panel(page).getByRole('button', { name: 'Полная версия' })).toHaveCount(1);
+  await expect(panel(page).locator('.plugrow', { hasText: 'Долгие дела' })).toHaveCount(0);
 });

@@ -246,7 +246,7 @@ test.describe('the new look (ТЗ 51)', () => {
     await expect(block(page, 'week.goals').locator('.wk-plug')).toHaveText('Неделя');
     await page.getByRole('tab').first().click(); // a file's tab: the panel is the compact day
     await page.keyboard.press('Shift+Meta+h');
-    const rows = page.getByRole('region', { name: 'Панель: Сегодня' }).getByRole('region', { name: 'Из плагинов' }).locator('.row');
+    const rows = page.getByRole('region', { name: 'Панель: Сегодня' }).locator('.plugrow'); // a plugin's block: its row in the screen's order (fix #311)
     await expect(rows.filter({ hasText: 'Итоги недели' }).locator('.sum')).toHaveText('можно');
     await expect(rows.filter({ hasText: 'Итоги недели' }).locator('.sum')).toHaveClass(/alert/);
     await expect(rows.filter({ hasText: 'Цели недели' }).locator('.sum')).toHaveText('1 из 3');
@@ -256,7 +256,7 @@ test.describe('the new look (ТЗ 51)', () => {
     await open(page, {}, '2026-10-14T10:00:00');
     await page.getByRole('tab').first().click();
     await page.keyboard.press('Shift+Meta+h');
-    const rows = page.getByRole('region', { name: 'Панель: Сегодня' }).getByRole('region', { name: 'Из плагинов' }).locator('.row');
+    const rows = page.getByRole('region', { name: 'Панель: Сегодня' }).locator('.plugrow'); // a plugin's block: its row in the screen's order (fix #311)
     await expect(rows.filter({ hasText: 'Цели недели' }).locator('.sum')).toHaveText('нет плана');
     await expect(rows.filter({ hasText: 'Цели недели' }).locator('.sum')).toHaveClass(/wait/);
   });
