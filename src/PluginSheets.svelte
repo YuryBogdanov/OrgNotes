@@ -109,7 +109,9 @@
   footer button { height: 30px; padding: 0 14px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--fg); }
   footer .pri { border: 0; background: var(--acc); color: var(--onacc); font-weight: 600; }
   .trust { z-index: 81; }
-  .bare { position: fixed; inset: 0; z-index: 81; pointer-events: none; }
+  /* a plugin's own sheet: centred across the window, under the toolbar — one that places itself (`position: absolute`)
+     is not moved; one that does not (an older build, as «Неделя» 0.3.0) is not left in the corner */
+  .bare { position: fixed; inset: 0; z-index: 81; pointer-events: none; display: flex; flex-direction: column; align-items: center; padding-top: 40px; box-sizing: border-box; }
   .bare > :global(*) { pointer-events: auto; }
   .trust .body p { margin: 0; font-size: 13px; line-height: 1.5; }
   .trust .fine { color: var(--fg2); font-size: 12px; }

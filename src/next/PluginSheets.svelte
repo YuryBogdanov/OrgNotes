@@ -124,6 +124,8 @@
   p { margin: 0; }
   .fine { font-size: 12px; color: var(--ink3); }
   .dim { position: fixed; inset: 0; z-index: 80; background: var(--dim); }
-  .bare { position: fixed; inset: 0; z-index: 81; pointer-events: none; }
+  /* a plugin's own sheet: centred across the window, under the toolbar — one that places itself (`position: absolute`)
+     is not moved; one that does not (an older build, as «Неделя» 0.3.0) is not left in the corner */
+  .bare { position: fixed; inset: 0; z-index: 81; pointer-events: none; display: flex; flex-direction: column; align-items: center; padding-top: 52px; box-sizing: border-box; }
   .bare > :global(*) { pointer-events: auto; }
 </style>

@@ -978,6 +978,10 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   transform — the board's `.kb-setup` here, the week's plan there (not reproduced in WebKit's tests: centred there
   both ways); the week's goals on «Сегодня» up to 3 lines in tiles of one height. weekPlugin.spec.ts checks both.
   In a worktree the week's e2e runs when `.claude/worktrees/panopticon-week` links to the plugin's repo.
+- **A plugin's bare sheet:** the core's layer `.bare` (both shells' PluginSheets) is a column centred across the
+  window under the toolbar (52 / 40 pt): a sheet that places itself (`position: absolute`, as the board's setup, the
+  week's plan since panopticon-week#8) is not moved; one that does not (the week's release 0.3.0 the app has
+  installed) is no more left in the top left corner. e2e bareSheet.spec.ts.
 - **The window's title bar in the new interface:** WKWebView has no `-webkit-app-region` (the CSS stays, harmless):
   `next/windowDrag.ts` — `use:windowDrag` on the toolbar (Toolbar.svelte) and the lights' room of the rail and of the
   panel (Sidebar.svelte); a press not on a button, field or tab asks Tauri `startDragging`, a double click
