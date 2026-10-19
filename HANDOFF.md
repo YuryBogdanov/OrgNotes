@@ -923,6 +923,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   «Профили» (their key of `terminal.profile1…5` or the command, a right click — edit, by default, remove; «+ Профиль…»),
   the sessions' right-click menu (rename, restart, to the tab / panel, end); ⌥-click on «+» the profiles. e2e
   terminalTab.spec.ts.
+  55.6, a heading into the session and the settings: the command `terminal.insertHeading` ⌃C ⌃I (⌃C ⌃T of the ТЗ is
+  «Сменить статус…» of «Как в Emacs») with the manifest's `"scope": "heading"` (API 1.16: the group «Заголовки и
+  задачи», the core's `heading` scope; keyDispatch runs a plugin's heading command as the window's when the caret is on
+  a heading or lines are selected) and `ui.headingAction` «Вставить в терминал»; the text — the folder (`index.folder`,
+  so the plugin has `index.read` now) and the path, «~» for the home, `:line` or `:from-to` (API 1.16
+  `ui.selectedLines()`, from EditorKeys' new `lines()`), spaces around it unless the terminal's caret is at a line's
+  start; no session — one by the default profile, the text queued till it starts; the focus to it. The settings by
+  the manifest's schema: the size (11 … 14), the scrollback (1 000 … 50 000), ⌥ as Meta, the notifications, the
+  shell — `terms.setOpts` applies them to the open terminals. e2e terminalInsert.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

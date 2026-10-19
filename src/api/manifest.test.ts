@@ -76,11 +76,13 @@ describe('parseManifest', () => {
     const r = parseManifest({ ...base, contributes: { commands: [{ id: 'goals.open', title: 'X' }] } });
     expect(r.ok ? [] : r.problems).toEqual(['команда «goals.open»: id начинается с «hello.»']);
   });
-  it('a command of the review: «scope» is review, view or nothing', () => {
+  it('a command of the review: «scope» is review, view, heading (1.16) or nothing', () => {
     const ok = parseManifest({ ...base, contributes: { commands: [{ id: 'hello.done', title: 'Выполнено', keys: ['⌘1'], scope: 'review' }] } });
     expect(ok.ok && ok.manifest.contributes.commands[0].scope).toBe('review');
     const bad = parseManifest({ ...base, contributes: { commands: [{ id: 'hello.x', title: 'X', scope: 'editor' }] } });
-    expect(bad.ok ? [] : bad.problems).toEqual(['команда «hello.x»: scope — review или view']);
+    expect(bad.ok ? [] : bad.problems).toEqual(['команда «hello.x»: scope — review, view или heading']);
+    const h = parseManifest({ ...base, contributes: { commands: [{ id: 'hello.h', title: 'H', scope: 'heading' }] } });
+    expect(h.ok && h.manifest.contributes.commands[0].scope).toBe('heading');
   });
   it('the hosts of net: exact, or the subdomains of «*.»; no user part, only http(s)', () => {
     expect(hostOf('https://Jira.Company.ru/rest?x=1')).toBe('jira.company.ru');

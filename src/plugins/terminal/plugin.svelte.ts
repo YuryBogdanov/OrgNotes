@@ -1,7 +1,7 @@
 // The plugin «terminal» (ТЗ 55): the panel under the editor with the sessions, ⌃` to show it, ⌃⇧` a new session; the
 // terminals repainted with the theme.
 
-import { definePlugin } from '@panopticon/api';
+import { definePlugin, type Ctx, type HeadingRef } from '@panopticon/api';
 import { mount, unmount } from 'svelte';
 import { terms } from './sessions.svelte';
 import { profiles } from './profiles.svelte';
@@ -10,10 +10,35 @@ import Section from './Section.svelte';
 
 let stop: (() => void) | null = null;
 
+/** «~/Panopticon/Midterm.org:31», a range «:31-38» with lines selected (§7). */
+async function pathOf(ctx: Ctx, h: HeadingRef | null): Promise<string | null> {
+  const sel = ctx.ui.selectedLines();
+  const path = sel?.path ?? h?.path;
+  if (!path) return null;
+  const folder = (await ctx.index?.folder()) ?? '';
+  const abs = (folder ? folder.replace(/\/$/, '') + '/' : '') + path;
+  const where = sel ? (sel.from === sel.to ? `${sel.from}` : `${sel.from}-${sel.to}`) : `${h!.line + 1}`;
+  return `${abs.replace(/^\/Users\/[^/]+/, '~')}:${where}`;
+}
+
 export default definePlugin({
   activate(ctx) {
     terms.init(ctx);
     profiles.init(ctx);
+    // the settings (§8): the size, the scrollback, ⌥ as Meta, the notifications, the shell
+    const readOpts = () => {
+      const v = ctx.settings.values();
+      terms.setOpts({ fontSize: Number(v.fontSize) || 12.5, scrollback: Number(v.scrollback) || 10000, optionMeta: v.optionMeta !== false, notify: v.notify !== false, shell: String(v.shell ?? '').trim() });
+    };
+    readOpts();
+    ctx.settings.onChange(readOpts);
+    // a heading's path into the active session (§7): its menu and ⌃C ⌃I on it
+    const insert = async (h: HeadingRef | null) => {
+      const t = await pathOf(ctx, h);
+      if (t) terms.insert(t);
+    };
+    ctx.ui.headingAction({ label: 'Вставить в терминал', run: (h) => void insert(h) });
+    ctx.commands.on('terminal.insertHeading', () => void insert(ctx.ui.currentHeading()));
     const next = ctx.ui.look === 'next';
     terms.drawer = ctx.ui.drawer('panel', {
       title: 'Терминал',

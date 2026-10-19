@@ -150,7 +150,10 @@ export function declareKeys(m: Manifest) {
   registerKeys(m.contributes.commands.map((c) => {
     const card = c.keys?.length ? null : cardChord(c);
     const note = [c.note, card?.taken].filter(Boolean).join(' · ');
-    return C(c.id, c.title, c.scope === 'view' ? viewGroup(m.id) : groupOf(m.id), c.scope === 'review' ? reviewScope(m.id) : c.scope === 'view' ? viewScope(m.id) : 'window', card?.key ? [card.key] : (c.keys ?? []), { synonyms: c.synonyms, ...(note ? { note } : {}) });
+    // a heading's command (1.16): with the core's in «Заголовок», on a heading in the editor
+    const group = c.scope === 'view' ? viewGroup(m.id) : c.scope === 'heading' ? 'heading' : groupOf(m.id);
+    const scope = c.scope === 'review' ? reviewScope(m.id) : c.scope === 'view' ? viewScope(m.id) : c.scope === 'heading' ? 'heading' : 'window';
+    return C(c.id, c.title, group, scope, card?.key ? [card.key] : (c.keys ?? []), { synonyms: c.synonyms, ...(note ? { note } : {}) });
   }));
 }
 export function undeclareKeys(m: Manifest) {

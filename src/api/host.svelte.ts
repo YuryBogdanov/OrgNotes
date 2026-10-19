@@ -42,6 +42,7 @@ import { clipboardApi, editApi, filesApi, indexApi, netApi } from './ctxData';
 import { processApi } from './process';
 import { put, schemaOf, settingsValues, whole, type Dynamic } from './pluginSettings';
 import { invoke, isTauri, pickSave } from '../tauri';
+import { focusedEditor } from '../editorKeys';
 export { RIGHTS, rightsText };
 
 /** The data files of the built-in plugins (their themes), as text. */
@@ -741,6 +742,11 @@ class Host {
           } else store.showAs(openFile(L, pi, f.path, 0, { focus: true }), fv);
           L.active = pi;
           return true;
+        },
+        selectedLines: () => {
+          const r = focusedEditor()?.lines?.();
+          const f = store.fileOf(store.tab);
+          return r && f ? { path: f.name, from: r[0] + 1, to: r[1] + 1 } : null;
         },
         currentHeading: () => {
           const t = store.tab;
