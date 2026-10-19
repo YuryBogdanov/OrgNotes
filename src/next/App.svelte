@@ -38,6 +38,7 @@
   import EndDay from './EndDay.svelte';
   import CloseSheet from './CloseSheet.svelte';
   import ConfirmSheet from './ConfirmSheet.svelte';
+  import Drawer from './Drawer.svelte';
   import DiskSheet from './DiskSheet.svelte';
   import Dialogs from './Dialogs.svelte';
   import SaveAsSheet from './SaveAsSheet.svelte';
@@ -279,6 +280,7 @@
       menu?.close();
     };
   });
+  let mainEl: HTMLDivElement | undefined = $state();
 </script>
 
 <div class="next" data-ui="next" data-font={nextPrefs.font} style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--text:{textFont};--title:{FONTS.title};--mono:{FONTS.mono};--col:{nextPrefs.col};--capc:{capc}">
@@ -286,10 +288,12 @@
   <div class="win" style:display={store.start ? "none" : undefined} inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
   <!-- the rail always; ⌘0 hides and shows its panel (ТЗ 50 §3) -->
   <Sidebar open={store.showNav} width={sideWidth} onwidth={setWidth} onmenu={(at, items) => (menu = { ...at, items })} />
-  <div class="main">
+  <div class="main" bind:this={mainEl}>
   <Toolbar onnew={newFile} />
   <Tabs onmenu={(at, items) => (menu = { ...at, items })} />
   <EditorArea />
+  <!-- a plugin's panel under the tabs (ТЗ 55, ui.drawer) -->
+  <Drawer area={mainEl} />
   </div>
   </div>
   <!-- the sheets of the files (ТЗ 44 §4) -->

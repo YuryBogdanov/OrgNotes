@@ -444,6 +444,14 @@ export interface ReviewResult {
   finished: boolean;
 }
 
+/** A panel under the tabs (`ui.drawer`, 1.16); disposing it takes the panel away. */
+export interface DrawerHandle {
+  show(): void;
+  hide(): void;
+  toggle(): void;
+  shown(): boolean;
+  dispose(): void;
+}
 /** A process in a pseudo-terminal (`ctx.process.pty`, 1.16): what is typed goes in, its output comes out as text. */
 export interface PtyHandle {
   id: string;
@@ -596,6 +604,10 @@ export interface Ctx {
     /** A piece of the plugin in a place another plugin declares (`contributes.slots` of its manifest), e.g.
      *  `calendar.weekCell`: `render` draws it for each item of that place with the place's `data`. Since 1.8. */
     slot<D = unknown>(id: string, render: (el: HTMLElement, data: D) => Dispose | void): Dispose;
+    /** A panel under the tabs of the new interface, across their width (the terminal's): drawn once when first shown
+     *  and kept while hidden; one shown at a time; its height the user's, kept on this Mac. In the old interface
+     *  `show()` does nothing and `shown()` is false. Since 1.16. */
+    drawer(id: string, spec: { title: string; render(el: HTMLElement): Dispose | void }): DrawerHandle;
     /** Draw in `el` the pieces the plugins put into a place of this plugin (one child each, in the plugins' order;
      *  drawn again when one comes or goes); `update` gives them new data. Since 1.8. */
     drawSlot<D = unknown>(el: HTMLElement, id: string, data: D): { update(data: D): void; dispose(): void };
