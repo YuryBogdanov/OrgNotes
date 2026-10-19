@@ -887,6 +887,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   and takes `shell`. `store.quit` asks `quitReq` («Завершить N процессов в терминале?», both shells) when processes
   live. API 1.16.0, README «Процессы», the template's copy, apiSurface. The e2e mock has a pretend shell (prompt, echo,
   `echo`, `exit`, ⌃C; `__ptyOut`). e2e processApi.spec.ts.
+  55.2, `ui.drawer(id, { title, render })` → `DrawerHandle` (show, hide, toggle, shown, dispose; kept among the
+  plugin's disposers): the host's `drawers` (by `plugin:id`) and `drawerShown`; `next/Drawer.svelte` under
+  EditorArea in `.main` — always mounted, height 0 when hidden (180 ms CSS transition), each panel drawn once when
+  first shown and kept (hidden by `display: none`, so the terminals live), the top edge dragged 160 … 70 % of the
+  area, `next:drawerH` (330). The old interface: `show()` does nothing. ⌃` is the plugin's command (55.3). e2e
+  drawerApi.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

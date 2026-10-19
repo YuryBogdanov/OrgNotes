@@ -107,6 +107,9 @@ class Host {
   oneOnOnes = new SvelteMap<string, Parameters<Ctx['ui']['oneOnOne']>[0]>();
   /** The pieces the plugins put into the places other plugins declare (API 1.8): by place, in the order they came. */
   slots = new SvelteMap<string, SlotPiece[]>();
+  /** The panels under the tabs (`ui.drawer`, 1.16), by `plugin:id`; the one shown. */
+  drawers = new SvelteMap<string, { plugin: string; title: string; render: (el: HTMLElement) => Dispose | void }>();
+  drawerShown = $state<string | null>(null);
   /** The functions a plugin gives the others (its manifest's `exports`). */
   private exported = new Map<string, Record<string, (...args: never[]) => unknown>>();
   /** The views of a file (ТЗ 33): their drawings by the plugins. */
@@ -779,6 +782,23 @@ class Host {
         drawSlot: (el, place, data) => {
           declared('места', m.contributes.slots.some((x) => x.id === place), place);
           return this.drawSlot(el, place, data);
+        },
+        drawer: (did, spec) => {
+          const k = `${id}:${did}`;
+          this.drawers.set(k, { plugin: id, title: spec.title, render: spec.render });
+          const next = () => store.nextUi;
+          const handle = {
+            show: () => void (next() && this.drawers.has(k) && (this.drawerShown = k)),
+            hide: () => void (this.drawerShown === k && (this.drawerShown = null)),
+            toggle: () => (this.drawerShown === k ? handle.hide() : handle.show()),
+            shown: () => this.drawerShown === k,
+            dispose: () => {
+              if (this.drawerShown === k) this.drawerShown = null;
+              this.drawers.delete(k);
+            },
+          };
+          keep(handle.dispose);
+          return handle;
         },
         oneOnOne: (spec) => {
           this.oneOnOnes.set(id, spec);
