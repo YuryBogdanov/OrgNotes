@@ -25,6 +25,7 @@ async function drawer(page: Page) {
 const call = (page: Page, fn: string) => page.evaluate((f) => (window as any).__drawer[f](), fn);
 
 test('shown under the tabs, the editor shrinks; hidden it stays drawn; the height dragged and kept', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(() => localStorage.setItem('ui:next', '1'));
   await openApp(page, { files: { '/mock/a.org': '* TODO A\n' }, ready: false, viewport: { width: 1280, height: 860 } });
   await expect(page.locator('.cm-content')).toBeVisible();
@@ -44,7 +45,8 @@ test('shown under the tabs, the editor shrinks; hidden it stays drawn; the heigh
   await call(page, 'show');
   await expect(region.locator('.probe')).toBeVisible();
   expect(await page.evaluate(() => (window as any).__drawn)).toBe(1);
-  // the top edge: 160 at least, kept on this Mac
+  // the top edge: 160 at least, kept on this Mac (measured once it is in place)
+  await expect.poll(() => region.evaluate((e) => Math.round(e.getBoundingClientRect().height))).toBe(330);
   const box = (await region.boundingBox())!;
   await page.mouse.move(box.x + 200, box.y + 2);
   await page.mouse.down();

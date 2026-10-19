@@ -72,6 +72,7 @@ pub(crate) const BUILTIN_MANIFESTS: &[&str] = &[
     include_str!("../../src/plugins/kanban/manifest.json"),
     include_str!("../../src/plugins/long-matters/manifest.json"),
     include_str!("../../src/plugins/quarter-goals/manifest.json"),
+    include_str!("../../src/plugins/terminal/manifest.json"),
     include_str!("../../src/plugins/theme-pack/manifest.json"),
 ];
 
