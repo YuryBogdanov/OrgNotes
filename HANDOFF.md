@@ -954,6 +954,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   levels, statuses, priority) take the heading seen when the caret sits after a folded heading's «…» (`headAt`) — a
   click at a folded line's end put it on the hidden last line and ⌥↓ moved that line, the subtree broken.
   e2e nextFolds.spec.ts.
+  4, «Долгие дела» (#315): the dot of a change (SetRow `changed`) only in «Клавиши» — SetGeneral, SetLook, SetSchema
+  pass none (ТЗ 54 §2 amended); «Статус ожидания» offers the open states of every set (`long.statusSets` from
+  `index.workflow`, the set's name a disabled line, the value first, «— нет в статусах» when gone); «Статусы бэклога»
+  (`backlog`, a custom field — Backlog.svelte, chips by set): such matters are the group `backlog` (`shown(…, backlog)`)
+  — never due, out of the badge, «Сегодня» and the walk; folded at the bottom of the list and the panel; the row's
+  menu «В бэклог» (the first backlog status) / «Из бэклога» (the status before it, else the first open one out of it).
+  ТЗ 40 §4.6 (local). e2e nextLongBacklog.spec.ts.
 - **The window's title bar in the new interface:** WKWebView has no `-webkit-app-region` (the CSS stays, harmless):
   `next/windowDrag.ts` — `use:windowDrag` on the toolbar (Toolbar.svelte) and the lights' room of the rail and of the
   panel (Sidebar.svelte); a press not on a button, field or tab asks Tauri `startDragging`, a double click

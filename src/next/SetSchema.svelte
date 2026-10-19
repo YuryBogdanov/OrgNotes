@@ -1,6 +1,6 @@
 <script lang="ts">
   import { store } from '../store.svelte';
-  import { WIDE, changedOf, hintOf, optionsOf, type Field, type Schema } from '../settingsSchema';
+  import { WIDE, hintOf, optionsOf, type Field, type Schema } from '../settingsSchema';
   import FormFields from './FormFields.svelte';
   import PlacePalette from './PlacePalette.svelte';
   import Toggle from './ui/Toggle.svelte';
@@ -29,9 +29,9 @@
       {@const hint = hintOf(f, v)}
       {@const off = f.disabled?.(v) ?? false}
       {#if WIDE.has(f.type)}
-        <Row label={f.label} {hint} id={id(f)} changed={changedOf(f, v)} wide><FormFields schema={one(f)} bare /></Row>
+        <Row label={f.label} {hint} id={id(f)} wide><FormFields schema={one(f)} bare /></Row>
       {:else}
-        <Row label={f.label} {hint} id={id(f)} changed={changedOf(f, v)}>
+        <Row label={f.label} {hint} id={id(f)}>
           {#if f.type === 'switch'}
             <Toggle checked={!!v[f.key]} labelledby={id(f)} disabled={off} onchange={() => set(f.key, !v[f.key])} />
           {:else if f.type === 'choice'}

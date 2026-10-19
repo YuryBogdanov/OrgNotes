@@ -51,6 +51,17 @@ describe('the day to look and the groups', () => {
     const s = shown(m({ touched: { at: TODAY, approx: false }, nextReview: new Date(2026, 9, 10) }), TODAY, 14);
     expect(s).toMatchObject({ left: 14, group: 'ok' });
   });
+  // fix #315: the backlog is not watched — never due, its own group, out of the badge
+  it('a matter in a status of the backlog: «Бэклог», calm, even long untouched; the badge leaves it out', () => {
+    const old = { touched: { at: new Date(2026, 5, 1), approx: false } };
+    expect(shown(m({ ...old, keyword: 'SOMEDAY' }), TODAY, 14, ['SOMEDAY'])).toMatchObject({ group: 'backlog', tone: 'calm' });
+    expect(shown(m({ ...old, keyword: 'TODO' }), TODAY, 14, ['SOMEDAY']).group).toBe('due');
+    const g = grouped([{ m: m({ keyword: 'SOMEDAY' }), s: shown(m({ ...old, keyword: 'SOMEDAY' }), TODAY, 14, ['SOMEDAY']) }]);
+    expect(g.backlog).toHaveLength(1);
+    expect(badgeOf(g)).toEqual({ n: 0, alert: false });
+    expect(readSettings({ backlog: ['SOMEDAY', 'SOMEDAY', 3, ''] }).backlog).toEqual(['SOMEDAY']);
+    expect(readSettings({}).backlog).toEqual([]);
+  });
   it('waiting until its day; past it — «Пора проверить»', () => {
     expect(shown(m({ touched: { at: TODAY, approx: false }, waiting: 'бизнес' }), TODAY, 14).group).toBe('waiting');
     expect(shown(m({ touched: { at: new Date(2026, 8, 1), approx: false }, waiting: 'бизнес' }), TODAY, 14).group).toBe('due');
@@ -106,8 +117,8 @@ describe('the actions\' helpers', () => {
 
 describe('the section\'s badge (ТЗ 43 §1)', () => {
   it('«Пора проверить» as an alarm when there are some; else how many matters, as any', () => {
-    expect(badgeOf({ due: [1, 2], waiting: [3], ok: [4, 5] })).toEqual({ n: 2, alert: true });
-    expect(badgeOf({ due: [], waiting: [3], ok: [4, 5] })).toEqual({ n: 3, alert: false });
-    expect(badgeOf({ due: [], waiting: [], ok: [] })).toEqual({ n: 0, alert: false });
+    expect(badgeOf({ due: [1, 2], waiting: [3], ok: [4, 5], backlog: [] })).toEqual({ n: 2, alert: true });
+    expect(badgeOf({ due: [], waiting: [3], ok: [4, 5], backlog: [] })).toEqual({ n: 3, alert: false });
+    expect(badgeOf({ due: [], waiting: [], ok: [], backlog: [] })).toEqual({ n: 0, alert: false });
   });
 });
