@@ -120,3 +120,30 @@ test('⌥↩ opens beside, the focus kept in the list; ⌥↩ again — into the
   });
   await expect(side(page)).toHaveCount(0);
 });
+
+// ТЗ 56.3: the file follows the choice in the list, 120 ms after; the chip pins it; ⌥↩ opens even when pinned
+test('↑↓ in the list switch the file; «закреплён» keeps it; ⌥↩ opens another row even when pinned', async ({ page }) => {
+  await agenda(page);
+  await page.locator('.split .list .row', { hasText: 'План переезда' }).first().click();
+  await page.keyboard.press('Alt+Enter');
+  const head = side(page).locator('header');
+  await expect(head).toContainText('План переезда хранилища');
+  await page.keyboard.press('ArrowDown');
+  await expect(head).toContainText('Синк платформы');
+  await expect(side(page).locator('.cm-sub.top')).toContainText('Синк платформы');
+  expect(await inList(page)).toBe(true);
+  // pinned: the choice does not change it
+  await side(page).getByRole('button', { name: 'следует за выбором' }).click();
+  await expect(side(page).getByRole('button', { name: 'закреплён' })).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('.split .list .row', { hasText: 'План переезда' }).first().click();
+  await page.waitForTimeout(300);
+  await expect(head).toContainText('Синк платформы');
+  await page.keyboard.press('Alt+Enter'); // ⌥↩ opens it, the pin kept
+  await expect(head).toContainText('План переезда хранилища');
+  await expect(side(page).getByRole('button', { name: 'закреплён' })).toBeVisible();
+  // following again
+  await side(page).getByRole('button', { name: 'закреплён' }).click();
+  await page.locator('.split .list .row', { hasText: 'План переезда' }).first().click();
+  await page.keyboard.press('ArrowDown');
+  await expect(head).toContainText('Синк платформы');
+});

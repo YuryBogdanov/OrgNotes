@@ -1,9 +1,10 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import { store } from '../store.svelte';
   import { openFile } from '../layout';
   import { displayName } from '../names';
-  import { besideOf, besideShare, closeBeside, setBesideShare, togglePin } from '../beside.svelte';
+  import { besideOf, besideShare, closeBeside, openBeside, setBesideShare, togglePin } from '../beside.svelte';
+  import { lists, resolve } from '../taskLists.svelte';
   import Editor from './Editor.svelte';
 
   // A tab of a list with the file of its row beside it (ТЗ 56 §4): the list on the left (46 % by default, 35–65 %,
@@ -19,6 +20,27 @@
   const heading = $derived(file && b ? file.headings.find((h) => h.line === b.line) : undefined);
   const crumb = $derived(heading ? [...heading.path, heading.title].join(' › ') : '');
   let box: HTMLDivElement | undefined = $state();
+
+  // §3: the file follows the row chosen in the list, 120 ms after (a quick scroll does not jerk the editor) — not
+  // while pinned, not while the caret is in the file (typing does not take it away)
+  const chosen = $derived.by(() => {
+    if (!b || b.pinned) return null;
+    const spec = lists.specs.find((s) => s.tab?.()?.id === tabId && lists.besideTab(s));
+    const t = spec?.selected();
+    const r = t ? resolve(t) : null;
+    return r ? { path: r.f.path, line: r.h.line } : null;
+  });
+  $effect(() => {
+    const c = chosen;
+    if (!c) return;
+    const cur = untrack(() => besideOf(tabId));
+    if (!cur || (cur.path === c.path && cur.line === c.line)) return;
+    const t = setTimeout(() => {
+      if (box?.querySelector('.side')?.contains(document.activeElement)) return;
+      openBeside(tabId, c, { keepPin: true });
+    }, 120);
+    return () => clearTimeout(t);
+  });
 
   function drag(e: PointerEvent) {
     e.preventDefault();

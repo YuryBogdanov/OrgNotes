@@ -953,6 +953,9 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   ⎋ (`taskDeselect`) closes it first. The scope `beside` (rank 30, over the window, the editor and the list): ⌃⌘← /
   ⌃⌘→ (`besideFocusList` / `besideFocusFile`, nested over the old interface's «Переместить вкладку»), `besideClose`
   without a key, also the palette's «Закрыть файл сбоку». e2e nextBeside.spec.ts.
+  56.3, following the choice: BesideSplit derives the row chosen in its tab's list (`lists.besideTab`, `resolve`) and,
+  120 ms after it changes, opens its file (the pin kept) — not while pinned, not while the focus is in the file.
+  e2e nextBeside.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
