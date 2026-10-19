@@ -18,7 +18,7 @@ async function open(page: Page) {
 
 test('the sections: the core\'s, «Входящие» with the Inbox plugin, the plugins\' group; «Файлы» by default', async ({ page }) => {
   await open(page);
-  await expect(secs(page).getByRole('button')).toHaveText([/Сегодня/, /Файлы\s*2/, /Входящие/, /Агенда/, /Теги/, /Поиск/]);
+  await expect(secs(page).getByRole('button')).toHaveText([/Сегодня/, /^\s*Файлы\s*$/, /Входящие/, /Агенда/, /Теги/, /Поиск/]);
   await expect(plug(page).getByRole('button', { name: /Долгие дела/ })).toBeVisible();
   await expect(plug(page).getByRole('button', { name: /Календарь/ })).toBeVisible();
   await expect(head(page)).toHaveText('Файлы');

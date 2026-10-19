@@ -39,6 +39,7 @@
             "fields": [
               { "key": "order", "type": "choice", "look": "menu", "where": "folder", "label": "Порядок", "default": "new", "options": [{ "value": "new", "label": "Новые сверху" }, { "value": "file", "label": "Как в файле" }] },
               { "key": "counter", "type": "switch", "where": "folder", "label": "Счётчик на кнопке Inbox", "default": true },
+              { "key": "alertAfter", "type": "choice", "look": "menu", "where": "folder", "label": "Красный счётчик, если запись лежит дольше", "default": 7, "options": [{ "value": 3, "label": "3 дня" }, { "value": 7, "label": "7 дней" }, { "value": 14, "label": "14 дней" }, { "value": 0, "label": "Никогда" }] },
               { "key": "details", "type": "switch", "where": "folder", "label": "Показывать детали под заголовком", "default": true }
             ]
           },

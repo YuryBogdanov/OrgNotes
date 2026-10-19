@@ -4,6 +4,7 @@
 import { definePlugin } from '@panopticon/api';
 import { mount, unmount } from 'svelte';
 import { data } from './state.svelte';
+import { inboxBadge } from './list';
 import { session } from './session.svelte';
 import Panel from './Panel.svelte';
 import Card from './Card.svelte';
@@ -55,7 +56,11 @@ export default definePlugin({
       },
     });
     stop = $effect.root(() => {
-      $effect(() => ctx.ui.setBadge('inbox', data.settings.counter ? data.list.length : 0));
+      // fix-50: the badge — the entries to sort; red when the oldest has lain too long
+      $effect(() => {
+        const b = inboxBadge(data.list, data.settings);
+        ctx.ui.setBadge('inbox', b.n, b.alert ? { tone: 'alert' } : {});
+      });
       $effect(() => ctx.commands.setAvailable('inbox.review', data.pending.length > 0));
     });
   },

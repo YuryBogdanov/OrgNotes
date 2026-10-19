@@ -52,3 +52,17 @@ describe('settings', () => {
     expect(readSettings({ stale: 5, reviewOrder: 'x', order: 'file', counter: false })).toMatchObject({ stale: 7, reviewOrder: 'old', order: 'file', counter: false });
   });
 });
+
+// fix-50: the badge of «Входящие» — the entries to sort, red when the oldest has lain longer than the setting
+describe('the badge', async () => {
+  const { inboxBadge } = await import('./list');
+  const now = new Date(2026, 9, 19, 12);
+  const at = (d: number) => ({ created: new Date(2026, 9, 19 - d, 12) });
+  it('how many; red past the days set, never with 0; none with the counter off', () => {
+    expect(inboxBadge([at(1), at(2)], { counter: true, alertAfter: 7 }, now)).toEqual({ n: 2, alert: false });
+    expect(inboxBadge([at(1), at(9)], { counter: true, alertAfter: 7 }, now)).toEqual({ n: 2, alert: true });
+    expect(inboxBadge([at(30)], { counter: true, alertAfter: 0 }, now)).toEqual({ n: 1, alert: false });
+    expect(inboxBadge([at(30)], { counter: false, alertAfter: 7 }, now)).toEqual({ n: 0, alert: false });
+    expect(inboxBadge([{ created: null }], { counter: true, alertAfter: 3 }, now)).toEqual({ n: 1, alert: false });
+  });
+});

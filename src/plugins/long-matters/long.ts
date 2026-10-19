@@ -133,10 +133,11 @@ export function grouped<T extends { s: Shown; m: Matter }>(rows: T[]): Record<Gr
   return out;
 }
 
-/** The section's badge (ТЗ 43 §1): «Пора проверить» as an alarm when there are some, else how many matters. */
+/** The section's badge (ТЗ 43 §1, fix-50): «Пора проверить» as an alarm; none due — no badge (how many matters there
+ *  are is the panel's head). */
 export function badgeOf(groups: Record<Group, unknown[]>): { n: number; alert: boolean } {
   const due = groups.due.length;
-  return due ? { n: due, alert: true } : { n: groups.waiting.length + groups.ok.length, alert: false };
+  return { n: due, alert: due > 0 };
 }
 
 /** The source that makes the heading long: its own tag of a tag source (null: none), a file source. */
