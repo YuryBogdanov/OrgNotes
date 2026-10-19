@@ -27,7 +27,8 @@ export const FONTS = {
 };
 
 const BUNDLED: Record<string, string> = { 'Yeseva One': FONTS.title, 'Cormorant Garamond': FONTS.text, 'IBM Plex Mono': FONTS.mono, system: FONTS.ui };
-const FALLBACK: Record<keyof AppTheme['fonts'], string> = { title: 'Georgia, serif', text: 'Georgia, serif', ui: FONTS.ui, mono: 'ui-monospace, Menlo, monospace' };
+/** A font the Mac does not have gives way to the role's own by default (ТЗ 57 §7). */
+const FALLBACK: Record<keyof AppTheme['fonts'], string> = { title: FONTS.title, text: FONTS.text, ui: FONTS.ui, mono: FONTS.mono };
 /** A theme's font as CSS (ТЗ 57 §6): the bundled ones with their stacks, «system» the interface's, any other by its
- *  family name with the role's fallback. */
+ *  family name with the role's default after it. */
 export const fontCss = (name: string, role: keyof AppTheme['fonts']) => BUNDLED[name] ?? `'${name.replace(/['\\]/g, '')}', ${FALLBACK[role]}`;

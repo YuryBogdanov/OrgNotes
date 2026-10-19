@@ -1018,6 +1018,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   theme in effect (a built-in one: a sheet «Дублировать и изменить» — the copy takes the font, the editor opens);
   the editor's «Шрифты» — four rows. The mock answers `font_families` with four families (one without Cyrillic).
   e2e nextThemeFonts.spec.ts.
+  57.6, the plugins and the windows: the plugins' event `theme.changed` also comes when the theme itself changes
+  (another light one, a colour in the editor: `watch(store.theme.app)`), not only light ↔ dark — the terminal
+  recolours; its ANSI colours are the palette's (`--p-red` … `--p-teal` of the layer, the statuses' tokens if none).
+  A font the Mac lacks gives way to its role's own (`fontCss`: the bundled stack after the name). The plugins'
+  `contributes.themes` may be of the new format (README). The mini window and the quick entry took the theme and its
+  fonts in 57.3 / 57.5. e2e nextThemePlugins.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
