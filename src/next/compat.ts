@@ -1,5 +1,5 @@
-// The compatibility layer (ТЗ 43 §5): the old interface's CSS variables (app.css) given by the new tokens, so an old
-// screen, a plugin's panel or tab, a bridged sheet draws in the new colours with its own layout and fonts. Each
+// The compatibility layer (ТЗ 43 §5): the old interface's CSS variables (app.css) given by the new tokens, so a
+// plugin's panel, tab, sheet or field draws in the new colours with its own layout and fonts. Each
 // variable app.css defines has its line here (compat.test.ts): a new one there must say what it is here.
 
 import { BUILTIN, NEXT_THEME, type Appearance } from '../themes';

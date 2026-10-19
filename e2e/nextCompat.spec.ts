@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openApp, settingsSheet } from './helpers';
 
-// ТЗ 43.2: the compatibility layer — the bridged settings' sections draw with the new tokens: the old variables given
-// by them; `data-ui="next"` on the layer. The sheet itself is the new interface's own since ТЗ 54.1. (The editor's menu is the new interface's own since ТЗ 44.3.)
+// ТЗ 43.2: the compatibility layer — what plugins draw the old way gets the old variables by the new tokens;
+// `data-ui="next"` on the layer. The settings are the new interface's own since ТЗ 54 (no section in the layer). (The editor's menu is the new interface's own since ТЗ 44.3.)
 
 const css = (page: Page, sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p).trim(), prop);
 
@@ -20,11 +20,14 @@ for (const scheme of ['light', 'dark'] as const)
     await expect(settingsSheet(page)).toBeVisible();
     const sheet = '[role="dialog"][aria-label="Настройки"]';
     expect(await page.locator(sheet).evaluate((e) => !!e.closest('.compat[data-ui="next"]'))).toBe(false);
-    // the theme's editor is still old (54.8): in the layer
+    // the theme's editor is the new interface's own too (54.8): no section in the layer
     await page.getByRole('tab', { name: 'Оформление' }).click();
     await page.getByRole('radiogroup', { name: 'Тема при светлом оформлении' }).getByRole('radio').first().click({ button: 'right' });
     await page.getByRole('menuitem', { name: 'Редактировать' }).click();
-    const pal = `${sheet} .compat[data-ui="next"]`;
+    await expect(page.getByRole('region', { name: 'Редактор темы' })).toBeVisible();
+    await expect(page.locator(`${sheet} .compat`)).toHaveCount(0);
+    // the layer itself (the window's, for the plugins' parts): the old variables by the new tokens
+    const pal = '.compat[data-ui="next"]';
     await expect(page.locator(pal).first()).toBeAttached();
     const lampink = scheme === 'light' ? '#8a5f0e' : '#f2c66d';
     expect(await css(page, pal, '--acc')).toBe(await css(page, pal, '--lampink'));
