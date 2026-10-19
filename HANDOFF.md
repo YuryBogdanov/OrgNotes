@@ -860,6 +860,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   «Поведение» (CLOSED, LOGBOOK — kept though not on the mockup). The rename and delete dialogs are ConfirmSheets. A new
   state starts grey. No set is a plugin's in the editor, so «только чтение» is not shown. e2e
   nextSettingsStatuses.spec.ts.
+  54.7, the other core sections by the rules of §2: next/SetToday (its two schemas, «Задачи» — the statuses' chips
+  with a menu, the files' chips with the palette, the overdue; «Блоки» on/off, dragged or ⌥↑↓), SetTags (not
+  inherited — chips and «+ тег»; each tag's colour — a MenuButton-like button with a menu of «Авто» and the named),
+  SetAgendas (mine with their blocks and ×, «Новая агенда…», the plugins' blocks), SetInbox (the file by the palette,
+  «В начало / В конец», the capture's key — to «Клавиши» on «capture», the switches, the status as a menu, the
+  plugins' blocks). «Файлы» stays not made (disabled), as before. Only the theme's editor is bridged now; a feature's
+  own settings component (none of the core's) would draw in Compat. e2e nextSettingsRest.spec.ts, nextCompat via the
+  theme's editor.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
