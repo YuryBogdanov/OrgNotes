@@ -123,6 +123,10 @@ class LongMatters {
   beside(m: Matter) {
     void this.ctx.commands.run('file.open', { path: m.path, line: m.line, beside: true });
   }
+  /** ⌥↩, ⌥-click: the matter's file beside the list (the new interface, API 1.17), else in the second pane. */
+  aside(m: Matter) {
+    if (!this.ctx.ui.openBeside(this.refOf(m))) this.beside(m);
+  }
   /** The tab «Долгие дела», with this matter chosen. */
   openList(key: string | null = null) {
     if (key) this.sel = key;

@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.16.0';
+export const API_VERSION = '1.17.0';
 
 /** The handle of a block of «Сегодня» (`ui.todayBlock`). */
 export interface TodayBlockHandle {
@@ -287,9 +287,11 @@ export interface MenuItem {
 export interface TaskListSpec {
   /** The task chosen in it now (null: none), and the date its place in the list stands by: ⌥⇧← → moves that one. */
   selected(): { ref: HeadingRef; date?: 'SCHEDULED' | 'DEADLINE' | 'event' } | null;
-  /** ↩ and the menu's «Открыть» (false); ⌥↩ and its second item (true). */
+  /** ↩ and the menu's «Открыть» (false); ⌥↩ and its second item (true) — without `otherLabel`, in the new interface
+   *  the core opens the file beside the list itself (since 1.17) and `open(true)` is not called. */
   open(other: boolean): void;
-  /** The second item's name (by default «Открыть во второй панели»). */
+  /** The second item's name: the plugin opens it itself (by default «Открыть во второй панели», in the new interface
+   *  «Открыть сбоку»). */
   otherLabel?: string;
   /** ⎋: the choice let go. */
   clear(): void;
@@ -589,6 +591,10 @@ export interface Ctx {
     /** The lines selected in the editor with the focus (1-based, the first and the last) and its file; null — nothing
      *  selected. Since 1.16. */
     selectedLines(): { path: string; from: number; to: number } | null;
+    /** The file of a heading (or of a line, 0-based) beside the plugin's tab, in «Исходник», the heading's subtree
+     *  marked — as ⌥↩ in a list (ТЗ 56). false — the active tab is not one of the plugin's views, the interface is the
+     *  old one, no such file or heading. Since 1.17. */
+    openBeside(at: HeadingRef | { path: string; line: number }): boolean;
     /** An item of the menu of a heading — in the navigator's outline and in the editor on a heading's line — where
      *  `when` says so. Since 1.9. */
     headingAction(spec: { label: string; when?(h: HeadingInfo): boolean; run(h: HeadingRef): void }): Dispose;

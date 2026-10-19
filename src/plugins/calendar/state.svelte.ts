@@ -91,6 +91,11 @@ class Calendar {
     const h = p && this.fileOf(p.path)?.headings.find((x) => x.line === p.line);
     return p && h ? { path: p.path, line: h.line, title: h.title } : null;
   }
+  /** ⌥-click on an entry just chosen: its file beside the tab (the new interface, API 1.17; ⌥↩ is the core's). */
+  aside(ev: MouseEvent) {
+    const ref = ev.altKey && !ev.metaKey ? this.pickedRef() : null;
+    if (ref) this.ctx.ui.openBeside(ref);
+  }
   /** The core's list of the calendar tab (`ui.taskList`): its menu at a point. */
   tasks: { menu(at: { x: number; y: number }): void; dispose(): void } | null = null;
   /** Right click (⌃-click) on an entry: chosen, then the core's menu of the task. */

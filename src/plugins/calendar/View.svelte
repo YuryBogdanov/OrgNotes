@@ -140,6 +140,7 @@
     calendar.pick(e);
     set({ date: e.day });
     root?.focus({ preventScroll: true });
+    calendar.aside(ev);
   }
   function open(ev: MouseEvent, e: CalEntry) {
     ev.stopPropagation();
@@ -373,7 +374,7 @@
   </div>
   {#if next}
     <!-- the chosen day (ТЗ 47 §1.5): the inspector of the old interface, here a column of the tab -->
-    <aside class="side" aria-label="Выбранный день"><Day shown={cal} next /></aside>
+    <aside class="side" aria-label="Выбранный день" data-beside-hide><Day shown={cal} next /></aside>
   {/if}
 </div>
 
