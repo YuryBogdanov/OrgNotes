@@ -874,6 +874,19 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   is gone; eslint forbids an old component in `src/next/` with no exception; boundary.test checks the file is gone.
   The compatibility layer stays for what plugins draw the old way (their panels, tabs, sheets, own fields). The old
   sheet (src/Settings.svelte and its sections) stays for the old interface till it goes. e2e nextThemeEditor.spec.ts.
+- **ТЗ 55, the plugin «Терминал» (`docs/55-plagin-terminal.md`)** — worked in a git worktree
+  (`.claude/worktrees/t55`, node_modules a symlink; `.claude/` in `.git/info/exclude`) and cargo with its own
+  `CARGO_TARGET_DIR`, so the user's `tauri dev` was not rebuilt. 55.1, the core: `src-tauri/src/pty.rs`
+  (`portable-pty`, `libc`): `pty_spawn` (the right «process» checked by the manifest Rust reads; `$SHELL -l`, a
+  command as `-c 'exec "$0" "$@"' cmd args…`; cwd the notes folder by default; TERM, COLORTERM, LANG from
+  `AppleLocale` when not given, PANOPTICON, PANOPTICON_FOLDER), `pty_write`, `pty_resize`, `pty_kill` (the group:
+  -pid), `pty_kill_plugin`, `pty_count`; a reader thread per process emits `pty-data` (UTF-8 with a cut character
+  kept — `utf8_chunk`, tested) and `pty-exit` {code}; `RunEvent::Exit` kills all. JS: `src/api/process.ts`
+  (`processApi`: one listener for both events, handles by id, output before `onData` kept, `livePtys`); `ctx.process`
+  with the right, its `pty_kill_plugin` among the plugin's disposers; `pty()` returns a Promise (the spawn is async)
+  and takes `shell`. `store.quit` asks `quitReq` («Завершить N процессов в терминале?», both shells) when processes
+  live. API 1.16.0, README «Процессы», the template's copy, apiSurface. The e2e mock has a pretend shell (prompt, echo,
+  `echo`, `exit`, ⌃C; `__ptyOut`). e2e processApi.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

@@ -9,6 +9,7 @@ mod exchange;
 mod capture;
 mod mini;
 mod system;
+mod pty;
 #[cfg(test)]
 mod tests;
 
@@ -146,6 +147,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState::default())
+        .manage(pty::Ptys::default())
         .invoke_handler(tauri::generate_handler![
             notes::set_note_types,
             exchange::export_bytes,
@@ -178,6 +180,12 @@ pub fn run() {
             files::create_entry,
             files::save_new_file,
             quit_app,
+            pty::pty_spawn,
+            pty::pty_write,
+            pty::pty_resize,
+            pty::pty_kill,
+            pty::pty_kill_plugin,
+            pty::pty_count,
             files::rename_entry,
             files::move_entry,
             files::trash_entry,
@@ -254,6 +262,8 @@ pub fn run() {
                 show_main(app);
                 let _ = app.emit("quit-requested", ());
             }
+            // the processes of the terminal do not outlive the app (ТЗ 55 §1)
+            tauri::RunEvent::Exit => pty::kill_all(app),
             _ => {}
         });
 }

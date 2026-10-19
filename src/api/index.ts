@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.15.0';
+export const API_VERSION = '1.16.0';
 
 /** The handle of a block of «Сегодня» (`ui.todayBlock`). */
 export interface TodayBlockHandle {
@@ -444,6 +444,17 @@ export interface ReviewResult {
   finished: boolean;
 }
 
+/** A process in a pseudo-terminal (`ctx.process.pty`, 1.16): what is typed goes in, its output comes out as text. */
+export interface PtyHandle {
+  id: string;
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  kill(signal?: 'TERM' | 'KILL' | 'INT'): void;
+  /** Its output, as it comes (what came before the first `onData` is given to it). */
+  onData(fn: (data: string) => void): Dispose;
+  /** Its end: the exit code (null: by a signal). */
+  onExit(fn: (code: number | null) => void): Dispose;
+}
 export interface NetResponse {
   status: number;
   ok: boolean;
@@ -645,6 +656,11 @@ export interface Ctx {
   clipboard?: { write(text: string): Promise<void> };
   /** Needs `net`: only to the hosts of the manifest's `net` («jira.company.ru», «*.company.ru»); 30 s, 10 MB. */
   net?: { fetch(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<NetResponse> };
+  /** Needs `process` (the user is told the plugin may run programs): a process in a pseudo-terminal — the user's
+   *  shell as a login shell (its PATH; `shell` another one), alone or running `command` with `args`; `cwd` the notes folder unless given
+   *  (one outside it is allowed); TERM=xterm-256color, PANOPTICON=1, PANOPTICON_FOLDER. The plugin's processes end
+   *  when it is turned off or fails, and when the app quits. Since 1.16. */
+  process?: { pty(o: { command?: string; args?: string[]; cwd?: string; env?: Record<string, string>; shell?: string; cols: number; rows: number }): Promise<PtyHandle> };
   /** Sets of statuses from code (they replace the plugin's earlier ones; [] none); the manifest's stay. */
   statusSets: { set(defs: StatusSet[], o?: { ifMissing?: boolean }): void };
   /** The values of the settings the manifest declares. */

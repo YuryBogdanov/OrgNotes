@@ -37,6 +37,7 @@
   import PluginSheets from './PluginSheets.svelte';
   import EndDay from './EndDay.svelte';
   import CloseSheet from './CloseSheet.svelte';
+  import ConfirmSheet from './ConfirmSheet.svelte';
   import DiskSheet from './DiskSheet.svelte';
   import Dialogs from './Dialogs.svelte';
   import SaveAsSheet from './SaveAsSheet.svelte';
@@ -297,6 +298,13 @@
   {#if store.unsavedReq}<CloseSheet items={store.unsavedReq.items} onanswer={(a) => store.unsavedReq?.resolve(a)} />{/if}
   {#if store.diskReq}{#key store.diskReq}<DiskSheet kind={store.diskReq.kind} path={store.diskReq.path} onanswer={(a) => store.diskReq?.resolve(a)} />{/key}{/if}
   {#if store.errorReq}<CloseSheet error={store.errorReq} onanswer={() => store.errorReq?.resolve()} />{/if}
+  {#if store.quitReq}
+    {@const q = store.quitReq}
+    <ConfirmSheet label="Выход" title="Завершить {q.n} {q.n % 10 === 1 && q.n % 100 !== 11 ? 'процесс' : q.n % 10 >= 2 && q.n % 10 <= 4 && (q.n % 100 < 12 || q.n % 100 > 14) ? 'процесса' : 'процессов'} в терминале?" onclose={() => q.resolve(false)}
+      actions={[{ label: 'Завершить и выйти', kind: 'danger', run: () => q.resolve(true) }]}>
+      Процессы терминала не переживают выход из приложения.
+    </ConfirmSheet>
+  {/if}
   <!-- «Завершить день» (ТЗ 45 §2.5) -->
   {#if today.ending}<EndDay />{/if}
   <!-- the plugins' forms, sheets, menus, «Включить плагин?», the choice of a place (ТЗ 44 §4) -->
