@@ -967,6 +967,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   new interface and the active tab one of the plugin's views. «Долгие дела» ⌥↩ / ⌥-click and the calendar's ⌥-click
   use it (their manifests ask ^1.17); the calendar's column «Выбранный день» `data-beside-hide`. README, apiSurface.
   e2e nextBesidePlugins.spec.ts.
+- **ТЗ 57, the themes of the whole app (`docs/57-temy-prilozheniya.md`)** — a theme is a few colours and fonts; the new
+  interface's tokens and the editor's colours are derived from it. 57.1, the model: `src/appTheme.ts` (`AppTheme`:
+  `base` bg / ink / accent, the eight named colours, `details` — side, grid, headings by levels —, `fonts`; dark by
+  the ground's luminance < 0.2; `deriveTokens` — the tokens of next/tokens.ts, light and dark rules (the light
+  theme's rules and chips are its text's hue brighter, `shade` in HSV; `lampink` the accent darkened by steps of 8 %
+  till 4.5:1 on the ground and on `lampsoft`); `editorColors` — ThemeColors for the editor and the old interface;
+  the built-in «Бумага» / «Синька» (`PAPER`, `BLUEPRINT`, their sidebars set)). `TOKENS` is now derived from them:
+  tokens.test.ts keeps the concept's old values and compares, laid on the ground, ±2 per channel; the palette of
+  «Бумага»: yellow is the old `wait` (#a2700c), orange a new #a8541b.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
