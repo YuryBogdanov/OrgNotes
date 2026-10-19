@@ -961,6 +961,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   — never due, out of the badge, «Сегодня» and the walk; folded at the bottom of the list and the panel; the row's
   menu «В бэклог» (the first backlog status) / «Из бэклога» (the status before it, else the first open one out of it).
   ТЗ 40 §4.6 (local). e2e nextLongBacklog.spec.ts.
+  5, the window: #304 the tabs' strip drags too (`use:windowDrag` on `.tabs`; tabs and buttons keep their clicks); a
+  double click asks Rust `system::double_click_action` (`defaults read -g AppleActionOnDoubleClick`: Maximize / Fill
+  → zoom, Minimize → `minimize` — `core:window:allow-minimize` added —, None → nothing). #298 `next/FullscreenLights`
+  — the page's own lights in full screen (Rust hides macOS's): at 18 / 20 + `--menu`, only while `titlebar.fullscreen
+  && lights`, 150 ms of opacity; the red closes (`closeFromFullscreen`), the green leaves; the new root takes `--menu`
+  and `.win` goes down by it. The mock: `double_click_action` (`__dblAction`), `minimize`. e2e nextWindowDrag.spec.ts.
 - **The window's title bar in the new interface:** WKWebView has no `-webkit-app-region` (the CSS stays, harmless):
   `next/windowDrag.ts` — `use:windowDrag` on the toolbar (Toolbar.svelte) and the lights' room of the rail and of the
   panel (Sidebar.svelte); a press not on a button, field or tab asks Tauri `startDragging`, a double click
