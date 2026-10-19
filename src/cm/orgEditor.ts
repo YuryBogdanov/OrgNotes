@@ -30,7 +30,7 @@ import { cycleState, cycleVisibility, newHeading, onHeading, orgFold, run, sel }
 import { decorate } from './decorate';
 import { narrowRange, narrowing, setNarrow } from './narrow';
 import { sectionBar } from './section';
-import { subtreeBar } from './subtree';
+import { hitMark, subtreeBar } from './subtree';
 import { linkCard } from './linkCard';
 
 /** What the wrapping component gives: the file and how it is shown, and what the editor tells back. */
@@ -77,6 +77,8 @@ export interface EditorProps {
   onwiden?: () => void;
   /** The subtree of the heading at this line marked by a bar of the lamp (the file beside a list, ТЗ 56 §4). */
   mark?: number | null;
+  /** A search's match shown on the lamp (the file beside the results, ТЗ 56 §4). */
+  hit?: { line: number; col: number; len: number } | null;
 }
 /** What the editor asks its component to draw. */
 export interface EditorUi {
@@ -96,6 +98,10 @@ const copyText = (t: string) => void navigator.clipboard?.writeText(t).catch(() 
  *  editor's attributes: CodeMirror rewrites its own classes (on focus, say) and would drop one set by hand. */
 const selectionClass = EditorView.editorAttributes.compute(['selection'], (s): Record<string, string> => (s.selection.main.empty ? {} : { class: 'cm-has-selection' }));
 
+/** The marks of the file beside (ТЗ 56 §4): the heading's subtree, a search's match. */
+const markKey = (p: EditorProps) => JSON.stringify([p.mark ?? null, p.hit ?? null]);
+const markExt = (p: EditorProps) => [...(p.mark === undefined || p.mark === null ? [] : [subtreeBar(p.mark)]), ...(p.hit ? [hitMark(p.hit)] : [])];
+
 export class OrgEditor {
   readonly view: EditorView;
   private p: EditorProps;
@@ -114,7 +120,7 @@ export class OrgEditor {
   private readonly numbers = new Compartment(); // line numbers: off while drawn, unless asked for
   private readonly note = new Compartment();
   private readonly markC = new Compartment();
-  private lastMark: number | null = null; // set in the constructor's state
+  private lastMark = ''; // set in the constructor's state: the subtree's line and the match, as a key
   private narrowField: StateField<{ from: number; to: number }> | null = null;
   /** The statuses of the document shown: the newest, a status added in the settings too. */
   private words: Workflow;
@@ -126,7 +132,7 @@ export class OrgEditor {
     this.ui = ui;
     this.words = p.wf;
     this.lastNote = p.lineNote ?? null;
-    this.lastMark = p.mark ?? null;
+    this.lastMark = markKey(p);
     const view = (this.view = new EditorView({ state: this.makeState(p.text, p.wf), parent: host }));
     foldAllDrawers(view, this.drawersOn);
     foldLines(view, p.folded ?? []);
@@ -178,9 +184,9 @@ export class OrgEditor {
       this.lastNote = p.lineNote ?? null;
       this.view.dispatch({ effects: this.note.reconfigure(noteExt(p.lineNote ?? null)) });
     }
-    if ((p.mark ?? null) !== this.lastMark) {
-      this.lastMark = p.mark ?? null;
-      this.view.dispatch({ effects: this.markC.reconfigure(this.lastMark === null ? [] : subtreeBar(this.lastMark)) });
+    if (markKey(p) !== this.lastMark) {
+      this.lastMark = markKey(p);
+      this.view.dispatch({ effects: this.markC.reconfigure(markExt(p)) });
     }
     this.syncText();
     this.syncNarrow();
@@ -590,7 +596,7 @@ export class OrgEditor {
             return el;
           },
         }),
-        ...(gutter ? [foldGutter()] : []), plugin, ...lineLinkExt(() => this.path), selectionClass, this.note.of(noteExt(p.lineNote ?? null)), this.markC.of(p.mark === undefined || p.mark === null ? [] : subtreeBar(p.mark)), this.structure.of(this.structureExt(words)),
+        ...(gutter ? [foldGutter()] : []), plugin, ...lineLinkExt(() => this.path), selectionClass, this.note.of(noteExt(p.lineNote ?? null)), this.markC.of(markExt(p)), this.structure.of(this.structureExt(words)),
         ...(p.hint ? [cmPlaceholder(p.hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         p.next ? this.linkCardTip : this.linkTip,

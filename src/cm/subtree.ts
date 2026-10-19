@@ -44,3 +44,28 @@ export function subtreeBar(line: number) {
     { decorations: (p) => p.decorations },
   );
 }
+
+/** A search's match on the lamp (the file beside the results): it follows the text as it is edited. */
+export function hitMark(hit: { line: number; col: number; len: number }) {
+  const deco = Decoration.mark({ class: 'cm-hit' });
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+      constructor(view: EditorView) {
+        const doc = view.state.doc;
+        const b = new RangeSetBuilder<Decoration>();
+        if (hit.line >= 0 && hit.line < doc.lines && hit.len > 0) {
+          const l = doc.line(hit.line + 1);
+          const from = Math.min(l.to, l.from + hit.col);
+          const to = Math.min(l.to, from + hit.len);
+          if (to > from) b.add(from, to, deco);
+        }
+        this.decorations = b.finish();
+      }
+      update(u: ViewUpdate) {
+        if (u.docChanged) this.decorations = this.decorations.map(u.changes);
+      }
+    },
+    { decorations: (p) => p.decorations },
+  );
+}

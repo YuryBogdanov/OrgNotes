@@ -956,6 +956,11 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   56.3, following the choice: BesideSplit derives the row chosen in its tab's list (`lists.besideTab`, `resolve`) and,
   120 ms after it changes, opens its file (the pin kept) — not while pinned, not while the focus is in the file.
   e2e nextBeside.spec.ts.
+  56.4, the search's results: SearchTab's ⌥↩ / ⌥-click on a block open the match's file beside at the heading above
+  it with `hit` (the caret on the match; `cm/subtree.ts` `hitMark` — the class `cm-hit` on the lamp, mapped through
+  edits; OrgEditor's `hit` prop shares the compartment of `mark`); no find bar (no `findReq`); ⎋ in the list closes it;
+  it follows ↑↓ (`followBeside` in beside.svelte.ts, BesideSplit uses it too); «Фильтры» `data-beside-hide`;
+  ⌃⌘← focuses the results' own list (`[tabindex="0"]` in the split's list) when no list of tasks is there.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

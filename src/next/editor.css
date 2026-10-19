@@ -179,3 +179,6 @@
 .next .cm-sub::before { content: ''; position: absolute; left: -10px; top: 0; bottom: 0; width: 3px; background: var(--lamp); }
 .next .cm-sub.top::before { top: 0.3em; border-radius: 2px 2px 0 0; }
 .next .cm-sub.last::before { bottom: 0.2em; border-radius: 0 0 2px 2px; }
+/* a search's match in the file beside the results (§4): on the lamp */
+.next .cm-hit { background: var(--lamp); color: var(--onlamp); border-radius: 3px; }
+.next .cm-hit * { color: var(--onlamp) !important; }

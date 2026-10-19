@@ -9,7 +9,7 @@ import { firstDone, sequenceFor, setKeyword, setPriority, toJs, toneFor, type He
 import { setTags, shiftEvent } from './edits';
 import { priorityAfter, rotateStatus } from './outline';
 import { bare, headingStep, register, setListTask, setMoreTaskCommands, taskCommands, type Ctx, type HeadingAct, type Icon, type TaskCommand, type TaskCtx } from './commands';
-import { besideNow, besideOf, closeBeside, openBeside } from './beside.svelte';
+import { besideNow, besideOf, closeBeside, focusBesideFile, openBeside } from './beside.svelte';
 import { toneStyle } from './colors';
 import type { MenuItem } from './ContextMenu.svelte';
 import type { NoteFile } from './store.svelte';
@@ -379,9 +379,12 @@ class TaskLists {
   }
   /** ⌃⌘←: back into the list beside the file, on its chosen row. */
   focusList(tabId: string) {
-    const spec = this.specs.find((s) => s.tab?.()?.id === tabId && s.el()?.closest(`[data-beside="${CSS.escape(tabId)}"]`));
+    const sel = `[data-beside="${CSS.escape(tabId)}"]`;
+    const spec = this.specs.find((s) => s.tab?.()?.id === tabId && s.el()?.closest(sel));
+    // a list that is not one of tasks (the search's results): its own focusable list
+    const own = document.querySelector<HTMLElement>(`${sel} > .list [tabindex="0"]`);
     const el = spec?.el();
-    if (!el) return false;
+    if (!el) return own?.focus(), !!own;
     (el.querySelector<HTMLElement>('[aria-selected="true"], .rb.sel') ?? el).focus();
     return true;
   }
@@ -521,11 +524,6 @@ task('task.open', 'Задача: открыть', 'goto', (_t, L) => void setTim
 store.setScopeKeys('list', { active: () => !!lists.focused() && !lists.menu && !lists.tagsReq, run: (id) => lists.run(id) });
 
 // the keys of the tab with a file beside (ТЗ 56 §5): wherever the focus is in it, the list's or the file's
-function focusBesideFile(tabId: string) {
-  const ed = document.querySelector<HTMLElement>(`[data-beside="${CSS.escape(tabId)}"] .side .cm-content`);
-  ed?.focus();
-  return !!ed;
-}
 store.setScopeKeys('beside', {
   active: () => !!besideNow() && !store.sheetOpen && !lists.menu,
   run: (id) => {

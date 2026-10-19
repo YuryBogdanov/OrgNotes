@@ -61,3 +61,18 @@ export function togglePin(tabId: string) {
   const b = byTab[tabId];
   if (b) b.pinned = !b.pinned;
 }
+
+/** The focus into the file beside the tab (⌃⌘→, a second ⌥↩ on the same row). */
+export function focusBesideFile(tabId: string) {
+  const ed = document.querySelector<HTMLElement>(`[data-beside="${CSS.escape(tabId)}"] .side .cm-content`);
+  ed?.focus();
+  return !!ed;
+}
+/** §3: the row chosen in the list, 120 ms after (the caller waits): its file, unless pinned, unless the caret is in
+ *  the file (typing does not take it away), unless it is shown already. */
+export function followBeside(tabId: string, at: { path: string; line: number; hit?: Beside['hit'] }) {
+  const b = byTab[tabId];
+  if (!b || b.pinned || (b.path === at.path && b.line === at.line && b.hit?.line === at.hit?.line && b.hit?.col === at.hit?.col)) return;
+  if (document.querySelector(`[data-beside="${CSS.escape(tabId)}"] .side`)?.contains(document.activeElement)) return;
+  openBeside(tabId, at, { keepPin: true });
+}

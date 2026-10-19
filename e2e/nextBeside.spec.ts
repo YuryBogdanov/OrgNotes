@@ -147,3 +147,47 @@ test('↑↓ in the list switch the file; «закреплён» keeps it; ⌥�
   await page.keyboard.press('ArrowDown');
   await expect(head).toContainText('Синк платформы');
 });
+
+// ТЗ 56.4: the search's results — the caret on the match, the match on the lamp, no find bar, «Фильтры» hidden
+test('the search: ⌥↩ on a match — its file beside, the line numbers as in the results, the match on the lamp; ↓ follows; ⎋ closes', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.addInitScript(() => localStorage.setItem('ui:next', '1'));
+  await openApp(page, { files: { '/mock/Midterm.org': '* NEXT Переезд хранилища\nокно переезда 12 ноября\n** Риски\n- переезд контура биллинга\n', '/mock/work/plan.org': '* TODO План\nпереезд в ноябре\n' }, ready: false, viewport: { width: 1440, height: 860 } });
+  await expect(page.getByRole('tree', { name: 'Файлы' })).toBeVisible();
+  await page.keyboard.press('Shift+Meta+f');
+  const field = page.getByRole('textbox', { name: 'Поиск по всем файлам' });
+  await field.fill('переезд');
+  await field.press('Enter');
+  await expect(page.locator('.sp .sum')).toContainText('совпадени');
+  await field.press('Meta+Enter');
+  const st = page.locator('.stab');
+  await st.getByRole('textbox', { name: 'Запрос' }).press('ArrowDown');
+  await page.keyboard.press('ArrowDown'); // the second block: «- переезд контура биллинга», line 4
+  await expect(st.locator('.blk.sel .ln.m .no')).toHaveText('4');
+  await page.keyboard.press('Alt+Enter');
+  await expect(side(page)).toBeVisible();
+  await expect(side(page).locator('header')).toContainText('› Переезд хранилища › Риски');
+  await expect(side(page).locator('.cm-hit')).toHaveText('переезд');
+  await expect(side(page).locator('.cm-line', { has: page.locator('.cm-hit') })).toContainText('переезд контура');
+  await expect(side(page).locator('.cm-gutterElement', { hasText: /^4$/ })).toBeVisible();
+  await expect(page.locator('.cm-find, .findbar, [aria-label="Найти"]')).toHaveCount(0);
+  await expect(st.getByRole('complementary', { name: 'Фильтры' })).toBeHidden();
+  await expect(st.getByRole('listbox', { name: 'Результаты поиска' })).toBeFocused();
+  // the caret on the match: line 4 (index 3), at «переезд»
+  const caret = await page.evaluate(async () => {
+    const { store } = await import('/src/store.svelte.ts' as string);
+    const { besideOf } = await import('/src/beside.svelte.ts' as string);
+    return besideOf(store.tab.id)?.caret;
+  });
+  expect(caret).toEqual({ line: 3, col: 2 });
+  await page.keyboard.press('ArrowDown'); // follows: the other file
+  await expect(side(page).locator('header')).toContainText('plan');
+  await expect(side(page).locator('.cm-hit')).toHaveText('переезд');
+  await page.keyboard.press('Alt+Enter'); // the same: into the file
+  await expect.poll(() => inSide(page)).toBe(true);
+  await page.keyboard.press('Control+Meta+ArrowLeft');
+  await expect(st.getByRole('listbox', { name: 'Результаты поиска' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(side(page)).toHaveCount(0);
+  await expect(st.getByRole('complementary', { name: 'Фильтры' })).toBeVisible();
+});
