@@ -940,6 +940,11 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   «Агенда на сегодня» — the meetings and the day's tasks, 1-1, the overdue, a plugin's block its summary or «›»;
   «Из плагинов» gone, rows `.plugrow`), an empty day says so with «Полная версия» once. The panel's TodayCtl had the
   data: the day's scheduled tasks are the agenda's, not «Задачи» (those are the task files').
+  2, the file's column: #299 the board's file card — its description the whole width, wrapped, the buttons' row
+  `.fc-btns` under it; #296 the cards do not shrink or scroll (`.cards` flex 0 0 auto), «Структура» scrolls under
+  them, «Связи» under it; Structure's `onsqueeze` — the cards higher than 45 % of the column (their height last
+  measured unfolded) — EditorArea folds all but the first (`squeezed`; a click on a forced one opens it, `opened`).
+  e2e nextFileColumn.spec.ts.
 - **The window's title bar in the new interface:** WKWebView has no `-webkit-app-region` (the CSS stays, harmless):
   `next/windowDrag.ts` — `use:windowDrag` on the toolbar (Toolbar.svelte) and the lights' room of the rail and of the
   panel (Sidebar.svelte); a press not on a button, field or tab asks Tauri `startDragging`, a double click

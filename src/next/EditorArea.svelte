@@ -125,6 +125,9 @@
   const shownCards = $derived(session ? cardsCtl.cards.filter((c) => c.plugin !== session.plugin) : cardsCtl.cards);
   const sessionIcon = $derived(session ? (iconOf(plugins.manifest(session.plugin) ?? ({ contributes: { navSections: [], views: [], fileViews: [] } } as never)) ?? '') : '');
   const sessionNext = $derived(session?.spec.actions.find((a) => a.command && store.keyHint(a.command) === '⌘↩'));
+  /** The cards too high for the column (fix #296): all but the first folded; one opened by a click meanwhile. */
+  let squeezed = $state(false);
+  let opened = $state(new Set<string>());
   const colW = $derived(cardsCtl.cards.length || session ? 268 : 220);
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   function actsMenu(e: MouseEvent) {
@@ -223,11 +226,13 @@
       {#if store.rich && !file.text.trim()}<div class="empty" aria-hidden="true"><span class="et">Пустой файл</span><span>Начните с <code>* </code> — это заголовок</span></div>{/if}
     </div>
     {#if structure}
-      <Structure range={narrowed} width={colW} queue={session ? queue : undefined}>
+      <Structure range={narrowed} width={colW} queue={session ? queue : undefined} onsqueeze={(on) => ((squeezed = on), (opened = new Set()))}>
         {#snippet cards()}
           {#if session}<SessionCard />{#if session.spec.calendar && session.cur >= 0 && plugins.live('calendar')}<ReviewCalendar />{/if}{/if}
-          {#each shownCards as c (c.id)}
-            <FileCard card={c} path={file.name} heading={caret} folded={cardsCtl.folded.has(c.id)} ontoggle={() => cardsCtl.toggle(c.id)} />
+          {#each shownCards as c, ci (c.id)}
+            {@const forced = squeezed && ci > 0 && !opened.has(c.id)}
+            <FileCard card={c} path={file.name} heading={caret} folded={cardsCtl.folded.has(c.id) || forced}
+              ontoggle={() => (forced ? (opened = new Set([...opened, c.id])) : squeezed && ci > 0 && opened.has(c.id) ? (opened = new Set([...opened].filter((x) => x !== c.id))) : cardsCtl.toggle(c.id))} />
           {/each}
         {/snippet}
       </Structure>
