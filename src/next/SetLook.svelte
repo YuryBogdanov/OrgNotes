@@ -171,10 +171,10 @@
   <Row label="Шрифт текста" hint="Шрифт текста темы «{store.theme.name}»: заголовки, текст файла, карточки доски">
     <FontMenu value={textFontOf(store.theme)} role="text" label="Шрифт текста" onchange={setTextFont} />
   </Row>
-  <Row label="Ширина текста" id="set-width" changed={nextPrefs.width !== 'medium'}>
+  <Row label="Ширина текста" id="set-width">
     <Segments value={nextPrefs.width} options={TEXT_WIDTHS.map((w) => ({ value: w.id, label: w.name }))} labelledby="set-width" onchange={(v) => nextPrefs.setWidth(v)} />
   </Row>
-  <Row label="«Структура» справа" hint="Когда окно шире 900 pt · ⌥⌘0" id="set-struct" changed={!nextPrefs.structure}>
+  <Row label="«Структура» справа" hint="Когда окно шире 900 pt · ⌥⌘0" id="set-struct">
     <Toggle checked={nextPrefs.structure} labelledby="set-struct" onchange={() => nextPrefs.setStructure(!nextPrefs.structure)} />
   </Row>
   <Row label="Сворачивать ящики при открытии" hint=":PROPERTIES:, :LOGBOOK: — одной строкой с «…»; файл не меняется" id="set-drawers">

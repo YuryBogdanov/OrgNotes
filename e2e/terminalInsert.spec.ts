@@ -44,7 +44,7 @@ test('«Вставить в терминал» in a heading\'s menu; the setting
   await expect(s.locator('section.grp .cap')).toHaveText(['Вид', 'Ввод', 'Оболочка'], { ignoreCase: true });
   await s.getByRole('button', { name: /^Размер шрифта:/ }).click();
   await page.getByRole('menuitem', { name: '14' }).click();
-  await expect(s.locator('.row').filter({ hasText: 'Размер шрифта' }).locator('.dot')).toHaveCount(1);
+  await expect(s.locator('.row').filter({ hasText: 'Размер шрифта' }).locator('.dot')).toHaveCount(0); // no dot of a change outside «Клавиши» (fix #315)
   // the command in «Клавиши», with the core's of a heading
   await s.getByRole('tab', { name: 'Клавиши', exact: true }).click();
   await expect(s.getByRole('region', { name: /ЗАГОЛОВКИ/i }).locator('.row[data-id="terminal.insertHeading"]')).toContainText('⌃C ⌃I');

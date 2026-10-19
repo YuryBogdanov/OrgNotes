@@ -26,7 +26,7 @@ test('«Основные»: the folder, the interface, the levels, the links', a
   await expect(step.locator('.dot')).toHaveCount(0);
   await step.getByRole('radio', { name: 'Больше' }).click();
   await expect(step.getByRole('radio', { name: 'Больше' })).toHaveAttribute('aria-checked', 'true');
-  await expect(step.locator('.dot')).toHaveCount(1);
+  await expect(step.locator('.dot')).toHaveCount(0);
   const links = s.locator('.row').filter({ hasText: 'Ссылки на заголовки' });
   await links.getByRole('radio', { name: 'По названию' }).click();
   await expect(links).toContainText('ссылка ломается');
