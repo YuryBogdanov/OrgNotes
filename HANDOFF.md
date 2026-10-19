@@ -985,6 +985,18 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   светлая / тёмная» (were «Panopticon …»), «Бумага», «Синька» (were «Синька — светлая / тёмная», now `fromApp(PAPER /
   BLUEPRINT)`); `themeAlias` reads the old names (the choice on this Mac, `basedOn`). `defaultThemes()` — the shell's
   defaults: a deleted or gone theme gives way to «Бумага» / «Синька» in the new interface.
+  57.3, the choice: a place (light / dark) takes any theme (`themeNamed` by name only, `cachedTheme` too,
+  `resetMissingThemes`); `applyAppearance` puts the theme's own light or dark on the root (`data-appearance`) and the
+  native window. The new interface's tokens are the theme's: `tokenVars(app)` (cached per AppTheme) and
+  `compatVars(app)` (the plugins' layer, the palette `--p-*` the theme's) in App, Compat, FileView, Kit; the windows
+  over other programs take `storedTheme(place)` (appearance.ts: the built-in by name or the one last applied) and
+  follow the main one by `storage`. `defaultThemes()` follows the flag only (the mini window too). A change of theme:
+  `.next.theming` for 260 ms, colours transition 0.2 s (none with reduced motion). «Оформление» (SetLook): the
+  appearance, «Светлая тема» / «Тёмная тема» menus of every theme; «Темы» — `ThemePreview.svelte` (the window in
+  miniature in the theme's tokens and fonts, `fontCss` in tokens.ts, type in `cqw`), the name with six dots, «светлая ·
+  встроенная / <plugin> / своя», the chips of the places, 4 a row; a click → the place in effect, ←→↑↓; the menu
+  «Поставить для светлого / тёмного», «Изменить…», «Дублировать и изменить…» (`copyTheme(t, '<t> — копия', place)`),
+  «Переименовать», «Экспорт…», «Удалить»; «+ Новая тема» — a copy of the theme in effect as «Новая тема».
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

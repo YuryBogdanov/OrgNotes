@@ -34,7 +34,7 @@ class Themes {
   /** A chosen theme that is gone (its plugin turned off) gives way to Panopticon of its appearance. */
   resetMissingThemes() {
     if (!this.themesRead) return;
-    for (const a of ['light', 'dark'] as const) if (!this.themes.some((t) => t.name === this.themeNames[a] && t.appearance === a)) this.setThemeName(a, defaultThemes()[a]);
+    for (const a of ['light', 'dark'] as const) if (!this.themes.some((t) => t.name === this.themeNames[a])) this.setThemeName(a, defaultThemes()[a]);
   }
   /** The own themes have been read (till then a chosen own theme is the one cached at the last run). */
   themesRead = $state(false);
@@ -61,11 +61,11 @@ class Themes {
     this.ownThemes = [...this.ownThemes.filter((x) => x.name !== t.name && x.name !== replace), t].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   }
   /** «+ Новая тема», «Дублировать», editing a built-in one: an own copy, saved and chosen for its appearance. */
-  async copyTheme(t: Theme): Promise<Theme | null> {
-    const c = copyOf(t, this.themes.map((x) => x.name));
+  async copyTheme(t: Theme, as?: string, place: Appearance = t.appearance): Promise<Theme | null> {
+    const c = copyOf(t, this.themes.map((x) => x.name), as);
     if (!(await this.saveTheme(c))) return null;
     this.putTheme(c);
-    this.setThemeName(c.appearance, c.name);
+    this.setThemeName(place, c.name);
     return c;
   }
   /** «Переименовать»: the file follows the name; a taken name gets «(2)». Null: nothing to do. */
@@ -103,7 +103,6 @@ class Themes {
     const t = this.ownThemes.find((x) => x.name === name);
     if (!t) return;
     const next = fromApp({ ...app, name: t.name, source: 'own' }, { basedOn: t.basedOn });
-    if (next.appearance !== t.appearance) for (const a of ['light', 'dark'] as const) if (this.themeNames[a] === t.name) this.setThemeName(next.appearance, t.name);
     this.writeLater(next);
   }
   private writeLater(next: Theme) {

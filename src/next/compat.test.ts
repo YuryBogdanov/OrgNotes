@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { COMPAT, compatPalette, compatVars } from './compat';
+import { COMPAT, compatVars } from './compat';
+import { BLUEPRINT, PAPER } from '../appTheme';
 import { TOKENS } from './tokens';
 import { NAMED } from '../themes';
 
@@ -20,11 +21,8 @@ describe('the compatibility layer (ТЗ 43 §5)', () => {
   it('refers only to tokens there are', () => {
     for (const v of Object.values(COMPAT)) for (const m of (v ?? '').matchAll(/var\(--([\w-]+)\)/g)) expect(m[1] in TOKENS.light, m[1]).toBe(true);
   });
-  it('gives the named colours of «Синька»: all of them, in both appearances', () => {
-    for (const a of ['light', 'dark'] as const) {
-      expect(Object.keys(compatPalette(a)).sort()).toEqual([...NAMED].sort());
-      expect(compatVars(a)).toContain(`--p-red:${compatPalette(a).red}`);
-    }
-    expect(compatPalette('dark').blue).toBe('#8ab8ff');
+  it('gives the named colours of the theme: all of them (ТЗ 57)', () => {
+    for (const t of [PAPER, BLUEPRINT]) for (const n of NAMED) expect(compatVars(t)).toContain(`--p-${n}:${t.palette[n]}`);
+    expect(compatVars(BLUEPRINT)).toContain('--p-blue:#8ab8ff');
   });
 });

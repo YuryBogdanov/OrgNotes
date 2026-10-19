@@ -3,15 +3,20 @@
 // and «Синька» give the values the concept had (tokens.test.ts).
 
 import type { Appearance } from '../themes';
-import { BLUEPRINT, PAPER, deriveTokens, type Tokens } from '../appTheme';
+import { BLUEPRINT, PAPER, deriveTokens, type AppTheme, type Tokens } from '../appTheme';
 
 export { deriveTokens, type Tokens };
 
 export const TOKENS: Record<Appearance, Tokens> = { light: deriveTokens(PAPER), dark: deriveTokens(BLUEPRINT) };
 
-/** The variables for an appearance: the mockups' names (`--bg`, `--ink`, `--lamp`…). The old interface's names are the
+const cache = new WeakMap<AppTheme, string>();
+/** The variables of a theme: the mockups' names (`--bg`, `--ink`, `--lamp`…). The old interface's names are the
  *  compatibility layer's (compat.ts), around anything old only (ТЗ 43 §5). */
-export const tokenVars = (a: Appearance) => Object.entries(TOKENS[a]).map(([k, v]) => `--${k}:${v}`).join(';');
+export function tokenVars(t: AppTheme): string {
+  let v = cache.get(t);
+  if (!v) cache.set(t, (v = Object.entries(deriveTokens(t)).map(([k, x]) => `--${k}:${x}`).join(';')));
+  return v;
+}
 
 /** The fonts (§3.3): bundled, no network. */
 export const FONTS = {
@@ -20,3 +25,9 @@ export const FONTS = {
   title: "'Yeseva One', Georgia, serif",
   mono: "'IBM Plex Mono', ui-monospace, Menlo, monospace",
 };
+
+const BUNDLED: Record<string, string> = { 'Yeseva One': FONTS.title, 'Cormorant Garamond': FONTS.text, 'IBM Plex Mono': FONTS.mono, system: FONTS.ui };
+const FALLBACK: Record<keyof AppTheme['fonts'], string> = { title: 'Georgia, serif', text: 'Georgia, serif', ui: FONTS.ui, mono: 'ui-monospace, Menlo, monospace' };
+/** A theme's font as CSS (ТЗ 57 §6): the bundled ones with their stacks, «system» the interface's, any other by its
+ *  family name with the role's fallback. */
+export const fontCss = (name: string, role: keyof AppTheme['fonts']) => BUNDLED[name] ?? `'${name.replace(/['\\]/g, '')}', ${FALLBACK[role]}`;

@@ -234,9 +234,10 @@ export function uniqueName(name: string, taken: string[]): string {
   const base = name.replace(/ \(\d+\)$/, '');
   for (let i = 2; ; i++) if (!low.has(themeFile(`${base} (${i})`).toLowerCase())) return `${base} (${i})`;
 }
-/** A copy of a theme to make one's own: «Nord — моя», based on the theme copied. */
-export function copyOf(t: Theme, taken: string[]): Theme {
-  const name = uniqueName(t.builtin ? `${t.name} — моя` : t.name, taken);
+/** A copy of a theme to make one's own: «Nord — моя» (the new interface: «Nord — копия», or a name of its own as
+ *  «Новая тема»), based on the theme copied. */
+export function copyOf(t: Theme, taken: string[], as?: string): Theme {
+  const name = uniqueName(as ?? (t.builtin ? `${t.name} — моя` : t.name), taken);
   const app: AppTheme = { ...t.app, name, source: 'own', base: { ...t.app.base }, palette: { ...t.app.palette }, details: { ...t.app.details }, fonts: { ...t.app.fonts } };
   return { name, appearance: t.appearance, builtin: false, basedOn: t.builtin ? t.name : (t.basedOn ?? t.name), colors: { ...t.colors, palette: { ...t.colors.palette } }, app, ...(t.v ? { v: t.v } : {}) };
 }
