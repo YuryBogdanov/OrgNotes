@@ -341,7 +341,7 @@ function fileRows(q: string): Row[] {
     if (!m) return;
     out.push({
       m, w: 0, i,
-      r: { id: 'file:' + f.path, group: 'ФАЙЛЫ', title: name, at: m.at, icon: 'file', hint: dirOf(f.name), run: () => store.jump(i, 0) },
+      r: { id: 'file:' + f.path, group: 'ФАЙЛЫ', title: name, at: m.at, icon: 'file', hint: dirOf(f.name), run: () => store.jump(i) },
     });
   });
   return out.sort(rank).map((x) => x.r);

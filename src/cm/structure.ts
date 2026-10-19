@@ -9,9 +9,46 @@ import { HEAD, drawerFold, drawerMap, headingSet } from './doc';
 
 export const cycleState = new WeakMap<EditorView, number>(); // S-Tab position per editor, absent = everything open
 
+/** The headings folded now, by who they are (fix #310): the title without its stars and its place among the
+ *  headings of the same title — a subtree moved, promoted or demoted is the same heading after. */
+function foldedHeads(v: EditorView): Set<string> {
+  const doc = v.state.doc;
+  const heads = headingSet(doc);
+  const folded = new Set<number>();
+  foldedRanges(v.state).between(0, doc.length, (from) => {
+    const n = doc.lineAt(from).number - 1;
+    if (heads.has(n)) folded.add(n);
+  });
+  const out = new Set<string>();
+  if (!folded.size) return out;
+  for (const [n, key] of headKeys(v)) if (folded.has(n)) out.add(key);
+  return out;
+}
+function headKeys(v: EditorView): [number, string][] {
+  const doc = v.state.doc;
+  const count = new Map<string, number>();
+  return [...headingSet(doc)].sort((a, b) => a - b).map((n) => {
+    const t = doc.line(n + 1).text.replace(/^\*+\s*/, '');
+    const k = (count.get(t) ?? 0) + 1;
+    count.set(t, k);
+    return [n, t + '\u0000' + k];
+  });
+}
 export const apply = (v: EditorView, r: Result) => {
+  const was = foldedHeads(v);
   v.dispatch({ changes: r.changes, selection: { anchor: r.caret }, scrollIntoView: true, userEvent: 'input' });
   cycleState.delete(v);
+  // the folds the change took away (the text of the subtrees was replaced): back on the same headings
+  if (was.size) {
+    const now = foldedHeads(v);
+    const effects = headKeys(v).flatMap(([n, key]) => {
+      if (!was.has(key) || now.has(key)) return [];
+      const l = v.state.doc.line(n + 1);
+      const f = foldable(v.state, l.from, l.to);
+      return f ? [foldEffect.of(f)] : [];
+    });
+    if (effects.length) v.dispatch({ effects });
+  }
   return true;
 };
 export const sel = (v: EditorView) => v.state.selection.main;
