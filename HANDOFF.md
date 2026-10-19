@@ -842,6 +842,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   The old info plate is gone; the hints are the chips' tips. `next/SetMini.svelte`: the mini window's schema in rows
   («Не гаснуть после ввода» as segments, a copy of the schema), its three keys; a click sets `keysFocus` and opens
   «Клавиши» on that row. `SetRow` takes `dataId`. e2e nextSettingsKeys.spec.ts.
+  54.5, «Плагины» (next/SetPlugins): one page — «Найти в каталоге» (over the installed and the catalog), «Установить
+  по ссылке…»; «Установлены · N» (rows of 54: the icon on 14 % `plug`, the name and version, the description · its
+  source, the problems and warnings under them, «Обновить · v» main, «⋯» — settings, a check, Finder, the plugin's keys,
+  «Удалить плагин…»; «включён»); «Каталог · repo» — the not installed ones with «★ N» (downloads), «Установить» or why
+  not, the progress as a bar of 3 with «Отменить»; «Папка плагинов» with API and the app's version. The old catalog
+  page and a plugin's page are not in the new one. Sheets of ТЗ 44: PluginInstallSheet, PluginLinkSheet (its logic
+  moved to `src/pluginLink.svelte.ts` `LinkInstall`, the old UrlSheet uses it too), PluginRemoveSheet (also for
+  «Удалить плагин…» of a plugin's own section). The rights' sheet is next/PluginSheets' as before. e2e
+  nextSettingsPlugins.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

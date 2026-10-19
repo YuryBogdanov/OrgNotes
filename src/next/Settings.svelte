@@ -11,10 +11,12 @@
   import SetLook from './SetLook.svelte';
   import SetKeys from './SetKeys.svelte';
   import SetMini from './SetMini.svelte';
+  import SetPlugins from './SetPlugins.svelte';
+  import PluginRemoveSheet from './PluginRemoveSheet.svelte';
   import { plugins } from '../api/host.svelte';
   import { pluginUpdates as up } from '../pluginUpdates.svelte';
   import {
-    Picker, RemovePlugin, SettingsAgendas, SettingsInbox, StatusesSettings,
+    Picker, SettingsAgendas, SettingsInbox, StatusesSettings,
     TagsSettings, ThemeEditor,
   } from './bridges';
 
@@ -37,7 +39,7 @@
   function key(e: KeyboardEvent) {
     if (e.defaultPrevented || store.keyRecording) return;
     if (e.key === 'Escape') {
-      if (confirmAgenda || pickFile || layerOpen()) return; // theirs
+      if (confirmAgenda || pickFile || up.removing || layerOpen()) return; // theirs
       e.preventDefault();
       store.closeSettings();
       return;
@@ -102,6 +104,7 @@
           {:else if tab === 'Оформление'}<SetLook />
           {:else if tab === 'Клавиши'}<SetKeys />
           {:else if tab === 'Мини-окно'}<SetMini />
+          {:else if tab === 'Плагины'}<SetPlugins />
           {:else if settingsOf(tab)?.schema}
             <!-- a feature's or a plugin's schema, in the new rows (ТЗ 54 §2) -->
             {@const spec = settingsOf(tab)!}
@@ -129,9 +132,10 @@
     </div>
   </div>
 </div>
+<!-- «Удалить плагин…» of a plugin's own section (the «Плагины» section has its own) -->
+{#if tab !== 'Плагины'}<PluginRemoveSheet />{/if}
 <Compat>
   {#if pickFile}<Picker onclose={() => (pickFile = false)} />{/if}
-  <RemovePlugin />
 </Compat>
 {#if confirmAgenda}
   {@const id = confirmAgenda.id}
