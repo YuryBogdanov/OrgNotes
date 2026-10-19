@@ -44,6 +44,8 @@ export interface ManifestView {
   icon: string;
   /** A button in the toolbar's «Открыть в панели», after the core's: the view in the second pane, or out of it. */
   toolbar?: boolean;
+  /** Not kept after a restart (a terminal's: its processes do not outlive the app). Since 1.16. */
+  transient?: boolean;
 }
 /** A section of the settings of its own, or a block in another section (`block`: its name). */
 export interface ManifestSettings {
@@ -202,7 +204,7 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
   for (const x of arr(c.views).map(obj)) {
     if (!own('вид', x.id)) continue;
     if (!isStr(x.title)) problems.push(`вид «${x.id}»: нет title`);
-    views.push({ id: x.id as string, title: String(x.title ?? ''), icon: isStr(x.icon) ? x.icon : 'M4 4h12v12H4z', ...(x.toolbar === true ? { toolbar: true } : {}) });
+    views.push({ id: x.id as string, title: String(x.title ?? ''), icon: isStr(x.icon) ? x.icon : 'M4 4h12v12H4z', ...(x.toolbar === true ? { toolbar: true } : {}), ...(x.transient === true ? { transient: true } : {}) });
   }
   const todayBlocks: ManifestTodayBlock[] = [];
   for (const x of arr(c.todayBlocks).map(obj)) {

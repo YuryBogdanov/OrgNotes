@@ -400,7 +400,7 @@ class Host {
     for (const v of m.contributes.views) {
       const spec = () => this.views.get(v.id)?.spec;
       this.keep(id, registerView({
-        kind: v.id, icon: v.icon, component: PluginView, inspector: PluginInspector, hasInspector: () => !!spec()?.inspector,
+        kind: v.id, icon: v.icon, component: PluginView, inspector: PluginInspector, hasInspector: () => !!spec()?.inspector, transient: v.transient,
         label: (t) => this.guard(id, () => spec()?.title(t.data), v.title) ?? v.title,
         crumbs: (t) => this.guard(id, () => spec()?.crumbs?.(t.data), null) ?? [this.guard(id, () => spec()?.title(t.data), v.title) ?? v.title],
         restore: (raw) => {

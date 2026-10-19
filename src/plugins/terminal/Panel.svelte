@@ -4,10 +4,13 @@
   // The terminal's panel under the editor (ТЗ 55 §2): the head of 32 on `side` — the sessions' tabs (the dot, the name,
   // its folder; the active one on `bg` with a `lamp` bar on top, × on hover), «+» a new one; on the right «Во вкладку»,
   // ⌃`, ⌄ hide. The body: the active session's terminal on `bg`, 10/16 inside; ⌘F — a find bar over it.
-  let { tab = false }: { tab?: boolean } = $props();
+  let { tab = false, old = false }: { tab?: boolean; old?: boolean } = $props();
   const active = $derived(terms.active);
+  // the sessions live in one place: this one draws them while it is that place
+  const home = $derived(tab ? terms.where === 'tab' : terms.where === 'panel');
   // every session's element in this body (the others hidden): moved here, not made again; the active one shown
   const place = (el: HTMLElement) => {
+    if (!home) return;
     for (const s of terms.list) {
       if (s.host.parentElement !== el) el.append(s.host);
       s.host.style.display = s === active ? '' : 'none';
@@ -36,22 +39,27 @@
   }
 </script>
 
-<div class="tp" class:tab>
+<div class="tp" class:tab class:old>
   <div class="head" role="tablist" aria-label="Сессии терминала">
     {#each terms.list as s (s.id)}
       <div class="st" class:on={s === active} role="tab" tabindex="-1" aria-selected={s === active} title={s.launch.command || s.name}
-        onclick={() => terms.pick(s.id)} onkeydown={() => {}}>
+        onclick={() => terms.pick(s.id)} onkeydown={() => {}} oncontextmenu={(e) => (e.preventDefault(), terms.sessionMenu(s, { x: e.clientX, y: e.clientY }))}>
         <i class="dot" class:ring={s.mood === 'bell'} style:background={DOT[s.mood]}></i>
         <span class="nm">{s.name}</span>
         {#if s.launch.cwd}<span class="cwd">{s.launch.cwd.replace(/^\/Users\/[^/]+/, '~')}</span>{/if}
         <button class="x" aria-label="Закрыть сессию {s.name}" onclick={(e) => (e.stopPropagation(), void terms.close(s.id))}>×</button>
       </div>
     {/each}
-    <button class="plus" aria-label="Новая сессия" title="Новая сессия ⌃⇧`" onclick={() => terms.add()}>+</button>
+    <button class="plus" aria-label="Новая сессия" title="Новая сессия ⌃⇧` · ⌥-клик — профиль" onclick={(e) => {
+      if (e.altKey) {
+        const r = e.currentTarget.getBoundingClientRect();
+        terms.profileMenu({ x: r.left, y: r.bottom + 4 });
+      } else terms.add();
+    }}>+</button>
     <span class="sp"></span>
     {#if !tab}
       <span class="right">
-        <button class="lnk" disabled title="Скоро">Во вкладку</button>
+        <button class="lnk" onclick={() => terms.toTab()}>Во вкладку</button>
         <kbd>⌃`</kbd>
         <button class="hide" aria-label="Скрыть терминал" title="Скрыть ⌃`" onclick={() => terms.drawer?.hide()}>⌄</button>
       </span>
@@ -69,11 +77,16 @@
       </div>
     {/if}
     <div class="body" {@attach place}></div>
-    {#if !terms.list.length}<div class="empty">Нет сессий · <button class="lnk" onclick={() => terms.add()}>Новая сессия ⌃⇧`</button></div>{/if}
+    {#if !home}<div class="empty">Сессии — в панели под редактором · <button class="lnk" onclick={() => terms.toPanel()}>Показать</button></div>
+    {:else if !terms.list.length}<div class="empty">Нет сессий · <button class="lnk" onclick={() => terms.add()}>Новая сессия ⌃⇧`</button></div>{/if}
   </div>
 </div>
 
 <style>
+  /* the old interface's tab: its variables as the new tokens */
+  .tp.old { --bg: var(--ed-bg, #fff); --ink: var(--fg); --ink2: var(--fg2); --ink3: var(--fg3); --rule: var(--line); --chip: var(--field); --lamp: var(--acc); --lampink: var(--acc);
+    --lampsoft: color-mix(in srgb, var(--acc) 18%, transparent); --lampline: var(--acc); --todo: var(--p-red); --done: var(--p-green); --wait: var(--p-orange); --next: var(--p-blue); --plug: var(--p-purple);
+    --card: var(--bg); --field: var(--bg); --mono: ui-monospace, Menlo, monospace; --ui: -apple-system, system-ui, sans-serif; }
   .tp { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); font: 12px var(--ui); }
   .head { flex: 0 0 32px; height: 32px; box-sizing: border-box; display: flex; align-items: stretch; background: var(--side); border-bottom: 1px solid var(--rule); }
   .st { display: flex; align-items: center; gap: 6px; padding: 0 8px 0 12px; border-right: 1px solid var(--rule); color: var(--ink2); cursor: default; white-space: nowrap; }
