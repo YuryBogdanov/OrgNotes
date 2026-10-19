@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { untrack, type Snippet } from 'svelte';
+  import type { Snippet } from 'svelte';
   import { store } from '../store.svelte';
   import { openFile } from '../layout';
   import { displayName } from '../names';
-  import { besideOf, besideShare, closeBeside, openBeside, setBesideShare, togglePin } from '../beside.svelte';
+  import { besideOf, besideShare, closeBeside, followBeside, setBesideShare, togglePin } from '../beside.svelte';
   import { lists, resolve } from '../taskLists.svelte';
   import Editor from './Editor.svelte';
 
@@ -33,12 +33,7 @@
   $effect(() => {
     const c = chosen;
     if (!c) return;
-    const cur = untrack(() => besideOf(tabId));
-    if (!cur || (cur.path === c.path && cur.line === c.line)) return;
-    const t = setTimeout(() => {
-      if (box?.querySelector('.side')?.contains(document.activeElement)) return;
-      openBeside(tabId, c, { keepPin: true });
-    }, 120);
+    const t = setTimeout(() => followBeside(tabId, c), 120);
     return () => clearTimeout(t);
   });
 
@@ -92,7 +87,7 @@
       <div class="ed grid" onkeydown={edKey} role="presentation">
         {#key file.path}
           <Editor text={file.text} fileKey={'beside:' + tabId + ':' + file.path} path={file.name} wf={file.wf} rich={false} levels={store.levels} drawers={store.foldDrawers}
-            mark={b.line} reveal={{ line: b.caret.line, col: b.caret.col, n: b.n, top: b.line, focus: false }} resetOn={store.diskGen[file.path] ?? 0}
+            mark={b.line} hit={b.hit ?? null} reveal={{ line: b.caret.line, col: b.caret.col, n: b.n, top: b.line, focus: false }} resetOn={store.diskGen[file.path] ?? 0}
             onchange={(t) => store.setText(t, file.path)} oncursor={() => {}} onfollow={(l) => store.follow(l)} />
         {/key}
       </div>

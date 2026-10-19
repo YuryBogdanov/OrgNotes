@@ -9,6 +9,7 @@
   import { toneFor } from '../org';
   import { toneStyle } from '../colors';
   import type { SearchGroup } from '../store.svelte';
+  import { besideOf, closeBeside, focusBesideFile, followBeside, openBeside } from '../beside.svelte';
 
   // The tab of the results of the search in every file (ТЗ 53 §1–2): the header as the screens of ТЗ 47 — «Поиск по всем
   // файлам», the query in Yeseva One in «ёлочках», «Свернуть все» / «Развернуть все»; the field (up to 560 pt), the
@@ -134,6 +135,13 @@
       const n = stops[Math.min(stops.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))];
       if (n) s.sel = n;
       void scrollSel();
+    } else if (e.key === 'Escape' && besideOf(tabId)) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeBeside(tabId);
+    } else if (e.key === 'Enter' && e.altKey && s.sel && s.sel.i >= 0) {
+      e.preventDefault();
+      beside(s.sel.g, s.sel.i);
     } else if (e.key === 'Enter' && s.sel) {
       e.preventDefault();
       if (s.sel.i < 0) s.groups[s.sel.g].open = !s.groups[s.sel.g].open;
@@ -150,6 +158,31 @@
       void scrollSel();
     }
   }
+  // ---- the file beside the results (ТЗ 56 §4): ⌥↩, ⌥-click — the match's file, its heading marked, the caret on the
+  // match and the match on the lamp; the same match again — the focus into it; ⎋ closes it; it follows ↑↓ ----
+  const tabId = store.tab?.id ?? '';
+  function hitAt(gi: number, i: number) {
+    const g = s.groups[gi];
+    const h = g?.hits[i];
+    if (!h) return null;
+    const head = fileOf(g.path)?.headings.filter((x) => x.line <= h.line).pop();
+    return { path: g.path, line: head?.line ?? h.line, hit: { line: h.line, col: h.col, len: h.len } };
+  }
+  function beside(gi: number, i: number) {
+    const at = hitAt(gi, i);
+    if (!at || !tabId) return;
+    s.sel = { g: gi, i };
+    const b = besideOf(tabId);
+    if (b && b.path === at.path && b.hit?.line === at.hit.line && b.hit.col === at.hit.col) return void focusBesideFile(tabId);
+    openBeside(tabId, at, { keepPin: true });
+  }
+  $effect(() => {
+    const c = s.sel;
+    const at = c && c.i >= 0 ? hitAt(c.g, c.i) : null;
+    if (!at || !besideOf(tabId)) return;
+    const t = setTimeout(() => followBeside(tabId, at), 120);
+    return () => clearTimeout(t);
+  });
   const SHOWN = 4; // blocks of a group before «Ещё N в …» (as the panel)
 
   // ---- the blocks of a group: from the text searched (its lines are the hits'); computed for the open ones only.
@@ -223,7 +256,7 @@
             {@const shownBs = g.all ? bs : bs.slice(0, SHOWN)}
             {#each shownBs as b (b.lines[0]?.n ?? 0)}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
-              <div class="blk" class:sel={isSel(gi, b)} role="option" tabindex="-1" aria-selected={isSel(gi, b)} onclick={() => store.openHit(gi, b.hits[0])}>
+              <div class="blk" class:sel={isSel(gi, b)} role="option" tabindex="-1" aria-selected={isSel(gi, b)} onclick={(e) => (e.altKey ? beside(gi, b.hits[0]) : store.openHit(gi, b.hits[0]))}>
                 {#if b.keyword || b.where}
                   <div class="bh">{#if b.keyword}<span class="cap" style={tone(b.keyword, g.path)}>{b.keyword}</span>{/if}<span class="wh">{b.where}</span></div>
                 {/if}
@@ -249,7 +282,7 @@
         {/if}
       {/each}
     </div>
-    <aside class="flt" aria-label="Фильтры">
+    <aside class="flt" aria-label="Фильтры" data-beside-hide>
       <div class="fh"><span>Фильтры</span>{#if filtered}<button class="reset" onclick={resetFilters}>Сбросить</button>{/if}</div>
       <div class="lab">Где искать</div>
       <div class="seg" role="radiogroup" aria-label="Где искать">
