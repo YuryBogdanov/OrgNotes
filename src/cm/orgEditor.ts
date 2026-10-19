@@ -30,6 +30,7 @@ import { cycleState, cycleVisibility, newHeading, onHeading, orgFold, run, sel }
 import { decorate } from './decorate';
 import { narrowRange, narrowing, setNarrow } from './narrow';
 import { sectionBar } from './section';
+import { subtreeBar } from './subtree';
 import { linkCard } from './linkCard';
 
 /** What the wrapping component gives: the file and how it is shown, and what the editor tells back. */
@@ -38,7 +39,7 @@ export interface EditorProps {
   fileKey: string;
   wf: Workflow;
   path?: string; // the file's name in the folder: what a plugin's link at the end of a line is run with (ТЗ 33)
-  reveal: { line: number; n: number; focus?: boolean; col?: number } | null | undefined;
+  reveal: { line: number; n: number; focus?: boolean; col?: number; top?: number } | null | undefined; // `top`: this line in the upper third (the file beside a list)
   initial?: { line: number; col: number }; // where the caret of this tab was (restored when the tab is shown)
   initialTop?: number; // the first line that was in view (the scroll comes back with the tab)
   initialFolds?: number[]; // the headings folded when the tab was last shown (their lines)
@@ -74,6 +75,8 @@ export interface EditorProps {
   /** The new interface's menu of a heading (ТЗ 44 §3.1), given what the editor does itself; the old menu otherwise. */
   headingMenu?: (l: { path: string; line: number; tags: () => void; note: () => void; narrow?: () => void; remove: () => void }) => MenuItem[];
   onwiden?: () => void;
+  /** The subtree of the heading at this line marked by a bar of the lamp (the file beside a list, ТЗ 56 §4). */
+  mark?: number | null;
 }
 /** What the editor asks its component to draw. */
 export interface EditorUi {
@@ -110,6 +113,8 @@ export class OrgEditor {
   private readonly structure = new Compartment(); // switching the view is not an edit: no undo step, no unsaved mark
   private readonly numbers = new Compartment(); // line numbers: off while drawn, unless asked for
   private readonly note = new Compartment();
+  private readonly markC = new Compartment();
+  private lastMark: number | null = null; // set in the constructor's state
   private narrowField: StateField<{ from: number; to: number }> | null = null;
   /** The statuses of the document shown: the newest, a status added in the settings too. */
   private words: Workflow;
@@ -121,6 +126,7 @@ export class OrgEditor {
     this.ui = ui;
     this.words = p.wf;
     this.lastNote = p.lineNote ?? null;
+    this.lastMark = p.mark ?? null;
     const view = (this.view = new EditorView({ state: this.makeState(p.text, p.wf), parent: host }));
     foldAllDrawers(view, this.drawersOn);
     foldLines(view, p.folded ?? []);
@@ -171,6 +177,10 @@ export class OrgEditor {
     if (p.lineNote !== this.lastNote) {
       this.lastNote = p.lineNote ?? null;
       this.view.dispatch({ effects: this.note.reconfigure(noteExt(p.lineNote ?? null)) });
+    }
+    if ((p.mark ?? null) !== this.lastMark) {
+      this.lastMark = p.mark ?? null;
+      this.view.dispatch({ effects: this.markC.reconfigure(this.lastMark === null ? [] : subtreeBar(this.lastMark)) });
     }
     this.syncText();
     this.syncNarrow();
@@ -580,7 +590,7 @@ export class OrgEditor {
             return el;
           },
         }),
-        ...(gutter ? [foldGutter()] : []), plugin, ...lineLinkExt(() => this.path), selectionClass, this.note.of(noteExt(p.lineNote ?? null)), this.structure.of(this.structureExt(words)),
+        ...(gutter ? [foldGutter()] : []), plugin, ...lineLinkExt(() => this.path), selectionClass, this.note.of(noteExt(p.lineNote ?? null)), this.markC.of(p.mark === undefined || p.mark === null ? [] : subtreeBar(p.mark)), this.structure.of(this.structureExt(words)),
         ...(p.hint ? [cmPlaceholder(p.hint)] : []),
         EditorView.atomicRanges.of((v) => v.plugin(plugin)?.atomic ?? Decoration.none),
         p.next ? this.linkCardTip : this.linkTip,
@@ -770,7 +780,9 @@ export class OrgEditor {
     const ln = Math.min(r.line + 1, view.state.doc.lines);
     const line = view.state.doc.line(ln);
     const pos = line.from + Math.min(r.col ?? 0, line.length); // a new task puts the caret after its keyword
-    view.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: 'center' }) });
+    // `top`: that line in the upper third (the file beside a list), else the caret in the middle
+    const at = r.top !== undefined ? view.state.doc.line(Math.min(r.top + 1, view.state.doc.lines)).from : pos;
+    view.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(at, r.top !== undefined ? { y: 'start', yMargin: Math.round(view.scrollDOM.clientHeight / 4) } : { y: 'center' }) });
     if (r.focus !== false) view.focus(); // a task opened from the agenda keeps the focus in the agenda
   }
 }

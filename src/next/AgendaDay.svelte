@@ -192,7 +192,7 @@
         </section>
       {/if}
     </div>
-    <aside class="hz" aria-label="Горизонт">
+    <aside class="hz" aria-label="Горизонт" data-beside-hide>
       <div class="sh"><b>Горизонт</b><span>30 дней</span></div>
       <div class="line">
         {#each horizon as h (+h.day)}

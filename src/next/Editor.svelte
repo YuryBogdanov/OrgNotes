@@ -15,9 +15,9 @@
 
   // The new interface's editor (ТЗ 42 §2, 42.5): the same Org editor as the old one (cm/orgEditor.ts — the engine,
   // keys, folding, undo, the file followed), its own component with the new menu and the tags' popover.
-  let { text, fileKey, path = '', wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, rich = false, richNumbers = false, gutter = true, onrich, eyebrow, narrow = null, onnarrow, onnarrowTo, onwiden, find = null, onfound, onapi, onchange, oncursor, onfollow }: {
+  let { text, fileKey, path = '', wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint = '', resetOn = 0, levels = DEFAULT_LEVELS, drawers = true, rich = false, richNumbers = false, gutter = true, onrich, eyebrow, narrow = null, onnarrow, onnarrowTo, onwiden, find = null, onfound, onapi, mark = null, onchange, oncursor, onfollow }: {
     text: string; fileKey: string; path?: string; wf: Workflow;
-    reveal: { line: number; n: number; focus?: boolean; col?: number } | null | undefined;
+    reveal: { line: number; n: number; focus?: boolean; col?: number; top?: number } | null | undefined;
     initial?: { line: number; col: number }; initialTop?: number; ontop?: (line: number) => void;
     initialFolds?: number[]; onfolds?: (lines: number[]) => void;
     hint?: string; resetOn?: number; levels?: LevelView; drawers?: boolean; rich?: boolean; richNumbers?: boolean;
@@ -27,6 +27,7 @@
     narrow?: { line: number; end: number } | null; onnarrow?: (line: number, last: number, typed: boolean) => void; // ⌃X N S (§5.8)
     onnarrowTo?: (line: number) => void; onwiden?: () => void;
     find?: EditorProps['find']; onfound?: EditorProps['onfound']; onapi?: EditorProps['onapi']; // ⌘F (§5.7)
+    mark?: number | null; // the subtree of this heading marked (the file beside, ТЗ 56)
     onchange: (t: string) => void; oncursor: (line: number, col: number) => void; onfollow: (link: OrgLink) => void;
   } = $props();
 
@@ -34,7 +35,7 @@
   let ed = $state.raw<OrgEditor | undefined>();
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null);
   let tagPop = $state<{ tags: string[]; x: number; y: number } | null>(null);
-  const snapshot = (): EditorProps => ({ text, fileKey, path, wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint, resetOn, levels, drawers, rich, richNumbers, gutter, onrich, onchange, oncursor, onfollow, next: true, headingMenu, look: nextPrefs.font + ' ' + nextPrefs.width, eyebrow, narrow, onnarrow, onnarrowTo, onwiden, find, onfound, onapi });
+  const snapshot = (): EditorProps => ({ text, fileKey, path, wf, reveal, initial, initialTop, ontop, initialFolds, onfolds, hint, resetOn, levels, drawers, rich, richNumbers, gutter, onrich, onchange, oncursor, onfollow, next: true, headingMenu, look: nextPrefs.font + ' ' + nextPrefs.width, eyebrow, narrow, onnarrow, onnarrowTo, onwiden, find, onfound, onapi, mark });
   onMount(() => {
     ed = new OrgEditor(host, snapshot(), { menu: (x, y, items) => (menu = { x, y, items }), tags: (p) => (tagPop = p) });
     return () => ed?.destroy();

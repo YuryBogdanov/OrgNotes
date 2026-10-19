@@ -932,6 +932,19 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   start; no session — one by the default profile, the text queued till it starts; the focus to it. The settings by
   the manifest's schema: the size (11 … 14), the scrollback (1 000 … 50 000), ⌥ as Meta, the notifications, the
   shell — `terms.setOpts` applies them to the open terminals. e2e terminalInsert.spec.ts.
+- **ТЗ 56, the file beside a list (`docs/56-novyy-interfeys-fayl-sboku.md`)** — no second pane in the new interface:
+  a list's tab shows the file of its row on the right. 56.1, the frame: `next/besideState.svelte.ts` (`Beside` per tab
+  id, in memory — kept while another tab is shown, gone after a restart; `openBeside(tabId, { path, line, hit? })`,
+  the caret at the end of the first line of the text under the heading, `closeBeside`, `togglePin`; the share 35–65 %,
+  `next:besideShare`, 0.46), `next/BesideSplit.svelte` around every list's view in EditorArea («Сегодня», the agendas,
+  the views of `viewOf` — the search's tab, «Тег», the plugins' tabs; not a file's tab, not a file's view as the board):
+  the list | a rule with a grip | the file — its head of 44 on `side` (the icon `lampink`, the name, «› the path», the
+  chip «следует за выбором» / «закреплён», «Открыть вкладкой ⌘↩» — a tab of its own after this one at the caret's line,
+  ×) and next/Editor in «Исходник» always (rich off, the numbers, Plex Mono 13.5 / 24) on the grid; under 1000 pt the
+  file lies over the list (60 %, the board card's shadow). The editor: `mark` — the subtree of a heading marked
+  (`cm/subtree.ts`, `subtreeOf` tested, the class `cm-sub` with a bar of 3 of the lamp), `reveal.top` — that line in the
+  upper third. A list's screen gives up its second columns (`data-beside-hide`: the agenda's «Горизонт») and its h1 is
+  32. e2e nextBeside.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`
