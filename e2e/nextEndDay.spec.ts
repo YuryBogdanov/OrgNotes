@@ -38,7 +38,7 @@ test('the new sheet: 640 pt, done, left with its three choices, the morning\'s c
   await expect(focus.getByRole('listitem')).toHaveCount(2);
   await expect(focus.locator('.n')).toHaveText(['1', '2', '3']);
   await expect(focus.getByRole('textbox', { name: 'Найти задачу' })).toHaveAttribute('placeholder', '+ выбрать задачу…');
-  expect(await s.getByRole('textbox', { name: 'Заметка на завтра' }).evaluate((e) => getComputedStyle(e).fontFamily)).toContain('Cormorant');
+  expect(await s.getByRole('textbox', { name: 'Заметка на завтра' }).evaluate((e) => getComputedStyle(e).fontFamily)).toContain('IBM Plex Mono');
   await expect(s).toContainText(`Запишется в journal › ${iso(DAY)} ${WD[DAY.getDay()]}`);
   await page.keyboard.press('Escape');
   await expect(sheet(page)).toHaveCount(0);

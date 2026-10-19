@@ -78,7 +78,10 @@ test('a file outside the sources: no card of «Долгие дела»; «Кан
   await tree(page, 'Midterm').click();
   const k = card(page, 'Канбан');
   await expect(k).toBeVisible();
-  await expect(k.locator('.kb-fcard span')).toHaveText('Колонки — статусы файла');
+  // the cards higher than 45 % of a short column: the second folded (fix #296) — a click on its head opens it
+  const head = k.locator('[aria-expanded="false"]');
+  if (await head.count()) await head.first().click();
+  await expect(k.locator('.kb-fcard > span')).toHaveText('Колонки — статусы файла');
   const open_ = k.getByRole('button', { name: /Открыть доской/ });
   await expect(open_).toHaveText('Открыть доской⌥⌘B');
   // the cards in the sidebar's order: «Долгие дела» before «Канбан»

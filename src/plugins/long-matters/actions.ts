@@ -119,6 +119,25 @@ export function stopWaiting(m: Matter) {
     if (back !== undefined) tx.setStatus(ref(m), back);
   });
 }
+// ---- «В бэклог» / «Из бэклога» (fix #315) -----------------------------------------------------------------------------
+export const inBacklog = (m: Matter) => !!m.keyword && long.settings.backlog.includes(m.keyword);
+/** «В бэклог»: the first status of the backlog. */
+export function toBacklog(m: Matter) {
+  const to = long.settings.backlog[0];
+  if (to) return write('В бэклог', (tx) => tx.setStatus(ref(m), to));
+}
+/** «Из бэклога»: the status before it by the :LOGBOOK:, else the first open one of its set out of the backlog. */
+export function fromBacklog(m: Matter) {
+  const f = long.files.get(m.path);
+  const h = headingOf(m);
+  if (!f || !h || !m.keyword) return;
+  const B = long.settings.backlog;
+  const before = statusBefore(f.text.split('\n'), h, m.keyword);
+  const set = f.info.sets.find((s) => s.states.some((x) => x.name === m.keyword));
+  const back = (before && !B.includes(before) ? before : null) ?? set?.states.find((x) => !x.done && !B.includes(x.name))?.name ?? f.info.open.find((x) => !B.includes(x)) ?? null;
+  return write('Из бэклога', (tx) => tx.setStatus(ref(m), back));
+}
+
 /** W: «Ждём…», or «Больше не ждём» while it waits. */
 export const toggleWait = (m: Matter) => (m.waiting ? void stopWaiting(m) : void wait(m));
 export { write, namesOf };
@@ -147,6 +166,11 @@ export function rowMenu(m: Matter, at: At, under?: At) {
       { label: 'Проверить через…', run: () => void review(m, under ?? at) },
       m.waiting ? { label: 'Больше не ждём', run: () => void stopWaiting(m) } : { label: 'Ждём…', run: () => void wait(m) },
       { label: 'Осмотрено', run: () => void reviewed(m) },
+      ...(inBacklog(m)
+        ? [{ label: 'Из бэклога', run: () => void fromBacklog(m) }]
+        : long.settings.backlog.length
+          ? [{ label: 'В бэклог', hint: `статус ${long.settings.backlog[0]}`, run: () => void toBacklog(m) }]
+          : []),
       'sep',
       m.byTag
         ? { label: 'Убрать из долгих дел', hint: `снимет тег :${m.byTag}:`, run: () => removeLong(m) }

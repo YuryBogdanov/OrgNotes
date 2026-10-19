@@ -1,6 +1,5 @@
 <script lang="ts">
   import { store } from '../store.svelte';
-  import { DEFAULT_LEVELS } from '../orgIndent';
   import Group from './SetGroup.svelte';
   import Row from './SetRow.svelte';
   import Toggle from './ui/Toggle.svelte';
@@ -39,18 +38,18 @@
   </Row>
 </Group>
 <Group caption="Заголовки">
-  <Row label="Одна звёздочка на уровень" hint="Как org-odd-levels-only в Emacs" id="set-star" changed={store.levels.oneStar !== DEFAULT_LEVELS.oneStar}>
+  <Row label="Одна звёздочка на уровень" hint="Как org-odd-levels-only в Emacs" id="set-star">
     <Toggle checked={store.levels.oneStar} labelledby="set-star" onchange={() => store.setLevels({ oneStar: !store.levels.oneStar })} />
   </Row>
-  <Row label="Сдвигать текст по уровню" id="set-indent" changed={store.levels.indent !== DEFAULT_LEVELS.indent}>
+  <Row label="Сдвигать текст по уровню" id="set-indent">
     <Toggle checked={store.levels.indent} labelledby="set-indent" onchange={() => store.setLevels({ indent: !store.levels.indent })} />
   </Row>
-  <Row label="Шаг отступа" id="set-step" changed={store.levels.step !== DEFAULT_LEVELS.step}>
+  <Row label="Шаг отступа" id="set-step">
     <Segments value={store.levels.step} options={STEPS} labelledby="set-step" onchange={(v) => store.setLevels({ step: v })} />
   </Row>
 </Group>
 <Group caption="Ссылки">
-  <Row label="Ссылки на заголовки" id="set-links" changed={store.linkFormat !== 'id'}
+  <Row label="Ссылки на заголовки" id="set-links"
     hint={store.linkFormat === 'id' ? 'По ID ссылка не ломается, если заголовок переименовать' : 'По названию файл не меняется, но ссылка ломается при переименовании'}>
     <Segments value={store.linkFormat} options={LINKS} labelledby="set-links" onchange={(v) => store.setLinkFormat(v)} />
   </Row>

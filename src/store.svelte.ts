@@ -90,6 +90,13 @@ function fromDisk(l: Listed, cfg: ProjectConfig): NoteFile {
 }
 
 
+/** A file as it was left (fix #309). */
+interface FileState {
+  folds?: number[];
+  top?: number;
+  cursor?: { line: number; col: number };
+}
+
 class Store {
   // ---- owned (tech sprint 2.4): the agendas and their builder, the Inbox, «Перенести» --------------------------
   private agendaStore = new AgendaStore({ updateConfig: (make) => this.updateConfig(make), show: (id) => this.openAgendaHere(id) });
@@ -1590,11 +1597,55 @@ class Store {
    * Open a file in the active pane: a tab that already shows it is reused, the active file tab is retargeted
    * (like a click in Xcode's navigator), an agenda tab keeps its place and the file opens next to it.
    */
-  open(fileIdx: number, line = 0, focus = true) {
+  /** Open a file in the active pane. No `line` (the palette, the navigator's file): the file as it was left — its
+   *  folds, its scroll, its caret (fix #309); a `line`: the same folds, the way to that line opened. A tab already
+   *  showing the file keeps its own. */
+  open(fileIdx: number, line?: number, focus = true) {
     const f = this.files[fileIdx];
     if (!f) return;
-    openFile(this.layout, this.layout.active, f.path, line, { replace: true, focus });
+    const L = this.layout;
+    const st = this.fileStates()[f.path];
+    const had = L.panes[L.active]?.tabs.some((t) => t.kind === 'file' && t.path === f.path && !t.scope);
+    const t = openFile(L, L.active, f.path, line ?? st?.cursor?.line ?? 0, { replace: true, focus });
+    if (!had) {
+      // a new tab, or the active one retargeted: not the other file's folds
+      t.folds = st?.folds?.length ? (line === undefined ? [...st.folds] : st.folds.filter((x) => !f.headings.some((h) => h.line === x && h.line < line && h.end > line))) : undefined;
+      t.top = line === undefined ? st?.top : undefined;
+      if (line === undefined && st?.cursor) {
+        t.cursor = { ...st.cursor };
+        if (t.reveal) t.reveal = { ...t.reveal, line: st.cursor.line, col: st.cursor.col };
+      }
+    }
     lsSet('lastFile:' + (this.dir ?? ''), f.path);
+  }
+
+  // ---- a file as it was left (fix #309): its folds, scroll and caret, by file, on this Mac per folder ----------------
+  private fsCache: { dir: string; map: Record<string, FileState> } | null = null;
+  private fsTimer: ReturnType<typeof setTimeout> | undefined;
+  private fileStates(): Record<string, FileState> {
+    const d = this.dir ?? '';
+    if (this.fsCache?.dir !== d) {
+      let map: Record<string, FileState> = {};
+      try {
+        map = JSON.parse(lsGet('fileState:' + d) ?? '{}') ?? {};
+      } catch {
+        /* none */
+      }
+      this.fsCache = { dir: d, map };
+    }
+    return this.fsCache.map;
+  }
+  /** A file tab's folds, scroll or caret changed: kept for its file, written a moment later (the last 300 files). */
+  private rememberFile(tab: Tab) {
+    if (tab.kind !== 'file' || !tab.path || tab.scope || tab.narrow) return;
+    const map = this.fileStates();
+    delete map[tab.path]; // to the end: the newest
+    map[tab.path] = { ...(tab.folds?.length ? { folds: [...tab.folds] } : {}), ...(tab.top ? { top: tab.top } : {}), cursor: { ...tab.cursor } };
+    const keys = Object.keys(map);
+    for (const k of keys.slice(0, Math.max(0, keys.length - 300))) delete map[k];
+    const d = this.fsCache!.dir;
+    clearTimeout(this.fsTimer);
+    this.fsTimer = setTimeout(() => lsSet('fileState:' + d, JSON.stringify(map)), 300);
   }
 
   // ---- views of a file (ТЗ 33): a file tab shown as a plugin's view («Доска») or as text ------------------------------
@@ -1663,16 +1714,19 @@ class Store {
   /** The first line in view of a file tab, as it was scrolled (a tab shown again comes back there). */
   setTabTop(tab: Tab, line: number) {
     if (tab.top !== line) tab.top = line;
+    this.rememberFile(tab);
   }
   /** The headings folded in a file tab (S-Tab folds them all, ⇥ one): a tab shown again comes back folded so. */
   setTabFolds(tab: Tab, lines: number[]) {
     const was = tab.folds ?? [];
     if (was.length !== lines.length || was.some((x, i) => x !== lines[i])) tab.folds = lines;
+    this.rememberFile(tab);
   }
   /** The editor of a tab reports its caret; leaving the heading opened from the agenda drops the caption. */
   setTabCursor(tab: Tab, line: number, col: number) {
     tab.cursor = { line, col };
     if (tab.kind === 'file' && tab.path) this.lastCursor[tab.path] = { line, col };
+    this.rememberFile(tab);
     if (tab.fromAgenda) {
       const f = this.fileOf(tab);
       const at = f ? headingAt(f.headings, line) : -1;
@@ -2179,7 +2233,7 @@ class Store {
   }
 
   /** Open another place and remember where we came from (⌘[ goes back). */
-  jump(fileIdx: number, line = 0) {
+  jump(fileIdx: number, line?: number) {
     const f = this.file;
     if (f) this.history = [...this.history.slice(-49), { path: f.path, line: this.cursor.line }];
     this.open(fileIdx, line);

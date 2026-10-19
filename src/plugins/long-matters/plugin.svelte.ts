@@ -8,6 +8,7 @@ import { badgeOf } from './long';
 import Panel from './Panel.svelte';
 import List from './List.svelte';
 import Sources from './Sources.svelte';
+import Backlog from './Backlog.svelte';
 import Today from './Today.svelte';
 import Card from './Card.svelte';
 import { review, reviewed, stopWaiting, wait } from './actions';
@@ -34,8 +35,24 @@ export default definePlugin({
         return () => void unmount(app);
       },
     });
+    // «Статус ожидания» (fix #315): the open states of every set of «Статусы», by set (the set's name a grey line);
+    // the value first; one no set has any more — «нет в статусах»
     ctx.settings.dynamic('wait', {
-      options: (v) => [...new Set([String(v.wait ?? 'WAIT'), ...long.openStates])].map((s) => ({ value: s, label: s })),
+      options: (v) => {
+        const cur = String(v.wait ?? 'WAIT');
+        const sets = long.statusSets.length ? long.statusSets : [{ name: 'Статусы', open: long.openStates }];
+        const known = sets.some((s) => s.open.includes(cur));
+        return [
+          { value: cur, label: known ? cur : `${cur} — нет в статусах` },
+          ...sets.flatMap((s) => [{ value: '\u0000' + s.name, label: s.name, disabled: true }, ...s.open.filter((x) => x !== cur).map((x) => ({ value: x, label: x }))]),
+        ];
+      },
+    });
+    ctx.settings.dynamic('backlog', {
+      render: (el, ctrl) => {
+        const app = mount(Backlog, { target: el, props: { ctrl } });
+        return () => void unmount(app);
+      },
     });
     ctx.events.on('file.changed', () => long.soon());
     ctx.events.on('heading.touched', () => long.soon());

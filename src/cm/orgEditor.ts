@@ -11,7 +11,7 @@ import { autocompletion, type CompletionContext } from '@codemirror/autocomplete
 import type { Workflow } from '../org';
 import type { OrgLink } from '../links';
 import type { MenuItem } from '../ContextMenu.svelte';
-import { changeStatusAt, cyclePriority, moveSubtree, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree } from '../outline';
+import { changeStatusAt, cyclePriority, moveSubtree, rotateStatus, rotateWorkflow, shiftHeading, shiftSubtree, type Result } from '../outline';
 import { DEFAULT_LEVELS, orgIndent, type LevelView } from '../orgIndent';
 import { orgRich, refont, type RichPick } from '../orgRich';
 import { findExtension, findField, foundInfo, moveFind, replaceFound, setFind, type FindQuery } from '../findView';
@@ -244,9 +244,23 @@ export class OrgEditor {
 
   // ---- the commands the keys run (ids of keys.ts) ----------------------------------------------------------------
   private docText = (v: EditorView) => v.state.doc.toString();
-  private status = (v: EditorView, f: (w: Workflow, k: string | null) => string | null) => onHeading(v) && run(v, changeStatusAt(this.docText(v), sel(v).head, f, this.words));
-  private shift = (v: EditorView, d: -1 | 1) => onHeading(v) && run(v, shiftHeading(this.docText(v), sel(v).head, d));
-  private shiftTree = (v: EditorView, d: -1 | 1) => onHeading(v) && run(v, shiftSubtree(this.docText(v), sel(v).head, d));
+  /** The heading the caret is on, as a position on its line: also when the caret sits after a folded heading's
+   *  «…», inside its hidden subtree (a click at the end of the line puts it there) — the heading seen (fix #310: else
+   *  ⌥↓ moved the hidden last line and broke the subtree). Null: not on a heading. */
+  private headAt = (v: EditorView): number | null => {
+    if (onHeading(v)) return sel(v).head;
+    if (!sel(v).empty) return null;
+    const from = v.lineBlockAt(sel(v).head).from;
+    const n = v.state.doc.lineAt(from).number - 1;
+    return from !== v.state.doc.lineAt(sel(v).head).from && headingSet(v.state.doc).has(n) ? v.state.doc.line(n + 1).to : null;
+  };
+  private onHead = (v: EditorView, f: (pos: number) => Result | null) => {
+    const at = this.headAt(v);
+    return at !== null && run(v, f(at));
+  };
+  private status = (v: EditorView, f: (w: Workflow, k: string | null) => string | null) => this.onHead(v, (at) => changeStatusAt(this.docText(v), at, f, this.words));
+  private shift = (v: EditorView, d: -1 | 1) => this.onHead(v, (at) => shiftHeading(this.docText(v), at, d));
+  private shiftTree = (v: EditorView, d: -1 | 1) => this.onHead(v, (at) => shiftSubtree(this.docText(v), at, d));
   readonly commands: Record<string, (v: EditorView, line?: number) => boolean> = {
     newHeading: (v) => newHeading(v, false, this.words),
     newTask: (v) => newHeading(v, true, this.words),
@@ -255,10 +269,10 @@ export class OrgEditor {
     demote: (v) => this.shift(v, 1),
     promoteTree: (v) => this.shiftTree(v, -1),
     demoteTree: (v) => this.shiftTree(v, 1),
-    subtreeUp: (v) => onHeading(v) && run(v, moveSubtree(this.docText(v), sel(v).head, -1)),
-    subtreeDown: (v) => onHeading(v) && run(v, moveSubtree(this.docText(v), sel(v).head, 1)),
-    prioUp: (v) => onHeading(v) && run(v, cyclePriority(this.docText(v), sel(v).head, 'up', this.words)),
-    prioDown: (v) => onHeading(v) && run(v, cyclePriority(this.docText(v), sel(v).head, 'down', this.words)),
+    subtreeUp: (v) => this.onHead(v, (at) => moveSubtree(this.docText(v), at, -1)),
+    subtreeDown: (v) => this.onHead(v, (at) => moveSubtree(this.docText(v), at, 1)),
+    prioUp: (v) => this.onHead(v, (at) => cyclePriority(this.docText(v), at, 'up', this.words)),
+    prioDown: (v) => this.onHead(v, (at) => cyclePriority(this.docText(v), at, 'down', this.words)),
     // statuses: inside the workflow, and between workflows (heading lines only)
     statusNext: (v) => this.status(v, (w, k) => rotateStatus(w, k, 'next')),
     statusPrev: (v) => this.status(v, (w, k) => rotateStatus(w, k, 'prev')),

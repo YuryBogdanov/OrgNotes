@@ -938,6 +938,46 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   red when the oldest entry is older than «Красный счётчик, если запись лежит дольше» (Inbox's `alertAfter`: 3 / 7 /
   14 days / never, 7; `inboxBadge` in inbox/list.ts). README's `ui.setBadge` says the rule. e2e nextAlertBadge,
   nextRail (the corner's badge is the Inbox's now), nextWindow, nextSidebar.
+- **Bugs of the new interface, batch 1 (`docs/fix-bagi-novogo-interfeysa-1.md`, issues #291–#315)** — PRs chained.
+  1, «Сегодня» and «Завершить день»: #312 the capsules' column is the list's widest capsule (`next/capColumn.ts`,
+  `use:capColumn` on Today, AgendaBlocks and «Не успел»; `.kc` and what aligns under it read `--kc`); #291 / #313
+  «Записка со вчера» and «Заметка на завтра» in the monospace of «Исходник» 13 / 1.55 (ТЗ 32, ТЗ 45 amended); #311
+  the compact day of the panel shows every block of the screen in its order (the note in a line, «Главное», «Задачи»,
+  «Агенда на сегодня» — the meetings and the day's tasks, 1-1, the overdue, a plugin's block its summary or «›»;
+  «Из плагинов» gone, rows `.plugrow`), an empty day says so with «Полная версия» once. The panel's TodayCtl had the
+  data: the day's scheduled tasks are the agenda's, not «Задачи» (those are the task files').
+  2, the file's column: #299 the board's file card — its description the whole width, wrapped, the buttons' row
+  `.fc-btns` under it; #296 the cards do not shrink or scroll (`.cards` flex 0 0 auto), «Структура» scrolls under
+  them, «Связи» under it; Structure's `onsqueeze` — the cards higher than 45 % of the column (their height last
+  measured unfolded) — EditorArea folds all but the first (`squeezed`; a click on a forced one opens it, `opened`).
+  e2e nextFileColumn.spec.ts.
+  3, the folds: #309 a file as it was left — `store.fileStates()` (localStorage `fileState:<folder>`, the last 300
+  files: folds, top, caret), kept by `rememberFile` from setTabFolds / setTabTop / setTabCursor; `store.open(i, line?)`
+  without a line (the palette's `jump(i)`, the files' panel, the old navigator's file rows) restores them in a new or
+  retargeted tab (a retargeted tab no more keeps the other file's folds), with a line keeps the folds but the way to
+  it. #310 `cm/structure.ts` `apply` takes the folded headings by who they are (the title without stars and its
+  place among the same titles) and folds them again after the change; and OrgEditor's heading commands (⌥↑↓, the
+  levels, statuses, priority) take the heading seen when the caret sits after a folded heading's «…» (`headAt`) — a
+  click at a folded line's end put it on the hidden last line and ⌥↓ moved that line, the subtree broken.
+  e2e nextFolds.spec.ts.
+  4, «Долгие дела» (#315): the dot of a change (SetRow `changed`) only in «Клавиши» — SetGeneral, SetLook, SetSchema
+  pass none (ТЗ 54 §2 amended); «Статус ожидания» offers the open states of every set (`long.statusSets` from
+  `index.workflow`, the set's name a disabled line, the value first, «— нет в статусах» when gone); «Статусы бэклога»
+  (`backlog`, a custom field — Backlog.svelte, chips by set): such matters are the group `backlog` (`shown(…, backlog)`)
+  — never due, out of the badge, «Сегодня» and the walk; folded at the bottom of the list and the panel; the row's
+  menu «В бэклог» (the first backlog status) / «Из бэклога» (the status before it, else the first open one out of it).
+  ТЗ 40 §4.6 (local). e2e nextLongBacklog.spec.ts.
+  5, the window: #304 the tabs' strip drags too (`use:windowDrag` on `.tabs`; tabs and buttons keep their clicks); a
+  double click asks Rust `system::double_click_action` (`defaults read -g AppleActionOnDoubleClick`: Maximize / Fill
+  → zoom, Minimize → `minimize` — `core:window:allow-minimize` added —, None → nothing). #298 `next/FullscreenLights`
+  — the page's own lights in full screen (Rust hides macOS's): at 18 / 20 + `--menu`, only while `titlebar.fullscreen
+  && lights`, 150 ms of opacity; the red closes (`closeFromFullscreen`), the green leaves; the new root takes `--menu`
+  and `.win` goes down by it. The mock: `double_click_action` (`__dblAction`), `minimize`. e2e nextWindowDrag.spec.ts.
+  6, the sheets of the plugins (#292, #294 — «Неделя» is panopticon-week#8): a `bare` sheet is centred in the core's
+  layer (`.bare`, fixed over the window) by `position: absolute; left: 0; right: 0; margin: 0 auto`, not 50 % and a
+  transform — the board's `.kb-setup` here, the week's plan there (not reproduced in WebKit's tests: centred there
+  both ways); the week's goals on «Сегодня» up to 3 lines in tiles of one height. weekPlugin.spec.ts checks both.
+  In a worktree the week's e2e runs when `.claude/worktrees/panopticon-week` links to the plugin's repo.
 - **The window's title bar in the new interface:** WKWebView has no `-webkit-app-region` (the CSS stays, harmless):
   `next/windowDrag.ts` — `use:windowDrag` on the toolbar (Toolbar.svelte) and the lights' room of the rail and of the
   panel (Sidebar.svelte); a press not on a button, field or tab asks Tauri `startDragging`, a double click

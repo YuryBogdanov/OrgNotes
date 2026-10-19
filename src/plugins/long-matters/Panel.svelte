@@ -6,7 +6,7 @@
   // The navigator in the mode «Долгие дела» (ТЗ 40 §5): «ДОЛГИЕ ДЕЛА · 14» and «⋯», the groups with their numbers
   // («В норме» folded), a row of 28 pt — the status, the title, the age by its tone. A click opens the heading in the
   // editor; ⌥-click — the tab «Долгие дела» with this matter.
-  let open = $state<Record<Group, boolean>>({ due: true, waiting: true, ok: false });
+  let open = $state<Record<Group, boolean>>({ due: true, waiting: true, ok: false, backlog: false });
   const total = $derived(long.rows.length);
 
   function click(e: MouseEvent, r: Row) {

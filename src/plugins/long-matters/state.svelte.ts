@@ -32,7 +32,7 @@ class LongMatters {
   /** The tab of ours shown (the navigator marks its row). */
   shownTab = $state(false);
 
-  rows = $derived(this.matters.map((m): Row => ({ m, s: shown(m, this.today, this.settings.norm) })));
+  rows = $derived(this.matters.map((m): Row => ({ m, s: shown(m, this.today, this.settings.norm, this.settings.backlog) })));
   groups = $derived(grouped(this.rows));
   /** Some touches are not known yet: the index is being built. */
   counting = $derived(this.matters.some((m) => !m.touched));
@@ -43,8 +43,11 @@ class LongMatters {
   readStored() {
     this.settings = readSettings(this.ctx.settings.values());
   }
-  /** The open statuses of the files read: the choice of «Статус ожидания». */
+  /** The open statuses of the files read. */
   openStates = $state<string[]>([]);
+  /** The folder's sets of statuses («Статусы», fix #315): «Статус ожидания» and «Статусы бэклога» offer their open
+   *  states, by set. */
+  statusSets = $state.raw<{ name: string; open: string[] }[]>([]);
 
   private reading = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -94,6 +97,10 @@ class LongMatters {
     if (n !== this.reading) return;
     this.files = read;
     this.openStates = [...new Set([...read.values()].flatMap((f) => f.info.open))];
+    const any = files[0]?.path;
+    const wf = any ? await ctx.index!.workflow(any).catch(() => null) : null;
+    if (n !== this.reading) return;
+    if (wf) this.statusSets = wf.sets.map((s) => ({ name: s.name, open: s.states.filter((x) => !x.done).map((x) => x.name) })).filter((s) => s.open.length);
     this.matters = out.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line);
     this.progress = null;
     this.today = startOfDay();

@@ -94,6 +94,11 @@ test('the choice of a workflow: the sheet 500 pt, «Показать «platform�
   await open(page, FILES(false), false);
   await page.keyboard.press('Alt+Meta+b');
   const sh = page.getByRole('dialog', { name: 'Показать как доску' });
+  // fix #292: the sheet in the window's middle (the core's layer, not 50 % and a transform)
+  await expect(sh).toBeVisible();
+  const b = (await sh.boundingBox())!;
+  const vw = page.viewportSize()!.width;
+  expect(Math.abs(b.x + b.width / 2 - vw / 2)).toBeLessThanOrEqual(1);
   await expect(sh).toHaveCSS('width', '500px');
   expect(await sh.evaluate((e) => !!e.closest('[data-ui="next"]'))).toBe(true);
   await expect(sh.locator('.kb-st')).toHaveText('Показать «platform» как доску');

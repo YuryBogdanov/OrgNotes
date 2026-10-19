@@ -51,6 +51,12 @@ for (const ui of ['old', 'next'] as const)
       await expect(block.locator('.wk-plug')).toHaveText('Неделя');
       await block.getByRole('button', { name: 'Спланировать' }).click();
       const sheet = page.getByRole('dialog', { name: /План на \d+ неделю/ });
+      // fix #292: the new interface's plan in the window's middle (the old one's stays where it was)
+      await expect(sheet).toBeVisible();
+      if (ui === 'next') {
+        const sb = (await sheet.boundingBox())!;
+        expect(Math.abs(sb.x + sb.width / 2 - page.viewportSize()!.width / 2)).toBeLessThanOrEqual(1);
+      }
       await expect(sheet).toBeVisible();
       await sheet.getByLabel('Цель 1').fill('Закрыть найм SRE');
       await sheet.getByRole('checkbox', { name: 'задачей' }).check();
@@ -244,9 +250,14 @@ test.describe('the new look (ТЗ 51)', () => {
     await expect(ban).toContainText('Итоги 42 недели — можно подвести');
     expect(await font(block(page, 'week.goals').locator('.wk-tt').first())).toContain('Cormorant');
     await expect(block(page, 'week.goals').locator('.wk-plug')).toHaveText('Неделя');
+    // fix #294: a goal's title up to three lines, the tiles of a row one height
+    const tiles = block(page, 'week.goals').locator('.wk-tile');
+    expect(await tiles.first().locator('.wk-tt').evaluate((e) => getComputedStyle(e).webkitLineClamp)).toBe('3');
+    const hs = await tiles.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+    expect(new Set(hs).size).toBe(1);
     await page.getByRole('tab').first().click(); // a file's tab: the panel is the compact day
     await page.keyboard.press('Shift+Meta+h');
-    const rows = page.getByRole('region', { name: 'Панель: Сегодня' }).getByRole('region', { name: 'Из плагинов' }).locator('.row');
+    const rows = page.getByRole('region', { name: 'Панель: Сегодня' }).locator('.plugrow'); // a plugin's block: its row in the screen's order (fix #311)
     await expect(rows.filter({ hasText: 'Итоги недели' }).locator('.sum')).toHaveText('можно');
     await expect(rows.filter({ hasText: 'Итоги недели' }).locator('.sum')).toHaveClass(/alert/);
     await expect(rows.filter({ hasText: 'Цели недели' }).locator('.sum')).toHaveText('1 из 3');
@@ -256,7 +267,7 @@ test.describe('the new look (ТЗ 51)', () => {
     await open(page, {}, '2026-10-14T10:00:00');
     await page.getByRole('tab').first().click();
     await page.keyboard.press('Shift+Meta+h');
-    const rows = page.getByRole('region', { name: 'Панель: Сегодня' }).getByRole('region', { name: 'Из плагинов' }).locator('.row');
+    const rows = page.getByRole('region', { name: 'Панель: Сегодня' }).locator('.plugrow'); // a plugin's block: its row in the screen's order (fix #311)
     await expect(rows.filter({ hasText: 'Цели недели' }).locator('.sum')).toHaveText('нет плана');
     await expect(rows.filter({ hasText: 'Цели недели' }).locator('.sum')).toHaveClass(/wait/);
   });

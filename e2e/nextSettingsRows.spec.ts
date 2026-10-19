@@ -22,13 +22,13 @@ test('a plugin\'s section: its head, the groups, the rows; a menu, a switch, the
   await expect(s.locator('section.grp .cap')).toHaveText(['Источники', 'Проверка', '«Сегодня»', 'Редактор'], { ignoreCase: true });
   // the plugin's own field under its name, across the row
   await expect(s.locator('.row.wide').filter({ hasText: 'Где долгие дела' }).getByText('+ Источник')).toBeVisible();
-  // a menu: 14 by default, no dot; 7 — the dot
+  // a menu: no dot of a change (fix #315: only «Клавиши» marks them)
   const norm = s.locator('.row').filter({ hasText: 'Норма проверки' });
   await expect(norm.locator('.dot')).toHaveCount(0);
   await norm.getByRole('button', { name: /Норма проверки/ }).click();
   await page.getByRole('menuitem', { name: /7 дней/ }).click();
   await expect(norm.getByRole('button', { name: /Норма проверки/ })).toContainText('7 дней');
-  await expect(norm.locator('.dot')).toHaveCount(1);
+  await expect(norm.locator('.dot')).toHaveCount(0);
   // ⎋ in a menu closes the menu, not the sheet
   await norm.getByRole('button', { name: /Норма проверки/ }).click();
   await page.keyboard.press('Escape');

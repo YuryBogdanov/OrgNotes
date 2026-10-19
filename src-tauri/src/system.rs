@@ -87,6 +87,22 @@ pub(crate) fn remind_end_day(app: AppHandle) -> bool {
     }
 }
 
+/// What a double click on a window's title bar does on this Mac («Рабочий стол и Dock» → «Двойное нажатие на строку
+/// заголовка окна»): `Maximize` (zoom), `Fill`, `Minimize` or `None`; not set — macOS zooms.
+#[tauri::command]
+pub(crate) fn double_click_action() -> String {
+    #[cfg(target_os = "macos")]
+    if let Ok(o) = std::process::Command::new("defaults").args(["read", "-g", "AppleActionOnDoubleClick"]).output() {
+        if o.status.success() {
+            let v = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            if !v.is_empty() {
+                return v;
+            }
+        }
+    }
+    "Maximize".into()
+}
+
 /// The font families of this Mac (ТЗ 57 §6): `[{ name, cyr }]` as JSON text — `cyr` whether the family covers Cyrillic.
 #[tauri::command]
 pub(crate) fn font_families() -> String {

@@ -203,6 +203,7 @@ pub fn run() {
             system::notify_system,
             system::clipboard_text,
             system::font_families,
+            system::double_click_action,
             show_main_window,
             themes::list_themes,
             themes::write_theme,

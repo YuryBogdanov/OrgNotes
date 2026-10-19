@@ -13,6 +13,8 @@ export interface Settings {
   wait: string;
   /** The block on «Сегодня». */
   today: boolean;
+  /** «Статусы бэклога» (fix #315): matters in them are not watched — not due, not on «Сегодня», nor in the walk. */
+  backlog: string[];
 }
 export const DEFAULTS: Settings = {
   sources: [
@@ -22,6 +24,7 @@ export const DEFAULTS: Settings = {
   norm: 14,
   wait: 'WAIT',
   today: true,
+  backlog: [],
 };
 
 /** The settings as stored (the notes folder), the defaults for what is missing or wrong. */
@@ -41,6 +44,7 @@ export function readSettings(raw: unknown): Settings {
     norm: Number.isFinite(norm) && norm >= 1 ? Math.round(norm) : DEFAULTS.norm,
     wait: typeof o.wait === 'string' && o.wait ? o.wait : DEFAULTS.wait,
     today: o.today === undefined ? DEFAULTS.today : !!o.today,
+    backlog: Array.isArray(o.backlog) ? [...new Set(o.backlog.filter((x): x is string => typeof x === 'string' && !!x))] : DEFAULTS.backlog,
   };
 }
 
@@ -72,7 +76,7 @@ const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 /** Whole days from `a` to `b` (calendar days, not 24 hours). */
 export const daysBetween = (a: Date, b: Date) => Math.round((+day(b) - +day(a)) / 86_400_000);
 
-export type Group = 'due' | 'waiting' | 'ok';
+export type Group = 'due' | 'waiting' | 'ok' | 'backlog';
 export type Tone = 'late' | 'soon' | 'calm';
 /** A long matter as the plugin knows it. */
 export interface Matter {
@@ -100,13 +104,15 @@ export interface Shown {
   group: Group;
   tone: Tone;
 }
-export function shown(m: Matter, today: Date, norm: number): Shown {
+export function shown(m: Matter, today: Date, norm: number, backlog: string[] = []): Shown {
   const age = m.touched ? Math.max(0, daysBetween(m.touched.at, today)) : null;
   // `:NEXT_REVIEW:` stands while it is after the last touch; touched on its day or later (looked at), the norm again
   const byNorm = m.touched ? new Date(day(m.touched.at).getTime() + norm * 86_400_000) : null;
   const due = m.nextReview && (!m.touched || +m.nextReview > +day(m.touched.at)) ? m.nextReview : byNorm;
   const left = due ? daysBetween(today, due) : null;
   const late = left !== null && left < 0;
+  // in the backlog: not watched — never due, calm
+  if (m.keyword && backlog.includes(m.keyword)) return { age, due, left, group: 'backlog', tone: 'calm' };
   const group: Group = late ? 'due' : m.waiting ? 'waiting' : 'ok';
   const tone: Tone = late ? 'late' : left !== null && left < norm * 0.3 ? 'soon' : 'calm';
   return { age, due, left, group, tone };
@@ -116,10 +122,11 @@ export const GROUPS: { id: Group; title: string }[] = [
   { id: 'due', title: 'Пора проверить' },
   { id: 'waiting', title: 'Ждём' },
   { id: 'ok', title: 'В норме' },
+  { id: 'backlog', title: 'Бэклог' },
 ];
 /** The matters by group, the most overdue first in each (unknown dates last). */
 export function grouped<T extends { s: Shown; m: Matter }>(rows: T[]): Record<Group, T[]> {
-  const out: Record<Group, T[]> = { due: [], waiting: [], ok: [] };
+  const out: Record<Group, T[]> = { due: [], waiting: [], ok: [], backlog: [] };
   for (const r of rows) out[r.s.group].push(r);
   const at = (r: T) => (r.s.due ? +r.s.due : Infinity);
   for (const g of Object.values(out)) g.sort((a, b) => at(a) - at(b) || a.m.title.localeCompare(b.m.title, 'ru'));

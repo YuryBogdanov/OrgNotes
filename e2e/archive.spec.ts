@@ -66,7 +66,7 @@ test('the palette «Архивировать поддерево» and the old ed
   await expect(item).toContainText('⌃C ⌃X ⌃S');
   await item.click();
   await expect.poll(() => disk(page, '/mock/work.org_archive')).toContain('* TODO Бюджет 2027');
-  expect(await disk(page, '/mock/work.org')).toMatch(/^#\+TITLE: Работа\n\* Q4\n?$/);
+  await expect.poll(() => disk(page, '/mock/work.org')).toMatch(/^#\+TITLE: Работа\n\* Q4\n?$/); // the source is written after the archive
 });
 
 test('the new interface: «В архив» in the heading menu; none in an archive file', async ({ page }) => {

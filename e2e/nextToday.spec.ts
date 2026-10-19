@@ -30,7 +30,7 @@ test('the new screen: its own (no compatibility layer), the head, the cards; the
   const note = block(page, 'Записка со вчера');
   await expect(note).toContainText('18:42');
   await expect(note.locator('b')).toHaveText('бюджету');
-  expect(await note.locator('.ntext').evaluate((e) => getComputedStyle(e).fontFamily)).toContain('Cormorant');
+  expect(await note.locator('.ntext').evaluate((e) => getComputedStyle(e).fontFamily)).toContain('IBM Plex Mono');
   const focus = block(page, 'Главное на сегодня');
   await expect(focus).toContainText('выбрано вчера');
   await expect(focus).toContainText('дедлайн сегодня');

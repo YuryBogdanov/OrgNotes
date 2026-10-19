@@ -29,10 +29,15 @@
   const pass = (r: Row) => filter === 'all' || (filter === 'nostatus' ? !r.m.note : r.s.group === filter);
   const groups = $derived(GROUPS.map((g) => ({ ...g, rows: long.groups[g.id].filter(pass) })).filter((g) => g.rows.length));
   /** Nothing is due or awaited: «В норме» is the list, unfolded. */
-  const allCalm = $derived(groups.length === 1 && groups[0].id === 'ok');
+  const watched = $derived(groups.filter((g) => g.id !== 'backlog'));
+  const allCalm = $derived(watched.length === 1 && watched[0].id === 'ok');
   /** «В норме» folds in the whole list; filtered or alone, it is open. */
   const folding = $derived(!allCalm && filter === 'all');
-  const isOpen = (g: Group) => g !== 'ok' || okOpen || !folding;
+  // «Бэклог» (fix #315): folded at the bottom, always
+  let backlogOpen = $state(false);
+  const isOpen = (g: Group) => (g === 'backlog' ? backlogOpen : g !== 'ok' || okOpen || !folding);
+  const folds = (g: Group) => g === 'backlog' || (g === 'ok' && folding);
+  const unfold = (g: Group) => (g === 'backlog' ? (backlogOpen = !backlogOpen) : g === 'ok' && folding && (okOpen = !okOpen));
   const visible = $derived(groups.flatMap((g) => (isOpen(g.id) ? g.rows : [])));
   /** The main file of the sources: its matters go without a path. */
   const home = $derived(long.settings.sources.find((s) => s.kind === 'file')?.file ?? null);
@@ -165,14 +170,14 @@
       <div class="cols" role="row"><span role="columnheader">Дело и последний статус</span><span role="columnheader">{next ? 'Давность · черта = норма' : 'Давность'}</span><span role="columnheader">Проверить</span></div>
       {#if allCalm && filter === 'all'}<div class="allcalm">Всё под присмотром</div>{/if}
       {#each groups as g (g.id)}
-        <button class="grp {g.id}" class:fold={g.id === 'ok' && folding} aria-expanded={isOpen(g.id)} onclick={() => g.id === 'ok' && folding && (okOpen = !okOpen)}>
-          {#if g.id === 'ok' && folding}<svg class="chev" class:on={okOpen} width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>{/if}
+        <button class="grp {g.id}" class:fold={folds(g.id)} aria-expanded={isOpen(g.id)} onclick={() => unfold(g.id)}>
+          {#if folds(g.id)}<svg class="chev" class:on={isOpen(g.id)} width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>{/if}
           <span>{g.title}</span><span class="n">{g.rows.length}</span>
         </button>
         {#if isOpen(g.id)}
           {#each g.rows as r (r.m.key)}
             <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <div class="row" class:on={long.sel === r.m.key} class:dim={g.id === 'ok'} role="row" tabindex="-1" aria-selected={long.sel === r.m.key} title={tipOf(r.m, r.s)}
+            <div class="row" class:on={long.sel === r.m.key} class:dim={g.id === 'ok' || g.id === 'backlog'} role="row" tabindex="-1" aria-selected={long.sel === r.m.key} title={tipOf(r.m, r.s)}
               data-key={r.m.key} onclick={(e) => (void select(r.m.key), e.altKey && long.aside(r.m))} ondblclick={() => long.reveal(r.m)} oncontextmenu={(e) => menu(e, r)}>
               <div class="what" role="gridcell">
                 <div class="l1">
