@@ -47,8 +47,9 @@ test('the status capsule on the capitals\' middle at every level, in each text f
   for (const font of ['Cormorant Garamond', 'Системный', 'Моноширинный']) {
     if (font !== 'Cormorant Garamond') {
       await page.keyboard.press('Meta+,');
-      await settingsSheet(page).getByRole('tab', { name: 'Основные', exact: true }).click();
-      await settingsSheet(page).getByLabel('Шрифт текста').selectOption({ label: font });
+      await settingsSheet(page).getByRole('tab', { name: 'Оформление', exact: true }).click();
+      await settingsSheet(page).getByRole('button', { name: /^Шрифт текста:/ }).click();
+      await page.getByRole('menuitem', { name: font }).click();
       await page.keyboard.press('Escape');
       await page.locator('.cm-line', { hasText: 'текст' }).click();
     }

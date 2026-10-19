@@ -824,6 +824,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   in a square of 30 on 14 % `plug`, the name, version · source, «включён». FormFields' plugin field is an attachment
   now — drawn again when its `render` comes after the plugin starts. The sheet is centred without a transform (a menu
   inside it is fixed to the window). e2e nextSettingsRows.spec.ts.
+  54.3, «Основные» and «Оформление» (next/SetGeneral, SetLook): the folder (its path, «N файлов · size», «Изменить…»),
+  «Интерфейс» (no «(бета)»), «Заголовки» (the step as segments Меньше/Обычный/Больше/Крупный = 1–4), «Ссылки»;
+  dots by DEFAULT_LEVELS and «По ID». «Оформление»: the appearance as segments; the light themes as cards (a
+  preview of 74: h1, `fg` and `cursor` bars; the name and «✓»; ←→ over them), a right click — the theme's menu
+  (next Menu; «Удалить» by ConfirmSheet), «Импорт… / Новая тема»; the dark one's as a MenuButton; «Текст» — the
+  font, the width (four segments as before), «Структура» right, the drawers folded. Gone in the new interface:
+  «Экспериментальное», «заголовки в навигаторе», «Оформленный текст», the line numbers (the old sheet keeps all).
+  The theme's editor is still the old one through a bridge (54.8). Mind the class `.tcard`: a global one exists.
+  e2e nextSettingsLook.spec.ts, nextSettings.spec.ts moved to «Оформление».
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

@@ -7,10 +7,12 @@
   import ConfirmSheet from './ConfirmSheet.svelte';
   import SchemaGroups from './SetSchema.svelte';
   import PluginHead from './SetPluginHead.svelte';
+  import SetGeneral from './SetGeneral.svelte';
+  import SetLook from './SetLook.svelte';
   import { plugins } from '../api/host.svelte';
   import { pluginUpdates as up } from '../pluginUpdates.svelte';
   import {
-    AppearanceSettings, KeysSettings, Picker, RemovePlugin, SettingsAgendas, SettingsGeneral, SettingsInbox, StatusesSettings,
+    KeysSettings, Picker, RemovePlugin, SettingsAgendas, SettingsInbox, StatusesSettings,
     TagsSettings, ThemeEditor,
   } from './bridges';
 
@@ -94,7 +96,9 @@
       {:else}
         <div class="col" class:wide>
           <h1>{tab}</h1>
-          {#if settingsOf(tab)?.schema}
+          {#if tab === 'Основные'}<SetGeneral />
+          {:else if tab === 'Оформление'}<SetLook />
+          {:else if settingsOf(tab)?.schema}
             <!-- a feature's or a plugin's schema, in the new rows (ТЗ 54 §2) -->
             {@const spec = settingsOf(tab)!}
             {#if spec.plugin}<PluginHead id={spec.plugin} />{/if}
@@ -107,14 +111,12 @@
           <div class="old">
             <Compat>
               {#if tab === 'Клавиши'}<KeysSettings />
-              {:else if tab === 'Оформление'}<AppearanceSettings />
               {:else if tab === 'Inbox'}<SettingsInbox onpick={() => (pickFile = true)} />
               {:else if tab === 'Теги'}<TagsSettings />
               {:else if settingsOf(tab)}
                 {@const spec = settingsOf(tab)!}
                 {#if spec.component}<spec.component />{/if}
               {:else if tab === 'Агенды'}<SettingsAgendas onremove={(a) => (confirmAgenda = a)} />
-              {:else if tab === 'Основные'}<SettingsGeneral />
               {:else}<StatusesSettings />{/if}
             </Compat>
           </div>

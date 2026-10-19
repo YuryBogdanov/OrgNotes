@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openApp, palette, settingsSheet } from './helpers';
 
-// ТЗ 42.11 (§8, §10): «Основные → Экспериментальное» — «Шрифт текста», «Ширина текста», «Структура справа»: shown
+// ТЗ 42.11 (§8, §10), ТЗ 54.3: «Основные → Экспериментальное» (the old interface; the new one's in «Оформление → Текст») — «Шрифт текста», «Ширина текста», «Структура справа»: shown
 // always, active with the new interface only, kept on this Mac; ⌃⌘E — «Оформление / Исходник»; ⌘K — «Искать везде»,
 // a command of «Клавиши».
 
@@ -13,6 +13,17 @@ const general = async (page: Page) => {
   await sheet.getByRole('tab', { name: 'Основные', exact: true }).click();
   return sheet;
 };
+// the new interface: in «Оформление → Текст» (ТЗ 54.3)
+const look = async (page: Page) => {
+  await page.keyboard.press('Meta+,');
+  const sheet = settingsSheet(page);
+  await sheet.getByRole('tab', { name: 'Оформление', exact: true }).click();
+  return sheet;
+};
+async function choose(page: Page, sheet: ReturnType<typeof settingsSheet>, label: string, item: string) {
+  await sheet.getByRole('button', { name: new RegExp(`^${label}:`) }).click();
+  await page.getByRole('menuitem', { name: item }).click();
+}
 
 test('the old interface: the three settings shown, off', async ({ page }) => {
   await openApp(page, { files: { '/mock/a.org': DOC } });
@@ -33,10 +44,10 @@ test('the new interface: the font, the width and the column change at once and s
   await expect(content(page)).toBeVisible();
   await expect.poll(() => content(page).evaluate((e) => getComputedStyle(e).fontFamily)).toContain('Cormorant');
   await expect.poll(() => content(page).evaluate((e) => getComputedStyle(e).maxWidth)).toBe('700px');
-  const sheet = await general(page);
-  await sheet.getByLabel('Шрифт текста').selectOption({ label: 'Моноширинный' });
-  await sheet.getByLabel('Ширина текста').selectOption({ label: 'Широкая (860)' });
-  await sheet.getByRole('switch', { name: 'Структура справа' }).click();
+  const sheet = await look(page);
+  await choose(page, sheet, 'Шрифт текста', 'Моноширинный');
+  await sheet.getByRole('radiogroup', { name: 'Ширина текста' }).getByRole('radio', { name: 'Широкая' }).click();
+  await sheet.getByRole('switch', { name: '«Структура» справа' }).click();
   await page.keyboard.press('Escape');
   await expect.poll(() => content(page).evaluate((e) => getComputedStyle(e).fontFamily)).toContain('IBM Plex Mono');
   await expect.poll(() => content(page).evaluate((e) => getComputedStyle(e).fontSize)).toBe('14px');
@@ -47,12 +58,18 @@ test('the new interface: the font, the width and the column change at once and s
   await expect.poll(() => content(page).evaluate((e) => getComputedStyle(e).fontFamily)).toContain('IBM Plex Mono');
   await expect(page.getByRole('complementary', { name: 'Структура' })).toHaveCount(0);
   // «Во всю ширину»: the whole area
-  const s2 = await general(page);
-  await s2.getByLabel('Ширина текста').selectOption({ label: 'Во всю ширину' });
-  await s2.getByLabel('Шрифт текста').selectOption({ label: 'Системный' });
+  const s2 = await look(page);
+  await s2.getByRole('radiogroup', { name: 'Ширина текста' }).getByRole('radio', { name: 'Во всю ширину' }).click();
+  await choose(page, s2, 'Шрифт текста', 'Системный');
   await page.keyboard.press('Escape');
   await expect.poll(() => content(page).evaluate((e) => e.getBoundingClientRect().width)).toBeGreaterThan(1000);
   await expect.poll(() => content(page).evaluate((e) => getComputedStyle(e).fontFamily)).toContain('apple-system');
+  // «Экспериментального» is gone from «Основные»; the old interface's own are not shown
+  const g = await general(page);
+  await expect(g.getByText('Экспериментальное')).toHaveCount(0);
+  await expect(g.getByText('Показывать заголовки в навигаторе')).toHaveCount(0);
+  await expect(g.getByText('Номера строк в оформленном виде')).toHaveCount(0);
+  await expect(g.getByRole('switch', { name: 'Новый интерфейс' })).toHaveAttribute('aria-checked', 'true');
 });
 
 test('the new interface: ⌃⌘E switches «Оформление» and «Исходник»; ⌘K opens the palette', async ({ page }) => {
