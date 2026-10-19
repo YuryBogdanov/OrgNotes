@@ -38,8 +38,8 @@ test('the columns and the cards: 272 pt, radius 12; the title in the text\'s fon
   await expect(col).toHaveCSS('width', '272px');
   await expect(col).toHaveCSS('border-radius', '12px');
   const t = page.locator('.kb-card .kb-t').first();
-  expect(await t.evaluate((e) => getComputedStyle(e).fontFamily)).toContain('Cormorant');
-  await expect(t).toHaveCSS('font-size', '18px');
+  expect(await t.evaluate((e) => getComputedStyle(e).fontFamily)).toContain('apple-system'); // the interface's font
+  await expect(t).toHaveCSS('font-size', '14px');
   await expect(t).toHaveCSS('font-weight', '600');
   const load = page.locator('.kb-card', { hasText: 'Нагрузочное' });
   await expect(load.locator('.kb-chip')).toHaveText(['#A', /^⚑ /, ':billing:']);

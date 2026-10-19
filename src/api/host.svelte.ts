@@ -989,7 +989,7 @@ class Host {
         widget: (el, field, value, onChange) => mountWidget(id, el, field, value, onChange, (err) => this.fail(id, err)),
         editor: (el, h, o = {}) => {
           // the new interface gives its own editor (ТЗ 49 §7, set by next/App), the old one PluginEditor
-          const app = mount(this.editorComponent ?? PluginEditor, { target: el, props: { path: h.path, line: h.line, title: h.title, onref: (r: HeadingRef) => this.guard(id, () => o.onRef?.(r), undefined) } });
+          const app = mount(this.editorComponent ?? PluginEditor, { target: el, props: { path: h.path, line: h.line, title: h.title, source: !!o.source, onref: (r: HeadingRef) => this.guard(id, () => o.onRef?.(r), undefined) } });
           const off = () => {
             void unmount(app);
           };

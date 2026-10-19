@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.17.0';
+export const API_VERSION = '1.18.0';
 
 /** The handle of a block of «Сегодня» (`ui.todayBlock`). */
 export interface TodayBlockHandle {
@@ -604,9 +604,9 @@ export interface Ctx {
      *  not change. Since 1.5. */
     editorLink(spec: { label(text: string, line: number): string | null; run(path: string, line: number): void }): Dispose;
     /** A heading with its subtree, narrowed, in an editor in the plugin's element (the board's card at the side): edits
-     *  go to the file at once, the Org keys work. `onRef` — where the heading is now (its line, its title as edited).
-     *  Since 1.5. */
-    editor(el: HTMLElement, h: HeadingRef, o?: { onRef?(h: HeadingRef): void }): { focus(): void; dispose(): void };
+     *  go to the file at once, the Org keys work. `onRef` — where the heading is now (its line, its title as edited);
+     *  `source` (since 1.18) — the new interface's editor in «Исходник» (the file as it is), not «Оформление». Since 1.5. */
+    editor(el: HTMLElement, h: HeadingRef, o?: { onRef?(h: HeadingRef): void; source?: boolean }): { focus(): void; dispose(): void };
     /** A list of tasks in the plugin's element (ТЗ 34): while the focus is in `el`, the keys of «Задачи в списках»,
      *  the palette's «ВЫДЕЛЕННАЯ ЗАДАЧА» and the inspector act on the task the list has chosen; `menu(at)` shows the
      *  core's menu of that task (status, priority, dates, tags, refile, link, the plugins' actions, `more`). The

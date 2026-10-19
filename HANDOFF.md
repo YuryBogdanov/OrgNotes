@@ -978,6 +978,9 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   transform — the board's `.kb-setup` here, the week's plan there (not reproduced in WebKit's tests: centred there
   both ways); the week's goals on «Сегодня» up to 3 lines in tiles of one height. weekPlugin.spec.ts checks both.
   In a worktree the week's e2e runs when `.claude/worktrees/panopticon-week` links to the plugin's repo.
+- **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
+  1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
+  (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.
 - **The window's title bar in the new interface:** WKWebView has no `-webkit-app-region` (the CSS stays, harmless):
   `next/windowDrag.ts` — `use:windowDrag` on the toolbar (Toolbar.svelte) and the lights' room of the rail and of the
   panel (Sidebar.svelte); a press not on a button, field or tab asks Tauri `startDragging`, a double click

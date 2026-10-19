@@ -155,7 +155,8 @@
 
 [data-ui='next'] .kb-card { gap: 0; padding: 9px 11px; border-radius: 9px; background: var(--card); border: 1px solid var(--rule); box-shadow: none; }
 [data-ui='next'] .kb-card.sel, [data-ui='next'] .kb-card:focus-visible { border-color: var(--lamp); box-shadow: 0 0 0 3px var(--lampsoft); }
-[data-ui='next'] .kb-t { font: 600 18px/1.25 var(--font-text); color: var(--ink); }
+/* the card's title in the interface's own font (the user's choice: not the file's text's) */
+[data-ui='next'] .kb-t { font: 600 14px/1.35 var(--ui); color: var(--ink); }
 [data-ui='next'] .kb-t code { font: 0.8em var(--font-mono); }
 [data-ui='next'] .kb-t .kb-link { color: var(--lampink); }
 [data-ui='next'] .kb-card.done { opacity: 0.55; }
