@@ -20,8 +20,8 @@ for (const scheme of ['light', 'dark'] as const)
     await expect(settingsSheet(page)).toBeVisible();
     const sheet = '[role="dialog"][aria-label="Настройки"]';
     expect(await page.locator(sheet).evaluate((e) => !!e.closest('.compat[data-ui="next"]'))).toBe(false);
-    // a section still old (54.4 makes «Клавиши» new): in the layer
-    await page.getByRole('tab', { name: 'Клавиши' }).click();
+    // a section still old (54.7 makes «Теги» new): in the layer
+    await page.getByRole('tab', { name: 'Теги' }).click();
     const pal = `${sheet} .compat[data-ui="next"]`;
     await expect(page.locator(pal).first()).toBeAttached();
     const lampink = scheme === 'light' ? '#8a5f0e' : '#f2c66d';

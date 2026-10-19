@@ -9,10 +9,12 @@
   import PluginHead from './SetPluginHead.svelte';
   import SetGeneral from './SetGeneral.svelte';
   import SetLook from './SetLook.svelte';
+  import SetKeys from './SetKeys.svelte';
+  import SetMini from './SetMini.svelte';
   import { plugins } from '../api/host.svelte';
   import { pluginUpdates as up } from '../pluginUpdates.svelte';
   import {
-    KeysSettings, Picker, RemovePlugin, SettingsAgendas, SettingsInbox, StatusesSettings,
+    Picker, RemovePlugin, SettingsAgendas, SettingsInbox, StatusesSettings,
     TagsSettings, ThemeEditor,
   } from './bridges';
 
@@ -98,6 +100,8 @@
           <h1>{tab}</h1>
           {#if tab === 'Основные'}<SetGeneral />
           {:else if tab === 'Оформление'}<SetLook />
+          {:else if tab === 'Клавиши'}<SetKeys />
+          {:else if tab === 'Мини-окно'}<SetMini />
           {:else if settingsOf(tab)?.schema}
             <!-- a feature's or a plugin's schema, in the new rows (ТЗ 54 §2) -->
             {@const spec = settingsOf(tab)!}
@@ -110,8 +114,7 @@
           <!-- the sections' own look is to come (ТЗ 54.2–54.7): the old ones in the compatibility layer meanwhile -->
           <div class="old">
             <Compat>
-              {#if tab === 'Клавиши'}<KeysSettings />
-              {:else if tab === 'Inbox'}<SettingsInbox onpick={() => (pickFile = true)} />
+              {#if tab === 'Inbox'}<SettingsInbox onpick={() => (pickFile = true)} />
               {:else if tab === 'Теги'}<TagsSettings />
               {:else if settingsOf(tab)}
                 {@const spec = settingsOf(tab)!}

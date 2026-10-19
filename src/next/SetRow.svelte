@@ -4,13 +4,13 @@
   // A row of a settings' group (ТЗ 54 §2): from 46 pt, 8/16 inside, a `rule` between rows; the name 13.5 pt and its
   // hint 12 pt `ink3` on the left, the control on the right — or, `wide`, under them across the row. `changed`: a dot
   // 6 pt `lamp` before the name (the value is not the default). `id`: the name's, for the control's label.
-  let { label, hint, id, changed = false, wide = false, disabled = false, onclick, children, sub }: {
-    label: string; hint?: string; id?: string; changed?: boolean; wide?: boolean; disabled?: boolean; onclick?: () => void; children?: Snippet; sub?: Snippet;
+  let { label, hint, id, changed = false, wide = false, disabled = false, dataId, onclick, children, sub }: {
+    label: string; hint?: string; id?: string; changed?: boolean; wide?: boolean; disabled?: boolean; dataId?: string; onclick?: () => void; children?: Snippet; sub?: Snippet;
   } = $props();
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="row" class:wide class:off={disabled} class:link={!!onclick} {onclick}>
+<div class="row" class:wide class:off={disabled} class:link={!!onclick} data-id={dataId} {onclick}>
   <div class="tx">
     <div class="nm" {id}>{#if changed}<i class="dot" title="Изменено" aria-label="изменено"></i>{/if}{label}</div>
     {#if hint}<div class="hint">{hint}</div>{/if}
