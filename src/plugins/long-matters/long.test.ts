@@ -117,8 +117,8 @@ describe('the actions\' helpers', () => {
 
 describe('the section\'s badge (ТЗ 43 §1)', () => {
   it('«Пора проверить» as an alarm when there are some; else how many matters, as any', () => {
-    expect(badgeOf({ due: [1, 2], waiting: [3], ok: [4, 5] })).toEqual({ n: 2, alert: true });
-    expect(badgeOf({ due: [], waiting: [3], ok: [4, 5] })).toEqual({ n: 3, alert: false });
-    expect(badgeOf({ due: [], waiting: [], ok: [] })).toEqual({ n: 0, alert: false });
+    expect(badgeOf({ due: [1, 2], waiting: [3], ok: [4, 5], backlog: [] })).toEqual({ n: 2, alert: true });
+    expect(badgeOf({ due: [], waiting: [3], ok: [4, 5], backlog: [] })).toEqual({ n: 3, alert: false });
+    expect(badgeOf({ due: [], waiting: [], ok: [], backlog: [] })).toEqual({ n: 0, alert: false });
   });
 });
