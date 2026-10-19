@@ -997,6 +997,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   встроенная / <plugin> / своя», the chips of the places, 4 a row; a click → the place in effect, ←→↑↓; the menu
   «Поставить для светлого / тёмного», «Изменить…», «Дублировать и изменить…» (`copyTheme(t, '<t> — копия', place)`),
   «Переименовать», «Экспорт…», «Удалить»; «+ Новая тема» — a copy of the theme in effect as «Новая тема».
+  57.4, the theme's editor (SetThemeEditor.svelte, rewritten; the settings' `fill` in place of the gallery, crumb
+  «Оформление › Тема»): «‹ Все темы», «Тема «…»»; on the left (380) the name with «светлая / тёмная — по фону»,
+  «Основа» (the ground, the text, the accent: the contrast chip — the text's to the ground, `lampink`'s for the accent;
+  the hex; a swatch of 26 → ColorPop), «Палитра» (the eight of 28 with short names, a red dot under 4.5:1 to the
+  ground; the user's statuses as capsules in them — `namedFor` over the config's sets), «Детали» (the sidebar Авто /
+  Свой цвет, the grid, the headings by levels — four swatches, the blue / teal / orange / purple of the palette to
+  start); on the right ThemePreview `big`, «Сбросить» (`store.restoreTheme` of the theme as the editor opened it,
+  format kept; renamed meanwhile — under its new name), «Экспорт…». Every change is `store.setThemeApp` (the file in
+  the new format from then). A built-in theme has no «Изменить…»: «Дублировать и изменить…».
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

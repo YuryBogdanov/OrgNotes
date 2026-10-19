@@ -105,6 +105,10 @@ class Themes {
     const next = fromApp({ ...app, name: t.name, source: 'own' }, { basedOn: t.basedOn });
     this.writeLater(next);
   }
+  /** «Сбросить» of the new editor: the theme as it was when the editor opened (its format too). */
+  restoreTheme(t: Theme) {
+    if (this.ownThemes.some((x) => x.name === t.name)) this.writeLater(t);
+  }
   private writeLater(next: Theme) {
     this.putTheme(next);
     clearTimeout(this.themeTimer);
