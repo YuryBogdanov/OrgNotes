@@ -31,7 +31,7 @@
     if (r.kind !== 'file' || r.file === undefined) return;
     // ⌥-click: a tab of its own; a click: in the tab shown (as the old navigator)
     if (e.altKey) openFile(store.layout, store.layout.active, store.files[r.file].path, 0, { replace: false });
-    else store.open(r.file, 0);
+    else store.open(r.file); // the file as it was left (fix #309)
   }
   const startCreate = (dir: string, kind: 'file' | 'folder', type?: string) => {
     if (dir) open.add(folderKey(dir));

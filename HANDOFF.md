@@ -945,6 +945,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   them, «Связи» under it; Structure's `onsqueeze` — the cards higher than 45 % of the column (their height last
   measured unfolded) — EditorArea folds all but the first (`squeezed`; a click on a forced one opens it, `opened`).
   e2e nextFileColumn.spec.ts.
+  3, the folds: #309 a file as it was left — `store.fileStates()` (localStorage `fileState:<folder>`, the last 300
+  files: folds, top, caret), kept by `rememberFile` from setTabFolds / setTabTop / setTabCursor; `store.open(i, line?)`
+  without a line (the palette's `jump(i)`, the files' panel, the old navigator's file rows) restores them in a new or
+  retargeted tab (a retargeted tab no more keeps the other file's folds), with a line keeps the folds but the way to
+  it. #310 `cm/structure.ts` `apply` takes the folded headings by who they are (the title without stars and its
+  place among the same titles) and folds them again after the change; and OrgEditor's heading commands (⌥↑↓, the
+  levels, statuses, priority) take the heading seen when the caret sits after a folded heading's «…» (`headAt`) — a
+  click at a folded line's end put it on the hidden last line and ⌥↓ moved that line, the subtree broken.
+  e2e nextFolds.spec.ts.
 - **The window's title bar in the new interface:** WKWebView has no `-webkit-app-region` (the CSS stays, harmless):
   `next/windowDrag.ts` — `use:windowDrag` on the toolbar (Toolbar.svelte) and the lights' room of the rail and of the
   panel (Sidebar.svelte); a press not on a button, field or tab asks Tauri `startDragging`, a double click
