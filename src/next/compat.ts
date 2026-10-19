@@ -2,8 +2,8 @@
 // plugin's panel, tab, sheet or field draws in the new colours with its own layout and fonts. Each
 // variable app.css defines has its line here (compat.test.ts): a new one there must say what it is here.
 
-import { BUILTIN, NEXT_THEME, type Appearance } from '../themes';
-import { FONTS } from './tokens';
+import type { AppTheme } from '../appTheme';
+import { FONTS, fontCss } from './tokens';
 
 /** An old variable → a value in the new tokens. `null`: the same name in both, inherited as it is. */
 export const COMPAT: Record<string, string | null> = {
@@ -71,16 +71,19 @@ export const COMPAT: Record<string, string | null> = {
   'font-mono': FONTS.mono,
 };
 
-/** The named colours (`--p-red` … `--p-gray`) of «Синька» in this appearance (ТЗ 42 §3.2). */
-export const compatPalette = (a: Appearance) => BUILTIN.find((t) => t.name === NEXT_THEME[a])!.colors.palette;
 
 /** The layer's variables for an appearance: an inline style. `--font-text` — the font of the file's text as the
  *  editor has it (the settings' choice, the window's `--text`): the board's cards, a canvas's nodes (ТЗ 49 §7). */
-export const compatVars = (a: Appearance) =>
+export const compatVars = (t: AppTheme) =>
   [
     '--font-text:var(--text)',
     ...Object.entries(COMPAT).flatMap(([k, v]) => (v === null ? [] : [`--${k}:${v}`])),
-    ...Object.entries(compatPalette(a)).map(([k, v]) => `--p-${k}:${v}`),
+    ...Object.entries(t.palette).map(([k, v]) => `--p-${k}:${v}`), // the named colours of the theme (ТЗ 57)
+    // the theme's fonts (ТЗ 57 §7): the interface's, the monospace, the titles
+    `--ui:${fontCss(t.fonts.ui, 'ui')}`,
+    `--mono:${fontCss(t.fonts.mono, 'mono')}`,
+    `--font-display:${fontCss(t.fonts.title, 'title')}`,
+    `--font-mono:${fontCss(t.fonts.mono, 'mono')}`,
   ].join(';');
 
 /** The old names inside the new editor: its tooltips (the tags offered, a folded match, a line's link) are drawn by

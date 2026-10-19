@@ -78,9 +78,15 @@ export function listen(e: EventName, send: (p: unknown) => void, ownsView: (kind
     case 'folder.changed':
       return watch(() => store.dir, (d) => send({ folder: d }));
     case 'theme.changed': {
-      const o = new MutationObserver(() => send({ appearance: document.documentElement.dataset.appearance ?? null }));
+      const tell = () => send({ appearance: document.documentElement.dataset.appearance ?? null });
+      const o = new MutationObserver(tell);
       o.observe(document.documentElement, { attributes: true, attributeFilter: ['data-appearance', 'style'] });
-      return () => o.disconnect();
+      // another theme of the same light or dark, a colour changed in the theme's editor (ТЗ 57): its tokens are new
+      const stop = watch(() => store.theme.app, () => requestAnimationFrame(tell));
+      return () => {
+        o.disconnect();
+        stop();
+      };
     }
     case 'day.changed': {
       let day = new Date().toDateString();

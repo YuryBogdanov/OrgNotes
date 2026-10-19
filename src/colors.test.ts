@@ -30,14 +30,14 @@ describe('palette', () => {
 });
 
 describe('built-in themes', () => {
-  it('the core has Panopticon and «Синька» (ТЗ 42); the pack four for the light appearance with them, five for the dark; every colour set', () => {
-    expect(BUILTIN.map((t) => t.name)).toEqual(['Panopticon светлая', 'Panopticon тёмная', 'Синька — светлая', 'Синька — тёмная']);
-    expect(ALL.filter((t) => t.appearance === 'light').map((t) => t.name)).toEqual(['Panopticon светлая', 'Синька — светлая', 'Leuven', 'Solarized Light', 'Modus Operandi']);
-    expect(ALL.filter((t) => t.appearance === 'dark').map((t) => t.name)).toEqual(['Panopticon тёмная', 'Синька — тёмная', 'Nord', 'Gruvbox Dark', 'Dracula', 'Modus Vivendi']);
+  it('the core has «Классическая» and «Бумага» / «Синька» (ТЗ 42, ТЗ 57); the pack four for the light appearance with them, five for the dark; every colour set', () => {
+    expect(BUILTIN.map((t) => t.name)).toEqual(['Классическая светлая', 'Классическая тёмная', 'Бумага', 'Синька']);
+    expect(ALL.filter((t) => t.appearance === 'light').map((t) => t.name)).toEqual(['Классическая светлая', 'Бумага', 'Leuven', 'Solarized Light', 'Modus Operandi']);
+    expect(ALL.filter((t) => t.appearance === 'dark').map((t) => t.name)).toEqual(['Классическая тёмная', 'Синька', 'Nord', 'Gruvbox Dark', 'Dracula', 'Modus Vivendi']);
     for (const t of ALL) for (const n of NAMED) expect(t.colors.palette[n], t.name + ' ' + n).toMatch(/^#[0-9a-f]{6}$/);
   });
-  it('the Panopticon themes keep the text readable: text, headings and the palette ≥ 4.5:1', () => {
-    for (const t of BUILTIN.filter((x) => x.name.startsWith('Panopticon'))) {
+  it('the classic themes keep the text readable: text, headings and the palette ≥ 4.5:1', () => {
+    for (const t of BUILTIN.filter((x) => x.name.startsWith('Классическая'))) {
       const c = t.colors;
       for (const v of [c.fg, c.h1, c.h2, c.h3, c.link, c.date, ...Object.values(c.palette)]) expect(contrast(v, c.bg), t.name + ' ' + v).toBeGreaterThanOrEqual(4.5);
     }
@@ -67,7 +67,7 @@ describe('own themes', async () => {
     expect(t.name).toBe('Моя');
     expect(t.colors.bg).toBe('#112233');
     expect(t.colors.h5).toBe('#abcdef');
-    expect(t.colors.fg).toBe(BUILTIN.find((x) => x.name === 'Panopticon тёмная')!.colors.fg);
+    expect(t.colors.fg).toBe(BUILTIN.find((x) => x.name === 'Классическая тёмная')!.colors.fg);
     expect(t.colors.palette.red).toBe('#ff0000');
     expect(parseTheme('{"name":"x"}')).toBeNull();
     expect(parseTheme('nope')).toBeNull();
@@ -109,5 +109,50 @@ describe('contrast in the theme editor', async () => {
     expect([...low.keys()]).toEqual(['dim', 'h3']);
     expect(ratioWords(low.get('dim')!)).toBe('1,9:1');
     expect(lowContrast({ ...c, h6: '#eeeeee' }).has('h6')).toBe(true);
+  });
+});
+
+// ТЗ 57 §4: the themes of the old format read into the app's theme; the new format read and written back
+describe('the app theme of a theme', async () => {
+  const { parseTheme, themeJson, copyOf, fromApp, themeAlias } = await import('./themes');
+  const { editorColors, isDarkTheme } = await import('./appTheme');
+  it('the old format: the ground, the text, the accent the cursor; the palette; the headings by levels when they differ; its own colours kept', () => {
+    const leuven = ALL.find((x) => x.name === 'Leuven')!;
+    expect(leuven.app.base).toEqual({ bg: leuven.colors.bg, ink: leuven.colors.fg, accent: leuven.colors.cursor.slice(0, 7) });
+    const nord = ALL.find((x) => x.name === 'Nord')!;
+    expect(nord.app.palette).toEqual(nord.colors.palette);
+    expect(nord.app.details.headings).toBe('levels');
+    expect(nord.app.details.levels).toEqual([nord.colors.h1, nord.colors.h2, nord.colors.h3, nord.colors.h4]);
+    expect(nord.app.details.grid).toBe('quiet');
+    expect(nord.app.fonts.title).toBe('Yeseva One');
+    expect(nord.v).toBeUndefined(); // the editor keeps the file's own colours
+    // Nord's and Dracula's cursor is their text: the accent is their link
+    expect(nord.app.base.accent).toBe(nord.colors.link);
+    const dr = ALL.find((x) => x.name === 'Dracula')!;
+    expect(dr.app.base.accent).toBe(dr.colors.link);
+    expect(isDarkTheme(dr.app)).toBe(true);
+    // the same headings: the text's colour
+    expect(BUILTIN.find((x) => x.name === 'Бумага')!.app.details.headings).toBe('ink');
+  });
+  it('an old file is written back as it was till the theme changes', () => {
+    const text = readFileSync(new URL('./plugins/theme-pack/themes/nord.json', import.meta.url), 'utf8');
+    const t = parseTheme(text)!;
+    expect(JSON.parse(themeJson(t))).toEqual(JSON.parse(themeJson(parseTheme(themeJson(t))!)));
+    expect(JSON.parse(themeJson(t)).version).toBe(1);
+  });
+  it('the new format: read back as written, the editor colours derived; missing parts from «Бумага» / «Синька»', () => {
+    const t = fromApp({ ...copyOf(ALL.find((x) => x.name === 'Dracula')!, []).app, details: { grid: 'visible', headings: 'ink', side: '#1e1f29' }, fonts: { title: 'Georgia', text: 'Georgia', ui: 'system', mono: 'Menlo' } });
+    const json = themeJson(t);
+    expect(JSON.parse(json).v).toBe(2);
+    const back = parseTheme(json)!;
+    expect(back).toEqual(t);
+    expect(back.colors).toEqual(editorColors(back.app));
+    expect(back.appearance).toBe('dark');
+    const bare = parseTheme(JSON.stringify({ format: 'panopticon-theme', v: 2, name: 'Пусто', base: { bg: '#0a0a0a' } }))!;
+    expect(bare.app.base.ink).toBe('#e6edf6');
+    expect(bare.app.fonts.mono).toBe('IBM Plex Mono');
+  });
+  it('the built-in names before ТЗ 57 are read as the new ones', () => {
+    expect(['Panopticon светлая', 'Panopticon тёмная', 'Синька — светлая', 'Синька — тёмная', 'Nord'].map(themeAlias)).toEqual(['Классическая светлая', 'Классическая тёмная', 'Бумага', 'Синька', 'Nord']);
   });
 });

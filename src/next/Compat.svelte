@@ -9,7 +9,7 @@
   // new colours, its layout and fonts its own. The tokens themselves too: a menu moved to <body> (`use:portal`) is out
   // of the window's frame. `data-ui="next"` lets a plugin know where it is. No box of its own: `display: contents`.
   let { children }: { children: Snippet } = $props();
-  const style = $derived(`${tokenVars(store.appearance)};${compatVars(store.appearance)}`);
+  const style = $derived(`${tokenVars(store.theme.app)};${compatVars(store.theme.app)}`);
 </script>
 
 <div class="compat" data-ui="next" {style}>{@render children()}</div>

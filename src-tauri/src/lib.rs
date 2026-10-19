@@ -202,6 +202,7 @@ pub fn run() {
             system::remind_end_day,
             system::notify_system,
             system::clipboard_text,
+            system::font_families,
             show_main_window,
             themes::list_themes,
             themes::write_theme,

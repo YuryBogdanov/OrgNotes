@@ -53,9 +53,9 @@ test('the built-in themes; by default the look is as before; a theme recolours t
   await openSettingsSheet(page, 'Оформление');
   const light = look(page).getByRole('radiogroup', { name: 'Тема при светлом оформлении' });
   const dark = look(page).getByRole('radiogroup', { name: 'Тема при тёмном оформлении' });
-  expect(await light.getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Panopticon светлая', 'Синька — светлая', 'Leuven', 'Solarized Light', 'Modus Operandi']);
-  expect(await dark.getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Panopticon тёмная', 'Синька — тёмная', 'Nord', 'Gruvbox Dark', 'Dracula', 'Modus Vivendi']);
-  await expect(light.getByRole('radio', { name: 'Panopticon светлая' })).toHaveAttribute('aria-checked', 'true');
+  expect(await light.getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Классическая светлая', 'Бумага', 'Leuven', 'Solarized Light', 'Modus Operandi']);
+  expect(await dark.getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['Классическая тёмная', 'Синька', 'Nord', 'Gruvbox Dark', 'Dracula', 'Modus Vivendi']);
+  await expect(light.getByRole('radio', { name: 'Классическая светлая' })).toHaveAttribute('aria-checked', 'true');
   await expect(light.getByRole('radio', { name: 'Leuven' }).locator('..')).toContainText('из плагина');
   await light.getByRole('radio', { name: 'Solarized Light' }).click();
   await expect(light.getByRole('radio', { name: 'Solarized Light' })).toHaveAttribute('aria-checked', 'true');

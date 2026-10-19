@@ -1,6 +1,6 @@
 <script lang="ts">
   import { store } from '../../store.svelte';
-  import { tokenVars, FONTS } from '../tokens';
+  import { tokenVars, fontCss } from '../tokens';
   import Button from './Button.svelte';
   import Field from './Field.svelte';
   import Sheet from './Sheet.svelte';
@@ -22,7 +22,7 @@
   ];
 </script>
 
-<div class="next kit" data-ui="next" style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--mono:{FONTS.mono}">
+<div class="next kit" data-ui="next" style="{tokenVars(store.theme.app)};--ui:{fontCss(store.theme.app.fonts.ui, 'ui')};--mono:{fontCss(store.theme.app.fonts.mono, 'mono')}">
   <div class="row">
     <Button kind="main" key="↩">Сохранить</Button>
     <Button key="esc">Отмена</Button>

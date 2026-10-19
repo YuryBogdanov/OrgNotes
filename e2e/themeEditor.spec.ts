@@ -50,7 +50,7 @@ test('a colour from the picker or as hex applies at once — the example, the op
   await expect(row(page, 'h1')).toContainText('#FF8800');
   expect(await css(page, '.pvbody .cm-h1')).toBe('rgb(255, 136, 0)');
   expect(await css(page, '.pane .cm-h1')).toBe('rgb(255, 136, 0)'); // the chosen theme: the window's editor too
-  await expect.poll(async () => (await file(page, 'Panopticon тёмная — моя'))?.colors.h1).toBe('#ff8800');
+  await expect.poll(async () => (await file(page, 'Классическая тёмная — моя'))?.colors.h1).toBe('#ff8800');
   // a colour of the palette; ⎋ closes the picker, not the settings
   await pop(page).getByRole('button', { name: /Цвет палитры/ }).first().click();
   await page.keyboard.press('Escape');
@@ -117,7 +117,7 @@ test('levels 5–9: hidden behind a link, inherit level 4 until set, «Как у
   await page.getByRole('menuitem', { name: 'Как уровень 4' }).click();
   await expect(row(page, 'h5')).toContainText('как уровень 4');
   await expect(row(page, 'h5')).toContainText('#123456');
-  await expect.poll(async () => (await file(page, 'Panopticon тёмная — моя'))?.colors.h5).toBeUndefined();
+  await expect.poll(async () => (await file(page, 'Классическая тёмная — моя'))?.colors.h5).toBeUndefined();
   // a theme with a deep level set opens unfolded
   await ed(page).getByRole('button', { name: 'Скрыть уровни 5–9' }).click();
   await expect(row(page, 'h5')).toHaveCount(0);

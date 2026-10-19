@@ -1,6 +1,10 @@
-// Editor themes (ТЗ 25): sets of colours for the text editor only, one chosen for the light appearance and one for
-// the dark. A theme also gives the shade of each of the eight named colours that statuses and tags use, so they
-// suit any theme. The rest of the app keeps its own light and dark tokens (app.css).
+// Themes (ТЗ 25, ТЗ 57): one chosen for the light appearance and one for the dark. Since ТЗ 57 a theme is the app's
+// whole (`app`: appTheme.ts — the ground, the text, the accent, the palette, details, fonts); its editor colours
+// (`colors`, ТЗ 25) are derived from that, or — a theme of the old format, its own file not changed yet — its file's
+// own, the app's theme read from them (`fromV1`, §4). A theme also gives the shade of each of the eight named colours
+// that statuses and tags use, so they suit any theme.
+
+import { BLUEPRINT, DEFAULT_FONTS, PAPER, contrastOf, editorColors, isDarkTheme, type AppTheme } from './appTheme';
 
 export type Appearance = 'light' | 'dark';
 export type AppearanceChoice = 'system' | Appearance;
@@ -22,50 +26,68 @@ export interface ThemeColors {
 }
 export interface Theme {
   name: string;
+  /** Light or dark by its ground (ТЗ 57 §1). */
   appearance: Appearance;
   builtin: boolean;
   basedOn?: string;
   /** A plugin's theme (its id): chosen and copied as a built-in one, gone when the plugin is off. */
   plugin?: string;
+  /** The editor's colours: derived from `app` (v2), or the old format's own (v1). */
   colors: ThemeColors;
+  /** The theme of the whole app (ТЗ 57). */
+  app: AppTheme;
+  /** 2: the format of ТЗ 57 (`colors` derived); missing — the old one, written back as it was till it is changed. */
+  v?: 2;
 }
 
-const T = (name: string, appearance: Appearance, colors: ThemeColors): Theme => ({ name, appearance, builtin: true, colors });
+/** The app's theme of a theme of the old format (ТЗ 57 §4): the ground, the text, the accent the cursor (the link
+ *  when the cursor is the text's colour, as Dracula's), the palette, the headings by levels when they differ. */
+export function fromV1(name: string, c: ThemeColors, source: AppTheme['source']): AppTheme {
+  const accent = contrastOf(c.cursor.slice(0, 7), c.fg.slice(0, 7)) < 1.6 ? c.link : c.cursor;
+  const lv: [string, string, string, string] = [c.h1, c.h2, c.h3, c.h4];
+  const levels = new Set(lv).size > 1;
+  return {
+    name, source,
+    base: { bg: c.bg.slice(0, 7), ink: c.fg.slice(0, 7), accent: accent.slice(0, 7) },
+    palette: { ...c.palette },
+    details: { grid: 'quiet', headings: levels ? 'levels' : 'ink', ...(levels ? { levels: lv } : {}) },
+    fonts: { ...DEFAULT_FONTS },
+  };
+}
+/** A theme of the format of ТЗ 57: its editor colours derived. */
+export function fromApp(app: AppTheme, o: { builtin?: boolean; plugin?: string; basedOn?: string } = {}): Theme {
+  return { name: app.name, appearance: isDarkTheme(app) ? 'dark' : 'light', builtin: !!o.builtin, ...(o.plugin ? { plugin: o.plugin } : {}), ...(o.basedOn ? { basedOn: o.basedOn } : {}), colors: editorColors(app), app, v: 2 };
+}
+
+const T = (name: string, appearance: Appearance, colors: ThemeColors): Theme => ({ name, appearance, builtin: true, colors, app: fromV1(name, colors, 'builtin') });
 
 // The Panopticon themes are the colours the editor had before themes (app.css) — the core's; the themes laid out from
 // the Emacs ones (Leuven, Solarized, Modus, Nord, Gruvbox, Dracula) are a plugin of data, src/plugins/theme-pack
 // (roadmap 1.4).
 export const BUILTIN: Theme[] = [
-  T('Panopticon светлая', 'light', {
+  // the editor's colours before themes (app.css), «Panopticon светлая / тёмная» till ТЗ 57
+  T('Классическая светлая', 'light', {
     bg: '#ffffff', fg: '#1d1d1f', dim: '#6e6e76', curLine: '#0a64d60d', selection: '#0a64d642', cursor: '#0a64d6',
     h1: '#0a58c2', h2: '#0b7a6f', h3: '#a4510a', h4: '#a4510a',
     date: '#a3187a', tag: '#4a4a52', link: '#0a58c2', meta: '#6e6e76', code: '#a3187a',
     palette: { red: '#c4262e', orange: '#935300', yellow: '#7d6400', green: '#1d7f3a', teal: '#0b7a6f', blue: '#0a58c2', purple: '#7a3fc4', gray: '#5f5f66' },
   }),
-  T('Panopticon тёмная', 'dark', {
+  T('Классическая тёмная', 'dark', {
     bg: '#1e1e22', fg: '#ececef', dim: '#9a9aa5', curLine: '#6cb4ff12', selection: '#0a84ff73', cursor: '#6cb4ff',
     h1: '#6cb4ff', h2: '#5fd3c2', h3: '#f0a45d', h4: '#f0a45d',
     date: '#f58ad4', tag: '#c9c9d2', link: '#6cb4ff', meta: '#9a9aa5', code: '#f58ad4',
     palette: { red: '#ff7b80', orange: '#f0b04d', yellow: '#e8d26a', green: '#6fd58a', teal: '#5fd3c2', blue: '#6cb4ff', purple: '#c39bff', gray: '#a9a9b3' },
   }),
-  // «Синька» (ТЗ 42 §3.2): the new interface's «бумага» and «синька» — the default there, a choice here; the colours
-  // of its tokens (next/tokens.ts) made opaque on the background
-  T('Синька — светлая', 'light', {
-    bg: '#f8f6f0', fg: '#15243a', dim: '#69727d', curLine: '#e3aa3c2b', selection: '#e3aa3c5c', cursor: '#e3aa3c',
-    h1: '#15243a', h2: '#15243a', h3: '#15243a', h4: '#15243a',
-    date: '#1f5fbf', tag: '#69727d', link: '#8a5f0e', meta: '#69727d', code: '#495464',
-    palette: { red: '#c4432f', orange: '#a2700c', yellow: '#8a6a0a', green: '#2f7d4f', teal: '#1f7a78', blue: '#1f5fbf', purple: '#7a3fc4', gray: '#69727d' },
-  }),
-  T('Синька — тёмная', 'dark', {
-    bg: '#101c2c', fg: '#e6edf6', dim: '#778495', curLine: '#f2c66d21', selection: '#f2c66d4d', cursor: '#f2c66d',
-    h1: '#e6edf6', h2: '#e6edf6', h3: '#e6edf6', h4: '#e6edf6',
-    date: '#8ab8ff', tag: '#778495', link: '#f2c66d', meta: '#778495', code: '#9ca7b5',
-    palette: { red: '#ff8f7e', orange: '#f0a868', yellow: '#f2c66d', green: '#8fd6a6', teal: '#7fd4cf', blue: '#8ab8ff', purple: '#c9a2ff', gray: '#a3adbb' },
-  }),
+  // the new interface's «Бумага» and «Синька» (ТЗ 42 §3.2), the default there; till ТЗ 57 «Синька — светлая / тёмная»
+  fromApp(PAPER, { builtin: true }),
+  fromApp(BLUEPRINT, { builtin: true }),
 ];
-export const DEFAULT_THEME: Record<Appearance, string> = { light: 'Panopticon светлая', dark: 'Panopticon тёмная' };
+export const DEFAULT_THEME: Record<Appearance, string> = { light: 'Классическая светлая', dark: 'Классическая тёмная' };
 /** The new interface's themes by default (ТЗ 42 §3.2), till one is chosen. */
-export const NEXT_THEME: Record<Appearance, string> = { light: 'Синька — светлая', dark: 'Синька — тёмная' };
+export const NEXT_THEME: Record<Appearance, string> = { light: 'Бумага', dark: 'Синька' };
+/** The built-in themes' names before ТЗ 57: a choice kept on this Mac, a theme based on one. */
+const RENAMED: Record<string, string> = { 'Panopticon светлая': 'Классическая светлая', 'Panopticon тёмная': 'Классическая тёмная', 'Синька — светлая': 'Бумага', 'Синька — тёмная': 'Синька' };
+export const themeAlias = (name: string) => RENAMED[name] ?? name;
 export const builtinFor = (a: Appearance) => BUILTIN.find((t) => t.name === DEFAULT_THEME[a])!;
 
 /** A heading level's colour: 5…9 as level 4 unless set; deeper than 9 as 9. */
@@ -146,8 +168,8 @@ const DEEP = ['h5', 'h6', 'h7', 'h8', 'h9'] as const;
 /** `#rgb` → `#rrggbb`, lower case. */
 const full = (c: string) => (c.length === 4 ? '#' + [...c.slice(1)].map((x) => x + x).join('') : c).toLowerCase();
 
-/** A theme from its file: unknown keys ignored, missing colours from the Panopticon theme of its appearance; null
- *  when it is not a Panopticon theme at all. */
+/** A theme from its file: the format of ТЗ 57 (`"v": 2`) or the old one (ТЗ 25); unknown keys ignored, missing
+ *  colours from the built-in theme of its appearance; null when it is not a Panopticon theme at all. */
 export function parseTheme(text: string): Theme | null {
   let v: any;
   try {
@@ -156,23 +178,52 @@ export function parseTheme(text: string): Theme | null {
     return null;
   }
   if (!v || typeof v !== 'object' || v.format !== 'panopticon-theme' || typeof v.name !== 'string' || !v.name.trim()) return null;
-  const c = v.colors && typeof v.colors === 'object' ? v.colors : {};
+  const name = v.name.trim().slice(0, 80);
+  const basedOn = typeof v.basedOn === 'string' ? themeAlias(v.basedOn) : undefined;
   const ok = (x: unknown): x is string => typeof x === 'string' && COLOR.test(x);
+  const hex = (x: unknown, or: string) => (ok(x) ? full(x).slice(0, 7) : or);
+  if (v.v === 2) {
+    const b = v.base && typeof v.base === 'object' ? v.base : {};
+    const like = ok(b.bg) && lum(full(b.bg)) < 0.2 ? BLUEPRINT : PAPER;
+    const d = v.details && typeof v.details === 'object' ? v.details : {};
+    const f = v.fonts && typeof v.fonts === 'object' ? v.fonts : {};
+    const font = (x: unknown, or: string) => (typeof x === 'string' && x.trim() ? x.trim().slice(0, 80) : or);
+    const levels = Array.isArray(d.levels) && d.levels.length === 4 && d.levels.every(ok) ? (d.levels.map((x: string) => full(x).slice(0, 7)) as [string, string, string, string]) : undefined;
+    const app: AppTheme = {
+      name, source: 'own',
+      base: { bg: hex(b.bg, like.base.bg), ink: hex(b.ink, like.base.ink), accent: hex(b.accent, like.base.accent) },
+      palette: Object.fromEntries(NAMED.map((n) => [n, hex(v.palette?.[n], like.palette[n])])) as Record<Named, string>,
+      details: {
+        ...(ok(d.side) ? { side: full(d.side).slice(0, 7) } : {}),
+        grid: d.grid === 'none' || d.grid === 'visible' ? d.grid : 'quiet',
+        headings: d.headings === 'levels' && levels ? 'levels' : 'ink',
+        ...(levels ? { levels } : {}),
+      },
+      fonts: { title: font(f.title, DEFAULT_FONTS.title), text: font(f.text, DEFAULT_FONTS.text), ui: font(f.ui, DEFAULT_FONTS.ui), mono: font(f.mono, DEFAULT_FONTS.mono) },
+    };
+    return fromApp(app, { basedOn });
+  }
+  const c = v.colors && typeof v.colors === 'object' ? v.colors : {};
   const appearance: Appearance = v.appearance === 'dark' || v.appearance === 'light' ? v.appearance : ok(c.bg) && lum(full(c.bg)) < 0.18 ? 'dark' : 'light';
   const base = builtinFor(appearance).colors;
   const colors: ThemeColors = { ...base, palette: { ...base.palette } };
   for (const k of KEYS) if (ok(c[k])) colors[k] = full(c[k]);
   for (const k of DEEP) if (ok(c[k])) colors[k] = full(c[k]);
   for (const n of NAMED) if (ok(c.palette?.[n])) colors.palette[n] = full(c.palette[n]);
-  return { name: v.name.trim().slice(0, 80), appearance, builtin: false, basedOn: typeof v.basedOn === 'string' ? v.basedOn : undefined, colors };
+  return { name, appearance, builtin: false, basedOn, colors, app: fromV1(name, colors, 'own') };
 }
-/** The file text of a theme. */
+/** The file text of a theme: in its own format (the old one stays old till the new editor changes it). */
 export function themeJson(t: Theme): string {
+  const based = t.basedOn ? { basedOn: t.basedOn } : {};
+  if (t.v === 2) {
+    const a = t.app;
+    return JSON.stringify({ format: 'panopticon-theme', v: 2, name: t.name, ...based, base: a.base, palette: a.palette, details: a.details, fonts: a.fonts }, null, 2) + '\n';
+  }
   const colors: Record<string, unknown> = {};
   for (const k of KEYS) colors[k] = t.colors[k];
   for (const k of DEEP) if (t.colors[k]) colors[k] = t.colors[k];
   colors.palette = { ...t.colors.palette };
-  return JSON.stringify({ format: 'panopticon-theme', version: 1, name: t.name, appearance: t.appearance, ...(t.basedOn ? { basedOn: t.basedOn } : {}), colors }, null, 2) + '\n';
+  return JSON.stringify({ format: 'panopticon-theme', version: 1, name: t.name, appearance: t.appearance, ...based, colors }, null, 2) + '\n';
 }
 /** The file of an own theme: its name with the characters a file name cannot have replaced. */
 export const themeFile = (name: string) => name.replace(/[/\\:]/g, '-').replace(/^\.+/, '').trim() + '.json';
@@ -183,10 +234,12 @@ export function uniqueName(name: string, taken: string[]): string {
   const base = name.replace(/ \(\d+\)$/, '');
   for (let i = 2; ; i++) if (!low.has(themeFile(`${base} (${i})`).toLowerCase())) return `${base} (${i})`;
 }
-/** A copy of a theme to make one's own: «Nord — моя», based on the theme copied. */
-export function copyOf(t: Theme, taken: string[]): Theme {
-  const name = uniqueName(t.builtin ? `${t.name} — моя` : t.name, taken);
-  return { name, appearance: t.appearance, builtin: false, basedOn: t.builtin ? t.name : (t.basedOn ?? t.name), colors: { ...t.colors, palette: { ...t.colors.palette } } };
+/** A copy of a theme to make one's own: «Nord — моя» (the new interface: «Nord — копия», or a name of its own as
+ *  «Новая тема»), based on the theme copied. */
+export function copyOf(t: Theme, taken: string[], as?: string): Theme {
+  const name = uniqueName(as ?? (t.builtin ? `${t.name} — моя` : t.name), taken);
+  const app: AppTheme = { ...t.app, name, source: 'own', base: { ...t.app.base }, palette: { ...t.app.palette }, details: { ...t.app.details }, fonts: { ...t.app.fonts } };
+  return { name, appearance: t.appearance, builtin: false, basedOn: t.builtin ? t.name : (t.basedOn ?? t.name), colors: { ...t.colors, palette: { ...t.colors.palette } }, app, ...(t.v ? { v: t.v } : {}) };
 }
 
 // ---- the theme editor (ТЗ 25 §2.5): colours that read badly on the theme's background -------------------------------

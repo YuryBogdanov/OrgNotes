@@ -22,8 +22,8 @@ for (const scheme of ['light', 'dark'] as const)
     expect(await page.locator(sheet).evaluate((e) => !!e.closest('.compat[data-ui="next"]'))).toBe(false);
     // the theme's editor is the new interface's own too (54.8): no section in the layer
     await page.getByRole('tab', { name: 'Оформление' }).click();
-    await page.getByRole('radiogroup', { name: 'Тема при светлом оформлении' }).getByRole('radio').first().click({ button: 'right' });
-    await page.getByRole('menuitem', { name: 'Редактировать' }).click();
+    await page.getByRole('radiogroup', { name: 'Темы' }).getByRole('radio', { checked: true }).click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Дублировать и изменить…' }).click();
     await expect(page.getByRole('region', { name: 'Редактор темы' })).toBeVisible();
     await expect(page.locator(`${sheet} .compat`)).toHaveCount(0);
     // the layer itself (the window's, for the plugins' parts): the old variables by the new tokens

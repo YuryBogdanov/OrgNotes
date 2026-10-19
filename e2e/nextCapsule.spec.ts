@@ -44,12 +44,17 @@ test('the status capsule on the capitals\' middle at every level, in each text f
   await expect(page.locator('.next[data-ui="next"] .cm-r-status').first()).toBeVisible();
   await page.locator('.cm-line', { hasText: 'текст' }).click(); // the caret off the headings
   await page.evaluate(() => document.fonts.ready);
-  for (const font of ['Cormorant Garamond', 'Системный', 'Моноширинный']) {
+  // the text font is the theme's (ТЗ 57.5): an own one to change
+  await page.evaluate(async () => {
+    const { store } = await import('/src/store.svelte.ts' as string);
+    await store.copyTheme(store.theme, 'Моя', store.appearance);
+  });
+  for (const font of ['Cormorant Garamond', 'Системный', 'IBM Plex Mono']) {
     if (font !== 'Cormorant Garamond') {
       await page.keyboard.press('Meta+,');
       await settingsSheet(page).getByRole('tab', { name: 'Оформление', exact: true }).click();
       await settingsSheet(page).getByRole('button', { name: /^Шрифт текста:/ }).click();
-      await page.getByRole('menuitem', { name: font }).click();
+      await page.getByRole('listbox', { name: 'Шрифт текста' }).getByRole('option', { name: font }).click();
       await page.keyboard.press('Escape');
       await page.locator('.cm-line', { hasText: 'текст' }).click();
     }

@@ -2,9 +2,10 @@
 // of each, on this Mac — the built-in themes, the plugins' ones and the own ones (`themes/*.json`). The store forwards
 // to it.
 
-import { cachedTheme, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
-import { BUILTIN, DEFAULT_THEME, builtinFor, copyOf, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
+import { cachedTheme, defaultThemes, effective, readChoice, readThemeNames, saveChoice, saveThemeName, systemDark as isSystemDark, themeNamed } from './appearance';
+import { BUILTIN, builtinFor, copyOf, fromApp, fromV1, parseTheme, themeFile, themeJson, uniqueName, type Appearance, type AppearanceChoice, type Theme } from './themes';
 import { notify } from './notify.svelte';
+import type { AppTheme } from './appTheme';
 import { invoke, isTauri, pickOpen, pickSave } from './tauri';
 
 
@@ -25,7 +26,7 @@ class Themes {
   pluginsReady = $state(false);
   addThemes(plugin: string, list: Theme[]) {
     const names = new Set([...BUILTIN, ...this.pluginThemes].map((t) => t.name));
-    const mine = list.filter((t) => !names.has(t.name) && !!names.add(t.name)).map((t) => ({ ...t, builtin: true, plugin }));
+    const mine = list.filter((t) => !names.has(t.name) && !!names.add(t.name)).map((t) => ({ ...t, builtin: true, plugin, app: { ...t.app, source: { plugin } } }));
     this.pluginThemes = [...this.pluginThemes, ...mine];
     this.ownThemes = this.ownThemes.filter((t) => !mine.some((m) => m.name === t.name));
     return () => void (this.pluginThemes = this.pluginThemes.filter((t) => t.plugin !== plugin));
@@ -33,7 +34,7 @@ class Themes {
   /** A chosen theme that is gone (its plugin turned off) gives way to Panopticon of its appearance. */
   resetMissingThemes() {
     if (!this.themesRead) return;
-    for (const a of ['light', 'dark'] as const) if (!this.themes.some((t) => t.name === this.themeNames[a] && t.appearance === a)) this.setThemeName(a, DEFAULT_THEME[a]);
+    for (const a of ['light', 'dark'] as const) if (!this.themes.some((t) => t.name === this.themeNames[a])) this.setThemeName(a, defaultThemes()[a]);
   }
   /** The own themes have been read (till then a chosen own theme is the one cached at the last run). */
   themesRead = $state(false);
@@ -60,11 +61,11 @@ class Themes {
     this.ownThemes = [...this.ownThemes.filter((x) => x.name !== t.name && x.name !== replace), t].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
   }
   /** «+ Новая тема», «Дублировать», editing a built-in one: an own copy, saved and chosen for its appearance. */
-  async copyTheme(t: Theme): Promise<Theme | null> {
-    const c = copyOf(t, this.themes.map((x) => x.name));
+  async copyTheme(t: Theme, as?: string, place: Appearance = t.appearance): Promise<Theme | null> {
+    const c = copyOf(t, this.themes.map((x) => x.name), as);
     if (!(await this.saveTheme(c))) return null;
     this.putTheme(c);
-    this.setThemeName(c.appearance, c.name);
+    this.setThemeName(place, c.name);
     return c;
   }
   /** «Переименовать»: the file follows the name; a taken name gets «(2)». Null: nothing to do. */
@@ -90,11 +91,25 @@ class Themes {
     this.themeEditing = own.name;
   }
   private themeTimer: ReturnType<typeof setTimeout> | undefined;
-  /** A colour changed in the editor: shown at once everywhere, written to its file a moment later. */
+  /** A colour changed in the editor of the old format (ТЗ 25): shown at once everywhere, written to its file a
+   *  moment later; the app's theme read from the colours again. */
   setThemeColors(name: string, colors: Theme['colors']) {
     const t = this.ownThemes.find((x) => x.name === name);
     if (!t) return;
-    const next = { ...t, colors };
+    this.writeLater({ ...t, colors, app: fromV1(t.name, colors, 'own') });
+  }
+  /** The app's theme changed (ТЗ 57's editor): the editor colours derived, the file in the new format. */
+  setThemeApp(name: string, app: AppTheme) {
+    const t = this.ownThemes.find((x) => x.name === name);
+    if (!t) return;
+    const next = fromApp({ ...app, name: t.name, source: 'own' }, { basedOn: t.basedOn });
+    this.writeLater(next);
+  }
+  /** «Сбросить» of the new editor: the theme as it was when the editor opened (its format too). */
+  restoreTheme(t: Theme) {
+    if (this.ownThemes.some((x) => x.name === t.name)) this.writeLater(t);
+  }
+  private writeLater(next: Theme) {
     this.putTheme(next);
     clearTimeout(this.themeTimer);
     this.themeTimer = setTimeout(() => void this.saveTheme(next), 300);
@@ -115,7 +130,7 @@ class Themes {
       return notify.say('Не удалось удалить тему: ' + e);
     }
     this.ownThemes = this.ownThemes.filter((x) => x.name !== t.name);
-    for (const a of ['light', 'dark'] as const) if (this.themeNames[a] === t.name) this.setThemeName(a, DEFAULT_THEME[a]);
+    for (const a of ['light', 'dark'] as const) if (this.themeNames[a] === t.name) this.setThemeName(a, defaultThemes()[a]);
     if (this.themeEditing === t.name) this.themeEditing = null;
   }
   /** «Экспорт…»: the theme's file where the system save panel says. */

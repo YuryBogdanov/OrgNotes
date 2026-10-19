@@ -72,7 +72,7 @@ test('42.2: the tokens of the appearance, «Синька» by default, the bundl
   await openApp(page, { files: FILES, ready: false });
   await expect(nextShell(page)).toBeVisible();
   expect(await nextShell(page).evaluate((el) => getComputedStyle(el).getPropertyValue('--bg').trim())).toBe('#101c2c');
-  expect(await page.evaluate(async () => (await import('/src/store.svelte.ts' as string)).store.theme.name)).toBe('Синька — тёмная');
+  expect(await page.evaluate(async () => (await import('/src/store.svelte.ts' as string)).store.theme.name)).toBe('Синька');
   // the fonts come from the app, not the network
   await expect.poll(() => page.evaluate(async () => (await document.fonts.load('500 19px "Cormorant Garamond"', 'Текст')).length)).toBeGreaterThan(0);
   expect(await page.evaluate(async () => (await document.fonts.load('28px "Yeseva One"', 'Новый')).length)).toBeGreaterThan(0);
@@ -85,7 +85,7 @@ test('42.2: the tokens of the appearance, «Синька» by default, the bundl
   await expect.poll(() => page.evaluate(async () => (await import('/src/store.svelte.ts' as string)).store.loaded)).toBe(true);
   const st = await page.evaluate(async () => {
     const { store } = await import('/src/store.svelte.ts' as string);
-    return { name: store.theme.name, has: store.themes.some((t: any) => t.name === 'Синька — светлая') };
+    return { name: store.theme.name, has: store.themes.some((t: any) => t.name === 'Бумага') };
   });
-  expect(st).toEqual({ name: 'Panopticon светлая', has: true });
+  expect(st).toEqual({ name: 'Классическая светлая', has: true });
 });

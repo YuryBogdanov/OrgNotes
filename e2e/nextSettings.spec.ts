@@ -20,9 +20,14 @@ const look = async (page: Page) => {
   await sheet.getByRole('tab', { name: 'Оформление', exact: true }).click();
   return sheet;
 };
-async function choose(page: Page, sheet: ReturnType<typeof settingsSheet>, label: string, item: string) {
-  await sheet.getByRole('button', { name: new RegExp(`^${label}:`) }).click();
-  await page.getByRole('menuitem', { name: item }).click();
+/** «Шрифт текста» is the theme's (ТЗ 57.5): an own theme first, its text font from the font's menu. */
+async function chooseFont(page: Page, sheet: ReturnType<typeof settingsSheet>, item: string) {
+  await page.evaluate(async () => {
+    const { store } = await import('/src/store.svelte.ts' as string);
+    if (store.theme.builtin) await store.copyTheme(store.theme, 'Моя', store.appearance);
+  });
+  await sheet.getByRole('button', { name: /^Шрифт текста:/ }).click();
+  await page.getByRole('listbox', { name: 'Шрифт текста' }).getByRole('option', { name: item }).click();
 }
 
 test('the old interface: the three settings shown, off', async ({ page }) => {
@@ -45,7 +50,7 @@ test('the new interface: the font, the width and the column change at once and s
   await expect.poll(() => content(page).evaluate((e) => getComputedStyle(e).fontFamily)).toContain('Cormorant');
   await expect.poll(() => content(page).evaluate((e) => getComputedStyle(e).maxWidth)).toBe('700px');
   const sheet = await look(page);
-  await choose(page, sheet, 'Шрифт текста', 'Моноширинный');
+  await chooseFont(page, sheet, 'IBM Plex Mono');
   await sheet.getByRole('radiogroup', { name: 'Ширина текста' }).getByRole('radio', { name: 'Широкая' }).click();
   await sheet.getByRole('switch', { name: '«Структура» справа' }).click();
   await page.keyboard.press('Escape');
@@ -53,14 +58,14 @@ test('the new interface: the font, the width and the column change at once and s
   await expect.poll(() => content(page).evaluate((e) => getComputedStyle(e).fontSize)).toBe('14px');
   await expect.poll(() => content(page).evaluate((e) => getComputedStyle(e).maxWidth)).toBe('860px');
   await expect(page.getByRole('complementary', { name: 'Структура' })).toHaveCount(0);
+  // after a reload (the font is the theme's file's: the mock's disk is not kept, themesOwn checks the files)
   await page.reload();
   await expect(content(page)).toBeVisible();
-  await expect.poll(() => content(page).evaluate((e) => getComputedStyle(e).fontFamily)).toContain('IBM Plex Mono');
   await expect(page.getByRole('complementary', { name: 'Структура' })).toHaveCount(0);
   // «Во всю ширину»: the whole area
   const s2 = await look(page);
   await s2.getByRole('radiogroup', { name: 'Ширина текста' }).getByRole('radio', { name: 'Во всю ширину' }).click();
-  await choose(page, s2, 'Шрифт текста', 'Системный');
+  await chooseFont(page, s2, 'Системный');
   await page.keyboard.press('Escape');
   await expect.poll(() => content(page).evaluate((e) => e.getBoundingClientRect().width)).toBeGreaterThan(1000);
   await expect.poll(() => content(page).evaluate((e) => getComputedStyle(e).fontFamily)).toContain('apple-system');

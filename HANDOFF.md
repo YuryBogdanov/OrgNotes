@@ -971,6 +971,63 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   new interface and the active tab one of the plugin's views. «Долгие дела» ⌥↩ / ⌥-click and the calendar's ⌥-click
   use it (their manifests ask ^1.17); the calendar's column «Выбранный день» `data-beside-hide`. README, apiSurface.
   e2e nextBesidePlugins.spec.ts.
+- **ТЗ 57, the themes of the whole app (`docs/57-temy-prilozheniya.md`)** — a theme is a few colours and fonts; the new
+  interface's tokens and the editor's colours are derived from it. 57.1, the model: `src/appTheme.ts` (`AppTheme`:
+  `base` bg / ink / accent, the eight named colours, `details` — side, grid, headings by levels —, `fonts`; dark by
+  the ground's luminance < 0.2; `deriveTokens` — the tokens of next/tokens.ts, light and dark rules (the light
+  theme's rules and chips are its text's hue brighter, `shade` in HSV; `lampink` the accent darkened by steps of 8 %
+  till 4.5:1 on the ground and on `lampsoft`); `editorColors` — ThemeColors for the editor and the old interface;
+  the built-in «Бумага» / «Синька» (`PAPER`, `BLUEPRINT`, their sidebars set)). `TOKENS` is now derived from them:
+  tokens.test.ts keeps the concept's old values and compares, laid on the ground, ±2 per channel; the palette of
+  «Бумага»: yellow is the old `wait` (#a2700c), orange a new #a8541b.
+  57.2, the old themes: every `Theme` has `app` (its AppTheme) and `v` (2: the new file format, `colors` derived by
+  `editorColors`; missing: the old format — the file's own colours kept for the editor, `app` read from them by
+  `fromV1`: the accent is the cursor, or the link when the cursor is the text's colour as Nord's and Dracula's; the
+  headings by levels when h1…h4 differ). `parseTheme` reads both (`"v": 2`: base, palette, details, fonts — what is
+  missing from «Бумага» / «Синька»), `themeJson` writes each in its own format, so an old file stays old till the new
+  editor changes it (`store.setThemeApp`; the old editor's `setThemeColors` keeps v1). The built-ins: «Классическая
+  светлая / тёмная» (were «Panopticon …»), «Бумага», «Синька» (were «Синька — светлая / тёмная», now `fromApp(PAPER /
+  BLUEPRINT)`); `themeAlias` reads the old names (the choice on this Mac, `basedOn`). `defaultThemes()` — the shell's
+  defaults: a deleted or gone theme gives way to «Бумага» / «Синька» in the new interface.
+  57.3, the choice: a place (light / dark) takes any theme (`themeNamed` by name only, `cachedTheme` too,
+  `resetMissingThemes`); `applyAppearance` puts the theme's own light or dark on the root (`data-appearance`) and the
+  native window. The new interface's tokens are the theme's: `tokenVars(app)` (cached per AppTheme) and
+  `compatVars(app)` (the plugins' layer, the palette `--p-*` the theme's) in App, Compat, FileView, Kit; the windows
+  over other programs take `storedTheme(place)` (appearance.ts: the built-in by name or the one last applied) and
+  follow the main one by `storage`. `defaultThemes()` follows the flag only (the mini window too). A change of theme:
+  `.next.theming` for 260 ms, colours transition 0.2 s (none with reduced motion). «Оформление» (SetLook): the
+  appearance, «Светлая тема» / «Тёмная тема» menus of every theme; «Темы» — `ThemePreview.svelte` (the window in
+  miniature in the theme's tokens and fonts, `fontCss` in tokens.ts, type in `cqw`), the name with six dots, «светлая ·
+  встроенная / <plugin> / своя», the chips of the places, 4 a row; a click → the place in effect, ←→↑↓; the menu
+  «Поставить для светлого / тёмного», «Изменить…», «Дублировать и изменить…» (`copyTheme(t, '<t> — копия', place)`),
+  «Переименовать», «Экспорт…», «Удалить»; «+ Новая тема» — a copy of the theme in effect as «Новая тема».
+  57.4, the theme's editor (SetThemeEditor.svelte, rewritten; the settings' `fill` in place of the gallery, crumb
+  «Оформление › Тема»): «‹ Все темы», «Тема «…»»; on the left (380) the name with «светлая / тёмная — по фону»,
+  «Основа» (the ground, the text, the accent: the contrast chip — the text's to the ground, `lampink`'s for the accent;
+  the hex; a swatch of 26 → ColorPop), «Палитра» (the eight of 28 with short names, a red dot under 4.5:1 to the
+  ground; the user's statuses as capsules in them — `namedFor` over the config's sets), «Детали» (the sidebar Авто /
+  Свой цвет, the grid, the headings by levels — four swatches, the blue / teal / orange / purple of the palette to
+  start); on the right ThemePreview `big`, «Сбросить» (`store.restoreTheme` of the theme as the editor opened it,
+  format kept; renamed meanwhile — under its new name), «Экспорт…». Every change is `store.setThemeApp` (the file in
+  the new format from then). A built-in theme has no «Изменить…»: «Дублировать и изменить…».
+  57.5, the fonts: the theme's four (`app.fonts`: title, text, ui, mono) are the new interface's `--title`, `--text`,
+  `--ui`, `--mono` (App), the plugins' layer's (`--ui`, `--mono`, `--font-display`, `--font-mono`, compatVars), the
+  windows over other programs' and Kit's; `fontCss` (tokens.ts) — the bundled by their stacks, «system» the
+  interface's, any other by name with its role's fallback. `next/fontList.svelte.ts`: the bundled four, the Mac's
+  families read once (Rust `system::font_families` → Swift `Fonts.swift` `font_families_json`: NSFontManager, each
+  `{ name, cyr }` — Cyrillic covered; a Rust test on this Mac), `textFontOf(theme)` (a built-in theme keeps the old
+  «Шрифт текста» of ТЗ 42 — `nextPrefs.font` system / mono — till a font is chosen anew), `fontKind` for editor.css's
+  `data-font` sizes. `FontMenu.svelte`: a button in its font; the menu — the bundled, a rule, the Mac's, a field to
+  find, ↑↓↩⎋, each in its own font, «нет кириллицы». «Оформление → Текст → Шрифт текста» sets the text font of the
+  theme in effect (a built-in one: a sheet «Дублировать и изменить» — the copy takes the font, the editor opens);
+  the editor's «Шрифты» — four rows. The mock answers `font_families` with four families (one without Cyrillic).
+  e2e nextThemeFonts.spec.ts.
+  57.6, the plugins and the windows: the plugins' event `theme.changed` also comes when the theme itself changes
+  (another light one, a colour in the editor: `watch(store.theme.app)`), not only light ↔ dark — the terminal
+  recolours; its ANSI colours are the palette's (`--p-red` … `--p-teal` of the layer, the statuses' tokens if none).
+  A font the Mac lacks gives way to its role's own (`fontCss`: the bundled stack after the name). The plugins'
+  `contributes.themes` may be of the new format (README). The mini window and the quick entry took the theme and its
+  fonts in 57.3 / 57.5. e2e nextThemePlugins.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

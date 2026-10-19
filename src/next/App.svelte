@@ -7,7 +7,8 @@
   import { installMenu, type AppMenu } from '../menu';
   import { toAccelerator } from '../keys';
   import { applyAppearance } from '../appearance';
-  import { tokenVars, FONTS } from './tokens';
+  import { tokenVars, fontCss } from './tokens';
+  import { fontKind, textFontOf } from './fontList.svelte';
   import './fonts';
   import { parentOf } from '../navTree';
   import { focusedEditor } from '../editorKeys';
@@ -195,8 +196,11 @@
     notePop.req = null;
     back?.();
   }
-  // «Шрифт текста» (§10): Cormorant, the system's or IBM Plex Mono — the text of «Оформление»
-  const textFont = $derived(nextPrefs.font === 'system' ? FONTS.ui : nextPrefs.font === 'mono' ? FONTS.mono : FONTS.text);
+  // the theme's fonts (ТЗ 57 §6): the screens' titles, the text of «Оформление» (the old «Шрифт текста» on a built-in
+  // theme, fontList), the interface, the monospace
+  const textName = $derived(textFontOf(store.theme));
+  const textFont = $derived(fontCss(textName, 'text'));
+  const fonts = $derived(store.theme.app.fonts);
   // half the cap height of that font (ТЗ 44 §12): the capsules beside a heading centre on its capitals; measured, not
   // written down — Cormorant ≈ 0.63 em, SF Pro and IBM Plex Mono ≈ 0.70; again once the fonts are loaded
   let capc = $state(0.315);
@@ -247,8 +251,19 @@
     run();
     return true;
   };
-  // the appearance and the editor theme (by default «Синька» here, §3.2), macOS's dark followed
+  // the appearance and the theme (by default «Бумага» / «Синька» here, §3.2), macOS's dark followed
   $effect(() => applyAppearance(store.appearanceChoice, store.appearance, store.theme));
+  // another theme: its colours come in over 200 ms, without a flash (ТЗ 57 §3)
+  let theming = $state(false);
+  let lastTheme = store.theme.name;
+  $effect(() => {
+    const n = store.theme.name;
+    if (n === lastTheme) return;
+    lastTheme = n;
+    theming = true;
+    const t = setTimeout(() => (theming = false), 260);
+    return () => clearTimeout(t);
+  });
   onMount(() => {
     store.searchKept = keptForStep; // ⌥⌘G over the tab's filtered results (ТЗ 53 §5)
     const mq = matchMedia('(prefers-color-scheme: dark)');
@@ -283,7 +298,7 @@
   let mainEl: HTMLDivElement | undefined = $state();
 </script>
 
-<div class="next" data-ui="next" data-font={nextPrefs.font} style="{tokenVars(store.appearance)};--ui:{FONTS.ui};--text:{textFont};--title:{FONTS.title};--mono:{FONTS.mono};--col:{nextPrefs.col};--capc:{capc}">
+<div class="next" class:theming data-ui="next" data-font={fontKind(textName)} style="{tokenVars(store.theme.app)};--ui:{fontCss(fonts.ui, 'ui')};--text:{textFont};--title:{fontCss(fonts.title, 'title')};--mono:{fontCss(fonts.mono, 'mono')};--col:{nextPrefs.col};--capc:{capc}">
   <!-- the first start has the window to itself (ТЗ 48 §6): no sidebar, no tabs under it -->
   <div class="win" style:display={store.start ? "none" : undefined} inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
   <!-- the rail always; ⌘0 hides and shows its panel (ТЗ 50 §3) -->
@@ -342,6 +357,10 @@
 
 <style>
   .next { position: fixed; inset: 0; display: flex; background: var(--bg); color: var(--ink); font: 13px/1.45 var(--ui); }
+  /* another theme coming in (ТЗ 57 §3); none for those who reduce motion */
+  @media (prefers-reduced-motion: no-preference) {
+    .next.theming, .next.theming :global(*) { transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, fill 0.2s, stroke 0.2s !important; }
+  }
   .win { flex: 1; min-width: 0; display: flex; }
   .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 8px 14px; border-radius: 8px; background: var(--card); border: 1px solid var(--rule); box-shadow: var(--popshadow); }
