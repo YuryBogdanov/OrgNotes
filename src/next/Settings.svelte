@@ -31,7 +31,7 @@
   const order = $derived([...nav.own, ...nav.ofPlugins, ...nav.plugins]);
   const tab = $derived(currentSection());
   const ready = (t: string) => nav.ready.includes(t);
-  const crumb = $derived(`${tab}${tab === 'Оформление' && store.themeEditing ? ' › Тема редактора' : ''}${store.settingsCrumb ? ` › ${store.settingsCrumb}` : ''}`);
+  const crumb = $derived(`${tab}${tab === 'Оформление' && store.themeEditing ? ' › Тема' : ''}${store.settingsCrumb ? ` › ${store.settingsCrumb}` : ''}`);
   const wide = $derived(tab === 'Статусы' || tab === 'Клавиши');
   const fill = $derived(tab === 'Оформление' && !!store.themeEditing);
 
