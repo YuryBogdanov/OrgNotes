@@ -44,7 +44,9 @@ export function themeOf(el: Element): ITheme {
   const t = (n: string, fb: string) => cs.getPropertyValue('--' + n).trim() || fb;
   const bg = over(t('bg', '#f8f6f0'), '#ffffff');
   const c = (n: string, fb: string) => over(t(n, fb), bg);
-  const ansi = { red: c('todo', '#c4432f'), green: c('done', '#2f7d4f'), yellow: c('wait', '#a2700c'), blue: c('next', '#1f5fbf'), magenta: c('plug', '#7a3fc4'), cyan: c('lampink', '#97680f'), white: c('ink', '#15243a'), black: c('ink3', '#888888') };
+  // the ANSI colours from the theme's palette (ТЗ 57 §7: `--p-*` of the plugins' layer), the statuses' tokens if none
+  const p = (n: string, tok: string, fb: string) => c('p-' + n, t(tok, fb));
+  const ansi = { red: p('red', 'todo', '#c4432f'), green: p('green', 'done', '#2f7d4f'), yellow: p('yellow', 'wait', '#a2700c'), blue: p('blue', 'next', '#1f5fbf'), magenta: p('purple', 'plug', '#7a3fc4'), cyan: p('teal', 'lampink', '#97680f'), white: c('ink', '#15243a'), black: c('ink3', '#888888') };
   return {
     background: bg,
     foreground: c('ink2', '#444444'),

@@ -87,10 +87,10 @@ describe.each(['light', 'dark'] as const)('the tokens: %s', (a) => {
 // ТЗ 57 §6: a theme's font as CSS
 describe('fontCss', async () => {
   const { fontCss, FONTS } = await import('./tokens');
-  it('the bundled ones by their stacks, «system» the interface\'s, any other by name with its role\'s fallback', () => {
+  it('the bundled ones by their stacks, «system» the interface\'s, any other by name with its role\'s own after it', () => {
     expect(fontCss('Yeseva One', 'title')).toBe(FONTS.title);
     expect(fontCss('system', 'ui')).toBe(FONTS.ui);
-    expect(fontCss('Georgia', 'text')).toBe("'Georgia', Georgia, serif");
-    expect(fontCss("Bad'Name", 'mono')).toBe("'BadName', ui-monospace, Menlo, monospace");
+    expect(fontCss('Georgia', 'text')).toBe(`'Georgia', ${FONTS.text}`);
+    expect(fontCss("Bad'Name", 'mono')).toBe(`'BadName', ${FONTS.mono}`); // missing: the role's own
   });
 });
