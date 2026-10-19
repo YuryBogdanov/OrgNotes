@@ -932,6 +932,10 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   start; no session — one by the default profile, the text queued till it starts; the focus to it. The settings by
   the manifest's schema: the size (11 … 14), the scrollback (1 000 … 50 000), ⌥ as Meta, the notifications, the
   shell — `terms.setOpts` applies them to the open terminals. e2e terminalInsert.spec.ts.
+- **The window's title bar in the new interface:** WKWebView has no `-webkit-app-region` (the CSS stays, harmless):
+  `next/windowDrag.ts` — `use:windowDrag` on the toolbar (Toolbar.svelte) and the lights' room of the rail and of the
+  panel (Sidebar.svelte); a press not on a button, field or tab asks Tauri `startDragging`, a double click
+  `toggleMaximize` (as the old Toolbar.svelte). The mock logs both. e2e nextWindowDrag.spec.ts.
 - **ТЗ 56, the file beside a list (`docs/56-novyy-interfeys-fayl-sboku.md`)** — no second pane in the new interface:
   a list's tab shows the file of its row on the right. 56.1, the frame: `beside.svelte.ts` (`Beside` per tab
   id, in memory — kept while another tab is shown, gone after a restart; `openBeside(tabId, { path, line, hit? })`,

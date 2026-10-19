@@ -13,6 +13,7 @@
   import SearchPanel from './SearchPanel.svelte';
   import TodayPanel from './TodayPanel.svelte';
   import { panelDate } from '../today';
+  import { windowDrag } from './windowDrag';
 
   // The sidebar of the new interface (ТЗ 50 §1–2): the rail of the sections at the window's left edge, 52 pt — the
   // core's, a line, the plugins' (the last ones in «⋯» when they do not fit), the gear at the bottom; buttons of 34 pt
@@ -118,7 +119,7 @@
 
 <aside class="side" class:closed={!open} class:dragging style:width="{open ? 52 + width + 1 : 53}px" aria-label="Боковая панель">
   <div class="rail" bind:clientHeight={railH}>
-    <div class="lights" aria-hidden="true"></div>
+    <div class="lights" aria-hidden="true" use:windowDrag></div>
     <div class="list">
       <nav class="secs" aria-label="Разделы">
         {#each groups.core as s (s.id)}{@render button(s)}{/each}
@@ -140,7 +141,7 @@
     </button>
   </div>
   <div class="pane" style:width="{width}px" inert={!open}>
-    <div class="lights" aria-hidden="true"></div>
+    <div class="lights" aria-hidden="true" use:windowDrag></div>
     <div class="grp head">
       <span class="pt">{broken?.label ?? shown.label}</span>
       {#if !broken && hint(shown)}<kbd>{hint(shown)}</kbd>{/if}

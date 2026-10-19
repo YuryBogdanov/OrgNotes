@@ -5,9 +5,10 @@
   import { TODAY } from '../todayState.svelte';
   import { fmtLong } from '../org';
   import { displayName } from '../names';
+  import { windowDrag } from './windowDrag';
 
   // The toolbar of the new interface (ТЗ 42 §4.1), 52 pt: the sidebar's button (⌘0), the file's name and its path in
-  // the notes folder, «Искать везде» (the palette, ⌘K) and «+» — a new note (⌘N). It drags the window.
+  // the notes folder, «Искать везде» (the palette, ⌘K) and «+» — a new note (⌘N). It drags the window (windowDrag).
   let { onnew }: { onnew: () => void } = $props();
   const folder = $derived((store.dir ?? '').replace(/^\/Users\/[^/]+/, '~'));
   // a screen's tab (ТЗ 43 §4): the screen's name, under it its crumbs — «Сегодня» the day, the agenda its name, a
@@ -28,7 +29,7 @@
   const key = (id: string) => store.keyHint(id);
 </script>
 
-<header class="bar" class:lights={!store.showNav && store.titlebar.lights}>
+<header class="bar" class:lights={!store.showNav && store.titlebar.lights} use:windowDrag>
   <button class="ib" aria-label="Боковая панель" title="Боковая панель ({key('nav')})" aria-pressed={store.showNav} onclick={() => (store.showNav = !store.showNav)}>
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2" /><path d="M6 2.5v11" /></svg>
   </button>
