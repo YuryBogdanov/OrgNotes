@@ -851,6 +851,15 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   moved to `src/pluginLink.svelte.ts` `LinkInstall`, the old UrlSheet uses it too), PluginRemoveSheet (also for
   «Удалить плагин…» of a plugin's own section). The rights' sheet is next/PluginSheets' as before. e2e
   nextSettingsPlugins.spec.ts.
+  54.6, «Статусы»: the draft's logic moved out of StatusesSettings.svelte into `src/statusesEditor.svelte.ts`
+  (`StatusEditor`; `effects()` called in the component's init — the writes, a new row's focus, the layers); both shells'
+  sections use it. `next/SetStatuses.svelte`: «Наборы» 220 (rows of 44, the keywords under the name, dragged by the
+  row, «+ Набор» dashed), the set's name and «Удалить набор» (danger; «в заметках: N?» first); «В работе» and
+  «Завершённые» groups of rows of 40 (the grip, the colour — a next Menu of «Авто» and the named ones, the capsule, the
+  keyword in Plex Mono, the key 44, «новая задача» / «сделать новой» on hover, ×), «+ Состояние»; «В файле» plate;
+  «Поведение» (CLOSED, LOGBOOK — kept though not on the mockup). The rename and delete dialogs are ConfirmSheets. A new
+  state starts grey. No set is a plugin's in the editor, so «только чтение» is not shown. e2e
+  nextSettingsStatuses.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

@@ -12,11 +12,12 @@
   import SetKeys from './SetKeys.svelte';
   import SetMini from './SetMini.svelte';
   import SetPlugins from './SetPlugins.svelte';
+  import SetStatuses from './SetStatuses.svelte';
   import PluginRemoveSheet from './PluginRemoveSheet.svelte';
   import { plugins } from '../api/host.svelte';
   import { pluginUpdates as up } from '../pluginUpdates.svelte';
   import {
-    Picker, SettingsAgendas, SettingsInbox, StatusesSettings,
+    Picker, SettingsAgendas, SettingsInbox,
     TagsSettings, ThemeEditor,
   } from './bridges';
 
@@ -105,6 +106,7 @@
           {:else if tab === 'Клавиши'}<SetKeys />
           {:else if tab === 'Мини-окно'}<SetMini />
           {:else if tab === 'Плагины'}<SetPlugins />
+          {:else if tab === 'Статусы'}<SetStatuses />
           {:else if settingsOf(tab)?.schema}
             <!-- a feature's or a plugin's schema, in the new rows (ТЗ 54 §2) -->
             {@const spec = settingsOf(tab)!}
@@ -123,7 +125,7 @@
                 {@const spec = settingsOf(tab)!}
                 {#if spec.component}<spec.component />{/if}
               {:else if tab === 'Агенды'}<SettingsAgendas onremove={(a) => (confirmAgenda = a)} />
-              {:else}<StatusesSettings />{/if}
+              {/if}
             </Compat>
           </div>
           {/if}
