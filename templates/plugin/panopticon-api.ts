@@ -586,6 +586,9 @@ export interface Ctx {
     /** The heading the user is at: the caret's in the editor, the branch of a view on one heading; null — none. Since
      *  1.9. */
     currentHeading(): HeadingRef | null;
+    /** The lines selected in the editor with the focus (1-based, the first and the last) and its file; null — nothing
+     *  selected. Since 1.16. */
+    selectedLines(): { path: string; from: number; to: number } | null;
     /** An item of the menu of a heading — in the navigator's outline and in the editor on a heading's line — where
      *  `when` says so. Since 1.9. */
     headingAction(spec: { label: string; when?(h: HeadingInfo): boolean; run(h: HeadingRef): void }): Dispose;

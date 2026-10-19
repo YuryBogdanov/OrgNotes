@@ -136,7 +136,19 @@ export class OrgEditor {
         return view.state.sliceDoc(r.from, r.to);
       },
     });
-    this.unregister = registerEditor(view.dom, { run: (id, line) => this.commands[id]?.(view, line) ?? false, onHeading: () => onHeading(view) });
+    this.unregister = registerEditor(view.dom, {
+      run: (id, line) => this.commands[id]?.(view, line) ?? false,
+      onHeading: () => onHeading(view),
+      lines: () => {
+        const r = view.state.selection.main;
+        if (r.empty) return null;
+        const a = view.state.doc.lineAt(r.from).number - 1;
+        // a selection ending at a line's start does not take that line
+        const end = view.state.doc.lineAt(r.to);
+        const b = end.number - 1 - (r.to === end.from && r.to > r.from ? 1 : 0);
+        return [a, Math.max(a, b)];
+      },
+    });
   }
   destroy() {
     this.unregister();

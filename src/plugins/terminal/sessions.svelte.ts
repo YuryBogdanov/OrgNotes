@@ -47,9 +47,9 @@ export class Session {
     this.host.setAttribute('data-own-keys', OWN_KEYS);
     this.host.setAttribute('data-session', this.id);
     this.t = makeTerm({
-      fontSize: 12.5,
-      scrollback: 10000,
-      optionIsMeta: true,
+      fontSize: terms.opts.fontSize,
+      scrollback: terms.opts.scrollback,
+      optionIsMeta: terms.opts.optionMeta,
       onKey: (k) => (k === 'toggle' ? terms.toggle() : void terms.add()),
       onFind: () => (this.findOpen = true),
       copy: (text) => void ctx.clipboard?.write(text),
@@ -118,6 +118,16 @@ export class Session {
   recolor() {
     if (this.host.isConnected) this.t.term.options.theme = themeOf(this.host);
   }
+  /** The plugin's settings changed: the size, the scrollback, ⌥ as Meta. */
+  apply(o: Opts) {
+    this.t.setSize(o.fontSize);
+    this.t.term.options.scrollback = o.scrollback;
+    this.t.term.options.macOptionIsMeta = o.optionMeta;
+  }
+  /** Where the caret of the terminal is: at a line's start. */
+  get atLineStart() {
+    return this.t.term.buffer.active.cursorX === 0;
+  }
   /** Text into the process (a heading's path, 55.6): after it starts if it has not yet. */
   type(text: string) {
     if (this.pty && this.alive) this.pty.write(text);
@@ -128,7 +138,7 @@ export class Session {
     if (!p) return;
     const l = this.launch;
     try {
-      const pty = await p.pty({ command: l.command, args: l.args, cwd: l.cwd, env: l.env, cols: this.t.term.cols || 80, rows: this.t.term.rows || 24 });
+      const pty = await p.pty({ command: l.command, args: l.args, cwd: l.cwd, env: l.env, shell: this.terms.opts.shell || undefined, cols: this.t.term.cols || 80, rows: this.t.term.rows || 24 });
       this.pty = pty;
       this.alive = true;
       this.code = null;
@@ -170,6 +180,14 @@ export class Session {
   }
 }
 
+/** The plugin's settings (§8). */
+export interface Opts {
+  fontSize: number;
+  scrollback: number;
+  optionMeta: boolean;
+  notify: boolean;
+  shell: string;
+}
 /** The plugin's sessions and the one active; the panel's handle. */
 export class Terminals {
   list = $state<Session[]>([]);
@@ -266,10 +284,14 @@ export class Terminals {
   }
   /** The tab «Терминал» is the active one (told by the view). */
   tabShown = $state(false);
+  opts: Opts = { fontSize: 12.5, scrollback: 10000, optionMeta: true, notify: true, shell: '' };
+  setOpts(o: Opts) {
+    this.opts = o;
+    for (const s of this.list) s.apply(o);
+  }
   /** Notify the user on a bell when the window is not in front (the setting, on by default). */
-  notifyOn = true;
   rang(s: Session) {
-    if (!document.hasFocus() && this.notifyOn) void this.ctx.ui.systemNotify({ title: s.name, body: 'ждёт ответа' }, () => this.reveal(s));
+    if (!document.hasFocus() && this.opts.notify) void this.ctx.ui.systemNotify({ title: s.name, body: 'ждёт ответа' }, () => this.reveal(s));
   }
   /** How many rang and are not seen: the section's badge. */
   get ringing() {
@@ -311,6 +333,14 @@ export class Terminals {
   }
   recolor() {
     for (const s of this.list) s.recolor();
+  }
+  /** Text into the active session (§7): shown and in focus; none — one by the default profile, the text after it starts. */
+  insert(text: string) {
+    const s = this.active ?? this.add();
+    this.show();
+    const t = s.alive && s.atLineStart ? text : s.alive ? ` ${text} ` : text;
+    s.type(t);
+    queueMicrotask(() => s.focus());
   }
   dispose() {
     if (this.tick) clearInterval(this.tick);

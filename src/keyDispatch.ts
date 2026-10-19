@@ -42,6 +42,8 @@ function runOne(id: string, scope: Scope, c: Ctx): boolean {
     else store.openPalette(id as 'status');
     return true;
   }
+  // a plugin's command on a heading (1.16): run as the window's, the caret on a heading (or lines selected)
+  if (scope === 'heading' && id.includes('.')) return !!c.editor && (c.editor.onHeading() || !!c.editor.lines?.()) && c.window(id);
   if (scope === 'heading' || scope === 'editor') return c.editor!.run(id);
   return c.window(id);
 }

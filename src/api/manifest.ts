@@ -15,7 +15,8 @@ export interface ManifestCommand {
   synonyms?: string[];
   /** «review»: the keys of an action of the plugin's review (work while its tab is shown); «view»: of its view of a
    *  file (work while a file tab shows it: the board's keys, 1.5). */
-  scope?: 'review' | 'view';
+  /** `heading` (1.16): in the editor, the caret on a heading — in «Клавиши» the group «Заголовок». */
+  scope?: 'review' | 'view' | 'heading';
   /** From the palette it asks in the palette (`ui.choose` at once): the next step of the same window. */
   step?: boolean;
   /** A grey line under it in «Клавиши» (1.6). */
@@ -189,9 +190,9 @@ export function parseManifest(raw: unknown): { ok: true; manifest: Manifest } | 
     const keys = arr(x.keys).filter(isStr);
     const ok = keys.filter((k) => !RESERVED_KEYS.includes(k));
     for (const k of keys) if (!ok.includes(k)) warnings.push(`${k} у «${String(x.title)}» занято приложением`);
-    if (x.scope !== undefined && x.scope !== 'review' && x.scope !== 'view') problems.push(`команда «${x.id}»: scope — review или view`);
+    if (x.scope !== undefined && x.scope !== 'review' && x.scope !== 'view' && x.scope !== 'heading') problems.push(`команда «${x.id}»: scope — review, view или heading`);
     if (x.cardKey !== undefined && !(typeof x.cardKey === 'string' && /^[A-Za-z0-9]$/.test(x.cardKey))) problems.push(`команда «${x.id}»: cardKey — одна латинская буква или цифра`);
-    commands.push({ id: x.id as string, title: String(x.title ?? ''), keys: ok, ...(typeof x.cardKey === 'string' && /^[A-Za-z0-9]$/.test(x.cardKey) ? { cardKey: x.cardKey.toUpperCase() } : {}), synonyms: arr(x.synonyms).filter(isStr), ...(x.scope === 'review' || x.scope === 'view' ? { scope: x.scope } : {}), ...(x.step === true ? { step: true } : {}), ...(isStr(x.note) && x.note ? { note: x.note } : {}) });
+    commands.push({ id: x.id as string, title: String(x.title ?? ''), keys: ok, ...(typeof x.cardKey === 'string' && /^[A-Za-z0-9]$/.test(x.cardKey) ? { cardKey: x.cardKey.toUpperCase() } : {}), synonyms: arr(x.synonyms).filter(isStr), ...(x.scope === 'review' || x.scope === 'view' || x.scope === 'heading' ? { scope: x.scope } : {}), ...(x.step === true ? { step: true } : {}), ...(isStr(x.note) && x.note ? { note: x.note } : {}) });
   }
   const navSections: ManifestNav[] = [];
   for (const x of arr(c.navSections).map(obj)) {

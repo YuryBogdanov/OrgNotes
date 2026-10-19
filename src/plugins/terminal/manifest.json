@@ -9,20 +9,226 @@
   "main": "main.js",
   "defaultEnabled": false,
   "icon": "M3 4h14v12H3zM6 8l2.5 2L6 12M10 12.5h4",
-  "permissions": ["process", "clipboard"],
+  "permissions": [
+    "process",
+    "clipboard",
+    "index.read"
+  ],
   "contributes": {
-    "navSections": [{ "id": "terminal", "title": "Терминал", "icon": "M3 4h14v12H3zM6 8l2.5 2L6 12M10 12.5h4" }],
-    "views": [{ "id": "terminal", "title": "Терминал", "icon": "M3 4h14v12H3zM6 8l2.5 2L6 12M10 12.5h4", "transient": true }],
+    "navSections": [
+      {
+        "id": "terminal",
+        "title": "Терминал",
+        "icon": "M3 4h14v12H3zM6 8l2.5 2L6 12M10 12.5h4"
+      }
+    ],
+    "views": [
+      {
+        "id": "terminal",
+        "title": "Терминал",
+        "icon": "M3 4h14v12H3zM6 8l2.5 2L6 12M10 12.5h4",
+        "transient": true
+      }
+    ],
     "commands": [
-      { "id": "terminal.toggle", "title": "Терминал: показать или скрыть", "keys": ["⌃`"], "synonyms": ["терминал", "консоль", "shell", "оболочка"] },
-      { "id": "terminal.new", "title": "Терминал: новая сессия", "keys": ["⌃⇧`"], "synonyms": ["терминал", "консоль", "сессия"] },
-      { "id": "terminal.toTab", "title": "Терминал: во вкладку", "synonyms": ["терминал"] },
-      { "id": "terminal.toPanel", "title": "Терминал: в панель", "synonyms": ["терминал"] },
-      { "id": "terminal.profile1", "title": "Терминал: профиль 1", "synonyms": ["терминал", "профиль"] },
-      { "id": "terminal.profile2", "title": "Терминал: профиль 2", "synonyms": ["терминал", "профиль"] },
-      { "id": "terminal.profile3", "title": "Терминал: профиль 3", "synonyms": ["терминал", "профиль"] },
-      { "id": "terminal.profile4", "title": "Терминал: профиль 4", "synonyms": ["терминал", "профиль"] },
-      { "id": "terminal.profile5", "title": "Терминал: профиль 5", "synonyms": ["терминал", "профиль"] }
+      {
+        "id": "terminal.toggle",
+        "title": "Терминал: показать или скрыть",
+        "keys": [
+          "⌃`"
+        ],
+        "synonyms": [
+          "терминал",
+          "консоль",
+          "shell",
+          "оболочка"
+        ]
+      },
+      {
+        "id": "terminal.new",
+        "title": "Терминал: новая сессия",
+        "keys": [
+          "⌃⇧`"
+        ],
+        "synonyms": [
+          "терминал",
+          "консоль",
+          "сессия"
+        ]
+      },
+      {
+        "id": "terminal.insertHeading",
+        "title": "Вставить в терминал",
+        "keys": [
+          "⌃C ⌃I"
+        ],
+        "scope": "heading",
+        "synonyms": [
+          "терминал",
+          "путь",
+          "заголовок",
+          "агент"
+        ],
+        "note": "Путь файла и строка заголовка — в активную сессию"
+      },
+      {
+        "id": "terminal.toTab",
+        "title": "Терминал: во вкладку",
+        "synonyms": [
+          "терминал"
+        ]
+      },
+      {
+        "id": "terminal.toPanel",
+        "title": "Терминал: в панель",
+        "synonyms": [
+          "терминал"
+        ]
+      },
+      {
+        "id": "terminal.profile1",
+        "title": "Терминал: профиль 1",
+        "synonyms": [
+          "терминал",
+          "профиль"
+        ]
+      },
+      {
+        "id": "terminal.profile2",
+        "title": "Терминал: профиль 2",
+        "synonyms": [
+          "терминал",
+          "профиль"
+        ]
+      },
+      {
+        "id": "terminal.profile3",
+        "title": "Терминал: профиль 3",
+        "synonyms": [
+          "терминал",
+          "профиль"
+        ]
+      },
+      {
+        "id": "terminal.profile4",
+        "title": "Терминал: профиль 4",
+        "synonyms": [
+          "терминал",
+          "профиль"
+        ]
+      },
+      {
+        "id": "terminal.profile5",
+        "title": "Терминал: профиль 5",
+        "synonyms": [
+          "терминал",
+          "профиль"
+        ]
+      }
+    ],
+    "settings": [
+      {
+        "section": "Терминал",
+        "icon": "M3 4h14v12H3zM6 8l2.5 2L6 12M10 12.5h4",
+        "groups": [
+          {
+            "caption": "Вид",
+            "fields": [
+              {
+                "key": "fontSize",
+                "type": "choice",
+                "look": "menu",
+                "where": "local",
+                "label": "Размер шрифта",
+                "default": 12.5,
+                "options": [
+                  {
+                    "value": 11,
+                    "label": "11"
+                  },
+                  {
+                    "value": 12,
+                    "label": "12"
+                  },
+                  {
+                    "value": 12.5,
+                    "label": "12.5"
+                  },
+                  {
+                    "value": 13,
+                    "label": "13"
+                  },
+                  {
+                    "value": 14,
+                    "label": "14"
+                  }
+                ]
+              },
+              {
+                "key": "scrollback",
+                "type": "choice",
+                "look": "menu",
+                "where": "local",
+                "label": "Прокрутка, строк",
+                "default": 10000,
+                "options": [
+                  {
+                    "value": 1000,
+                    "label": "1 000"
+                  },
+                  {
+                    "value": 5000,
+                    "label": "5 000"
+                  },
+                  {
+                    "value": 10000,
+                    "label": "10 000"
+                  },
+                  {
+                    "value": 50000,
+                    "label": "50 000"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "caption": "Ввод",
+            "fields": [
+              {
+                "key": "optionMeta",
+                "type": "switch",
+                "where": "local",
+                "label": "⌥ как Meta",
+                "hint": "Выключено — ⌥ с буквой печатает символ раскладки",
+                "default": true
+              },
+              {
+                "key": "notify",
+                "type": "switch",
+                "where": "local",
+                "label": "Уведомлять, когда сессия ждёт ответа",
+                "hint": "Уведомление macOS, если окно не в фокусе",
+                "default": true
+              }
+            ]
+          },
+          {
+            "caption": "Оболочка",
+            "fields": [
+              {
+                "key": "shell",
+                "type": "text",
+                "where": "local",
+                "label": "Оболочка",
+                "placeholder": "$SHELL",
+                "hint": "Пусто — оболочка пользователя ($SHELL)",
+                "default": ""
+              }
+            ]
+          }
+        ]
+      }
     ]
   }
 }

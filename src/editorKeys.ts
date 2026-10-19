@@ -5,6 +5,8 @@
 export interface EditorKeys {
   run(id: string, line?: number): boolean; // false: not here (not on a heading, no link…), the key goes on; `line` (0-based): a heading the palette chose
   onHeading(): boolean; // the caret is on a heading line, nothing selected
+  /** The lines of the selection (0-based, the first and the last); null — nothing selected. */
+  lines?(): [number, number] | null;
 }
 const registry = new WeakMap<Element, EditorKeys>();
 
