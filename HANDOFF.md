@@ -933,7 +933,7 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   the manifest's schema: the size (11 … 14), the scrollback (1 000 … 50 000), ⌥ as Meta, the notifications, the
   shell — `terms.setOpts` applies them to the open terminals. e2e terminalInsert.spec.ts.
 - **ТЗ 56, the file beside a list (`docs/56-novyy-interfeys-fayl-sboku.md`)** — no second pane in the new interface:
-  a list's tab shows the file of its row on the right. 56.1, the frame: `next/besideState.svelte.ts` (`Beside` per tab
+  a list's tab shows the file of its row on the right. 56.1, the frame: `beside.svelte.ts` (`Beside` per tab
   id, in memory — kept while another tab is shown, gone after a restart; `openBeside(tabId, { path, line, hit? })`,
   the caret at the end of the first line of the text under the heading, `closeBeside`, `togglePin`; the share 35–65 %,
   `next:besideShare`, 0.46), `next/BesideSplit.svelte` around every list's view in EditorArea («Сегодня», the agendas,
@@ -945,6 +945,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   (`cm/subtree.ts`, `subtreeOf` tested, the class `cm-sub` with a bar of 3 of the lamp), `reveal.top` — that line in the
   upper third. A list's screen gives up its second columns (`data-beside-hide`: the agenda's «Горизонт») and its h1 is
   32. e2e nextBeside.spec.ts.
+  56.2, opening and the keys: the state moved to `src/beside.svelte.ts` (the core's lists and the plugins' host open it;
+  old code never imports `next/`). `lists.besideTab(spec)` — the new interface, a list's tab (the split marks itself
+  `data-beside`), no `otherLabel` (the core's agenda and «Тег» give theirs only in the old interface); `openOther`:
+  ⌥↩ (`taskOpenOther`, «Открыть сбоку»), the menu's item, ⌥-click on a row (a window listener after the row's click)
+  open the row's file beside, the pin kept, the focus left in the list; the same row again — the focus into the file.
+  ⎋ (`taskDeselect`) closes it first. The scope `beside` (rank 30, over the window, the editor and the list): ⌃⌘← /
+  ⌃⌘→ (`besideFocusList` / `besideFocusFile`, nested over the old interface's «Переместить вкладку»), `besideClose`
+  without a key, also the palette's «Закрыть файл сбоку». e2e nextBeside.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

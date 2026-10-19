@@ -3,7 +3,7 @@
   import { store } from '../store.svelte';
   import { openFile } from '../layout';
   import { displayName } from '../names';
-  import { besideOf, besideShare, closeBeside, setBesideShare, togglePin } from './besideState.svelte';
+  import { besideOf, besideShare, closeBeside, setBesideShare, togglePin } from '../beside.svelte';
   import Editor from './Editor.svelte';
 
   // A tab of a list with the file of its row beside it (ТЗ 56 §4): the list on the left (46 % by default, 35–65 %,
@@ -34,8 +34,9 @@
   /** «Открыть вкладкой»: the file as a tab of its own after this one, at its line; beside it is closed. */
   export function openAsTab() {
     if (!b || !file) return;
-    const t = openFile(store.layout, store.layout.active, file.path, b.caret.line, { replace: false, focus: true });
-    t.cursor = { line: b.caret.line, col: b.caret.col };
+    const at = { ...b.caret }; // taken before: the new tab unmounts this one
+    const t = openFile(store.layout, store.layout.active, file.path, at.line, { replace: false, focus: true });
+    t.cursor = at;
     closeBeside(tabId);
   }
   function edKey(e: KeyboardEvent) {
@@ -47,7 +48,7 @@
   }
 </script>
 
-<div class="split" class:open={!!b && !!file} class:over bind:clientWidth={w} bind:this={box} style:--share="{besideShare.v * 100}%">
+<div class="split" data-beside={tabId} class:open={!!b && !!file} class:over bind:clientWidth={w} bind:this={box} style:--share="{besideShare.v * 100}%">
   <div class="list">{@render children()}</div>
   {#if b && file}
     {#if !over}

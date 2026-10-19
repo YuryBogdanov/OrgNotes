@@ -198,7 +198,10 @@ export class AgendaListCtl {
             return it ? { path: it.path, line: it.line, title: it.title, dk: it.dk } : null;
           },
           open: (other) => this.openItem(this.sel, other ? 'here' : 'neighbor'),
-          otherLabel: 'Открыть здесь',
+          // the new interface: ⌥↩ is the core's, the file beside the list (ТЗ 56 §2)
+          get otherLabel() {
+            return store.nextUi ? undefined : 'Открыть здесь';
+          },
           clear: () => this.clear(),
           refresh: () => this.refresh(),
           freeze: () => this.freeze(),

@@ -27,7 +27,7 @@ registerGroup({ id: 'list', title: 'ЗАДАЧИ В СПИСКАХ', note: 'в �
 registerScope({ id: 'list', name: 'в списке задач', over: ['window', 'editor', 'heading'], outside: { scopes: ['window'], word: 'Вне списка' }, rank: 20, alone: true });
 registerKeys([
   C('taskOpen', 'Открыть задачу', 'list', 'list', ['↩']),
-  C('taskOpenOther', 'Открыть во второй панели', 'list', 'list', ['⌥↩']),
+  C('taskOpenOther', 'Открыть сбоку', 'list', 'list', ['⌥↩'], { synonyms: ['файл сбоку', 'вторая панель'], note: 'Второй раз — фокус в файл сбоку · в старом интерфейсе — во второй панели' }),
   C('taskStatusNext', 'Следующий статус', 'list', 'list', ['⇧→']),
   C('taskStatusPrev', 'Предыдущий статус', 'list', 'list', ['⇧←']),
   C('taskPrioUp', 'Приоритет выше', 'list', 'list', ['⇧↑']),
@@ -39,5 +39,13 @@ registerKeys([
   C('taskTags', 'Теги…', 'list', 'list', ['⌃C Q'], { synonyms: ['метки'] }),
   C('taskRefile', 'Перенести в другой файл…', 'list', 'list', [], { emacs: ['⌃C ⌃W'], mac: [], synonyms: ['refile', 'переместить'] }),
   C('taskRefresh', 'Обновить список', 'list', 'list', ['⌘R']),
-  C('taskDeselect', 'Снять выделение', 'list', 'list', ['⎋']),
+  C('taskDeselect', 'Снять выделение', 'list', 'list', ['⎋'], { note: 'Сначала закрывает файл сбоку' }),
+]);
+
+// ---- the file beside a list (ТЗ 56): its tab, the focus in the list or in the file ------------------------------------
+registerScope({ id: 'beside', name: 'с файлом сбоку', over: ['window', 'editor', 'heading', 'list'], outside: { scopes: ['window'], word: 'Без файла сбоку' }, rank: 30 });
+registerKeys([
+  C('besideFocusList', 'Фокус в список', 'list', 'beside', ['⌃⌘←'], { synonyms: ['файл сбоку'] }),
+  C('besideFocusFile', 'Фокус в файл сбоку', 'list', 'beside', ['⌃⌘→'], { synonyms: ['файл сбоку'] }),
+  C('besideClose', 'Закрыть файл сбоку', 'list', 'beside', [], { synonyms: ['файл сбоку', 'вторая панель'], note: 'В списке — также ⎋' }),
 ]);

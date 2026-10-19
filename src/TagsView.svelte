@@ -166,7 +166,10 @@
           return r ? { path: r.path, line: r.line, title: r.title, dk: r.dk } : null;
         },
         open: (other) => openRow(sel, other ? 'here' : 'neighbor'),
-        otherLabel: 'Открыть здесь',
+        // the new interface: ⌥↩ is the core's, the file beside the list (ТЗ 56 §2)
+          get otherLabel() {
+            return store.nextUi ? undefined : 'Открыть здесь';
+          },
         clear,
         refresh,
         freeze,

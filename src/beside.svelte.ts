@@ -2,8 +2,8 @@
 // list) shows on its right the file of the row chosen, in «Исходник», edited in place. It lives with its tab — kept
 // while another tab is shown — and not after a restart (here, in memory, by the tab's id).
 
-import { store } from '../store.svelte';
-import { lsGet, lsSet } from '../storage';
+import { store } from './store.svelte';
+import { lsGet, lsSet } from './storage';
 
 export interface Beside {
   path: string;
