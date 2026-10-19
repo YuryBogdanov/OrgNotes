@@ -12,9 +12,17 @@
   "permissions": ["process", "clipboard"],
   "contributes": {
     "navSections": [{ "id": "terminal", "title": "Терминал", "icon": "M3 4h14v12H3zM6 8l2.5 2L6 12M10 12.5h4" }],
+    "views": [{ "id": "terminal", "title": "Терминал", "icon": "M3 4h14v12H3zM6 8l2.5 2L6 12M10 12.5h4", "transient": true }],
     "commands": [
       { "id": "terminal.toggle", "title": "Терминал: показать или скрыть", "keys": ["⌃`"], "synonyms": ["терминал", "консоль", "shell", "оболочка"] },
-      { "id": "terminal.new", "title": "Терминал: новая сессия", "keys": ["⌃⇧`"], "synonyms": ["терминал", "консоль", "сессия"] }
+      { "id": "terminal.new", "title": "Терминал: новая сессия", "keys": ["⌃⇧`"], "synonyms": ["терминал", "консоль", "сессия"] },
+      { "id": "terminal.toTab", "title": "Терминал: во вкладку", "synonyms": ["терминал"] },
+      { "id": "terminal.toPanel", "title": "Терминал: в панель", "synonyms": ["терминал"] },
+      { "id": "terminal.profile1", "title": "Терминал: профиль 1", "synonyms": ["терминал", "профиль"] },
+      { "id": "terminal.profile2", "title": "Терминал: профиль 2", "synonyms": ["терминал", "профиль"] },
+      { "id": "terminal.profile3", "title": "Терминал: профиль 3", "synonyms": ["терминал", "профиль"] },
+      { "id": "terminal.profile4", "title": "Терминал: профиль 4", "synonyms": ["терминал", "профиль"] },
+      { "id": "terminal.profile5", "title": "Терминал: профиль 5", "synonyms": ["терминал", "профиль"] }
     ]
   }
 }

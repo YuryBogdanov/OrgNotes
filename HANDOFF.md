@@ -913,6 +913,16 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   title, body }, onClick)` → Rust `notify_system` → Swift `notify_text` (the id «tag:<plugin:n>|<ms>»; a click →
   `notify_on_tag`'s callback → the window forward, `notify-click` {tag} to the page, the host runs its `onClick`).
   Without a bundle (`tauri dev`, e2e) it is not shown (false); the mock logs it. e2e terminalMoods.spec.ts.
+  55.5, the section, the tab, the profiles: the manifest's view `terminal` with `"transient": true` (API 1.16:
+  `ManifestView.transient` → `registerView`); `terms.where` ('panel' | 'tab') — the sessions live in one place, the
+  Panel of that place moves their `host` elements in (the other says «Сессии — в панели… · Показать»); «Во вкладку»
+  (`toTab`: the drawer hidden, `ui.open('terminal')`), «В панель» (`toPanel`, a command; the tab closed brings them
+  back too); the old interface — every show opens the tab, its Panel maps the old variables to the tokens (`.old`).
+  `profiles.svelte.ts` (storage.local `profiles`; «Оболочка» by default and an empty «Агент» that asks its command;
+  the form of `ui.form` — name, command split into args, folder, `KEY=value` lines, by default); the section adds
+  «Профили» (their key of `terminal.profile1…5` or the command, a right click — edit, by default, remove; «+ Профиль…»),
+  the sessions' right-click menu (rename, restart, to the tab / panel, end); ⌥-click on «+» the profiles. e2e
+  terminalTab.spec.ts.
   42.10, in both shells unless said: narrowing a tab to a heading (`narrowTab.ts` `narrowRangeOf`/`narrowTarget`,
   `Tab.narrow` serialized, `store.narrowTab`/`widenTab`, keys `narrow` ⌃X N S and `widen` ⌃X N W — keyDispatch now
   takes three-press chords); find and replace (`search.ts` `findRanges`/`replacementOf` with `re`, `findView`

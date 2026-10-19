@@ -5,6 +5,7 @@
 
 import type { Ctx, DrawerHandle, PtyHandle } from '@panopticon/api';
 import { makeTerm, OWN_KEYS, themeOf } from './term';
+import { profiles, type Profile } from './profiles.svelte';
 
 export interface Launch {
   name: string;
@@ -176,6 +177,8 @@ export class Terminals {
   /** A clock for the dots (busy within the last 2 s). */
   now = $state(Date.now());
   drawer: DrawerHandle | null = null;
+  /** Where the sessions live (§5): the panel under the editor or the tab «Терминал»; moved together. */
+  where = $state<'panel' | 'tab'>('panel');
   ctx!: Ctx;
   private tick: ReturnType<typeof setInterval> | null = null;
   get active() {
@@ -185,17 +188,67 @@ export class Terminals {
     this.ctx = ctx;
     this.tick = setInterval(() => (this.now = Date.now()), 1000);
   }
-  /** The default launch: the user's shell. */
-  shellLaunch(): Launch {
-    return { name: 'Оболочка' };
-  }
-  add(l: Launch = this.shellLaunch()) {
-    const s = new Session(this.ctx, { ...l, name: l.name === 'Оболочка' ? 'zsh' : l.name }, this);
+  /** A new session: by the default profile, or the one given; shown where the sessions live. */
+  add(l: Launch = profiles.launchOf(profiles.default)) {
+    const s = new Session(this.ctx, l, this);
     this.list = [...this.list, s];
     this.activeId = s.id;
-    this.drawer?.show();
+    this.show();
     queueMicrotask(() => s.focus());
     return s;
+  }
+  /** A session by a profile; an empty template («Агент» with no command) asks for its command first. */
+  async byProfile(p: Profile) {
+    if (!p.command && p.id !== 'shell' && p.name !== 'Оболочка') {
+      const q = await profiles.edit(p);
+      if (!q || !q.command) return;
+      p = q;
+    }
+    this.add(profiles.launchOf(p));
+  }
+  /** The sessions shown where they live: the panel, or the tab (opened). */
+  show() {
+    if (this.where === 'tab' || this.ctx.ui.look === 'old') {
+      this.where = 'tab';
+      void this.ctx.ui.open('terminal', {}, 'here');
+    } else this.drawer?.show();
+  }
+  /** «Во вкладку»: every session into the tab, the panel hidden; the processes live on. */
+  toTab() {
+    this.where = 'tab';
+    this.drawer?.hide();
+    void this.ctx.ui.open('terminal', {}, 'here');
+    queueMicrotask(() => this.active?.focus());
+  }
+  /** «В панель»: back under the editor. */
+  toPanel() {
+    if (this.ctx.ui.look === 'old') return;
+    this.where = 'panel';
+    this.drawer?.show();
+    queueMicrotask(() => this.active?.focus());
+  }
+  async rename(s: Session) {
+    const v = await this.ctx.ui.form({ title: 'Переименовать сессию', submit: 'Сохранить', initial: { name: s.name }, groups: [{ fields: [{ type: 'text', key: 'name', label: 'Имя' }] }] });
+    const n = String(v?.name ?? '').trim();
+    if (n) s.name = n;
+  }
+  /** A session's menu (the section's rows, its tab): rename, restart, the tab or the panel, end. */
+  sessionMenu(s: Session, at: { x: number; y: number }) {
+    const look = this.ctx.ui.look;
+    this.ctx.ui.menu(
+      [
+        { label: 'Переименовать…', run: () => void this.rename(s) },
+        { label: 'Перезапустить', run: () => void s.restart() },
+        ...(look === 'next' ? [this.where === 'panel' ? { label: 'Во вкладку', run: () => this.toTab() } : { label: 'В панель', run: () => this.toPanel() }] : []),
+        'sep' as const,
+        { label: 'Завершить', danger: true, disabled: !s.alive, run: () => s.kill() },
+      ],
+      at,
+    );
+  }
+  /** ⌥-click on «+»: the profiles. */
+  profileMenu(at: { x: number; y: number }) {
+    this.ctx.ui.menu(profiles.list.map((p) => ({ label: p.name, run: () => void this.byProfile(p) })), at);
   }
   pick(id: string) {
     this.activeId = id;
@@ -209,8 +262,10 @@ export class Terminals {
   }
   /** The session is seen now: its panel shown, it the active one, the window in front. */
   inSight(s: Session) {
-    return !!this.drawer?.shown() && this.active === s && document.hasFocus();
+    return (this.where === 'tab' ? this.tabShown : !!this.drawer?.shown()) && this.active === s && document.hasFocus();
   }
+  /** The tab «Терминал» is the active one (told by the view). */
+  tabShown = $state(false);
   /** Notify the user on a bell when the window is not in front (the setting, on by default). */
   notifyOn = true;
   rang(s: Session) {
@@ -236,12 +291,18 @@ export class Terminals {
     this.list = this.list.filter((x) => x !== s);
     if (this.activeId === id) this.activeId = (this.list[i] ?? this.list[i - 1])?.id ?? null;
     s.dispose();
-    if (!this.list.length) this.drawer?.hide();
+    if (!this.list.length && this.where === 'panel') this.drawer?.hide();
   }
   /** ⌃`: the panel shown; again — hidden when the focus is in the terminal, else the focus to it. */
   toggle() {
     const d = this.drawer;
     if (!d) return;
+    if (this.where === 'tab' || this.ctx.ui.look === 'old') {
+      this.show();
+      if (!this.list.length) this.add();
+      else queueMicrotask(() => this.active?.focus());
+      return;
+    }
     const inside = !!document.activeElement?.closest('.tm-host');
     if (d.shown() && inside) return d.hide();
     d.show();
