@@ -1,4 +1,5 @@
 <script lang="ts">
+  import FullscreenLights from './FullscreenLights.svelte';
   import { onMount } from 'svelte';
   import { store } from '../store.svelte';
   import { plugins } from '../api/host.svelte';
@@ -298,9 +299,11 @@
   let mainEl: HTMLDivElement | undefined = $state();
 </script>
 
-<div class="next" class:theming data-ui="next" data-font={fontKind(textName)} style="{tokenVars(store.theme.app)};--ui:{fontCss(fonts.ui, 'ui')};--text:{textFont};--title:{fontCss(fonts.title, 'title')};--mono:{fontCss(fonts.mono, 'mono')};--col:{nextPrefs.col};--capc:{capc}">
+<div class="next" class:theming data-ui="next" data-font={fontKind(textName)} style:--menu="{store.titlebar.fullscreen && store.titlebar.lights ? store.titlebar.menu : 0}px" style="{tokenVars(store.theme.app)};--ui:{fontCss(fonts.ui, 'ui')};--text:{textFont};--title:{fontCss(fonts.title, 'title')};--mono:{fontCss(fonts.mono, 'mono')};--col:{nextPrefs.col};--capc:{capc}">
   <!-- the first start has the window to itself (ТЗ 48 §6): no sidebar, no tabs under it -->
   <div class="win" style:display={store.start ? "none" : undefined} inert={store.settingsOpen || !!plugins.form || !!plugins.trustReq || !!plugins.sheetReq}>
+  <!-- the window's buttons in full screen, the page's own (fix #298) -->
+  <FullscreenLights />
   <!-- the rail always; ⌘0 hides and shows its panel (ТЗ 50 §3) -->
   <Sidebar open={store.showNav} width={sideWidth} onwidth={setWidth} onmenu={(at, items) => (menu = { ...at, items })} />
   <div class="main" bind:this={mainEl}>
@@ -361,7 +364,9 @@
   @media (prefers-reduced-motion: no-preference) {
     .next.theming, .next.theming :global(*) { transition: background-color 0.2s, color 0.2s, border-color 0.2s, box-shadow 0.2s, fill 0.2s, stroke 0.2s !important; }
   }
-  .win { flex: 1; min-width: 0; display: flex; }
+  /* full screen with the menu's line shown (fix #298): the window under it */
+  .win { flex: 1; min-width: 0; display: flex; margin-top: var(--menu, 0px); transition: margin-top 0.15s ease; }
+  @media (prefers-reduced-motion: reduce) { .win { transition: none; } }
   .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; padding: 8px 14px; border-radius: 8px; background: var(--card); border: 1px solid var(--rule); box-shadow: var(--popshadow); }
   .toast button { border: 0; background: none; color: var(--lampink); font-weight: 600; }

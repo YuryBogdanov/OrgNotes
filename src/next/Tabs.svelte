@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { windowDrag } from './windowDrag';
   import { store } from '../store.svelte';
   import { viewOf, fileViewOf, allFileViews } from '../views';
   import { fileTypeOf, fileTypes } from '../fileTypes.svelte';
@@ -75,7 +76,8 @@
   });
 </script>
 
-<div class="tabs">
+<!-- the empty place right of the tabs drags the window too (fix #304) -->
+<div class="tabs" use:windowDrag>
   <div class="strip" role="tablist" aria-label="Вкладки" bind:this={strip}>
     {#each pane?.tabs ?? [] as t, ti (t.id)}
       {@const ic = iconOf(t)}
