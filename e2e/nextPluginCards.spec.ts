@@ -69,7 +69,7 @@ test('«Долгие дела» on Midterm: the groups, «Открыть спи�
   expect(await disk(page, MIDTERM)).toContain('* NEXT Переезд хранилища');
 });
 
-test('a file outside the sources: no card of «Долгие дела»; «Канбан» on a file with statuses: its line, the board by the view switch', async ({ page }) => {
+test('a file outside the sources: no card of «Долгие дела»; «Канбан» on a file with statuses: its line, the board by ⌥⌘B', async ({ page }) => {
   await open(page);
   await tree(page, 'Work').click();
   await expect(col(page)).toBeVisible();
@@ -82,11 +82,11 @@ test('a file outside the sources: no card of «Долгие дела»; «Кан
   const head = k.locator('[aria-expanded="false"]');
   if (await head.count()) await head.first().click();
   await expect(k.locator('.kb-fcard > span')).toHaveText('Колонки — статусы файла');
-  // no «Открыть доской» (fix-49): the file's view switch at the area's corner shows the board
+  // no «Открыть доской» (fix-49): ⌥⌘B and «Показывать как ›» show the board
   await expect(k.getByRole('button', { name: /Открыть доской/ })).toHaveCount(0);
   // the cards in the sidebar's order: «Долгие дела» before «Канбан»
   const [a, b] = await Promise.all([card(page, 'Долгие дела').boundingBox(), k.boundingBox()]);
   expect(a!.y).toBeLessThan(b!.y);
-  await page.getByRole('radiogroup', { name: 'Вид файла' }).getByRole('radio', { name: 'Доска' }).click();
+  await page.keyboard.press('Alt+Meta+b');
   await expect(page.getByRole('application', { name: /^Доска/ })).toBeVisible();
 });

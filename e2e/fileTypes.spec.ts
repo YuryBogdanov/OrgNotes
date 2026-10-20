@@ -66,9 +66,9 @@ test('a plugin\'s file: in the navigator with its icon and without its extension
   await page.locator('.probe-text').click();
   await page.keyboard.press('Meta+z');
   await expect.poll(() => disk(page, '/mock/plan.sketch')).toBe('{"items":[]}\n');
-  // the tab's menu has no «Показать как ›»: the file has its one view
+  // the tab's menu has no «Показывать как ›»: the file has its one view
   await page.locator('.tab.on').click({ button: 'right' });
-  await expect(page.getByRole('menuitem', { name: /Показать как/ })).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: /Показывать как/ })).toHaveCount(0);
 });
 
 test('«Новый эскиз» in a folder\'s menu makes the file with its template; a rename keeps the extension; the search leaves it out', async ({ page }) => {

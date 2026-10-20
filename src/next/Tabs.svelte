@@ -15,7 +15,6 @@
   let { onmenu }: { onmenu: (at: { x: number; y: number }, items: MenuItem[]) => void } = $props();
   const pi = 0;
   const pane = $derived(store.layout.panes[pi]);
-  // the view switch is the file area's own now (fix-49, ViewSwitch.svelte): the strip has only the tabs
 
   const FILE = 'M3.5 2h6l3 3v9h-9z';
   /** The icon of a tab: a path in a 16 box (the file's), or a view's in its 20 box. */

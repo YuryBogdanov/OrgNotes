@@ -120,8 +120,7 @@
 /* ТЗ 49 §3–4: the new interface (the file view's host has `data-ui="next"` and the layer's tokens): the header as the
    new screens', the columns on the host's grid, the cards in the file's text's font */
 [data-ui='next'] .kanban { background: transparent; color: var(--ink); }
-/* the core's view switch lies over the top right (fix-49): its corner kept clear */
-[data-ui='next'] .kb-head.nx { align-items: flex-end; gap: 10px; padding: 24px calc(32px + var(--fv-corner, 0px)) 16px 32px; }
+[data-ui='next'] .kb-head.nx { align-items: flex-end; gap: 10px; padding: 24px 32px 16px; }
 [data-ui='next'] .kb-ttl { flex: 1; min-width: 0; }
 [data-ui='next'] .kb-kick { margin-bottom: 6px; font: 500 11px var(--font-mono); color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 [data-ui='next'] .kb-h1 { margin: 0; font: 400 34px/1.1 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -185,7 +184,7 @@
 [data-ui='next'] .kb-zw { font: 11px var(--font-mono); color: var(--ink3); }
 
 [data-ui='next'] .kb-peek { background: var(--bg); border-left: 1px solid var(--rule); box-shadow: -18px 0 40px rgba(0, 0, 0, 0.18); }
-[data-ui='next'] .kb-ph2 { flex: 0 0 48px; border-bottom: 1px solid var(--rule); padding-right: calc(12px + var(--fv-corner, 0px)); } /* the view switch's corner (fix-49) */
+[data-ui='next'] .kb-ph2 { flex: 0 0 48px; border-bottom: 1px solid var(--rule); padding-right: 12px; }
 [data-ui='next'] .kb-pk { height: 20px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: 4px; font: 700 10.5px var(--ui); letter-spacing: 0.02em; }
 [data-ui='next'] .kb-pk:hover { filter: brightness(0.95); }
 [data-ui='next'] .kb-pt { font-size: 13.5px; font-weight: 600; color: var(--ink); }

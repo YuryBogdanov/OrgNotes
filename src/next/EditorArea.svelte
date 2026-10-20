@@ -1,6 +1,4 @@
 <script lang="ts">
-  import ViewSwitch from './ViewSwitch.svelte';
-  import { CORNER, otherViews } from './viewSwitch';
   import { RICH_ENABLED } from '../nextFlags';
   import { store } from '../store.svelte';
   import { slide } from 'svelte/transition';
@@ -166,10 +164,9 @@
   function rich(pick: RichPick, path: string) {
     if (!pickDate(pick, path)) richPick = { pick, path };
   }
-  const vsShown = $derived(otherViews(tab).length > 0);
 </script>
 
-<div class="area" style:--vs-top={vsShown ? `${CORNER.height}px` : undefined}>
+<div class="area">
   {#if tab?.kind === TODAY}
     <!-- «Сегодня» in the new style (ТЗ 45 §2) -->
     <div class="view"><BesideSplit tabId={tab.id}><Today pane={0} /></BesideSplit></div>
@@ -212,7 +209,7 @@
         {/if}
       </div>
     {/if}
-    <div class="with grid" bind:clientWidth={areaW} style:--sw={structure ? `${colW}px` : '0px'} style:--vsw={vsShown && !structure ? `${CORNER.width}px` : undefined} style:--st-top={vsShown ? '60px' : undefined}>
+    <div class="with grid" bind:clientWidth={areaW} style:--sw={structure ? `${colW}px` : '0px'}>
     <!-- the review's summary: typing in the text is done with it (ТЗ 46 §5); a change from outside is not -->
     <div class="ed" onkeydown={(e) => { if (session && session.cur < 0 && !e.metaKey && !e.ctrlKey && (e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace')) fileReview.finish(); }} role="presentation">
       {#if fb.open}
@@ -256,8 +253,6 @@
   {:else}
     <div class="word" role="status"><b class="title">Нет открытых вкладок</b><span>Откройте файл в сайдбаре или создайте новый.</span></div>
   {/if}
-  <!-- the view switch of a file (fix-49): at the area's top right, over the text or a plugin's view -->
-  <ViewSwitch />
   <!-- the toast after a change in a list (ТЗ 48 §1): one, at the bottom of the tab's area -->
   <ListToast />
 </div>
@@ -272,7 +267,7 @@
   /* §7.1: the editor scrolls up to the window's edge, its bar there; «Структура» lies over the right part of it, the
      text kept clear of it by the scroller's padding (--sw, the column's width) */
   .with { position: relative; flex: 1; min-height: 0; display: flex; }
-  .with :global(.cm-scroller) { padding-right: max(var(--sw), var(--vsw, 0px)); } /* the view switch's corner too (fix-49) */
+  .with :global(.cm-scroller) { padding-right: var(--sw); }
   /* the grid of 24 pt under the text and «Структура» alike (the mockup's PEditor, PEditorSrc): one ground, no seam */
   .grid {
     background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
