@@ -27,7 +27,7 @@ export interface Tab {
   agenda?: string; // agenda tabs: the id of a custom agenda («Мои агенды»); none = the built-in one
   data?: any; // a feature's tab: its state (JSON), kept after a restart
   label?: string; // a tab of a kind nobody registers: the name it had
-  view?: string; // a file tab: how it is shown — '' text, else a view of a plugin («Доска», ТЗ 33); unset: as the file was last
+  view?: string; // a tab of a view on one heading (with `scope`): that view; a plain file tab is shown as its file is (fix-49-2, store.viewOf)
   scope?: { line: number; title: string }; // a file tab of a plugin's view on one heading and its subtree (a mindmap of a branch, ТЗ 39)
   narrow?: { line: number; title: string }; // a file tab narrowed to a heading's subtree (⌃X N S, ТЗ 42 §5.8)
 }
@@ -53,7 +53,7 @@ const reveal = (line: number, focus = false) => ({ line, n: ++revealSeq, focus }
 export function newTab(kind: TabKind, path?: string, line = 0, focus = false): Tab {
   return { id: uid('t'), kind, path, cursor: { line, col: 0 }, reveal: kind === 'file' ? reveal(line, focus) : null, fromAgenda: null };
 }
-export const copyTab = (t: Tab): Tab => ({ ...newTab(t.kind, t.path, t.cursor.line), cursor: { ...t.cursor }, ...(t.view !== undefined ? { view: t.view } : {}), reveal: t.kind === 'file' ? reveal(t.cursor.line) : null, agenda: t.agenda, data: t.data === undefined ? undefined : JSON.parse(JSON.stringify(t.data)), label: t.label });
+export const copyTab = (t: Tab): Tab => ({ ...newTab(t.kind, t.path, t.cursor.line), cursor: { ...t.cursor }, ...(t.scope ? { view: t.view, scope: { ...t.scope } } : {}), reveal: t.kind === 'file' ? reveal(t.cursor.line) : null, agenda: t.agenda, data: t.data === undefined ? undefined : JSON.parse(JSON.stringify(t.data)), label: t.label });
 const newPane = (tabs: Tab[]): Pane => ({ id: uid('p'), tabs, active: 0 });
 
 export const emptyLayout = (first?: Tab): Layout => ({ panes: [newPane(first ? [first] : [])], active: 0, ratio: 0.5 });
@@ -441,7 +441,7 @@ export function serialize(L: Layout): string {
         active: Math.max(0, tabs.indexOf(act)),
         tabs: tabs.map((t) => {
           const label = core(t.kind) ? undefined : (viewOf(t.kind)?.label(t) ?? t.label);
-          return { kind: t.kind, path: t.path, cursor: t.cursor, ...(t.top ? { top: t.top } : {}), ...(t.folds?.length ? { folds: t.folds } : {}), ...(t.view !== undefined ? { view: t.view } : {}), ...(t.narrow ? { narrow: t.narrow } : {}), ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.data !== undefined ? { data: t.data } : {}), ...(label ? { label } : {}) };
+          return { kind: t.kind, path: t.path, cursor: t.cursor, ...(t.top ? { top: t.top } : {}), ...(t.folds?.length ? { folds: t.folds } : {}), ...(t.scope ? { view: t.view, scope: t.scope } : {}), ...(t.narrow ? { narrow: t.narrow } : {}), ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.data !== undefined ? { data: t.data } : {}), ...(label ? { label } : {}) };
         }),
       };
     }),
@@ -473,7 +473,9 @@ export function restore(raw: string | null, exists: (path: string) => boolean): 
           if (typeof st.top === 'number' && st.top > 0) t.top = st.top;
           if (Array.isArray(st.folds)) t.folds = st.folds.filter((x: unknown): x is number => typeof x === 'number' && x >= 0);
           t.reveal = null; // the editor restores the caret, column included
+          // a tab of a view on one heading keeps it; a plain tab's `view` (before fix-49-2) the store makes its file's
           if (typeof st.view === 'string') t.view = st.view;
+          if (typeof st.scope?.line === 'number' && typeof st.scope?.title === 'string' && t.view) t.scope = { line: st.scope.line, title: st.scope.title };
           if (typeof st.narrow?.line === 'number' && typeof st.narrow?.title === 'string') t.narrow = { line: st.narrow.line, title: st.narrow.title };
           tabs.push(t);
         } else return;

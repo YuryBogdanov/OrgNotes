@@ -5,6 +5,7 @@ import {
   newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, foldPanes, unfoldPanes, type Folded,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
+import { rekey } from './rekey';
 import { narrowTarget } from './narrowTab';
 import { isMainWindow, nextOn, setNext } from './uiFlag';
 import { displayName, isArchive, noteName, withOrg } from './names';
@@ -1054,6 +1055,7 @@ class Store {
     const last = lsGet('lastFile:' + (this.dir ?? ''));
     const pick = files.find((f) => f.path === last) ?? files.find((f) => f.name === 'Weekly.org') ?? files[0];
     this.folders = folders;
+    if (saved) this.adoptTabViews(saved, files);
     this.layout = saved ?? emptyLayout(pick ? newTab('file', pick.path) : undefined);
     this.files = files;
     this.loaded = true;
@@ -1661,37 +1663,81 @@ class Store {
       this.viewMemory = {};
     }
   }
-  /** How a file tab is shown now: '' text, else a view of a plugin that is on. The tab's own choice, else the file's
-   *  last one, else a view that wants the file (it has «#+BOARD»). */
+  /** How a file tab is shown now: '' text, else a view of a plugin that is on. The view is the file's (fix-49-2), not
+   *  the tab's: its file type's, else the file's chosen one, else a view that wants the file (it has «#+BOARD»). Only a
+   *  tab of a view on one heading (ТЗ 39) has a view of its own. */
   viewOf(tab: Tab | undefined): string {
     if (!tab || tab.kind !== 'file') return '';
     const ok = (v: string | undefined) => (v && fileViewOf(v) ? v : '');
     // a plugin's file type: always its view (the Org editor never shows it)
     const ft = fileTypeOf(tab.path);
     if (ft) return ft.view;
-    if (tab.view !== undefined) return ok(tab.view);
-    const f = this.fileOf(tab);
+    if (tab.scope) return ok(tab.view);
+    return this.viewOfFile(this.fileOf(tab));
+  }
+  /** The view a file is shown in (its tabs, the navigator's icon, the menus' «Показывать как ›»). */
+  viewOfFile(f: NoteFile | undefined): string {
     if (!f) return '';
-    if (f.name in this.viewMemory) return ok(this.viewMemory[f.name]);
+    const ft = fileTypeOf(f.path);
+    if (ft) return ft.view;
+    if (f.name in this.viewMemory) return fileViewOf(this.viewMemory[f.name]) ? this.viewMemory[f.name] : '';
     return allFileViews().find((v) => v.defaultFor?.(f))?.id ?? '';
   }
-  /** The view the tab was set to show (its own choice, the file's last one, its file type's), even one not there now —
-   *  its plugin stopped (the new interface says so in its place, ТЗ 49 §1). '' the text, null none chosen. */
+  /** The view the tab was set to show (its file type's, the file's chosen one), even one not there now — its plugin
+   *  stopped (the new interface says so in its place, ТЗ 49 §1). '' the text, null none chosen. */
   wantedView(tab: Tab | undefined): string | null {
     if (!tab || tab.kind !== 'file') return null;
     const ft = fileTypeOf(tab.path);
     if (ft) return ft.view;
-    if (tab.view !== undefined) return tab.view;
+    if (tab.scope) return tab.view ?? null;
     const f = this.fileOf(tab);
     return f && f.name in this.viewMemory ? this.viewMemory[f.name] : null;
   }
-  /** «Показать как ›»: the tab shows the file so; remembered for the file. */
+  /** «Показывать как ›»: the file is shown so — every tab of it at once, and when it is opened next. */
   showAs(tab: Tab, view: string) {
+    if (tab.scope) return void (tab.view = view);
+    delete tab.view; // a tab on one heading made the file's own (its «Текст»): the file's view from now on
     const f = this.fileOf(tab);
-    tab.view = view;
-    if (!f) return;
-    this.viewMemory = { ...this.viewMemory, [f.name]: view };
+    if (f) this.showFileAs(f.name, view);
+  }
+  /** The same by the file's name in the folder (the navigator's menu: the file need not be open). */
+  showFileAs(name: string, view: string) {
+    this.viewMemory = { ...this.viewMemory, [name]: view };
     lsSet(this.viewKey(), JSON.stringify(this.viewMemory));
+  }
+  /** A file renamed or moved (`map` of names in the folder; null: trashed): its view and its state as it was left go
+   *  with it (fix-49-2). */
+  private carryFileMemory(map: (name: string) => string | null) {
+    const views = rekey(this.viewMemory, map);
+    if (views) {
+      this.viewMemory = views;
+      lsSet(this.viewKey(), JSON.stringify(views));
+    }
+    const d = this.dir ?? '';
+    const st = rekey(this.fileStates(), (p) => {
+      const n = map(p.startsWith(d + '/') ? p.slice(d.length + 1) : p);
+      return n === null ? null : this.abs(n);
+    });
+    if (st) {
+      this.fsCache = { dir: d, map: st };
+      clearTimeout(this.fsTimer);
+      lsSet('fileState:' + d, JSON.stringify(st));
+    }
+  }
+  /** A saved layout from before fix-49-2: a file tab's own view becomes its file's, unless the file has one. */
+  private adoptTabViews(L: Layout, files: NoteFile[]) {
+    let next = this.viewMemory;
+    for (const p of L.panes)
+      for (const t of p.tabs) {
+        if (t.kind !== 'file' || t.scope || t.view === undefined) continue;
+        const f = files.find((x) => x.path === t.path);
+        if (f && !(f.name in next)) next = { ...next, [f.name]: t.view };
+        delete t.view;
+      }
+    if (next !== this.viewMemory) {
+      this.viewMemory = next;
+      lsSet(this.viewKey(), JSON.stringify(next));
+    }
   }
 
   // ---- panes and tabs (layout.ts does the work; the store keeps the layout of each folder) -------------------------
@@ -2181,6 +2227,7 @@ class Store {
       await this.flush();
       const abs = this.abs(rel);
       await invoke('trash_entry', { path: abs });
+      this.carryFileMemory((name) => (name === rel || name.startsWith(rel + '/') ? null : name));
       dropMissing(this.layout, (p) => p !== abs && !p.startsWith(abs + '/')); // deleted here: its tabs go too
       await this.reload();
       this.say('Перемещено в Корзину');
@@ -2202,6 +2249,11 @@ class Store {
       const newAbs = await op(oldAbs);
       const oldPaths = this.files.map((f) => f.path);
       const map = mapperFor(oldAbs, newAbs);
+      const d = this.dir ?? '';
+      this.carryFileMemory((name) => {
+        const n = map(this.abs(name));
+        return n.startsWith(d + '/') ? n.slice(d.length + 1) : n;
+      });
 
       // current file / history follow the move (before reload, which would otherwise fall back to the first file)
       mapPaths(this.layout, map); // tabs in both panes follow the move
