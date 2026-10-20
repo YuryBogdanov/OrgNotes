@@ -27,7 +27,7 @@
   });
   function openSub(i: number, keys = false) {
     clearTimeout(timer);
-    const row = el?.querySelectorAll<HTMLElement>('[data-row]')[i];
+    const row = el?.querySelector<HTMLElement>(`[data-mi="${i}"]`); // `i` counts the lines and notes too
     if (!row) return;
     const r = row.getBoundingClientRect();
     sub = { i, x: r.right + 2, y: r.top - 6, keys };
@@ -78,7 +78,7 @@
     {:else if typeof it === 'object' && 'head' in it}
       <div class="head" role="presentation">{it.head}</div>
     {:else}
-      <button role="menuitem" data-row class:cur={cur === i || sub?.i === i} class:danger={it.danger} disabled={it.disabled} tabindex="-1"
+      <button role="menuitem" data-mi={i} class:cur={cur === i || sub?.i === i} class:danger={it.danger} disabled={it.disabled} tabindex="-1"
         aria-keyshortcuts={it.shortcut} aria-haspopup={it.sub ? 'menu' : undefined} aria-expanded={it.sub ? sub?.i === i : undefined}
         onmouseenter={() => hover(i)} onmouseleave={() => !sub && (cur = -1)} onclick={() => run(i)}>
         {#if checks}<span class="chk" aria-hidden="true">{#if it.checked}<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5l2.6 2.6L10 3.5" /></svg>{/if}</span>{/if}
@@ -92,6 +92,7 @@
           {#if it.detail}<span class="dt">{it.detail}</span>{/if}
         </span>
         {#if it.dot}<span class="dot" aria-label="не сохранено"></span>{/if}
+        {#if it.hint}<span class="hint">{it.hint}</span>{/if}
         {#if it.shortcut}<span class="kb">{it.shortcut}</span>{/if}
         {#if it.sub}<span class="more" aria-hidden="true">›</span>{/if}
       </button>
@@ -120,9 +121,11 @@
   .ic { flex: 0 0 auto; color: var(--ink3); }
   .dot { flex: 0 0 6px; width: 6px; height: 6px; border-radius: 3px; background: currentColor; opacity: 0.6; }
   .kb { margin-left: auto; padding-left: 16px; font: 11px var(--mono); color: var(--ink3); white-space: nowrap; }
+  .hint { flex: 0 0 auto; padding-left: 16px; font-size: 11.5px; color: var(--ink3); white-space: nowrap; }
+  .hint + .kb { padding-left: 10px; }
   .more { margin-left: auto; padding-left: 12px; color: var(--ink3); }
   .kb + .more { margin-left: 0; }
-  button.cur .ic, button.cur .kb, button.cur .more, button.cur .dt { color: var(--onlamp); }
+  button.cur .ic, button.cur .kb, button.cur .more, button.cur .dt, button.cur .hint { color: var(--onlamp); }
   .capsule { display: inline-block; padding: 0 6px; border-radius: 4px; font: 700 10.5px/18px var(--ui); letter-spacing: 0.02em; color: var(--tl); background: color-mix(in srgb, var(--tl) 16%, transparent); }
   button.cur .capsule { background: color-mix(in srgb, var(--onlamp) 12%, var(--card)); }
   .sep { height: 1px; margin: 4px 8px; background: var(--rule); }
@@ -132,6 +135,6 @@
   .soft button { min-height: 30px; }
   .soft .chk { color: var(--lampink); }
   .soft button.cur { background: var(--lampsoft); color: var(--ink); }
-  .soft button.cur .ic, .soft button.cur .kb, .soft button.cur .more, .soft button.cur .dt { color: var(--ink3); }
+  .soft button.cur .ic, .soft button.cur .kb, .soft button.cur .more, .soft button.cur .dt, .soft button.cur .hint { color: var(--ink3); }
   .soft button.cur .capsule { background: color-mix(in srgb, var(--tl) 16%, transparent); }
 </style>

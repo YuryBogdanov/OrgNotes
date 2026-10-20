@@ -3,7 +3,7 @@
 // left pane, by itself at the start of the day when the settings say so.
 
 import { store } from './store.svelte';
-import { isPinned, newTab, pinFirst, type Layout } from './layout';
+import { insertAfterActive, isPinned, newTab, pinFirst, type Layout } from './layout';
 import type { Schema, Values } from './settingsSchema';
 import { isoOf, newId, writeDay, type DayTask, type Link } from './endDay';
 import { allTodayBlocks, withNew } from './todayBlocks';
@@ -163,9 +163,7 @@ class TodayState {
       if (pi < 0) {
         pi = Math.max(0, Math.min(L.active, L.panes.length - 1));
         const p = L.panes[pi];
-        const at = p.tabs.length ? Math.min(p.active + 1, p.tabs.length) : 0;
-        p.tabs.splice(at, 0, newTab(TODAY)); // (the state's proxy of it is in the list, not the tab itself)
-        p.active = at;
+        insertAfterActive(p, newTab(TODAY)); // never inside the pinned tabs (ТЗ 58)
       } else L.panes[pi].active = L.panes[pi].tabs.findIndex((t) => t.kind === TODAY);
       L.active = pi;
       this.markShown();

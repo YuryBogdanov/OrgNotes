@@ -5,7 +5,7 @@ import type { MenuItem } from './menuItems';
 import { store } from './store.svelte';
 import { allFileViews, viewOf, type FileViewSpec } from './views';
 import { fileTypeOf, fileTypes } from './fileTypes.svelte';
-import { isPinned, targetOf, type Tab } from './layout';
+import { canPin, isFilePinned, isPinned, othersOf, targetOf, type Tab } from './layout';
 
 export function tabMenuItems(pi: number, t: Tab): MenuItem[] {
   const pane = store.layout.panes[pi];
@@ -13,8 +13,12 @@ export function tabMenuItems(pi: number, t: Tab): MenuItem[] {
   const to = targetOf(store.layout, pi);
   const items: MenuItem[] = [
     { label: 'Закрыть', shortcut: store.keyHint('closeTab'), action: () => store.closeTab(pi, idx()) },
-    { label: 'Закрыть остальные', shortcut: store.keyHint('closeOthers'), disabled: pane.tabs.length < 2, action: () => store.closeOthers(pi, idx()) },
+    // ТЗ 58: the pinned tabs stay — said while there is one besides this tab
+    { label: 'Закрыть остальные', hint: pane.tabs.some((x) => x.id !== t.id && isFilePinned(x)) ? 'кроме закреплённых' : undefined, shortcut: store.keyHint('closeOthers'), disabled: !othersOf(store.layout, pi, idx()).length, action: () => store.closeOthers(pi, idx()) },
     'sep',
+    ...(store.nextUi && canPin(t) ? [isFilePinned(t)
+      ? { label: 'Открепить вкладку', action: () => store.pinTab(pi, idx(), false) }
+      : { label: 'Закрепить вкладку', action: () => store.pinTab(pi, idx(), true) }, 'sep' as const] : []),
     { label: 'Переместить в соседний редактор', shortcut: store.keyHint(to > pi ? 'moveRight' : 'moveLeft'), disabled: to < 0 || isPinned(t), action: () => store.moveTab(pi, idx()) },
     { label: 'Продублировать в соседнем редакторе', shortcut: store.keyHint(to > pi ? 'dupRight' : 'dupLeft'), disabled: to < 0 || t.kind === 'untitled' || !!viewOf(t.kind)?.single || isPinned(t), action: () => store.duplicateTab(pi, idx()) },
   ];

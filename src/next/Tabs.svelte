@@ -2,7 +2,7 @@
   import { windowDrag } from '../windowDrag';
   import { store } from '../store.svelte';
   import { viewOf, fileViewOf } from '../views';
-  import { isPinned, type Tab } from '../layout';
+  import { isFilePinned, isPinned, type Tab } from '../layout';
   import { OFF_ICON, isCore, isDirty, isGone, tabLabel } from '../tabLabels';
   import { tabMenuItems } from '../tabMenu';
   import { tabNames } from './tabNames';
@@ -17,6 +17,8 @@
   const pane = $derived(store.layout.panes[pi]);
 
   const FILE = 'M3.5 2h6l3 3v9h-9z';
+  // a pinned tab (ТЗ 58): the pin stuck in, left of the file's icon
+  const PIN = 'M5.5 1.8h5M6.3 1.8l-.4 4.6L3.6 9h8.8l-2.3-2.6-.4-4.6M8 9v5.2';
   /** The icon of a tab: a path in a 16 box (the file's), or a view's in its 20 box. */
   function iconOf(t: Tab): { d: string; box: number; dash?: boolean } {
     if (t.kind === 'untitled') return { d: FILE, box: 16, dash: true };
@@ -62,20 +64,22 @@
     {#each pane?.tabs ?? [] as t, ti (t.id)}
       {@const ic = iconOf(t)}
       {@const on = ti === pane.active}
-      <div class="tab" class:on class:pin={isPinned(t)} class:dirty={isDirty(t)} class:gone={isGone(t)} class:untitled={t.kind === 'untitled'} class:hinted={!!names.get(t.id)?.hint} data-tab={t.id}
-        role="tab" aria-selected={on} aria-label={label(t)} tabindex={on ? 0 : -1} title={isPinned(t) ? label(t) : t.kind === 'file' ? relOf(t) : undefined}
+      {@const fp = isFilePinned(t)}
+      <div class="tab" class:on class:pin={isPinned(t)} class:fpin={fp} class:dirty={isDirty(t)} class:gone={isGone(t)} class:untitled={t.kind === 'untitled'} class:hinted={!!names.get(t.id)?.hint} data-tab={t.id}
+        role="tab" aria-selected={on} aria-label={fp ? `${label(t)}, закреплена` : label(t)} tabindex={on ? 0 : -1} title={isPinned(t) ? label(t) : t.kind === 'file' ? relOf(t) : undefined}
         onclick={() => store.activateTab(pi, ti)} oncontextmenu={(e) => menu(e, t)}
         onauxclick={(e) => { if (e.button === 1) { e.preventDefault(); void store.closeTab(pi, ti); } }}
         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); store.activateTab(pi, ti); } }}>
+        {#if fp}<svg class="ic pinic" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={PIN} /></svg>{/if}
         <svg class="ic" width={ic.box === 20 ? 16 : 15} height={ic.box === 20 ? 16 : 15} viewBox="0 0 {ic.box} {ic.box}" fill="none" stroke="currentColor" stroke-width={ic.box === 20 ? 1.6 : 1.4} stroke-linecap="round" stroke-linejoin="round" stroke-dasharray={ic.dash ? '2 1.8' : undefined} aria-hidden="true"><path d={ic.d} /></svg>
         {#if !isPinned(t)}
           {@const n = nameOf(t)}
           <span class="lbl"><span class="nm">{n.name}</span>{#if n.hint}<span class="hint">{` — ${n.hint}`}</span>{/if}</span>
           <span class="end">
             <span class="dot" aria-hidden="true"></span>
-            <button class="x" tabindex="-1" aria-label="Закрыть вкладку {label(t)}" title="Закрыть вкладку" onclick={(e) => { e.stopPropagation(); void store.closeTab(pi, ti); }}>
+            {#if !fp}<button class="x" tabindex="-1" aria-label="Закрыть вкладку {label(t)}" title="Закрыть вкладку" onclick={(e) => { e.stopPropagation(); void store.closeTab(pi, ti); }}>
               <svg width="9" height="9" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 2l6 6M8 2 2 8" /></svg>
-            </button>
+            </button>{/if}
           </span>
         {/if}
       </div>
@@ -94,6 +98,11 @@
   /* a name told apart by its folder (ТЗ 44 §11): room for the folder too, then it gives way */
   .tab.hinted { flex-basis: 280px; }
   .tab.pin { flex: 0 0 40px; min-width: 40px; justify-content: center; padding: 0; }
+  /* a pinned file tab (ТЗ 58): never shrinks, up to 190 (the name cut short); the pin 5 from the file's icon */
+  .tab.fpin { flex: 0 0 auto; min-width: 0; max-width: 190px; }
+  .pinic { margin-right: -2px; }
+  .tab.fpin:not(.dirty) .end { display: none; }
+  .tab.fpin.dirty:hover .dot { display: block; } /* no «×» to give way to */
   .tab:hover { color: var(--ink); }
   .tab.on { background: var(--bg); box-shadow: inset 0 2px 0 var(--lamp); color: var(--ink); }
   .tab:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; }

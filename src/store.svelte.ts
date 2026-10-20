@@ -3,6 +3,7 @@ import {
   activeTab, addPane, closePane, closeTab, dropMissing, emptyLayout, focusPane, keepOne, mapPaths, newTab, openAgenda,
   openFile, openFromAgenda, pinFirst, restore, serialize, splitRight, swap, toggleSecond, copyTab, type Layout, type Tab,
   newUntitled, moveTab, duplicateTab, othersOf, targetOf, UNTITLED, foldPanes, unfoldPanes, type Folded,
+  insertAfterActive, setTabPinned, canPin, isFilePinned,
 } from './layout';
 import { mapperFor, resolveLink, rewriteFileLinks, type OrgLink } from './links';
 import { rekey } from './rekey';
@@ -877,9 +878,7 @@ class Store {
       else {
         const t = newTab('agenda');
         if (id) t.agenda = id;
-        const at = p.tabs.length ? p.active + 1 : 0;
-        p.tabs.splice(at, 0, t);
-        p.active = at;
+        insertAfterActive(p, t);
       }
     }
     this.persistLayout();
@@ -1978,6 +1977,16 @@ class Store {
   }
   moveTab(pi: number, ti: number) {
     moveTab(this.layout, pi, ti);
+  }
+  /** «Закрепить вкладку» / «Открепить вкладку» (ТЗ 58): a file tab, in the new interface. */
+  pinTab(pi: number, ti: number, on: boolean) {
+    if (setTabPinned(this.layout, pi, ti, on)) this.persistLayout();
+  }
+  /** The palette's command on the active tab: what it can do now — 'pin', 'unpin' or nothing. */
+  pinAction(): 'pin' | 'unpin' | null {
+    const t = this.tab;
+    if (!this.nextUi || !t || !canPin(t)) return null;
+    return isFilePinned(t) ? 'unpin' : 'pin';
   }
   duplicateTab(pi: number, ti: number) {
     duplicateTab(this.layout, pi, ti);

@@ -228,6 +228,15 @@ register({
   id: 'narrow', title: 'Сузить до заголовка', icon: 'head', group: 'heading', synonyms: ['сужение', 'narrow', 'только этот заголовок'],
   when: (c) => onHeading(c) && store.tab?.kind === 'file' && !store.tab.narrow, run: (c) => void inEditor('narrow', c.heading!.line),
 });
+// ТЗ 58: the active file tab pinned or not, in the new interface
+register({
+  id: 'pinTab', title: 'Закрепить вкладку', icon: 'file', group: 'general', synonyms: ['закрепить', 'pin', 'булавка'],
+  when: () => store.pinAction() === 'pin', run: () => store.pinTab(store.layout.active, store.layout.panes[store.layout.active].active, true),
+});
+register({
+  id: 'unpinTab', title: 'Открепить вкладку', icon: 'file', group: 'general', synonyms: ['открепить', 'unpin', 'булавка'],
+  when: () => store.pinAction() === 'unpin', run: () => store.pinTab(store.layout.active, store.layout.panes[store.layout.active].active, false),
+});
 register({
   id: 'widen', title: 'Показать весь файл', icon: 'file', group: 'general', synonyms: ['сужение', 'widen', 'весь файл'],
   when: () => !!store.tab?.narrow, run: () => void setTimeout(() => store.widenTab(store.tab)),

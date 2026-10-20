@@ -1012,6 +1012,19 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   the type's icon; a file shown as a plugin's view (`store.viewOfFile`, the same as its tab and the menus) — the view's
   manifest icon in a 20 box, line 1.75 (looks as the leaf's 1.4 in 16), `data-view` on the svg; else the leaf. The
   colour and the selected row as the leaf's. The board plugin off — the leaf. e2e viewMenu (the last two tests).
+- **ТЗ 58, pinned tabs (`docs/58-zakreplennye-vkladki.md`)** — `Tab.pinned` (a file tab without `scope`), saved by
+  `serialize` / `restore`, not copied by `copyTab`. Obeyed only where `setFilePins(true)` (next/App, beside
+  `setPinning(false)`): `isFilePinned`; the old interface keeps the field, and its retarget of such a tab drops it. Not
+  the old «Сегодня» pinning (`isPinned` / `pinFirst`). Layout: the pinned first as one group (`pinnedFirst` after
+  `restore`, `closePane`, `unfoldPanes`, `moveTab`); `setTabPinned` — to the group's end / the first of the others;
+  `insertAfterActive` (exported; store's `openAgendaHere` and todayState use it now) never inside the group;
+  `openFile(..., { replace })` never retargets a pinned tab — every replace path (navigator, links, agenda «рядом»)
+  opens after the group; `othersOf` leaves them («Закрыть остальные»); ⌘W closes one. UI (next/Tabs): the pin (16 box,
+  1.5, 12 pt, `ink3` / `lampink` as the icon) left of the file's icon, no «×» (the unsaved dot stays), `flex: 0 0 auto`
+  up to 190. Menu: «Закрепить / Открепить вкладку» after «Закрыть остальные», which says «кроме закреплённых»
+  (`MenuItem.hint`, next Menu) while another pinned tab is there; palette `pinTab` / `unpinTab` (`store.pinAction`).
+  Tests: layoutPins.test.ts, e2e nextPinnedTabs. Fixed on the way: next/ui/Menu opened a submenu by the row among the
+  buttons, not by the item (`data-mi`): a line or a note before it opened none.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.

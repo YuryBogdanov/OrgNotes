@@ -30,6 +30,7 @@ export interface Tab {
   view?: string; // a tab of a view on one heading (with `scope`): that view; a plain file tab is shown as its file is (fix-49-2, store.viewOf)
   scope?: { line: number; title: string }; // a file tab of a plugin's view on one heading and its subtree (a mindmap of a branch, ТЗ 39)
   narrow?: { line: number; title: string }; // a file tab narrowed to a heading's subtree (⌃X N S, ТЗ 42 §5.8)
+  pinned?: true; // a pinned file tab (ТЗ 58, the new interface): first of its pane, not closed by «Закрыть остальные», never retargeted
 }
 export interface Pane {
   id: string;
@@ -73,8 +74,10 @@ export const secondKind = (L: Layout): TabKind | null => {
   return k === 'untitled' ? 'file' : k; // a text tab of any kind lights "Второй редактор"
 };
 
-function insertAfterActive(p: Pane, t: Tab) {
-  const at = p.tabs.length ? p.active + 1 : 0;
+/** A new tab after the active one, made active. */
+export function insertAfterActive(p: Pane, t: Tab) {
+  // never inside the group of the pinned tabs (ТЗ 58 §3): a pinned one active — right after the group
+  const at = p.tabs.length ? Math.max(p.active + 1, pinnedCount(p)) : 0;
   p.tabs.splice(at, 0, t);
   p.active = at;
 }
@@ -100,9 +103,11 @@ export function openFile(L: Layout, pi: number, path: string, line: number, opts
   const p = L.panes[pi];
   // a tab of a view on one heading (ТЗ 39) stays that heading's: a file opens beside it
   let i = p.tabs.findIndex((t) => t.kind === 'file' && t.path === path && !t.scope);
-  if (i < 0 && opts.replace && p.tabs[p.active]?.kind === 'file' && !p.tabs[p.active].scope) i = p.active;
+  // a pinned tab is never retargeted (ТЗ 58 §5): the file opens in a new tab after the group
+  if (i < 0 && opts.replace && p.tabs[p.active]?.kind === 'file' && !p.tabs[p.active].scope && !isFilePinned(p.tabs[p.active])) i = p.active;
   if (i >= 0) {
     const t = p.tabs[i];
+    if (t.path !== path) delete t.pinned; // retargeted in the old interface: the pin was the other file's tab
     t.path = path;
     t.cursor = { line, col: 0 };
     t.reveal = reveal(line, opts.focus ?? true);
@@ -177,6 +182,7 @@ export function closePane(L: Layout, pi: number) {
   const gone = L.panes[pi];
   const keep = L.panes[1 - pi];
   for (const t of gone.tabs) if (!keep.tabs.some((x) => sameContent(x, t))) keep.tabs.push(t);
+  pinnedFirst(keep); // the gone pane's pinned tabs at the end of the group (ТЗ 58 §5)
   L.panes = [keep];
   L.active = 0;
 }
@@ -222,6 +228,7 @@ export function unfoldPanes(L: Layout, f: Folded): boolean {
   }
   a.active = Math.max(0, a.tabs.indexOf(shown));
   const p = newPane(tabs);
+  pinnedFirst(p);
   p.active = Math.min(Math.max(0, f.active), tabs.length - 1);
   L.panes.push(p);
   L.ratio = f.ratio;
@@ -352,7 +359,10 @@ export function moveTab(L: Layout, pi: number, ti: number): boolean {
   closeTab(L, pi, ti); // may remove the source pane
   const ti2 = L.panes.indexOf(target);
   if (same >= 0) target.active = same; // already open there: no second tab
-  else insertAfterActive(target, t);
+  else {
+    insertAfterActive(target, t);
+    pinnedFirst(target);
+  }
   L.active = ti2;
   return true;
 }
@@ -370,8 +380,40 @@ export function duplicateTab(L: Layout, pi: number, ti: number): boolean {
   return true;
 }
 
-/** Tabs of pane `pi` other than `ti`, in order (what "Закрыть остальные" has to close). */
-export const othersOf = (L: Layout, pi: number, ti: number) => (L.panes[pi]?.tabs ?? []).filter((_, i) => i !== ti);
+/** Tabs of pane `pi` other than `ti`, in order (what "Закрыть остальные" has to close): the pinned ones stay (ТЗ 58). */
+export const othersOf = (L: Layout, pi: number, ti: number) => (L.panes[pi]?.tabs ?? []).filter((t, i) => i !== ti && !isFilePinned(t));
+
+// ---- pinned file tabs (ТЗ 58; not the old pinning of «Сегодня» below) --------------------------------------------
+
+/** The new interface pins file tabs; the old one keeps the field (it is saved) but neither shows nor obeys it. */
+let filePins = false;
+export const setFilePins = (on: boolean) => void (filePins = on);
+/** A file tab (not a view on one heading) pinned, in a shell that has pins. */
+export const isFilePinned = (t: Tab) => filePins && !!t.pinned && t.kind === 'file' && !t.scope;
+/** Can it be pinned: a file tab, not a view on one heading. */
+export const canPin = (t: Tab) => t.kind === 'file' && !t.scope;
+const pinnedCount = (p: Pane) => p.tabs.filter(isFilePinned).length;
+/** The pinned tabs first, as one group, each side in its order; the same tab stays active. */
+export function pinnedFirst(p: Pane) {
+  const shown = p.tabs[p.active];
+  const pins = p.tabs.filter(isFilePinned);
+  if (!pins.length) return;
+  p.tabs = [...pins, ...p.tabs.filter((t) => !isFilePinned(t))];
+  p.active = Math.max(0, p.tabs.indexOf(shown));
+}
+/** «Закрепить вкладку»: at the end of the group; «Открепить вкладку»: the first of the others. */
+export function setTabPinned(L: Layout, pi: number, ti: number, on: boolean): boolean {
+  const p = L.panes[pi];
+  const t = p?.tabs[ti];
+  if (!t || !canPin(t) || !!t.pinned === on) return false;
+  const shown = p.tabs[p.active];
+  p.tabs.splice(ti, 1);
+  if (on) t.pinned = true;
+  else delete t.pinned;
+  p.tabs.splice(pinnedCount(p), 0, t);
+  p.active = Math.max(0, p.tabs.indexOf(shown));
+  return true;
+}
 
 // ---- paths of files that moved or disappeared ------------------------------------------
 
@@ -441,7 +483,7 @@ export function serialize(L: Layout): string {
         active: Math.max(0, tabs.indexOf(act)),
         tabs: tabs.map((t) => {
           const label = core(t.kind) ? undefined : (viewOf(t.kind)?.label(t) ?? t.label);
-          return { kind: t.kind, path: t.path, cursor: t.cursor, ...(t.top ? { top: t.top } : {}), ...(t.folds?.length ? { folds: t.folds } : {}), ...(t.scope ? { view: t.view, scope: t.scope } : {}), ...(t.narrow ? { narrow: t.narrow } : {}), ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.data !== undefined ? { data: t.data } : {}), ...(label ? { label } : {}) };
+          return { kind: t.kind, path: t.path, cursor: t.cursor, ...(t.top ? { top: t.top } : {}), ...(t.folds?.length ? { folds: t.folds } : {}), ...(t.scope ? { view: t.view, scope: t.scope } : {}), ...(t.narrow ? { narrow: t.narrow } : {}), ...(t.pinned && canPin(t) ? { pinned: true } : {}), ...(t.agenda ? { agenda: t.agenda } : {}), ...(t.data !== undefined ? { data: t.data } : {}), ...(label ? { label } : {}) };
         }),
       };
     }),
@@ -477,11 +519,16 @@ export function restore(raw: string | null, exists: (path: string) => boolean): 
           if (typeof st.view === 'string') t.view = st.view;
           if (typeof st.scope?.line === 'number' && typeof st.scope?.title === 'string' && t.view) t.scope = { line: st.scope.line, title: st.scope.title };
           if (typeof st.narrow?.line === 'number' && typeof st.narrow?.title === 'string') t.narrow = { line: st.narrow.line, title: st.narrow.title };
+          if (st.pinned === true && !t.scope) t.pinned = true;
           tabs.push(t);
         } else return;
         if (i === sp.active) active = tabs.length - 1;
       });
-      if (tabs.length) panes.push({ id: uid('p'), tabs, active });
+      if (tabs.length) {
+        const p = { id: uid('p'), tabs, active };
+        pinnedFirst(p);
+        panes.push(p);
+      }
     }
     if (!panes.length) return null;
     const ratio = typeof d.ratio === 'number' && d.ratio > 0.1 && d.ratio < 0.9 ? d.ratio : 0.5;
