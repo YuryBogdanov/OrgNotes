@@ -5,7 +5,7 @@
   import { TODAY } from '../todayState.svelte';
   import { fmtLong } from '../org';
   import { displayName } from '../names';
-  import { windowDrag } from './windowDrag';
+  import { windowDrag } from '../windowDrag';
 
   // The toolbar of the new interface (ТЗ 42 §4.1), 52 pt: the sidebar's button (⌘0), the file's name and its path in
   // the notes folder, «Искать везде» (the palette, ⌘K) and «+» — a new note (⌘N). It drags the window (windowDrag).

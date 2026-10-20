@@ -13,7 +13,7 @@
   import SearchPanel from './SearchPanel.svelte';
   import TodayPanel from './TodayPanel.svelte';
   import { panelDate } from '../today';
-  import { windowDrag } from './windowDrag';
+  import { windowDrag } from '../windowDrag';
 
   // The sidebar of the new interface (ТЗ 50 §1–2): the rail of the sections at the window's left edge, 52 pt — the
   // core's, a line, the plugins' (the last ones in «⋯» when they do not fit), the gear at the bottom; buttons of 34 pt

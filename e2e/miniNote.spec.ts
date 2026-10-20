@@ -45,6 +45,21 @@ for (const ui of ['old', 'next'] as const)
       await expect.poll(async () => (await edits(page)).at(-1)).toBe('* Созвон\n** Что показали\n- миграция биллинга и тарифов\n* Другое\nтекст\n');
     });
 
+    // the header drags the window from anywhere, its note's name too (Tauri's drag region took only a press on the bare
+    // element); a double click never zooms the panel; the buttons keep their clicks
+    test('the header drags the window, from the note\'s name too; a double click does not zoom it', async ({ page }) => {
+      await open(page);
+      const acts = async () => (await log(page)).filter((x) => ['drag', 'zoom', 'minimize'].includes(x[0] as string)).map((x) => x[0]);
+      await mini(page).locator('header .path b').click();
+      await expect.poll(acts).toEqual(['drag']);
+      await mini(page).locator('header .path .file').dblclick();
+      await page.waitForTimeout(200);
+      expect(await acts()).toEqual(['drag', 'drag']); // the second press of a double click drags no more
+      await mini(page).getByRole('button', { name: 'Открыть в главном окне' }).click();
+      await page.waitForTimeout(200);
+      expect(await acts()).toEqual(['drag', 'drag']);
+    });
+
     test('an edit from the main window (or the disk) comes in; the heading gone: «Заголовок удалён»', async ({ page }) => {
       await open(page);
       await send(page, 'mini-file', { path: W, text: '* Созвон\n** Что показали\n- миграция биллинга\n- дашборд SLA\n* Другое\n', disk: '', diskRaw: '' });

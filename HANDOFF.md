@@ -1004,7 +1004,10 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 - **The window's title bar in the new interface:** WKWebView has no `-webkit-app-region` (the CSS stays, harmless):
   `next/windowDrag.ts` — `use:windowDrag` on the toolbar (Toolbar.svelte) and the lights' room of the rail and of the
   panel (Sidebar.svelte); a press not on a button, field or tab asks Tauri `startDragging`, a double click
-  `toggleMaximize` (as the old Toolbar.svelte). The mock logs both. e2e nextWindowDrag.spec.ts.
+  `toggleMaximize` (as the old Toolbar.svelte). The mock logs both. e2e nextWindowDrag.spec.ts. Now `src/windowDrag.ts`
+  (shared): the mini window's header in both shells uses it with `{ zoom: false }` — Tauri's `data-tauri-drag-region`
+  took only a press on the bare element (not on the note's name, most of the header) and zoomed the panel on a double
+  click. e2e miniNote.spec.ts «the header drags the window».
 - **ТЗ 56, the file beside a list (`docs/56-novyy-interfeys-fayl-sboku.md`)** — no second pane in the new interface:
   a list's tab shows the file of its row on the right. 56.1, the frame: `beside.svelte.ts` (`Beside` per tab
   id, in memory — kept while another tab is shown, gone after a restart; `openBeside(tabId, { path, line, hit? })`,
