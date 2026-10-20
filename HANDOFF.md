@@ -1008,6 +1008,10 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   keys, «Виды добавляют плагины»; in the tab's menu (a tab on one heading switches alone) and first in the navigator's
   menu of a file (`fileMenu.ts`, now on the shared `MenuItem`; the old navigator gets it too). None for a file type.
   e2e viewMenu. fix-49's entry above: its switch and corners no longer exist.
+- **fix-49-2 §4, the navigator's icon is the file's view** — `next/FilesPanel.svelte` `iconOf(row)`: a plugin's file type —
+  the type's icon; a file shown as a plugin's view (`store.viewOfFile`, the same as its tab and the menus) — the view's
+  manifest icon in a 20 box, line 1.75 (looks as the leaf's 1.4 in 16), `data-view` on the svg; else the leaf. The
+  colour and the selected row as the leaf's. The board plugin off — the leaf. e2e viewMenu (the last two tests).
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.
