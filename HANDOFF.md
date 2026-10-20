@@ -168,6 +168,9 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   - A clicked `<button>` does not get focus. Listen on window, or pass the element explicitly.
   - `keyboard.type` with Cyrillic inserts text without keydown. Dispatch keydown manually (`typeKeys` in `jumpbar.spec.ts`).
   - With the structural view, `innerText` shows one star; `textContent` / `toHaveText` show the real text.
+  - Focusing CodeMirror back from a popover (`view.focus()`) can drop the DOM caret to the start of the text, and CM
+    reads it back on the next key. Put the DOM selection back first: `refocus` in `cm/orgEditor.ts`.
+  - CI runners are slow: a chord's two presses (`CHORD_WAIT` 1.5 s, `keyDispatch.ts`) once came 1.54 s apart.
 - **Async writes:** assert with `expect.poll`, not right after a click.
 - **Svelte 5:** a child's props are gone after it is unmounted. Read them before calling `onclose()`.
 - **Screenshots:** a throwaway `e2e/_shots.spec.ts` writes to the scratchpad; delete it after. Viewport 1440×900,
