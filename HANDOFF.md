@@ -994,6 +994,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   `--vsw: 140px` (the text's right padding with no column), the plugin's view `--fv-corner: 140px` (FileView) — the
   board's head and its card's head keep it clear. The board's file card lost «Открыть доской». The tests of
   «Оформление» skip by `RICH_ENABLED` (nextRich, nextBlocks, nextCapsule, single tests elsewhere). e2e nextViewSwitch.
+- **fix-49-2 §1, the view is the file's (`docs/fix-49-2-vid-fayla-svoystvo-fayla.md`)** — `store.viewOf(tab)` for a
+  plain file tab reads only its file (`viewOfFile`: the file type's view, `viewMemory[name]`, `defaultFor`, text);
+  `tab.view` lives only on a tab of a view on one heading (`scope`, ТЗ 39; `copyTab` / `serialize` / `restore` now
+  carry `scope` with it). `showAs` writes `viewMemory` (`showFileAs(name)` without a tab): every tab of the file
+  switches at once; another file opened in the same tab is shown as that file is (the bug: the board stuck to the tab).
+  A saved layout's plain tab `view` becomes its file's unless the file has one (`adoptTabViews`). A rename or move
+  carries `viewMemory` and `fileState:` keys (`rekey.ts`, `carryFileMemory`); the Trash drops them. e2e viewOfFile.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.
