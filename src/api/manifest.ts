@@ -55,7 +55,7 @@ export interface ManifestSettings {
   icon?: string;
   groups: Group[];
 }
-/** A view of a file (ТЗ 33): «Показать как ›» in a file tab's menu; `key` — the plugin's command that switches to it. */
+/** A view of a file (ТЗ 33): «Показывать как ›» in a file tab's menu; `key` — the plugin's command that switches to it. */
 export interface ManifestFileView {
   id: string;
   title: string;

@@ -1,4 +1,4 @@
-// The plugin «Канбан» (ТЗ 33): a view of an Org file as a board — «Показать как ›» in a file tab's menu, ⌥⌘B there and
+// The plugin «Канбан» (ТЗ 33): a view of an Org file as a board — «Показывать как ›» in a file tab's menu, ⌥⌘B there and
 // back, «Открыть доску» right of «#+BOARD» in the text; its settings. On the public API only.
 
 import { definePlugin } from '@panopticon/api';

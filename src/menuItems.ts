@@ -6,7 +6,7 @@ export type MenuItem =
       label: string; action: () => void; danger?: boolean; disabled?: boolean; shortcut?: string;
       // the tab list of a pane: a check at the active one, the tab's icon, a dot at an unsaved one
       checked?: boolean; icon?: string; dot?: boolean; italic?: boolean; // icon: 'file' | 'agenda' | 'untitled', or an SVG path (a feature's tab)
-      sub?: MenuItem[]; // a submenu, opened by hovering or a click («Показать как ›»)
+      sub?: MenuItem[]; // a submenu, opened by hovering or a click («Показывать как ›»)
       subWidth?: number; // its least width
       detail?: string; // a grey second line: what exactly it does («https://wiki…», «Ревью архитектуры»), ТЗ 35
       capsule?: string; // the label as a status capsule: the tone's style (`--tl:…`), as the agenda draws it (ТЗ 34)

@@ -47,7 +47,7 @@ test.describe('context menu', () => {
     await tabs(page, 0).first().click({ button: 'right' });
     const items = await page.getByRole('menuitem').allInnerTexts();
     expect(items.map((t) => t.replace(/\s+/g, ' ').trim())).toEqual([
-      'Закрыть ⌘W', 'Закрыть остальные ⌥⌘W', 'Переместить в соседний редактор ⌃⌘→', 'Продублировать в соседнем редакторе ⌃⌥⌘→', 'Показать как ›', 'Показать в навигаторе ⇧⌘J', 'Скопировать путь ⌥⌘C',
+      'Закрыть ⌘W', 'Закрыть остальные ⌥⌘W', 'Переместить в соседний редактор ⌃⌘→', 'Продублировать в соседнем редакторе ⌃⌥⌘→', 'Показывать как ›', 'Показать в навигаторе ⇧⌘J', 'Скопировать путь ⌥⌘C',
     ]);
     await expect(tabs(page, 0).first()).toHaveClass(/menu/);
     await expect(tabs(page, 0).first().getByRole('button', { name: /Закрыть вкладку/ })).toHaveCSS('opacity', '1');

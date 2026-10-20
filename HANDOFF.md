@@ -1001,6 +1001,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   switches at once; another file opened in the same tab is shown as that file is (the bug: the board stuck to the tab).
   A saved layout's plain tab `view` becomes its file's unless the file has one (`adoptTabViews`). A rename or move
   carries `viewMemory` and `fileState:` keys (`rekey.ts`, `carryFileMemory`); the Trash drops them. e2e viewOfFile.
+- **fix-49-2 §2–3, no view switch; «Показывать как ›» in the menus** — fix-49's plate is gone (`ViewSwitch.svelte`,
+  `viewSwitch.ts`, `--vs-top / --vsw / --st-top / --fv-corner`): «Структура» from 46 again, the text's right padding
+  `var(--sw)`, ⌘F at 12, the board's head 32 / its card 12 on the right. `tabMenu.ts` `viewMenuItem(name, tab?)` (and
+  `otherViews()`: the plugins' views but a file type's own): «Показывать как ›» — ✓ at the file's view, the views'
+  keys, «Виды добавляют плагины»; in the tab's menu (a tab on one heading switches alone) and first in the navigator's
+  menu of a file (`fileMenu.ts`, now on the shared `MenuItem`; the old navigator gets it too). None for a file type.
+  e2e viewMenu. fix-49's entry above: its switch and corners no longer exist.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { CORNER, otherViews } from './viewSwitch';
   import { untrack } from 'svelte';
   import { plugins } from '../api/host.svelte';
   import { store } from '../store.svelte';
@@ -24,8 +23,7 @@
   // the props come as getters of the parent's file (a new object at each edit): a derived stops the redraw when the
   // value is the same, else the view would be drawn anew at every key typed in it (the board's card at the side)
   const thePath = $derived(path);
-  // fix-49: the view switch lies over the view's top right — the plugin keeps that corner clear (`--fv-corner`)
-  const vars = $derived(`${tokenVars(store.theme.app)};${compatVars(store.theme.app)};--fv-corner:${otherViews(tab).length ? CORNER.width : 0}px`);
+  const vars = $derived(`${tokenVars(store.theme.app)};${compatVars(store.theme.app)}`);
   const ownType = $derived(!!fileTypeOf(path));
 
   function showText() {

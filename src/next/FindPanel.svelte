@@ -99,7 +99,7 @@
 </div>
 
 <style>
-  .find { position: absolute; top: calc(12px + var(--vs-top, 0px)); right: calc(var(--sw, 0px) + 18px); z-index: 5; width: 420px; max-width: calc(100% - 36px - var(--sw, 0px)); box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--rule); border-radius: 10px; background: var(--card); box-shadow: var(--popshadow); font: 12.5px var(--ui); }
+  .find { position: absolute; top: 12px; right: calc(var(--sw, 0px) + 18px); z-index: 5; width: 420px; max-width: calc(100% - 36px - var(--sw, 0px)); box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--rule); border-radius: 10px; background: var(--card); box-shadow: var(--popshadow); font: 12.5px var(--ui); }
   .row { display: flex; align-items: center; gap: 4px; }
   .fld { flex: 1; min-width: 0; height: 28px; display: flex; align-items: center; gap: 7px; padding: 0 8px; box-sizing: border-box; border: 1px solid var(--rule); border-radius: 6px; background: var(--field); color: var(--ink3); }
   .fld:focus-within { border-color: var(--lamp); }

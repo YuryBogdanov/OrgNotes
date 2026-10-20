@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { installTauriMock, openSettingsSheet, pluginsReady } from './tauriMock';
 import { FILES } from './kanbanFixture';
 
-// ТЗ 33 (part A): the plugin «Канбан» — an Org file shown as a board through the API's view of a file: «Показать как ›»
+// ТЗ 33 (part A): the plugin «Канбан» — an Org file shown as a board through the API's view of a file: «Показывать как ›»
 // in a tab's menu, ⌥⌘B, the choice of a workflow (#+BOARD), the columns and the cards, the filter, folding, the
 // headings not on it, «Открыть доску» right of #+BOARD in the text.
 
@@ -66,7 +66,7 @@ test('«Не на доске»: the headings of no status or another set; one op
   await expect(page.locator('.cm-activeLine')).toContainText('Позвонить провайдеру');
 });
 
-test('«Текст ⌥⌘B», ⌥⌘B, «Показать как ›» in the tab\'s menu; the link right of #+BOARD; the view is kept per file', async ({ page }) => {
+test('«Текст ⌥⌘B», ⌥⌘B, «Показывать как ›» in the tab\'s menu; the link right of #+BOARD; the view is kept per file', async ({ page }) => {
   await open(page);
   await board(page).getByRole('button', { name: /Текст/ }).click();
   await expect(page.locator('.cm-content')).toBeVisible();
@@ -76,7 +76,7 @@ test('«Текст ⌥⌘B», ⌥⌘B, «Показать как ›» in the ta
   await page.keyboard.press('Alt+Meta+b');
   await expect(page.locator('.cm-content')).toBeVisible();
   await page.locator('.tab.on').click({ button: 'right' });
-  await page.getByRole('menuitem', { name: 'Показать как' }).hover();
+  await page.getByRole('menuitem', { name: 'Показывать как' }).hover();
   await expect(page.getByRole('menuitem', { name: /Текст/ })).toBeVisible();
   await expect(page.getByText('Виды добавляют плагины')).toBeVisible();
   await page.getByRole('menuitem', { name: /Доска/ }).click();

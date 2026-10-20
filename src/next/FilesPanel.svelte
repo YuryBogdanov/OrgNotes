@@ -4,11 +4,12 @@
   import { folderKey, readOpen, writeOpen } from '../navTree';
   import { visibleRows, type NavRow } from '../navRows';
   import { openFile } from '../layout';
-  import { createItems, entryItems, type FileMenu } from '../fileMenu';
+  import { createItems, entryItems } from '../fileMenu';
+  import type { MenuItem } from '../menuItems';
 
   // «Файлы» of the new sidebar (ТЗ 42 §4.2, ТЗ 43 §2.1): the tree of the notes folder — the same rows as the old
   // navigator, files and folders only; a click opens in the tab shown, ⌥-click in a tab of its own; the menu of a row.
-  let { onmenu }: { onmenu: (at: { x: number; y: number }, items: FileMenu) => void } = $props();
+  let { onmenu }: { onmenu: (at: { x: number; y: number }, items: MenuItem[]) => void } = $props();
 
   // the open folders, kept per notes folder (the same store as the old navigator's)
   const open = new SvelteSet<string>();
