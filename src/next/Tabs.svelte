@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { windowDrag } from './windowDrag';
+  import { windowDrag } from '../windowDrag';
   import { store } from '../store.svelte';
   import { viewOf, fileViewOf } from '../views';
   import { isPinned, type Tab } from '../layout';

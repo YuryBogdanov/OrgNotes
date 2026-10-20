@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { windowDrag } from '../windowDrag';
   import { onMount } from 'svelte';
   import Editor from './Editor.svelte';
   import { displayName } from '../names';
@@ -199,9 +200,9 @@
 </script>
 
 <div class="mini" role="application" aria-label="Мини-окно">
-  <header data-tauri-drag-region>
+  <header use:windowDrag={{ zoom: false }}>
     <button class="close" aria-label="Скрыть мини-окно" title="Скрыть мини-окно · ⌘W" onclick={() => call('mini_hide')}></button>
-    <span class="path" data-tauri-drag-region title={note && !note.whole ? `${path} › ${found?.h.title ?? note.title}` : path}>
+    <span class="path" title={note && !note.whole ? `${path} › ${found?.h.title ?? note.title}` : path}>
       {#if note && !note.whole}<span class="file">{displayName(path)} ›</span> <b>{found?.h.title || note.title || 'Без названия'}</b>{:else if note}<b>{displayName(path)}</b>{:else}<span class="file">Заметка не выбрана</span>{/if}
     </span>
     <button class="pk" aria-label="Сменить заметку" title="Сменить заметку · {store.keyHint('miniPalette') || '⌘P'}" onclick={() => (palette = true)}>{store.keyHint('miniPalette') || '⌘P'}</button>
