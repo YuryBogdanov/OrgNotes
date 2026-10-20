@@ -6,6 +6,8 @@
   import { openFile } from '../layout';
   import { createItems, entryItems } from '../fileMenu';
   import type { MenuItem } from '../menuItems';
+  import { fileViewOf } from '../views';
+  import { fileTypeOf } from '../fileTypes.svelte';
 
   // «Файлы» of the new sidebar (ТЗ 42 §4.2, ТЗ 43 §2.1): the tree of the notes folder — the same rows as the old
   // navigator, files and folders only; a click opens in the tab shown, ⌥-click in a tab of its own; the menu of a row.
@@ -59,6 +61,17 @@
 
   const FILE = 'M3.5 2h6l3 3v9h-9z';
   const FOLDER = 'M1.8 4.2c0-.7.5-1.2 1.2-1.2h3l1.5 1.6H13c.7 0 1.2.5 1.2 1.2V12c0 .7-.5 1.2-1.2 1.2H3c-.7 0-1.2-.5-1.2-1.2z';
+  /** A row's icon (fix-49-2 §4): a folder; a file shown as a plugin's view — that view's icon; a plugin's file type —
+   *  the type's; else the leaf. The view as its tab and «Показывать как ›» have it (`store.viewOfFile`). The views'
+   *  icons are drawn in a box of 20: their line 1.75 there looks as the leaf's 1.4 in 16. */
+  function iconOf(r: NavRow): { d: string; box: 16 | 20; view?: string } {
+    if (r.kind === 'folder') return { d: FOLDER, box: 16 };
+    const f = r.file === undefined ? undefined : store.files[r.file];
+    const ft = f ? fileTypeOf(f.name) : undefined;
+    if (ft) return { d: ft.icon, box: 20 };
+    const v = fileViewOf(store.viewOfFile(f));
+    return v ? { d: v.icon, box: 20, view: v.id } : { d: FILE, box: 16 };
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -75,11 +88,12 @@
           <input class="name" use:focusSelect aria-label="Новое имя" value={r.label} onkeydown={(e) => keyRename(e, r)} onblur={() => (store.renaming = null)} />
         </div>
       {:else}
+        {@const ic = iconOf(r)}
         <button class="row" class:on={r.kind === 'file' && r.file === store.cur} role="treeitem" aria-selected={r.kind === 'file' && r.file === store.cur}
           aria-expanded={r.kind === 'folder' && r.hasKids ? r.open : undefined} style:padding-left="{6 + r.depth * 16}px"
           onclick={(e) => click(e, r)} oncontextmenu={(e) => menu(e, r)}>
           <span class="chev" class:open={r.open}>{#if r.kind === 'folder' && r.hasKids}<svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><path d="M2.5 1.2 5.8 4 2.5 6.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>{/if}</span>
-          <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d={r.kind === 'folder' ? FOLDER : FILE} /></svg>
+          <svg class="ic" width="15" height="15" viewBox="0 0 {ic.box} {ic.box}" fill="none" stroke="currentColor" stroke-width={ic.box === 20 ? 1.75 : 1.4} stroke-linecap={ic.box === 20 ? 'round' : undefined} stroke-linejoin={ic.box === 20 ? 'round' : undefined} aria-hidden="true" data-view={ic.view}><path d={ic.d} /></svg>
           <span class="nm">{r.label}</span>
         </button>
       {/if}

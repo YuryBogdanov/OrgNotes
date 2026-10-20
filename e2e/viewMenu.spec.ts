@@ -86,3 +86,33 @@ test('the navigator\'s menu of a file: «Показывать как ›» first
   await tree(page).getByRole('treeitem', { name: 'work' }).click({ button: 'right' });
   await expect(menu(page).getByRole('menuitem', { name: /Показывать как/ })).toHaveCount(0);
 });
+
+// §4: the navigator's icon of a file is its view's — the board's for a board, the leaf for the text — the same as its
+// tab's; drawn in a box of 20 with a line of 1.75; the board plugin off — the leaf
+test('the navigator\'s icon: the view\'s for a board, the same as the tab\'s; the leaf for the text', async ({ page }) => {
+  await open(page);
+  await expect(board(page)).toBeVisible();
+  const work = tree(page).getByRole('treeitem', { name: 'work' });
+  if ((await work.getAttribute('aria-expanded')) !== 'true') await work.click();
+  const ic = (name: string) => tree(page).getByRole('treeitem', { name }).locator('svg.ic');
+  await expect(ic('platform')).toHaveAttribute('data-view', 'kanban.board');
+  await expect(ic('platform')).toHaveAttribute('viewBox', '0 0 20 20');
+  await expect(ic('platform')).toHaveAttribute('stroke-width', '1.75');
+  const tabPath = await page.getByRole('tab', { name: /platform/ }).locator('svg.ic path').getAttribute('d');
+  expect(await ic('platform').locator('path').getAttribute('d')).toBe(tabPath);
+  await expect(ic('inbox')).toHaveAttribute('data-view', 'kanban.board'); // «#+BOARD», not open
+  await page.keyboard.press('Alt+Meta+b');
+  await expect(board(page)).toHaveCount(0);
+  await expect(ic('platform')).not.toHaveAttribute('data-view', /./);
+  await expect(ic('platform')).toHaveAttribute('viewBox', '0 0 16 16');
+  await expect(ic('work')).toHaveAttribute('viewBox', '0 0 16 16'); // a folder
+});
+
+test('the board plugin off: the leaf, whatever the file was shown as', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ui:next', '1'));
+  await openApp(page, { files: { ...FILES(true) }, local: { 'plugins:enabled': JSON.stringify({ kanban: false }), 'fileView:/mock': JSON.stringify({ 'inbox.org': 'kanban.board' }) }, ready: false, viewport: { width: 1600, height: 900 } });
+  await pluginsReady(page);
+  const ic = tree(page).getByRole('treeitem', { name: 'inbox' }).locator('svg.ic');
+  await expect(ic).toHaveAttribute('viewBox', '0 0 16 16');
+  await expect(ic).not.toHaveAttribute('data-view', /./);
+});
