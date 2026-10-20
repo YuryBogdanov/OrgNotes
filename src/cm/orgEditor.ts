@@ -93,6 +93,20 @@ export interface EditorUi {
 const revealed = new Map<string, number>();
 const headLine = (t: string) => /^\*+\s/.test(t);
 const copyText = (t: string) => void navigator.clipboard?.writeText(t).catch(() => {});
+/** The focus back from a popover with the caret where it was. WebKit puts the caret at the start of a focused
+ *  contenteditable whose DOM selection is outside it, and the editor, sure the DOM caret is still its own, reads that
+ *  start back (the heading under the caret lost): the DOM selection is put back in the text before the focus. */
+function refocus(v: EditorView) {
+  const { anchor, head } = v.state.selection.main;
+  const a = v.domAtPos(anchor);
+  const h = v.domAtPos(head);
+  try {
+    getSelection()?.setBaseAndExtent(a.node, a.offset, h.node, h.offset);
+  } catch {
+    // a node gone meanwhile: the focus as it comes
+  }
+  v.focus();
+}
 
 /** `cm-has-selection` on the editor while something is selected: the current line is not marked then. Through the
  *  editor's attributes: CodeMirror rewrites its own classes (on focus, say) and would drop one set by hand. */
@@ -458,7 +472,7 @@ export class OrgEditor {
   private noteAt(v: EditorView, line: number) {
     const l = v.state.doc.line(line + 1);
     const c = v.coordsAtPos(l.from + Math.min(l.length, /^\*+\s*/.exec(l.text)![0].length));
-    openNote(this.path, line, c ? { x: c.left, y: c.bottom + 6 } : undefined, () => v.focus());
+    openNote(this.path, line, c ? { x: c.left, y: c.bottom + 6 } : undefined, () => refocus(v));
   }
 
   // ---- «Теги заголовка» (ТЗ 38 §6): each change in the line at once, kept out of the undo history; on closing, the
@@ -493,7 +507,7 @@ export class OrgEditor {
       const back = p.v.state.doc.line(p.line);
       p.v.dispatch({ changes: { from: back.from, to: back.to, insert: now }, annotations: isolateHistory.of('full'), userEvent: 'input' });
     }
-    p.v.focus();
+    refocus(p.v);
   };
 
   // ---- typing tags in a heading's line: after « :» the folder's tags are offered (ТЗ 38 §6) --------------------------
