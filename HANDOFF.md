@@ -1073,6 +1073,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   (`tx.body` / `replaceBody`); the others — the link at the end and `:LAYOUT: text-image`. «Копирую…» on the stage
   meanwhile. Not done: a file dragged from the navigator (its rows are not draggable and it lists no images). e2e
   presentImages.
+- **ТЗ 59.5, the show** — `show.svelte.ts`: `show.start(path, from)` (⌘↩ from the slide chosen, ⇧⌘↩ from the first,
+  «▶ Показать» in the head, the palette «Презентация: показать») → `ui.present`: `audience(el)` — plain DOM, the slide
+  fitted to the window on black (its `resize`), `visibility: hidden` on «B», the cursor hidden after 2 s still;
+  `presenter(el)` — `Presenter.svelte` mounted into the other window (the timer ticked every 0.5 s, «идёт · с 14:02» /
+  «на паузе», «СЛАЙД 2 ИЗ 7» or the digits typed, «Сейчас» up to 900 framed by the lamp, «Дальше · <title>» 380 or
+  «Конец», the notes 21). The keys from both windows (`key` → `act`: → ↓ Space PgDn ↩ / ← ↑ PgUp ⌫, Home / End,
+  digits + ↩, B, S = `swap()`, Esc = `end()`); on its end the editor shows the slide shown last. Slides in the show
+  draw with the main window's blob URLs (the same origin). e2e presentShow (one screen, two: `__screens`).
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.

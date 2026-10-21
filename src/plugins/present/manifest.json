@@ -16,22 +16,63 @@
       {
         "id": "present.toggle",
         "title": "Показать как презентацию / текст",
-        "keys": ["⌥⌘P"],
-        "synonyms": ["презентация", "слайды", "текст", "present"]
+        "keys": [
+          "⌥⌘P"
+        ],
+        "synonyms": [
+          "презентация",
+          "слайды",
+          "текст",
+          "present"
+        ]
+      },
+      {
+        "id": "present.show",
+        "title": "Презентация: показать",
+        "keys": [
+          "⌘↩"
+        ],
+        "scope": "view",
+        "synonyms": [
+          "показ",
+          "слайды",
+          "present",
+          "показать"
+        ]
+      },
+      {
+        "id": "present.showFirst",
+        "title": "Презентация: показать с начала",
+        "keys": [
+          "⇧⌘↩"
+        ],
+        "scope": "view",
+        "synonyms": [
+          "показ",
+          "с первого слайда"
+        ]
       },
       {
         "id": "present.prev",
         "title": "Презентация: предыдущий слайд",
-        "keys": ["⌥↑"],
+        "keys": [
+          "⌥↑"
+        ],
         "scope": "view",
-        "synonyms": ["слайд"]
+        "synonyms": [
+          "слайд"
+        ]
       },
       {
         "id": "present.next",
         "title": "Презентация: следующий слайд",
-        "keys": ["⌥↓"],
+        "keys": [
+          "⌥↓"
+        ],
         "scope": "view",
-        "synonyms": ["слайд"]
+        "synonyms": [
+          "слайд"
+        ]
       }
     ],
     "fileViews": [
@@ -58,9 +99,18 @@
                 "label": "Тема слайдов",
                 "default": "app",
                 "options": [
-                  { "value": "app", "label": "Как в приложении" },
-                  { "value": "light", "label": "Светлая" },
-                  { "value": "dark", "label": "Тёмная" }
+                  {
+                    "value": "app",
+                    "label": "Как в приложении"
+                  },
+                  {
+                    "value": "light",
+                    "label": "Светлая"
+                  },
+                  {
+                    "value": "dark",
+                    "label": "Тёмная"
+                  }
                 ],
                 "hint": "Светлая и тёмная — темы светлого и тёмного места в «Оформлении»"
               }
