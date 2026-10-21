@@ -42,6 +42,9 @@ test('a tab per file, its name without `.org`; a click activates; «×» closes;
 
 test('unsaved: a dot; ⌘W closes the active tab, an untitled one with text is asked about', async ({ page }) => {
   await open(page);
+  // the write held back: the edit stays unsaved while it is looked at (the autosave comes after 0.5 s; a slow runner
+  // looked later — #336)
+  await page.evaluate(() => ((window as any).__saveDelay = 600_000));
   await store(page, "store.setText('* A\\nправка\\n', '/mock/Midterm.org');");
   await expect(strip(page).getByRole('tab', { name: 'Midterm' })).toHaveClass(/dirty/);
   await strip(page).getByRole('button', { name: 'Новая вкладка' }).click();
