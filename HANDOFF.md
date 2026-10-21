@@ -1122,6 +1122,9 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   0.5 s after typing and on blur, re-read when shown; «Скопировать» (`clipboard`), «Показать в Finder», «Вернуть
   стандартный…» asked, off while standard, «изменён»); the palette «Презентация: скопировать бриф для агента». (Not
   `brief.svelte.ts`: it and `Brief.svelte` are one name on macOS's file system.) e2e presentBrief.
+- **`tauri dev` started nothing (the dev runner)** — `src-tauri/scripts/runner.sh` copied the new binary over the old
+  one in `Panopticon-dev.app`: the same file (inode), whose code signature macOS has cached — the new binary was killed
+  at once (exit 137, no output). The file is removed before the copy now.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.
