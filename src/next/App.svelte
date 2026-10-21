@@ -30,7 +30,7 @@
   import PluginEditor from './PluginEditor.svelte';
   import { AGENDA_EDIT } from '../store.svelte';
   import { registerView } from '../views';
-  import { openView, setPinning } from '../layout';
+  import { openView, setFilePins, setPinning } from '../layout';
   import { searchAll } from '../searchAll.svelte';
   import Capture from './Capture.svelte';
   import InboxPicker from './InboxPicker.svelte';
@@ -226,6 +226,7 @@
   });
   // no pinned tab in the new interface (ТЗ 50 §4): «Сегодня» is a tab as any — off before the layout is restored
   setPinning(false);
+  setFilePins(true); // its own pins: file tabs (ТЗ 58)
   searchAll.dense = true; // the search's results one line each, more of them open (ТЗ 50 §5)
   // the width of the sidebar's panel (ТЗ 50 §2: 260 by default, the rail aside), on this Mac
   const readWidth = () => {
