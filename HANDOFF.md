@@ -1125,6 +1125,13 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
 - **`tauri dev` started nothing (the dev runner)** — `src-tauri/scripts/runner.sh` copied the new binary over the old
   one in `Panopticon-dev.app`: the same file (inode), whose code signature macOS has cached — the new binary was killed
   at once (exit 137, no output). The file is removed before the copy now.
+- **«Починить» a free block (the user's ask)** — `fit` marks a free slide's block that does not fit (`.pr-box.over`;
+  the stage's slide says «не помещается» on it and frames it); its menu's «Починить» (also for a block out of the
+  slide) — free.ts `fixRect`: the least change, never centred: in the slide by what is out, taller by what the text
+  needs at full size (its top kept, up by what goes below), wider by 2 % steps (left at the right edge) only when the
+  slide's height is not enough; `toPctUp` keeps the size measured. The need measured on a hidden copy of the block
+  (FreeLayer `need`). Fixed on the way: the stage's slide was never fitted — `onfit?.(fit(el))` skips `fit` when
+  `onfit` is missing. e2e presentRepair.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.
