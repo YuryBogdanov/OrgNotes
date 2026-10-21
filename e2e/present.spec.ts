@@ -60,8 +60,8 @@ test('«#+PRESENT:» opens as slides: the count, the strip, the layouts by the c
   await expect(page.getByRole('button', { name: /Раскладка/ })).toContainText('Текст и картинка');
   // the image missing: a dashed frame with its path
   await thumbs(page).nth(2).click();
-  await expect(page.locator('.pr-holder .pr-img.missing')).toContainText('img/none.png');
-  await expect(page.locator('.pr-holder .pr-img.missing')).toContainText('нет файла');
+  await expect(page.locator('.pr-holder .pr-noimg.missing')).toContainText('Нет файла img/none.png'); // fix-59-1 §3.4
+  await expect(thumbs(page).nth(2).locator('.pr-img.missing')).toContainText('нет файла'); // the strip: as before
   // too long: «не помещается» under its thumbnail
   await expect(thumbs(page).nth(3).locator('.pr-over')).toHaveText('не помещается');
   await expect(thumbs(page).nth(1).locator('.pr-over')).toHaveCount(0);

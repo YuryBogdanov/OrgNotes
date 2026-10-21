@@ -11,6 +11,38 @@ export const FIELD = { '16:9': { w: 960, h: 540 }, '4:3': { w: 720, h: 540 } } a
 export interface Look {
   file: string;
   image(path: string): Promise<string | null>;
+  /** The editor's own (fix-59-1 §3–4): the place for an image where there is none, a missing image's red frame, the
+   *  hints of `two` and `quote`, the empty free slide. Never in the strip, the show or the PDF. `pick` — «Выбрать
+   *  файл…» (`replace`: the link of a missing image to replace). */
+  editor?: { pick(replace?: string): void };
+}
+
+const IMG_ICON = 'M3 4h14v12H3zM3 13l4-4 3 3 2-2 5 5M7.5 8a1 1 0 1 0 0-.01';
+/** An icon of 20 drawn with the stroke of the text. */
+function icon(d: string, size: number): SVGSVGElement {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  for (const [k, v] of Object.entries({ width: String(size), height: String(size), viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.4', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(k, v);
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', d);
+  svg.append(path);
+  return svg;
+}
+/** The editor's place for an image (§3.2), or a missing one's frame (§3.4): its words, «Выбрать файл…» / «Заменить…». */
+function placeEl(look: Look, cls: string, missing?: string): HTMLElement {
+  const box = el('div', `pr-noimg ${cls}${missing ? ' missing' : ''}`);
+  if (missing) box.dataset.path = missing;
+  box.append(icon(IMG_ICON, 40));
+  box.append(el('div', 'pr-noimg-t', missing ? `Нет файла ${missing}` : 'Перетащите картинку сюда или вставьте ⌘V'));
+  const b = el('button', 'pr-noimg-b', missing ? 'Заменить…' : 'Выбрать файл…');
+  b.type = 'button';
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    look.editor?.pick(missing);
+  });
+  box.append(b);
+  if (!missing) box.append(el('div', 'pr-noimg-n', 'видно только в редакторе'));
+  return box;
 }
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
@@ -65,6 +97,11 @@ export function imageEl(look: Look, path: string, cls = 'pr-img', fit: 'cover' |
   box.dataset.path = path;
   const real = resolveImage(look.file, path);
   const missing = () => {
+    if (look.editor) {
+      // the editor: the red frame with «Заменить…» (§3.4)
+      box.replaceWith(placeEl(look, cls.replace('pr-img', '').trim(), path));
+      return;
+    }
     box.classList.add('missing');
     box.replaceChildren(el('span', 'pr-path', path), el('span', 'pr-miss', 'нет файла'));
   };
@@ -216,10 +253,12 @@ export function slideEl(s: Slide, deck: Deck, look: Look, boxes?: [number, numbe
       if (lineCount(ownText) > 6) body.classList.add('dense');
       body.append(...blocksEl(withoutImages(ownText), look));
       col.append(...head(s), body);
+      // no image: the editor's place for it; elsewhere none — the text the whole width (§3.2)
       const img = slideImage(s);
-      const pic = img ? imageEl(look, img, 'pr-img side') : el('div', 'pr-img side none');
-      pad.classList.add('row');
-      if (s.imageSide === 'left') pad.append(pic, col);
+      const pic = img ? imageEl(look, img, 'pr-img side') : look.editor ? placeEl(look, 'side') : null;
+      if (pic) pad.classList.add('row');
+      if (!pic) pad.append(col);
+      else if (s.imageSide === 'left') pad.append(pic, col);
       else pad.append(col, pic);
       break;
     }
@@ -231,22 +270,36 @@ export function slideEl(s: Slide, deck: Deck, look: Look, boxes?: [number, numbe
       const cb = el('div', 'pr-body dense');
       cb.append(...blocksEl(b, look));
       cols.append(ca, cb);
-      pad.append(...head(s), cols);
+      // no `-----`: split by paragraphs — said in the editor (§4.3)
+      if (look.editor && !ownText.some((b) => b.kind === 'hr')) {
+        // over the columns, not in them (they clip what does not fit)
+        cols.classList.add('split-hint');
+        const wrap = el('div', 'pr-twowrap');
+        wrap.append(el('div', 'pr-hint-split', 'делится по абзацам · добавьте -----'), cols);
+        pad.append(...head(s), wrap);
+      } else pad.append(...head(s), cols);
       break;
     }
     case 'quote': {
       const qi = ownText.findIndex((b) => b.kind === 'quote');
       const q = el('div', 'pr-fit pr-bigquote');
-      if (qi >= 0) q.append(blockEl(ownText[qi], look)!);
       const cap = el('div', 'pr-caption');
-      cap.append(...blocksEl(ownText.slice(qi + 1), look));
+      if (qi >= 0) {
+        q.append(blockEl(ownText[qi], look)!);
+        cap.append(...blocksEl(ownText.slice(qi + 1), look));
+      } else {
+        // no #+begin_quote: the whole text is the quote (§4.3), said in the editor
+        const text = ownText.filter((b) => b.kind === 'p').map((b) => (b as { text: string }).text);
+        q.append(blockEl({ kind: 'quote', text }, look)!);
+        if (look.editor) cap.append(el('div', 'pr-hint', 'нет #+begin_quote — цитатой стал весь текст'));
+      }
       pad.append(q, cap);
       break;
     }
     case 'image': {
       root.classList.add('bleed');
       const img = slideImage(s);
-      root.replaceChildren(img ? imageEl(look, img, 'pr-img full') : el('div', 'pr-img full none'));
+      root.replaceChildren(img ? imageEl(look, img, 'pr-img full') : look.editor ? placeEl(look, 'full') : el('div'));
       break;
     }
     case 'free': {
@@ -254,6 +307,8 @@ export function slideEl(s: Slide, deck: Deck, look: Look, boxes?: [number, numbe
       const at = boxes ?? s.boxes.map((b) => b.box ?? [30, 35, 40, 30]);
       const layer = el('div', 'pr-boxes');
       s.boxes.forEach((b, i) => layer.append(boxEl(b, look, at[i])));
+      // no blocks yet: said in the editor (§3.3)
+      if (look.editor && !s.boxes.length) layer.append(el('div', 'pr-noblocks', 'Пока нет блоков. «+ Блок» или перетащите картинку'));
       root.append(layer);
       break;
     }
