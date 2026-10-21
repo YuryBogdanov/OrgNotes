@@ -1106,6 +1106,16 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   `present.replaceImage` (the link in the slide's lines, «Заменить картинку»). hints.ts (`SCHEME`, `HINTS`) +
   LayoutHint.svelte: the card left of the layouts' menu for the row pointed (↑↓ too, one element), «?» by the
   layout's button (300 ms hover or a click, ⎋). e2e presentHints.
+- **fix-59-1 C: the brief for the AI agents (§5)** — `.orgnotes/agents/presentation.md` (Rust `read_agent_file` /
+  `write_agent_file`, config.rs `agent_file`: a-z0-9- names); API 1.20 `ctx.agents` (read / write / reveal), the
+  built-in plugins only (`entry.builtin`). The plugin: `agent-brief.md` (`?raw`, the standard text of the brief §5.4,
+  checked against the code: the field 64 / 56 = 7 / 10 %, blocks from y 30), `agentBrief.svelte.ts` — `ensure()` on
+  start and on another folder: made when missing; the standard text last written kept as `base` in the folder's
+  storage: the file still `base` and a new standard text → written; changed by the user → kept, «есть новая версия»;
+  «Настройки → Презентация → ИИ-АГЕНТЫ» (a `custom` field, `BriefField.svelte`: monospace 12 / 14 lines, written
+  0.5 s after typing and on blur, re-read when shown; «Скопировать» (`clipboard`), «Показать в Finder», «Вернуть
+  стандартный…» asked, off while standard, «изменён»); the palette «Презентация: скопировать бриф для агента». (Not
+  `brief.svelte.ts`: it and `Brief.svelte` are one name on macOS's file system.) e2e presentBrief.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.

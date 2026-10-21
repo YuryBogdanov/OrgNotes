@@ -39,7 +39,7 @@ import { REVIEW_KIND, ReviewController, type FileReviewHooks, type ReviewRun } f
 export { REVIEW_KIND, type ReviewRun };
 import { listen } from './events.svelte';
 import { clone, watch } from './watch.svelte';
-import { clipboardApi, editApi, filesApi, indexApi, netApi } from './ctxData';
+import { agentsApi, clipboardApi, editApi, filesApi, indexApi, netApi } from './ctxData';
 import { processApi } from './process';
 import { exportPdf, present, presentLook } from './present';
 import { put, schemaOf, settingsValues, whole, type Dynamic } from './pluginSettings';
@@ -1133,6 +1133,8 @@ class Host {
       },
     };
     if (can('clipboard')) ctx.clipboard = clipboardApi();
+    // the agents' briefs (fix-59-1 §5): a built-in plugin's, in the notes folder's service folder
+    if (this.entry(m.id)?.builtin) ctx.agents = agentsApi();
     if (can('net')) ctx.net = netApi(m);
     if (can('process')) {
       // its processes end with it (turned off, failed)

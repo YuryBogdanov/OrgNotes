@@ -716,6 +716,15 @@ export interface Ctx {
   events: { on(e: EventName, fn: (payload: unknown) => void): Dispose };
   /** Needs `clipboard`. */
   clipboard?: { write(text: string): Promise<void> };
+  /** The briefs for AI agents in the notes folder, `.orgnotes/agents/<name>.md` (`name`: a-z, 0-9, «-»): they go with
+   *  the notes (git, sync). The built-in plugins only (fix-59-1 §5: «Презентация»). Since 1.20. */
+  agents?: {
+    /** The text; null — there is none. */
+    read(name: string): Promise<string | null>;
+    write(name: string, text: string): Promise<void>;
+    /** The file shown in Finder. */
+    reveal(name: string): Promise<void>;
+  };
   /** Needs `net`: only to the hosts of the manifest's `net` («jira.company.ru», «*.company.ru»); 30 s, 10 MB. */
   net?: { fetch(url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<NetResponse> };
   /** Needs `process` (the user is told the plugin may run programs): a process in a pseudo-terminal — the user's

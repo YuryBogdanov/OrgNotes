@@ -1,5 +1,10 @@
 {
   "all": {
+    "agents": {
+      "read": "function",
+      "reveal": "function",
+      "write": "function"
+    },
     "clipboard": {
       "write": "function"
     },
@@ -116,6 +121,11 @@
     }
   },
   "none": {
+    "agents": {
+      "read": "function",
+      "reveal": "function",
+      "write": "function"
+    },
     "commands": {
       "keyOf": "function",
       "on": "function",
