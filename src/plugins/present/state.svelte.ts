@@ -5,7 +5,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 import type { Ctx, HeadingRef } from '@panopticon/api';
 import { readOrg, type Heading } from '@panopticon/api/org';
-import { deckOf, gridBoxes, type Deck, type Layout, type Slide } from './model';
+import { deckOf, gridBoxes, imageLink, type Deck, type Layout, type Slide } from './model';
 
 export const VIEW = 'present.slides';
 
@@ -124,6 +124,44 @@ class Present {
   }
   remove(path: string, s: Slide) {
     return this.tx('Удалить слайд', (tx) => tx.remove(this.ref(path, s)));
+  }
+  /** §6: an image put on a slide (dropped from Finder, pasted): copied into `img/` beside the file (`-2`, `-3` when
+   *  the name is taken), its link where the layout shows images — the first image replaced in `text-image` and
+   *  `image`, at the end of the text with the layout made `text-image` in the others, a new block at `at` (% of the
+   *  slide) in `free`. One step «Вставить картинку» (the file copied stays when it is undone). */
+  async insertImage(path: string, s: Slide, f: { name: string; base64: string }, at?: { x: number; y: number }): Promise<boolean> {
+    const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
+    const m = /^(.*?)(?:\.([A-Za-z0-9]+))?$/.exec(f.name.split('/').pop() ?? '')!;
+    const stem = (m[1] || 'image').replace(/[\\/:]/g, '-').replace(/^\.+/, '').trim() || 'image';
+    const ext = (m[2] || 'png').toLowerCase();
+    let name = '';
+    for (let n = 1; n <= 30 && !name; n++) {
+      const tryName = n === 1 ? `${stem}.${ext}` : `${stem}-${n}.${ext}`;
+      try {
+        await this.ctx.edit!.writeBytes(`${dir}img/${tryName}`, f.base64);
+        name = tryName;
+      } catch {
+        // taken: the next name
+      }
+    }
+    if (!name) return false;
+    const link = `[[file:img/${name}]]`;
+    const ref = this.ref(path, s);
+    const r = await this.tx('Вставить картинку', (tx) => {
+      if (s.layout === 'free') {
+        const x = Math.round(Math.min(Math.max(0, (at?.x ?? 50) - 20), 60));
+        const y = Math.round(Math.min(Math.max(0, (at?.y ?? 50) - 15), 70));
+        tx.insertHeading({ under: ref, position: 'last' }, `** Картинка\n:PROPERTIES:\n:BOX: ${x} ${y} 40 30\n:END:\n${link}\n`);
+        return;
+      }
+      const lines = (tx.body(ref) ?? '').replace(/\n+$/, '').split('\n').filter((l, i, a) => l || i < a.length - 1);
+      const i = s.layout === 'text-image' || s.layout === 'image' ? lines.findIndex((l) => imageLink(l)) : -1;
+      if (i >= 0) lines[i] = link;
+      else lines.push(link);
+      tx.replaceBody(ref, lines.join('\n') + '\n');
+      if (s.layout !== 'text-image' && s.layout !== 'image') tx.setProperty(ref, 'LAYOUT', 'text-image');
+    });
+    return r === 'ok';
   }
   /** The notes of a slide typed where there were none: its subheading «Заметки» made last, with that text. */
   async startNotes(path: string, s: Slide, text: string): Promise<boolean> {

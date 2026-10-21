@@ -157,6 +157,54 @@
     editing = { line: b.line, title: b.title, block: true };
   }
 
+  // ---- images dropped from Finder or pasted (§6) ----
+  const IMG = /\.(png|jpe?g|gif|webp|svg)$/i;
+  const imageOf = (fs: FileList | File[] | undefined | null) => [...(fs ?? [])].find((f) => f.type.startsWith('image/') || IMG.test(f.name));
+  let copying = $state<{ x: number; y: number } | null>(null);
+  async function base64(f: File): Promise<string> {
+    const b = new Uint8Array(await f.arrayBuffer());
+    let s = '';
+    for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  async function put(f: File, at?: { x: number; y: number }) {
+    const s = slide;
+    if (!s) return;
+    copying = at ?? { x: 50, y: 50 };
+    try {
+      const name = f.name && f.name !== 'image.png' ? f.name : `Вставка.${(f.type.split('/')[1] || 'png').replace('jpeg', 'jpg').replace('svg+xml', 'svg')}`;
+      await present.insertImage(path, s, { name, base64: await base64(f) }, at);
+    } finally {
+      copying = null;
+    }
+  }
+  function dragOverStage(e: DragEvent) {
+    if (!e.dataTransfer?.types.includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }
+  function dropOnStage(e: DragEvent) {
+    const f = imageOf(e.dataTransfer?.files);
+    if (!f || !holderEl) return;
+    e.preventDefault();
+    const r = holderEl.getBoundingClientRect();
+    const at = { x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 };
+    void put(f, at);
+  }
+  $effect(() => {
+    const paste = (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (present.active.view !== 'present.slides' || present.active.path !== path) return;
+      if (t?.closest?.('input, textarea, [contenteditable="true"], .cm-editor')) return;
+      const f = imageOf(e.clipboardData?.files);
+      if (!f) return;
+      e.preventDefault();
+      void put(f);
+    };
+    addEventListener('paste', paste);
+    return () => removeEventListener('paste', paste);
+  });
+
   // ---- the free layout (§5) ----
   let holderEl: HTMLDivElement | undefined = $state();
   const scale = $derived(deck ? slideW / FIELD[deck.ratio].w : 1);
@@ -250,10 +298,13 @@
         {/each}
         <button class="pr-add" onclick={() => present.newSlide(path)}>+ Слайд</button>
       </div>
-      <div class="pr-stage" bind:clientWidth={stageW}>
+      <div class="pr-stage" role="presentation" bind:clientWidth={stageW} ondragover={dragOverStage} ondrop={dropOnStage}>
         {#if slide}
           <div class="pr-frame" style:width="{slideW}px">
             <div class="pr-holder" class:free={slide.layout === 'free'} role="presentation" bind:this={holderEl} ondblclick={editSlide} use:draw={{ s: slide, deck, width: slideW, vars: present.slideVars() }}></div>
+            {#if copying}
+              <div class="pr-copying" style:left="{copying.x}%" style:top="{copying.y}%">Копирую…</div>
+            {/if}
             {#if slide.layout === 'free' && holderEl}
               <div class="pr-freelayer" style:width="{FIELD[deck.ratio].w * scale}px" style:height="{FIELD[deck.ratio].h * scale}px"><FreeLayer {path} {slide} {deck} holder={holderEl} {scale} onedit={editBlock} /></div>
             {/if}
