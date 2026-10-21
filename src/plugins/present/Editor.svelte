@@ -3,6 +3,8 @@
   import { present } from './state.svelte';
   import { LAYOUTS, LAYOUT_NAMES, type Deck, type Layout, type Slide } from './model';
   import { FIELD, fit, slideEl, type Look } from './render';
+  import { gridBoxes } from './model';
+  import FreeLayer from './FreeLayer.svelte';
 
   // The editor of a presentation (ТЗ 59 §4): its head (the slide's number, «Раскладка ▾»), the strip of the slides on
   // the left (a click, ↑↓, a drag to reorder, the menu of a slide, «+ Слайд»), the slide in the middle (a double
@@ -135,7 +137,7 @@
   // ---- the slide's text in an editor over it (§4.4) ----
   let stageW = $state(0);
   const slideW = $derived(Math.min(860, Math.max(200, stageW - 64)));
-  let editing = $state<{ line: number; title: string } | null>(null);
+  let editing = $state<{ line: number; title: string; block?: boolean } | null>(null);
   let edBox: HTMLDivElement | undefined = $state();
   const open = $derived(!!editing);
   $effect(() => {
@@ -149,6 +151,33 @@
   });
   function editSlide() {
     if (slide) editing = { line: slide.line, title: slide.title };
+  }
+  /** A block's text (the free layout, §4.4): its heading only. */
+  function editBlock(b: { line: number; title: string }) {
+    editing = { line: b.line, title: b.title, block: true };
+  }
+
+  // ---- the free layout (§5) ----
+  let holderEl: HTMLDivElement | undefined = $state();
+  const scale = $derived(deck ? slideW / FIELD[deck.ratio].w : 1);
+  // blocks with no `:BOX:` (the layout changed to free, a block written in the text): laid out once, one step
+  const laidOut = new Set<string>();
+  $effect(() => {
+    const s = slide;
+    if (!s || s.layout !== 'free') return;
+    const none = s.boxes.filter((b) => !b.box);
+    const k = `${path}:${s.line}:${none.map((b) => b.line).join(',')}`;
+    if (!none.length || laidOut.has(k)) return;
+    laidOut.add(k);
+    const taken = s.boxes.length - none.length;
+    const at = gridBoxes(s.boxes.length).slice(taken);
+    void ctx.edit!.transaction('Разложить блоки', (tx) => none.forEach((b, i) => tx.setProperty({ path, line: b.line, title: b.title }, 'BOX', at[i].join(' '))));
+  });
+  async function newBlock() {
+    if (!slide) return;
+    let made: { line: number; title: string } | null = null;
+    const r = await ctx.edit!.transaction('Новый блок', (tx) => void (made = tx.insertHeading({ under: present.ref(path, slide!), position: 'last' }, '** Новый блок\n:PROPERTIES:\n:BOX: 30 35 40 30\n:END:\n')));
+    if (r === 'ok' && made) editBlock(made);
   }
   function editKey(e: KeyboardEvent) {
     if (e.key === 'Escape') {
@@ -197,6 +226,7 @@
       <span class="pr-count">{deck.slides.length ? `СЛАЙД ${cur + 1} ИЗ ${deck.slides.length}` : 'НЕТ СЛАЙДОВ'}</span>
       <span class="pr-sp"></span>
       {#if slide}
+        {#if slide.layout === 'free'}<button class="pr-btn" onclick={newBlock}>+ Блок</button>{/if}
         <button class="pr-btn pr-layout-btn" bind:this={layoutBtn} aria-haspopup="menu" aria-expanded={layoutOpen} onclick={openLayouts}>
           <span class="dim">Раскладка</span>{LAYOUT_NAMES[slide.layout]}<span class="caret">▾</span>
         </button>
@@ -223,9 +253,12 @@
       <div class="pr-stage" bind:clientWidth={stageW}>
         {#if slide}
           <div class="pr-frame" style:width="{slideW}px">
-            <div class="pr-holder" role="presentation" ondblclick={editSlide} use:draw={{ s: slide, deck, width: slideW, vars: present.slideVars() }}></div>
+            <div class="pr-holder" class:free={slide.layout === 'free'} role="presentation" bind:this={holderEl} ondblclick={editSlide} use:draw={{ s: slide, deck, width: slideW, vars: present.slideVars() }}></div>
+            {#if slide.layout === 'free' && holderEl}
+              <div class="pr-freelayer" style:width="{FIELD[deck.ratio].w * scale}px" style:height="{FIELD[deck.ratio].h * scale}px"><FreeLayer {path} {slide} {deck} holder={holderEl} {scale} onedit={editBlock} /></div>
+            {/if}
             {#if editing}
-              <div class="pr-editcard" role="dialog" aria-label="Текст слайда" tabindex="-1" onkeydown={editKey}>
+              <div class="pr-editcard" role="dialog" aria-label={editing.block ? 'Текст блока' : 'Текст слайда'} tabindex="-1" onkeydown={editKey}>
                 <div class="ed" bind:this={edBox}></div>
                 <div class="pr-editfoot"><button class="pr-btn" onclick={() => (editing = null)}>Готово <span class="dim">⎋</span></button></div>
               </div>

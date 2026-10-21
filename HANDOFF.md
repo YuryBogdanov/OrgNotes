@@ -1055,6 +1055,16 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   makes «** Заметки» with the text and the editor takes the caret, `caret: 'end'`). Core for it: the file beside a
   plugin's view of a file (EditorArea wraps FileView in BesideSplit; `openBeside` takes a file view of the plugin),
   `ui.themeVars(appearance?)` (the setting «Тема слайдов»), `ui.editor(…, { caret: 'end' })`. e2e present.
+- **ТЗ 59.3, the free layout** — `free.ts` (pure, tested): `targets` (the field's margins 64 / 56 and centre, the other
+  blocks' edges and centres, the title's bottom), `dragRect` (move or a handle; inside the slide, at least 8 × 6 %;
+  snapping within 6 pt of the screen, ⌥ off; the guides), `toPct` / `fromPct` / `nudge`. `FreeLayer.svelte` over the
+  stage's slide: one listener on the holder (the slide is redrawn on each change) — a click chooses (the frame 6 pt
+  outside, 8 handles), a drag moves the block's element live and writes `:BOX:` once on letting go («Переместить
+  блок» / «Изменить размер блока»), the size label, the dashed guides; the keys on the chosen block (arrows 1 %, ⇧ 5,
+  ⌫ asks, ↩ its text, ⎋); its menu (text, «Подложка» `:STYLE:`, a picture's `:FIT:`, front / back = `tx.move` among the
+  blocks, «Показать в тексте», delete). The choice keyed by the slide's line (its object is new on each parse).
+  Editor: blocks with no `:BOX:` laid out once («Разложить блоки», `gridBoxes`), «+ Блок» (made last, its text
+  opened), a block's text in the editor over the slide («Текст блока»). e2e presentFree.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.
