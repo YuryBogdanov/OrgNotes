@@ -10,6 +10,7 @@ mod capture;
 mod mini;
 mod system;
 mod pty;
+mod present;
 #[cfg(test)]
 mod tests;
 
@@ -189,6 +190,13 @@ pub fn run() {
             files::rename_entry,
             files::move_entry,
             files::trash_entry,
+            files::read_bytes,
+            files::write_bytes,
+            present::present_screens,
+            present::present_begin,
+            present::present_end,
+            present::pdf_print,
+            present::pdf_done,
             capture::set_capture_shortcut,
             mini::set_mini_shortcut,
             mini::mini_toggle,
@@ -218,6 +226,13 @@ pub fn run() {
             net_fetch
         ])
         .setup(|app| {
+            // the main window from its config, with the handler of `window.open` (a plugin's show, ТЗ 59 §9.2): built
+            // here, not by Tauri, as only a builder takes it ("create": false in tauri.conf.json)
+            if let Some(cfg) = app.config().app.windows.iter().find(|w| w.label == "main").cloned() {
+                tauri::WebviewWindowBuilder::from_config(app.handle(), &cfg)?
+                    .on_new_window(present::new_window(app.handle().clone()))
+                    .build()?;
+            }
             #[cfg(target_os = "macos")]
             {
                 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};

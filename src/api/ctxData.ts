@@ -92,12 +92,37 @@ export function indexApi(canTouch: boolean): NonNullable<Ctx['index']> {
     },
   };
 }
-export function filesApi(): NonNullable<Ctx['files']> {
+const MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
+/** A path in the notes folder as a plugin gives it: relative, no `..`, no hidden part. */
+export function folderPath(path: string): string {
+  const p = String(path).replace(/^\.\//, '');
+  if (!p || p.startsWith('/') || p.split('/').some((x) => !x || x === '.' || x === '..' || x.startsWith('.'))) throw new Error(`плохой путь «${path}»`);
+  return p;
+}
+/** `keep`: what the plugin made goes when it is turned off (its images' URLs). */
+export function filesApi(keep: (d: () => void) => void = () => {}): NonNullable<Ctx['files']> {
+  const urls = new Set<string>();
+  keep(() => {
+    for (const u of urls) URL.revokeObjectURL(u);
+    urls.clear();
+  });
   return {
     read: async (path) => {
       const f = fileOf(path);
       if (!f) throw new Error(`нет файла «${path}» в рабочей папке`);
       return f.text;
+    },
+    imageUrl: async (path) => {
+      const p = folderPath(path);
+      const bytes = await invoke<ArrayBuffer | number[]>('read_bytes', { path: store.abs(p) });
+      const ext = p.split('.').pop()!.toLowerCase();
+      const url = URL.createObjectURL(new Blob([bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes)], { type: MIME[ext] ?? 'application/octet-stream' }));
+      urls.add(url);
+      return url;
+    },
+    revoke: (url) => {
+      if (!urls.delete(String(url))) return;
+      URL.revokeObjectURL(String(url));
     },
   };
 }
@@ -121,5 +146,10 @@ export function editApi(guard: (fn: () => void) => void): NonNullable<Ctx['edit'
     },
     undo: () => store.undoLast(),
     ensureFile: async (path: string) => !!(await store.ensureFile(String(path))),
+    writeBytes: async (path, base64) => {
+      const p = folderPath(path);
+      const abs = await invoke<string>('write_bytes', { path: store.abs(p), data: String(base64) });
+      return abs.startsWith((store.dir ?? '') + '/') ? abs.slice((store.dir ?? '').length + 1) : p;
+    },
   };
 }

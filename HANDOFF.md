@@ -1025,6 +1025,21 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   (`MenuItem.hint`, next Menu) while another pinned tab is there; palette `pinTab` / `unpinTab` (`store.pinAction`).
   Tests: layoutPins.test.ts, e2e nextPinnedTabs. Fixed on the way: next/ui/Menu opened a submenu by the row among the
   buttons, not by the item (`data-mi`): a line or a note before it opened none.
+- **ТЗ 59.1, API 1.19 for «Презентация» (`docs/59-plagin-prezentatsiya.md` §9)** — `files.imageUrl(path)` / `revoke`
+  (ctxData: `read_bytes` → a `blob:`, revoked when the plugin goes; `folderPath` refuses `..`, absolute, hidden parts),
+  `edit.writeBytes(path, base64)` (`write_bytes`: folders made, never replaces; files.rs `write_bytes_in` checks every
+  part's name and that the nearest folder is inside). `ui.present` (api/present.ts): `present_screens` (Rust: the
+  monitors, logical, the main window's marked), a window a screen by `window.open('about:blank#present-…', …,
+  'left,top,width,height')` — the main window is now built in `setup` with `on_new_window` (present.rs `new_window`:
+  only `about:blank`, frameless, `window_features` (the opener's webview configuration: same origin, the page draws
+  into its document), then `set_simple_fullscreen`); tauri.conf `"create": false` for main. The page's styles copied
+  in, the root `data-ui="next"` with `presentLook.vars()` (set by next/App: tokens, compat, fonts). `present_begin`
+  hides the main window and runs `caffeinate -d -i -w <pid>`; `present_end` destroys the `present-*` windows and
+  shows it. `swap()` draws both anew the other way round. `ui.exportPdf`: `pickSave`, the pages in `.pdf-pages`
+  (print style: only they, `@page` of the size), `pdf_print` (Pdf.swift: `WKWebView.printOperation`, save job to
+  the path, no panels, modal for the window) and `pdf_done` polled. Mock: `read_bytes`, `write_bytes` («base64:…»),
+  `__screens`, `pdf_print` logs the pages. Tests: tests.rs `write_bytes_*`, e2e api119, apiSurface snapshot anew.
+  Native behaviour (two monitors, the print) is checked by hand.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.

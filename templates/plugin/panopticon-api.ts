@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.18.0';
+export const API_VERSION = '1.19.0';
 
 /** The handle of a block of «Сегодня» (`ui.todayBlock`). */
 export interface TodayBlockHandle {
@@ -595,6 +595,21 @@ export interface Ctx {
      *  marked — as ⌥↩ in a list (ТЗ 56). false — the active tab is not one of the plugin's views, the interface is the
      *  old one, no such file or heading. Since 1.17. */
     openBeside(at: HeadingRef | { path: string; line: number }): boolean;
+    /** A show on the whole screen (ТЗ 59): the slides to the audience on a screen of their own, the presenter's view on
+     *  the screen of the app's window — with one screen only `audience` (`presenter` is not called). The core opens
+     *  windows without a frame on those screens and gives their root elements (the new interface's tokens and fonts
+     *  in them); the main window hides meanwhile, the Mac does not sleep. `onKey` — a key in either window; `onEnd` —
+     *  the show ended (`end()`, or the windows closed). `swap()` — the two screens change places. Since 1.19. */
+    present(spec: {
+      audience(el: HTMLElement): Dispose | void;
+      presenter?(el: HTMLElement): Dispose | void;
+      onKey?(e: KeyboardEvent): void;
+      onEnd?(): void;
+    }): Promise<{ screens: 1 | 2; swap(): void; end(): void }>;
+    /** A vector PDF of the plugin's pages (its text selectable): `pages` — elements, one a page, drawn by the plugin
+     *  (the core lays them out of sight), `size` in pt. The save panel asks where; the path, or null (cancelled,
+     *  failed). The old interface too. Since 1.19. */
+    exportPdf(o: { name: string; pages: HTMLElement[]; size: { w: number; h: number } }): Promise<string | null>;
     /** An item of the menu of a heading — in the navigator's outline and in the editor on a heading's line — where
      *  `when` says so. Since 1.9. */
     headingAction(spec: { label: string; when?(h: HeadingInfo): boolean; run(h: HeadingRef): void }): Dispose;
@@ -657,7 +672,14 @@ export interface Ctx {
     markReviewed(ref: HeadingRef): Promise<void>;
   };
   /** Needs `files.read` (or `files.edit`). */
-  files?: { read(path: string): Promise<string> };
+  files?: {
+    read(path: string): Promise<string>;
+    /** A URL of an image of the notes folder (`path` in it, as `HeadingRef.path`) for `<img src>`: a `blob:` of its
+     *  bytes. It lives while the plugin is on; `revoke(url)` frees it before. Rejects when there is no such file.
+     *  Since 1.19. */
+    imageUrl(path: string): Promise<string>;
+    revoke(url: string): void;
+  };
   /** Needs `files.edit`. One step of ⌘Z, as an edit by hand. */
   edit?: {
     /** `touch: false` (1.12): a mass edit (a renaming across the files) — not a touch of the headings it changes. */
@@ -667,6 +689,10 @@ export interface Ctx {
     /** A file of the folder, made empty when it is not there yet (an archive, `<file>_archive`); false — not made.
      *  Since 1.5. */
     ensureFile(path: string): Promise<boolean>;
+    /** A new binary file (an image) at `path` in the notes folder, its folders made; `base64` its bytes. Rejects when
+     *  the file is there (the plugin picks another name) or the path is not a good one. Not a step of ⌘Z. The path
+     *  written. Since 1.19. */
+    writeBytes(path: string, base64: string): Promise<string>;
   };
   /** The functions the manifest's `exports` names, for the other plugins. Since 1.8. */
   exports(fns: Record<string, (...args: never[]) => unknown>): Dispose;

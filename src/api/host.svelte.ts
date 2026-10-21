@@ -41,6 +41,7 @@ import { listen } from './events.svelte';
 import { clone, watch } from './watch.svelte';
 import { clipboardApi, editApi, filesApi, indexApi, netApi } from './ctxData';
 import { processApi } from './process';
+import { exportPdf, present } from './present';
 import { put, schemaOf, settingsValues, whole, type Dynamic } from './pluginSettings';
 import { invoke, isTauri, pickSave } from '../tauri';
 import { focusedEditor } from '../editorKeys';
@@ -755,6 +756,8 @@ class Host {
           if ('title' in at && !h) return false;
           return openBeside(t.id, { path: f.path, line: h ? h.line : line }, { keepPin: true });
         },
+        present: (spec) => present(spec, (fn) => this.guard(id, fn, undefined)).then((h) => (keep(() => h.end()), h)),
+        exportPdf: (o) => exportPdf({ name: String(o.name ?? ''), pages: [...(o.pages ?? [])], size: { w: Number(o.size?.w), h: Number(o.size?.h) } }),
         selectedLines: () => {
           const r = focusedEditor()?.lines?.();
           const f = store.fileOf(store.tab);
@@ -1123,7 +1126,7 @@ class Host {
       ctx.process = processApi(id);
     }
     if (can('index.read')) ctx.index = indexApi(can('index.touch'));
-    if (can('files.read') || can('files.edit')) ctx.files = filesApi();
+    if (can('files.read') || can('files.edit')) ctx.files = filesApi(keep);
     if (can('files.edit')) ctx.edit = editApi((fn) => this.guard(id, fn, undefined));
     return ctx;
   }
