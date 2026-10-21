@@ -1065,6 +1065,14 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   blocks, «Показать в тексте», delete). The choice keyed by the slide's line (its object is new on each parse).
   Editor: blocks with no `:BOX:` laid out once («Разложить блоки», `gridBoxes`), «+ Блок» (made last, its text
   opened), a block's text in the editor over the slide («Текст блока»). e2e presentFree.
+- **ТЗ 59.4, images on a slide** — dropped from Finder on the stage (`dragDropEnabled: false`: a web `drop` with `File`)
+  or pasted (a window `paste` while the presentation is the tab shown, not in a field or an editor): the bytes in
+  base64 → `edit.writeBytes('<file's folder>/img/<name>')`, `-2`, `-3` while taken (pasted `image.png` named
+  «Вставка.png»); then one step «Вставить картинку» (`present.insertImage`): `free` — a block «Картинка» of 40 × 30 %
+  centred where dropped; `text-image` / `image` — the first image link of the slide's own text replaced
+  (`tx.body` / `replaceBody`); the others — the link at the end and `:LAYOUT: text-image`. «Копирую…» on the stage
+  meanwhile. Not done: a file dragged from the navigator (its rows are not draggable and it lists no images). e2e
+  presentImages.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.
