@@ -171,12 +171,17 @@
     el.select();
   }
   function keyNew(e: KeyboardEvent, r: Row) {
-    if (e.key === 'Enter') store.createEntry(r.rel, (e.currentTarget as HTMLInputElement).value, store.creating?.kind ?? 'file', store.creating?.type);
-    else if (e.key === 'Escape') store.creating = null;
+    // the Enter taken here: the editor of the new file, focused meanwhile, must not get it (an empty line on top)
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      store.createEntry(r.rel, (e.currentTarget as HTMLInputElement).value, store.creating?.kind ?? 'file', store.creating?.type);
+    } else if (e.key === 'Escape') store.creating = null;
   }
   function keyRename(e: KeyboardEvent, r: Row) {
-    if (e.key === 'Enter') store.renameEntry(r.rel, (e.currentTarget as HTMLInputElement).value);
-    else if (e.key === 'Escape') store.renaming = null;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      store.renameEntry(r.rel, (e.currentTarget as HTMLInputElement).value);
+    } else if (e.key === 'Escape') store.renaming = null;
   }
 
   // ---- drag and drop ------------------------------------------------------------

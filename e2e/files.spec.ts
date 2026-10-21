@@ -28,6 +28,22 @@ test('creates a file from the navigator\'s + button, opens it and writes a title
   await expect(row(page, 'Идеи')).toBeVisible();
 });
 
+// #338: the Enter of the name is taken by the field — on a slow machine the new file's editor, focused meanwhile, got
+// it: an empty line on top of the file
+test('the Enter of a new file\'s name stays in its field', async ({ page }) => {
+  await open(page);
+  await page.locator('.nav').getByRole('button', { name: 'Создать файл' }).click();
+  const field = page.getByRole('textbox', { name: 'Имя нового файла' });
+  await field.fill('Идеи');
+  const taken = await field.evaluate((el) => {
+    const e = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    el.dispatchEvent(e);
+    return e.defaultPrevented;
+  });
+  expect(taken).toBe(true);
+  await expect.poll(async () => (await disk(page))['/mock/Идеи.org']).toBe('#+TITLE: Идеи\n\n');
+});
+
 test('creates a folder, including an empty one, from the empty-area menu', async ({ page }) => {
   await open(page);
   await page.locator('.nav .list').click({ button: 'right', position: { x: 60, y: 560 } });
