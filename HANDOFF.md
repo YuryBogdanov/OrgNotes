@@ -1081,6 +1081,11 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   «Конец», the notes 21). The keys from both windows (`key` → `act`: → ↓ Space PgDn ↩ / ← ↑ PgUp ⌫, Home / End,
   digits + ↩, B, S = `swap()`, Esc = `end()`); on its end the editor shows the slide shown last. Slides in the show
   draw with the main window's blob URLs (the same origin). e2e presentShow (one screen, two: `__screens`).
+- **ТЗ 59.6, the PDF** — `pdf.ts` `exportDeck`: the sheet «Экспорт в PDF» (a switch «С заметками докладчика»), the
+  pages built out of sight in the theme of «Тема слайдов» (`ui.themeVars`), fitted, their images awaited; off — a page a
+  slide of its field (pt = px × 0.75: 720 × 405 for 16:9), on — A4 upright (595 × 842), the slide 48 px in and its notes
+  under it; `ui.exportPdf` named by `#+TITLE:` (else the file's name). e2e presentPdf (the pages as the print sees them).
+  The print itself (vector, the text selectable) is checked by hand in the built app.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.

@@ -6,6 +6,7 @@
   import { gridBoxes } from './model';
   import FreeLayer from './FreeLayer.svelte';
   import { show } from './show.svelte';
+  import { exportDeck } from './pdf';
 
   // The editor of a presentation (ТЗ 59 §4): its head (the slide's number, «Раскладка ▾»), the strip of the slides on
   // the left (a click, ↑↓, a drag to reorder, the menu of a slide, «+ Слайд»), the slide in the middle (a double
@@ -279,6 +280,7 @@
         <button class="pr-btn pr-layout-btn" bind:this={layoutBtn} aria-haspopup="menu" aria-expanded={layoutOpen} onclick={openLayouts}>
           <span class="dim">Раскладка</span>{LAYOUT_NAMES[slide.layout]}<span class="caret">▾</span>
         </button>
+        <button class="pr-btn" onclick={() => void exportDeck(path)}>PDF</button>
         <button class="pr-btn main" onclick={() => void show.start(path, cur)} title="С первого слайда — {ctx.commands.keyOf('present.showFirst') || '⇧⌘↩'}">
           <svg width="10" height="11" viewBox="0 0 10 11" fill="currentColor" aria-hidden="true"><path d="M1 0.8v9.4L9.2 5.5z" /></svg>Показать <span class="k">{ctx.commands.keyOf('present.show') || '⌘↩'}</span>
         </button>
