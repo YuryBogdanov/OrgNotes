@@ -1040,6 +1040,21 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   the path, no panels, modal for the window) and `pdf_done` polled. Mock: `read_bytes`, `write_bytes` («base64:…»),
   `__screens`, `pdf_print` logs the pages. Tests: tests.rs `write_bytes_*`, e2e api119, apiSurface snapshot anew.
   Native behaviour (two monitors, the print) is checked by hand.
+- **ТЗ 59.2, «Презентация»: the file, the layouts, the editor** — `src/plugins/present` (built in, the new interface
+  only: `look === 'old'` registers nothing). `model.ts` (pure, tested): `deckOf(text, headings)` — slides = level-1
+  headings but `:noexport:` / COMMENT, `:LAYOUT:` (else `autoLayout` §3.1), `:KICKER:`, `:IMAGE:`, the subheading
+  «Заметки»/«Notes» as notes, the other subheadings as sections and, in `free`, as boxes (`:BOX:` / `:STYLE:` /
+  `:FIT:`); `blocksOf` — paragraphs, lists of two levels, tables, quote, src, images (a link alone, `resolveImage`
+  from the file's folder), `-----`. `render.ts`: `slideEl` in the 960×540 (720×540) field per layout, Org markup to
+  nodes (never HTML), images by `files.imageUrl` (missing: a dashed frame «нет файла»), `fit` — the text smaller to
+  70 %, then «не помещается». `Editor.svelte` (the view `present.slides`, `defaultFor` «#+PRESENT:», ⌥⌘P): the head
+  («СЛАЙД 2 ИЗ 7», «Раскладка ▾» popover writing `:LAYOUT:`, into `free` the blocks get a `:BOX:` grid), the strip
+  (thumbnails redrawn only when their slide changed, ↑↓, drag → `tx.move`, menu: new after / duplicate / «Показать в
+  тексте» = `ui.openBeside` / delete with a sheet when it has text, «+ Слайд»), the stage (a double click: `ui.editor`
+  of the slide's heading over it, ⎋), the notes (`ui.editor` of «Заметки»; none — a field «Нет заметок», the first key
+  makes «** Заметки» with the text and the editor takes the caret, `caret: 'end'`). Core for it: the file beside a
+  plugin's view of a file (EditorArea wraps FileView in BesideSplit; `openBeside` takes a file view of the plugin),
+  `ui.themeVars(appearance?)` (the setting «Тема слайдов»), `ui.editor(…, { caret: 'end' })`. e2e present.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.

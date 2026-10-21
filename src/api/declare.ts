@@ -145,7 +145,8 @@ export function declareKeys(m: Manifest) {
   if (m.contributes.commands.some((c) => c.scope === 'view')) {
     declareViewScope(m);
     const w = viewWord(m);
-    registerGroup({ id: viewGroup(m.id), title: w.toUpperCase(), note: `только в виде «${w}»` });
+    // the view named as its plugin («Презентация», ТЗ 59): its group told apart from the plugin's own
+    registerGroup({ id: viewGroup(m.id), title: w === m.name ? `${w.toUpperCase()} · ВИД` : w.toUpperCase(), note: `только в виде «${w}»` });
   }
   registerKeys(m.contributes.commands.map((c) => {
     const card = c.keys?.length ? null : cardChord(c);

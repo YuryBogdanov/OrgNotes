@@ -45,5 +45,5 @@ test('the features\' sections of the navigator come in their places; their short
   await expect(tabs.nth(6)).toHaveAttribute('aria-selected', 'true'); // «Теги»
   // the settings: «Календарь» is the calendar's section, in its place
   await page.keyboard.press('Meta+Comma');
-  expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Сегодня', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Файлы', 'Мини-окно', 'Клавиши', 'Плагины', 'Долгие дела', 'Календарь', 'Канбан']);
+  expect(await page.getByRole('dialog', { name: 'Настройки' }).getByRole('tab').allInnerTexts()).toEqual(['Основные', 'Сегодня', 'Оформление', 'Статусы', 'Теги', 'Агенды', 'Inbox', 'Файлы', 'Мини-окно', 'Клавиши', 'Плагины', 'Долгие дела', 'Календарь', 'Канбан', 'Презентация']);
 });

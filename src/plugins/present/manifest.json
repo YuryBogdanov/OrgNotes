@@ -1,0 +1,73 @@
+{
+  "id": "present",
+  "name": "Презентация",
+  "version": "1.0.0",
+  "description": "Слайды из Org-файла, как org-present: слайд — заголовок 1-го уровня. Раскладки, картинки, свободная расстановка блоков, показ на весь экран с экраном докладчика, экспорт в PDF. Только новый интерфейс.",
+  "author": "Panopticon",
+  "api": "^1.19",
+  "minAppVersion": "2.1.0",
+  "main": "main.js",
+  "permissions": [
+    "index.read",
+    "files.edit"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "id": "present.toggle",
+        "title": "Показать как презентацию / текст",
+        "keys": ["⌥⌘P"],
+        "synonyms": ["презентация", "слайды", "текст", "present"]
+      },
+      {
+        "id": "present.prev",
+        "title": "Презентация: предыдущий слайд",
+        "keys": ["⌥↑"],
+        "scope": "view",
+        "synonyms": ["слайд"]
+      },
+      {
+        "id": "present.next",
+        "title": "Презентация: следующий слайд",
+        "keys": ["⌥↓"],
+        "scope": "view",
+        "synonyms": ["слайд"]
+      }
+    ],
+    "fileViews": [
+      {
+        "id": "present.slides",
+        "title": "Презентация",
+        "icon": "M3 4h14v9H3zM10 13v3.5M7 17h6",
+        "key": "present.toggle"
+      }
+    ],
+    "settings": [
+      {
+        "section": "Презентация",
+        "icon": "M3 4h14v9H3zM10 13v3.5M7 17h6",
+        "groups": [
+          {
+            "caption": "СЛАЙДЫ",
+            "fields": [
+              {
+                "key": "theme",
+                "type": "choice",
+                "look": "segments",
+                "where": "local",
+                "label": "Тема слайдов",
+                "default": "app",
+                "options": [
+                  { "value": "app", "label": "Как в приложении" },
+                  { "value": "light", "label": "Светлая" },
+                  { "value": "dark", "label": "Тёмная" }
+                ],
+                "hint": "Светлая и тёмная — темы светлого и тёмного места в «Оформлении»"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -107,6 +107,7 @@
       "systemNotify": "function",
       "taskAction": "function",
       "taskList": "function",
+      "themeVars": "function",
       "todayBlock": "function",
       "view": "function",
       "widget": "function"
@@ -185,6 +186,7 @@
       "systemNotify": "function",
       "taskAction": "function",
       "taskList": "function",
+      "themeVars": "function",
       "todayBlock": "function",
       "view": "function",
       "widget": "function"

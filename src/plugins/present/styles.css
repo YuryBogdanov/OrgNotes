@@ -1,0 +1,118 @@
+/* «Презентация» (ТЗ 59): the slide in its field (render.ts) and the editor (Editor.svelte). The new interface's tokens
+   (--card, --ink…, --font-display, --font-mono) come from the view's element or the show's window. */
+
+/* ---- the slide ---- */
+.pr-slide { position: relative; overflow: hidden; box-sizing: border-box; background: var(--card); color: var(--ink); font-family: var(--ui, -apple-system, system-ui, sans-serif); font-size: 24px; line-height: 1.35; text-align: left; }
+.pr-slide * { box-sizing: border-box; }
+.pr-pad { position: absolute; inset: 0; padding: 56px 64px; display: flex; flex-direction: column; min-height: 0; }
+.pr-pad.row { flex-direction: row; gap: 44px; }
+.pr-col { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.pr-kicker { font-family: var(--font-mono, 'IBM Plex Mono', monospace); font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); margin-bottom: 14px; flex: 0 0 auto; }
+.pr-h { font-family: var(--font-display, 'Yeseva One', Georgia, serif); font-weight: 400; font-size: 46px; line-height: 1.1; color: var(--ink); margin-bottom: 30px; flex: 0 0 auto; overflow-wrap: anywhere; }
+.pr-h.empty::before { content: 'Без названия'; color: var(--ink3); }
+.pr-h.free { margin-bottom: 0; font-size: 40px; }
+.pr-fit { flex: 1 1 auto; min-height: 0; overflow: hidden; font-size: calc(var(--fs, 24px) * var(--k, 1)); }
+.pr-body.dense { --fs: 22px; }
+.pr-p { margin: 0 0 0.6em; }
+.pr-list { margin: 0 0 0.6em; }
+.pr-li { display: flex; gap: 14px; margin-bottom: 0.55em; }
+.pr-li.l2 { margin-left: 1.4em; font-size: 0.88em; }
+.pr-mark { color: var(--lampink); flex: 0 0 auto; }
+.pr-link { color: var(--lampink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.pr-slide code { font-family: var(--font-mono, monospace); font-size: 0.86em; background: var(--chip); border-radius: 4px; padding: 0 0.2em; }
+.pr-code { font-family: var(--font-mono, monospace); font-size: 0.7em; line-height: 1.45; background: var(--chip); border-radius: 8px; padding: 14px 18px; margin: 0 0 0.6em; white-space: pre-wrap; }
+.pr-quote { margin: 0 0 0.6em; padding-left: 0.8em; border-left: 3px solid var(--lamp); color: var(--ink2); }
+.pr-quote p { margin: 0 0 0.3em; }
+.pr-table { border-collapse: collapse; font-size: 0.8em; margin: 0 0 0.6em; }
+.pr-table th, .pr-table td { border-bottom: 1px solid var(--rule); padding: 6px 14px 6px 0; text-align: left; }
+.pr-table th { font-weight: 600; color: var(--ink2); }
+.pr-sub { margin: 0 0 0.7em; }
+.pr-sub-t { font-weight: 650; font-size: 22px; margin-bottom: 6px; }
+
+/* title: the kicker and the name at the bottom, the text under it */
+.pr-l-title .pr-pad { justify-content: flex-end; }
+.pr-l-title .pr-h { font-size: 68px; line-height: 1.05; margin-bottom: 0; }
+.pr-subtitle { --fs: 22px; color: var(--ink2); margin-top: 22px; flex: 0 1 auto; max-height: 40%; }
+/* two columns */
+.pr-two { display: flex; gap: 44px; --fs: 22px; }
+.pr-two > .pr-body { flex: 1; min-width: 0; }
+/* the quote: big, in the middle of the height; the caption under it */
+.pr-l-quote .pr-pad { justify-content: center; }
+.pr-bigquote { --fs: 44px; flex: 0 1 auto; font-family: var(--font-display, Georgia, serif); line-height: 1.2; }
+.pr-bigquote .pr-quote { border: 0; padding: 0; color: var(--ink); }
+.pr-caption { font-size: 19px; color: var(--ink3); margin-top: 18px; flex: 0 0 auto; }
+.pr-caption .pr-p { margin: 0; }
+
+/* images */
+.pr-img { position: relative; overflow: hidden; border-radius: 10px; background: var(--chip); }
+.pr-img img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pr-img.side { flex: 0 0 40%; height: 100%; }
+.pr-img.inline { height: 220px; margin: 0 0 0.6em; }
+.pr-img.inline img { object-fit: contain; }
+.pr-img.full { position: absolute; inset: 0; border-radius: 0; }
+.pr-img.fill { position: absolute; inset: 0; }
+.pr-img.missing, .pr-img.none { border: 1.5px dashed var(--ink3); background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; text-align: center; }
+.pr-path { font-family: var(--font-mono, monospace); font-size: 13px; color: var(--ink2); overflow-wrap: anywhere; }
+.pr-miss { font-size: 12px; color: var(--ink3); }
+
+/* free: blocks in their places, the title on top */
+.pr-l-free .pr-pad { padding-bottom: 0; }
+.pr-boxes { position: absolute; inset: 0; }
+.pr-box { position: absolute; }
+.pr-box > .pr-fit { position: absolute; inset: 0; --fs: 17px; line-height: 1.45; color: var(--ink2); }
+.pr-box.card > .pr-fit { padding: 22px 24px; border-radius: 12px; background: var(--chip); }
+.pr-box-t { font-size: 22px; font-weight: 650; color: var(--ink); margin-bottom: 10px; }
+.pr-box.picture .pr-img { border-radius: 10px; }
+
+/* ---- the editor ---- */
+.pr-view { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); font-family: var(--ui, -apple-system, system-ui, sans-serif); font-size: 13px; }
+.pr-head { flex: 0 0 52px; display: flex; align-items: center; gap: 10px; padding: 0 20px; border-bottom: 1px solid var(--rule); }
+.pr-count { font-family: var(--font-mono, monospace); font-size: 11.5px; color: var(--ink3); letter-spacing: 0.04em; }
+.pr-sp { flex: 1; }
+.pr-btn { height: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: var(--chip2); color: var(--ink); font: inherit; font-size: 12.5px; display: inline-flex; align-items: center; gap: 8px; cursor: default; white-space: nowrap; }
+.pr-btn:hover { background: color-mix(in srgb, var(--chip2) 100%, var(--ink) 6%); }
+.pr-btn .dim { color: var(--ink3); }
+.pr-btn .caret { font-size: 9px; color: var(--ink3); }
+.pr-btn.main { background: var(--lamp); color: var(--onlamp); font-weight: 600; padding: 0 12px; gap: 7px; }
+.pr-btn.main .k { opacity: 0.6; font-size: 11px; font-weight: 400; }
+.pr-btn:focus-visible { outline: 2px solid var(--lamp); outline-offset: 1px; }
+.pr-work { flex: 1; min-height: 0; display: flex; }
+.pr-strip { flex: 0 0 196px; box-sizing: border-box; border-right: 1px solid var(--rule); background: var(--side); overflow-y: auto; padding: 16px 14px 16px 10px; outline: none; }
+.pr-thumb { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 12px; }
+.pr-thumb.drop-before { box-shadow: 0 -2px 0 var(--lamp); }
+.pr-thumb.drop-after { box-shadow: 0 2px 0 var(--lamp); }
+.pr-num { width: 14px; flex: 0 0 14px; text-align: right; font-family: var(--font-mono, monospace); font-size: 11px; color: var(--ink3); padding-top: 2px; }
+.pr-thumb.on .pr-num { color: var(--lampink); }
+.pr-mini { position: relative; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--rule); flex: 0 0 auto; }
+.pr-thumb.on .pr-mini { box-shadow: 0 0 0 2px var(--lamp); }
+.pr-mini-in { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+.pr-over { position: absolute; right: 4px; bottom: 4px; font-size: 9.5px; font-weight: 600; padding: 1px 5px; border-radius: 4px; color: var(--todo, #c4432f); background: color-mix(in srgb, var(--todo, #c4432f) 14%, var(--card)); }
+.pr-untitled { font-size: 11px; color: var(--ink3); margin-top: 4px; }
+.pr-add { display: flex; align-items: center; gap: 6px; margin: 4px 0 0 22px; height: 28px; padding: 0 10px; border: 1px dashed var(--rule); border-radius: 6px; background: transparent; color: var(--ink2); font: inherit; font-size: 12.5px; cursor: default; }
+.pr-add:hover { color: var(--ink); border-color: var(--ink3); }
+.pr-stage { flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; padding: 28px 32px 32px; gap: 18px; box-sizing: border-box;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; background-position: -1px -1px; }
+.pr-frame { position: relative; width: 100%; max-width: 860px; flex: 0 0 auto; }
+.pr-holder { position: relative; border: 1px solid var(--rule); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); overflow: hidden; background: var(--card); }
+.pr-holder > .pr-slide { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.pr-editcard { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14); overflow: hidden; z-index: 3; }
+.pr-editcard .ed { flex: 1; min-height: 0; overflow: auto; }
+.pr-editfoot { flex: 0 0 auto; display: flex; justify-content: flex-end; padding: 8px 12px; border-top: 1px solid var(--rule); }
+.pr-notes { width: 100%; max-width: 860px; flex: 0 0 auto; box-sizing: border-box; background: var(--panel, var(--side)); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.pr-notes-h { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px 6px; }
+.pr-notes-h b { font-size: 11.5px; font-weight: 600; color: var(--ink3); }
+.pr-notes-h span { margin-left: auto; font-size: 11px; color: var(--ink3); }
+.pr-notes-ed { min-height: 92px; max-height: 30vh; overflow: auto; font-size: 13px; }
+.pr-notes-none { display: block; width: 100%; box-sizing: border-box; padding: 4px 14px 14px; min-height: 70px; border: 0; outline: none; resize: none; background: transparent; color: var(--ink); font: inherit; font-size: 13px; }
+.pr-notes-none::placeholder { color: var(--ink3); }
+.pr-empty { margin: auto; color: var(--ink3); text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+/* the layouts' menu: a popover under its button */
+.pr-pop { position: absolute; z-index: 20; width: 250px; padding: 4px; box-sizing: border-box; background: var(--card); border: 1px solid var(--rule); border-radius: 9px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1); }
+.pr-lay { width: 100%; height: 34px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 13px; cursor: default; text-align: left; }
+.pr-lay:hover, .pr-lay.cur { background: var(--lampsoft); }
+.pr-lay svg { flex: 0 0 32px; color: var(--ink3); }
+.pr-lay .chk { margin-left: auto; color: var(--lampink); }
+.pr-pop hr { border: 0; border-top: 1px solid var(--rule); margin: 4px 6px; }
+/* the notes: the interface's font, 13 (§4.4), close under their head */
+.pr-notes-ed .cm-scroller { font-family: var(--ui, -apple-system, system-ui, sans-serif) !important; font-size: 13px !important; }
+.pr-notes-ed .cm-content { padding-top: 2px !important; }

@@ -17,8 +17,9 @@ interface Screen {
   main: boolean;
 }
 
-/** The new interface's variables (its tokens, the compatibility layer, the fonts), given by its shell. */
-export const presentLook = { vars: (): string => '' };
+/** The new interface's variables (its tokens, the compatibility layer, the fonts) of the theme shown, or of the one of
+ *  the light or the dark place; given by its shell. */
+export const presentLook = { vars: (_appearance?: 'light' | 'dark'): string => '' };
 
 let current: { end(): void } | null = null;
 
