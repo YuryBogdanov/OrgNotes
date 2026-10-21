@@ -43,7 +43,9 @@
       el.style.transform = `scale(${k})`;
       el.style.transformOrigin = '0 0';
       node.replaceChildren(el);
-      o.onfit?.(fit(el));
+      // fitted always: `onfit?.(fit(el))` skipped `fit` where no one asked (the stage's slide was never fitted)
+      const over = fit(el);
+      o.onfit?.(over);
     };
     paint(a);
     return { update: paint };

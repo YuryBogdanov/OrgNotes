@@ -327,7 +327,10 @@ export function fit(slide: HTMLElement): boolean {
       k = Math.round((k - 0.05) * 100) / 100;
       b.style.setProperty('--k', String(k));
     }
-    if (b.scrollHeight > b.clientHeight + 1) over = true;
+    const out = b.scrollHeight > b.clientHeight + 1;
+    if (out) over = true;
+    // a free slide's block: marked itself (the editor says «не помещается» on it, its menu «Починить»)
+    b.closest('.pr-box')?.classList.toggle('over', out);
   }
   slide.classList.toggle('over', over);
   return over;

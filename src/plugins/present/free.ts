@@ -122,3 +122,32 @@ export function toPct(r: Rect, f: { w: number; h: number }): [number, number, nu
 export function nudge(b: [number, number, number, number], dx: number, dy: number): [number, number, number, number] {
   return [Math.min(Math.max(0, b[0] + dx), 100 - b[2]), Math.min(Math.max(0, b[1] + dy), 100 - b[3]), b[2], b[3]];
 }
+
+/** «Починить» (the user's ask): a block whose text does not fit, or out of the slide, made to fit with the least change
+ *  — not centred: moved inside the slide by what is out; taller by what its text needs, its top kept (up by what goes
+ *  below the slide); wider in steps of 2 % (left by what goes past the right edge) only when the whole height of the
+ *  slide is not enough. `need(w)` — the height its text takes at the width `w` (field units). */
+export function fixRect(r: Rect, field: { w: number; h: number }, need: (w: number) => number): Rect {
+  let w = Math.min(r.w, field.w);
+  let h = Math.min(r.h, field.h);
+  let x = Math.min(Math.max(0, r.x), field.w - w);
+  let y = Math.min(Math.max(0, r.y), field.h - h);
+  let n = need(w);
+  const step = 0.02 * field.w;
+  while (n > field.h && w < field.w) {
+    w = Math.min(field.w, w + step);
+    if (x + w > field.w) x = field.w - w;
+    n = need(w);
+  }
+  if (n > h) h = Math.min(n, field.h);
+  if (y + h > field.h) y = field.h - h;
+  return { x, y, w, h };
+}
+/** A box in whole % that holds `r` (its size up, its place as near) — never smaller than what was measured. */
+export function toPctUp(r: Rect, f: { w: number; h: number }): [number, number, number, number] {
+  const w = Math.min(100, Math.max(MIN.w, Math.ceil((r.w / f.w) * 100 - 1e-6)));
+  const h = Math.min(100, Math.max(MIN.h, Math.ceil((r.h / f.h) * 100 - 1e-6)));
+  const x = Math.min(Math.max(0, Math.round((r.x / f.w) * 100)), 100 - w);
+  const y = Math.min(Math.max(0, Math.round((r.y / f.h) * 100)), 100 - h);
+  return [x, y, w, h];
+}
