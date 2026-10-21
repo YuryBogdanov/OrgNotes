@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dragRect, fromPct, nudge, targets, toPct } from './free';
+import { dragRect, fixRect, fromPct, nudge, targets, toPct, toPctUp } from './free';
 
 const F = { w: 960, h: 540 };
 const box = { x: 200, y: 200, w: 300, h: 150 };
@@ -44,5 +44,28 @@ describe('the box in %', () => {
   it('the keys nudge it by 1 % or 5, inside', () => {
     expect(nudge([7, 40, 40, 26], 5, -1)).toEqual([12, 39, 40, 26]);
     expect(nudge([58, 0, 40, 26], 5, -1)).toEqual([60, 0, 40, 26]);
+  });
+});
+
+describe('«Починить»: the least change that makes a block fit', () => {
+  const tall = (lines: number) => (w: number) => Math.ceil((lines * 30 * 400) / w); // text: fewer lines when wider
+  it('taller by what its text needs, its top kept', () => {
+    expect(fixRect({ x: 100, y: 100, w: 400, h: 100 }, F, tall(6))).toEqual({ x: 100, y: 100, w: 400, h: 180 });
+  });
+  it('up by what goes below the slide, not more', () => {
+    expect(fixRect({ x: 100, y: 400, w: 400, h: 100 }, F, tall(6))).toEqual({ x: 100, y: 360, w: 400, h: 180 });
+  });
+  it('wider only when the whole height is not enough; left by what goes past the right edge', () => {
+    const r = fixRect({ x: 700, y: 0, w: 200, h: 100 }, F, tall(12)); // 720 high at 200 wide
+    expect(r.h).toBeLessThanOrEqual(540);
+    expect(r.x + r.w).toBeLessThanOrEqual(960);
+    expect(r.w).toBeGreaterThan(200);
+    expect(r.w).toBeLessThan(300); // the least that is enough
+  });
+  it('a block out of the slide: moved in by what is out', () => {
+    expect(fixRect({ x: 900, y: -20, w: 200, h: 100 }, F, () => 50)).toEqual({ x: 760, y: 0, w: 200, h: 100 });
+  });
+  it('in whole %: its size up, so the text still fits', () => {
+    expect(toPctUp({ x: 100, y: 100, w: 400, h: 181 }, F)).toEqual([10, 19, 42, 34]);
   });
 });

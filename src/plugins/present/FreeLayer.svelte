@@ -3,7 +3,7 @@
   import { present } from './state.svelte';
   import type { Box, Deck, Slide } from './model';
   import { FIELD } from './render';
-  import { dragRect, fromPct, nudge, targets, toPct, type Guides, type Handle, type Rect } from './free';
+  import { dragRect, fixRect, fromPct, nudge, targets, toPct, toPctUp, type Guides, type Handle, type Rect } from './free';
 
   // The free layout on the stage (ТЗ 59 §5): a click on a block chooses it (a frame of the lamp 6 pt outside, eight
   // handles), on the empty place none; its body drags it, a handle resizes it — inside the slide, at least 8 × 6 %, the
@@ -126,10 +126,42 @@
     if (!edge || edge.line === b.line) return;
     void ctx.edit!.transaction(front ? 'На передний план' : 'На задний план', (tx) => tx.move(ref(b), front ? { after: ref(edge) } : { before: ref(edge) }));
   }
+  /** The height a block's text takes at the width `w` (field units): a copy of it laid out out of sight, its full
+   *  size (no shrinking). */
+  function need(el: HTMLElement, w: number): number {
+    const probe = el.cloneNode(true) as HTMLElement;
+    probe.classList.remove('over');
+    Object.assign(probe.style, { left: '0', top: '0', width: `${w}px`, height: 'auto', visibility: 'hidden' });
+    const inner = probe.querySelector<HTMLElement>('.pr-fit');
+    if (inner) {
+      Object.assign(inner.style, { position: 'static', height: 'auto' });
+      inner.style.setProperty('--k', '1');
+    }
+    el.parentElement!.append(probe);
+    const h = probe.offsetHeight;
+    probe.remove();
+    return h;
+  }
+  const elOf = (b: Box) => holder.querySelector<HTMLElement>(`.pr-box[data-line="${b.line}"]`);
+  /** The block does not fit, or is out of the slide: «Починить» is there. */
+  function broken(b: Box): boolean {
+    const [x, y, w, h] = at(b);
+    return !!elOf(b)?.classList.contains('over') || x < 0 || y < 0 || x + w > 100 || y + h > 100;
+  }
+  /** «Починить»: the least change that makes it fit (free.ts `fixRect`), one step. */
+  function repair(b: Box) {
+    const el = elOf(b);
+    if (!el) return;
+    const picture = b.blocks.length === 1 && b.blocks[0].kind === 'image';
+    const r = fixRect(fromPct(at(b), field), field, (w) => (picture ? 0 : need(el, w)));
+    const p = toPctUp(r, field);
+    if (p.join(' ') !== at(b).join(' ')) void setBox(b, p, 'Починить блок');
+  }
   function boxMenu(b: Box, x: number, y: number) {
     const picture = b.blocks.length === 1 && b.blocks[0].kind === 'image';
     ctx.ui.menu(
       [
+        ...(broken(b) ? [{ label: 'Починить', run: () => repair(b) }, 'sep' as const] : []),
         { label: 'Править текст', shortcut: '↩', run: () => onedit(b) },
         { label: 'Подложка', checked: b.style === 'card', run: () => void ctx.edit!.transaction('Подложка блока', (tx) => tx.setProperty(ref(b), 'STYLE', b.style === 'card' ? null : 'card')) },
         ...(picture
