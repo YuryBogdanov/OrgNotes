@@ -387,6 +387,8 @@ export async function installTauriMock(page: Page, files: Record<string, string>
         'plugin:window|start_dragging': () => void w.__log.push(['drag']),
         'plugin:window|toggle_maximize': () => void w.__log.push(['zoom']),
         'plugin:window|minimize': () => void w.__log.push(['minimize']),
+        // the native window's appearance (null: as macOS)
+        'plugin:window|set_theme': (a) => void w.__log.push(['window_theme', a.value ?? null]),
         // macOS's double click on a title bar (fix #304): the test sets it
         double_click_action: () => w.__dblAction ?? 'Maximize',
         'plugin:window|get_all_windows': () => (w.__windows as string[]) ?? ['main'],

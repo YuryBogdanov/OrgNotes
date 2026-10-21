@@ -54,10 +54,13 @@ export function themeNamed(name: string, a: Appearance, themes: Theme[] = BUILTI
 }
 
 let styleEl: HTMLStyleElement | null = null;
-let windowLook: Appearance | null = null;
+let windowLook: Appearance | 'system' | undefined;
 /** Put the appearance and the theme on the page (and the native window). `a` is the place in effect; the page and
- *  the window take the theme's own light or dark (ТЗ 57 §3: Dracula in the light place is dark). */
-export function applyAppearance(_choice: AppearanceChoice, a: Appearance, theme: Theme) {
+ *  the window take the theme's own light or dark (ТЗ 57 §3: Dracula in the light place is dark) — but under
+ *  «Системное» the window follows macOS: WebKit's `prefers-color-scheme` is the window's, and a window made dark by a
+ *  dark theme in the light place read as «macOS is dark» took the other place's theme, and so on, each frame (the
+ *  flicker), and a window kept light never saw macOS go dark. */
+export function applyAppearance(choice: AppearanceChoice, a: Appearance, theme: Theme) {
   const root = document.documentElement;
   const look = theme.appearance;
   if (root.dataset.appearance !== look) root.dataset.appearance = look;
@@ -72,10 +75,11 @@ export function applyAppearance(_choice: AppearanceChoice, a: Appearance, theme:
     // an own theme or a plugin's comes after the first paint: kept here, it shows from the start next time
     if (!BUILTIN.some((b) => b.name === theme.name)) set('theme:last:' + a, themeJson(theme));
   }
-  if (windowLook !== look && '__TAURI_INTERNALS__' in window) {
-    windowLook = look;
+  const want = choice === 'system' ? 'system' : look;
+  if (windowLook !== want && '__TAURI_INTERNALS__' in window) {
+    windowLook = want;
     void import('@tauri-apps/api/window')
-      .then(({ getCurrentWindow }) => getCurrentWindow().setTheme(look))
+      .then(({ getCurrentWindow }) => getCurrentWindow().setTheme(want === 'system' ? null : want))
       .catch(() => {});
   }
 }

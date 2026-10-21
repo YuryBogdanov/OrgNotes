@@ -1086,6 +1086,12 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   slide of its field (pt = px × 0.75: 720 × 405 for 16:9), on — A4 upright (595 × 842), the slide 48 px in and its notes
   under it; `ui.exportPdf` named by `#+TITLE:` (else the file's name). e2e presentPdf (the pages as the print sees them).
   The print itself (vector, the text selectable) is checked by hand in the built app.
+- **«Системное» and the window's appearance (the user's bug after ТЗ 57)** — WebKit's `prefers-color-scheme` is the
+  native window's appearance, not macOS's: setting the window to the theme's own light or dark under «Системное» made
+  a dark theme in the light place read as «macOS is dark» → the dark place's theme → the window light → … each frame
+  (the flicker), and a window kept light never saw macOS go dark. `applyAppearance`: under «Системное» the window is
+  `setTheme(null)` (as macOS); a chosen «Светлое» / «Тёмное» sets it to the theme's own. Mock `plugin:window|set_theme`
+  logs `window_theme`. e2e appearanceSystem.
 - **fix-59-1 A: the show opens, «Показать в тексте» closes (`docs/fix-59-1-prezentatsiya-podskazki.md` §1–2)** — the
   main webview's `WKPreferences.javaScriptCanOpenWindowsAutomatically` (present.rs `allow_windows`, set in `setup`):
   `window.open` after the `await` of the screens was refused by WebKit (no user activation). The show's window made
