@@ -116,3 +116,22 @@
 /* the notes: the interface's font, 13 (§4.4), close under their head */
 .pr-notes-ed .cm-scroller { font-family: var(--ui, -apple-system, system-ui, sans-serif) !important; font-size: 13px !important; }
 .pr-notes-ed .cm-content { padding-top: 2px !important; }
+
+/* the free layout (§5): the blocks taken by the pointer; the choice, its handles, the guides, the size */
+.pr-holder.free .pr-box { cursor: move; }
+.pr-freelayer { position: absolute; left: 1px; top: 1px; pointer-events: none; z-index: 2; }
+.pr-selbox { position: absolute; box-sizing: border-box; }
+.pr-selbox::before { content: ''; position: absolute; inset: -6px; border: 1.5px solid var(--lamp); border-radius: 6px; pointer-events: none; }
+.pr-handle { position: absolute; width: 9px; height: 9px; box-sizing: border-box; background: var(--card); border: 1.5px solid var(--lamp); border-radius: 2px; pointer-events: auto; }
+.pr-handle.nw { left: -10.5px; top: -10.5px; cursor: nwse-resize; }
+.pr-handle.n { left: calc(50% - 4.5px); top: -10.5px; cursor: ns-resize; }
+.pr-handle.ne { right: -10.5px; top: -10.5px; cursor: nesw-resize; }
+.pr-handle.e { right: -10.5px; top: calc(50% - 4.5px); cursor: ew-resize; }
+.pr-handle.se { right: -10.5px; bottom: -10.5px; cursor: nwse-resize; }
+.pr-handle.s { left: calc(50% - 4.5px); bottom: -10.5px; cursor: ns-resize; }
+.pr-handle.sw { left: -10.5px; bottom: -10.5px; cursor: nesw-resize; }
+.pr-handle.w { left: -10.5px; top: calc(50% - 4.5px); cursor: ew-resize; }
+.pr-size { position: absolute; left: 50%; top: -34px; transform: translateX(-50%); padding: 2px 7px; border-radius: 5px; background: var(--lamp); color: var(--onlamp); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pr-guide { position: absolute; pointer-events: none; }
+.pr-guide.v { top: 0; height: 100%; width: 0; border-left: 1.5px dashed var(--lamp); }
+.pr-guide.h { left: 0; width: 100%; height: 0; border-top: 1.5px dashed var(--lamp); }
