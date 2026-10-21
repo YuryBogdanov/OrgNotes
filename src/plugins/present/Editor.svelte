@@ -7,6 +7,8 @@
   import FreeLayer from './FreeLayer.svelte';
   import { show } from './show.svelte';
   import { exportDeck } from './pdf';
+  import { SCHEME } from './hints';
+  import LayoutHint from './LayoutHint.svelte';
 
   // The editor of a presentation (ТЗ 59 §4): its head (the slide's number, «Раскладка ▾»), the strip of the slides on
   // the left (a click, ↑↓, a drag to reorder, the menu of a slide, «+ Слайд»), the slide in the middle (a double
@@ -18,23 +20,25 @@
   const cur = $derived(Math.min(present.current.get(path) ?? 0, Math.max(0, (deck?.slides.length ?? 1) - 1)));
   const slide = $derived(deck?.slides[cur] ?? null);
   const look: Look = { get file() { return path; }, image: (p) => present.image(p) };
+  // the stage's slide: the editor's own places and hints (fix-59-1 §3–4), «Выбрать файл…» / «Заменить…»
+  const editLook: Look = { get file() { return path; }, image: (p) => present.image(p), editor: { pick: (replace) => choose(replace) } };
   onMount(() => void present.read(path));
 
   /** A slide drawn into `node`, scaled to its width; the text fitted. Drawn anew only when what it shows changed. */
-  function draw(node: HTMLElement, a: { s: Slide; deck: Deck; width: number; vars: string; onfit?: (over: boolean) => void }) {
+  function draw(node: HTMLElement, a: { s: Slide; deck: Deck; width: number; vars: string; editor?: boolean; onfit?: (over: boolean) => void }) {
     let key = '';
     const paint = (o: typeof a) => {
       const f = FIELD[o.deck.ratio];
       const k = o.width / f.w;
       node.style.height = `${f.h * k}px`;
-      const next = JSON.stringify([o.s, o.deck.ratio, o.vars]);
+      const next = JSON.stringify([o.s, o.deck.ratio, o.vars, !!o.editor]);
       const old = node.firstElementChild as HTMLElement | null;
       if (next === key && old) {
         old.style.transform = `scale(${k})`;
         return;
       }
       key = next;
-      const el = slideEl(o.s, o.deck, look);
+      const el = slideEl(o.s, o.deck, o.editor ? editLook : look);
       if (o.vars) el.style.cssText += ';' + o.vars;
       el.style.transform = `scale(${k})`;
       el.style.transformOrigin = '0 0';
@@ -83,6 +87,21 @@
     }
     await present.remove(path, s);
   }
+  /** «Показать в тексте» — the file beside; while it is open «Скрыть текст» ✓ closes it (fix-59-1 §2). */
+  function textItem(ref: { path: string; line: number; title: string }) {
+    const open = !!ctx.ui.beside();
+    return open ? { label: 'Скрыть текст', checked: true, run: () => ctx.ui.closeBeside() } : { label: 'Показать в тексте', run: () => void ctx.ui.openBeside(ref) };
+  }
+  // the file beside follows the slide chosen, unless pinned there
+  $effect(() => {
+    const s = slide;
+    if (!s) return;
+    const line = s.line;
+    untrack(() => {
+      const b = ctx.ui.beside();
+      if (b && !b.pinned && b.line !== line) ctx.ui.openBeside(present.ref(path, s));
+    });
+  });
   function thumbMenu(e: MouseEvent, s: Slide) {
     e.preventDefault();
     present.choose(path, deck!.slides.indexOf(s));
@@ -90,7 +109,7 @@
       [
         { label: 'Новый слайд после', run: () => present.newSlide(path, s) },
         { label: 'Дублировать', run: () => present.duplicate(path, s) },
-        { label: 'Показать в тексте', run: () => void ctx.ui.openBeside(present.ref(path, s)) },
+        textItem(present.ref(path, s)),
         'sep',
         { label: 'Удалить слайд…', danger: true, run: () => void removeSlide(s) },
       ],
@@ -102,26 +121,59 @@
   let layoutOpen = $state(false);
   let layoutBtn: HTMLButtonElement | undefined = $state();
   let pop = $state({ x: 0, y: 0 });
+  /** The row the pointer or the arrows are on (its card left of the menu, §4.1). */
+  let hl = $state<Layout | null>(null);
+  let popEl: HTMLDivElement | undefined = $state();
   function openLayouts() {
     const r = layoutBtn!.getBoundingClientRect();
     const host = layoutBtn!.closest('.pr-view')!.getBoundingClientRect();
-    pop = { x: Math.max(8, r.right - host.left - 250), y: r.bottom - host.top + 4 };
+    pop = { x: Math.max(318, r.right - host.left - 250), y: r.bottom - host.top + 4 };
+    hint = null;
+    hl = null;
     layoutOpen = !layoutOpen;
+    if (layoutOpen) queueMicrotask(() => popEl?.focus());
   }
+  function menuKey(e: KeyboardEvent) {
+    const i = hl ? LAYOUTS.indexOf(hl) : slide ? LAYOUTS.indexOf(slide.layout) : -1;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      hl = LAYOUTS[(i + (e.key === 'ArrowDown' ? 1 : LAYOUTS.length - 1) + (i < 0 && e.key === 'ArrowUp' ? 1 : 0)) % LAYOUTS.length];
+    } else if (e.key === 'Enter' && hl) {
+      e.preventDefault();
+      pick(hl);
+    }
+  }
+
+  // ---- «?» by the layout's button (§4.2): the card of the layout set, under the button ----
+  let hint = $state<{ x: number; y: number } | null>(null);
+  let qBtn: HTMLButtonElement | undefined = $state();
+  let qTimer: ReturnType<typeof setTimeout> | undefined;
+  function showHint() {
+    clearTimeout(qTimer);
+    if (!qBtn) return;
+    const r = qBtn.getBoundingClientRect();
+    const host = qBtn.closest('.pr-view')!.getBoundingClientRect();
+    hint = { x: Math.max(8, Math.min(r.left - host.left - 140, host.width - 308)), y: r.bottom - host.top + 8 };
+  }
+  function qEnter() {
+    clearTimeout(qTimer);
+    qTimer = setTimeout(showHint, 300);
+  }
+  function qLeave() {
+    clearTimeout(qTimer);
+    qTimer = setTimeout(() => (hint = null), 150);
+  }
+  $effect(() => {
+    if (!hint) return;
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && (hint = null);
+    addEventListener('keydown', esc, true);
+    return () => removeEventListener('keydown', esc, true);
+  });
   function pick(l: Layout) {
     layoutOpen = false;
     if (slide && slide.layout !== l) void present.setLayout(path, slide, l);
     else if (slide && !slide.set) void present.setLayout(path, slide, l);
   }
-  const SCHEME: Record<Layout, string> = {
-    title: 'M4 13h16M4 16h10',
-    text: 'M4 5h14M4 9h22M4 12h20M4 15h18',
-    'text-image': 'M4 5h10M4 9h12M4 12h11M18 4h10v12H18z',
-    two: 'M4 5h14M4 9h10M4 12h9M18 9h10M18 12h9',
-    quote: 'M7 8h18M9 11h14M12 15h8',
-    image: 'M3 3h26v14H3zM3 13l7-5 6 5 4-3 9 6',
-    free: 'M4 4h10M5 8h9v8H5zM18 6h9v5h-9zM18 13h9v3h-9z',
-  };
   $effect(() => {
     if (!layoutOpen) return;
     const off = (e: PointerEvent) => {
@@ -180,15 +232,52 @@
       copying = null;
     }
   }
+  /** A missing image of the slide replaced by the file (§3.4). */
+  async function replace(f: File, old: string) {
+    const s = slide;
+    if (!s) return;
+    copying = { x: 50, y: 50 };
+    try {
+      await present.replaceImage(path, s, old, { name: f.name || 'image.png', base64: await base64(f) });
+    } finally {
+      copying = null;
+    }
+  }
+  // «+ Картинка», «Выбрать файл…», «Заменить…» (§3.1): the system's choice of files
+  let picker: HTMLInputElement | undefined = $state();
+  let pickFor: string | undefined;
+  function choose(replaceOf?: string) {
+    pickFor = replaceOf;
+    if (!picker) return;
+    picker.multiple = !replaceOf;
+    picker.value = '';
+    picker.click();
+  }
+  async function picked() {
+    const fs = [...(picker?.files ?? [])].filter((f) => f.type.startsWith('image/') || IMG.test(f.name));
+    if (!fs.length) return;
+    if (pickFor) return void replace(fs[0], pickFor);
+    // several in free: blocks in a cascade, 4 % apart
+    for (let i = 0; i < fs.length; i++) await put(fs[i], slide?.layout === 'free' ? { x: 50 + 4 * i, y: 50 + 4 * i } : undefined);
+  }
+  /** The place for an image under the pointer lit while a file is over it (§3.2). */
+  function light(t: EventTarget | null) {
+    for (const p of holderEl?.querySelectorAll('.pr-noimg.over') ?? []) if (p !== t) p.classList.remove('over');
+    (t as HTMLElement | null)?.classList?.add('over');
+  }
   function dragOverStage(e: DragEvent) {
     if (!e.dataTransfer?.types.includes('Files')) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
+    light((e.target as HTMLElement).closest?.('.pr-noimg') ?? null);
   }
   function dropOnStage(e: DragEvent) {
+    light(null);
     const f = imageOf(e.dataTransfer?.files);
     if (!f || !holderEl) return;
     e.preventDefault();
+    const miss = (e.target as HTMLElement).closest?.<HTMLElement>('.pr-noimg.missing');
+    if (miss?.dataset.path) return void replace(f, miss.dataset.path);
     const r = holderEl.getBoundingClientRect();
     const at = { x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 };
     void put(f, at);
@@ -280,6 +369,9 @@
         <button class="pr-btn pr-layout-btn" bind:this={layoutBtn} aria-haspopup="menu" aria-expanded={layoutOpen} onclick={openLayouts}>
           <span class="dim">Раскладка</span>{LAYOUT_NAMES[slide.layout]}<span class="caret">▾</span>
         </button>
+        <button class="pr-q" class:on={!!hint} bind:this={qBtn} aria-label="Как работает раскладка" title="Как работает раскладка" aria-expanded={!!hint}
+          onpointerenter={qEnter} onpointerleave={qLeave} onclick={() => (hint ? (hint = null) : showHint())}>?</button>
+        <button class="pr-btn" onclick={() => choose()}>+ Картинка</button>
         <button class="pr-btn" onclick={() => void exportDeck(path)}>PDF</button>
         <button class="pr-btn main" onclick={() => void show.start(path, cur)} title="С первого слайда — {ctx.commands.keyOf('present.showFirst') || '⇧⌘↩'}">
           <svg width="10" height="11" viewBox="0 0 10 11" fill="currentColor" aria-hidden="true"><path d="M1 0.8v9.4L9.2 5.5z" /></svg>Показать <span class="k">{ctx.commands.keyOf('present.show') || '⌘↩'}</span>
@@ -307,12 +399,12 @@
       <div class="pr-stage" role="presentation" bind:clientWidth={stageW} ondragover={dragOverStage} ondrop={dropOnStage}>
         {#if slide}
           <div class="pr-frame" style:width="{slideW}px">
-            <div class="pr-holder" class:free={slide.layout === 'free'} role="presentation" bind:this={holderEl} ondblclick={editSlide} use:draw={{ s: slide, deck, width: slideW, vars: present.slideVars() }}></div>
+            <div class="pr-holder" class:free={slide.layout === 'free'} role="presentation" bind:this={holderEl} ondblclick={editSlide} ondragleave={(e) => !holderEl?.contains(e.relatedTarget as Node) && light(null)} use:draw={{ s: slide, deck, width: slideW, vars: present.slideVars(), editor: true }}></div>
             {#if copying}
               <div class="pr-copying" style:left="{copying.x}%" style:top="{copying.y}%">Копирую…</div>
             {/if}
             {#if slide.layout === 'free' && holderEl}
-              <div class="pr-freelayer" style:width="{FIELD[deck.ratio].w * scale}px" style:height="{FIELD[deck.ratio].h * scale}px"><FreeLayer {path} {slide} {deck} holder={holderEl} {scale} onedit={editBlock} /></div>
+              <div class="pr-freelayer" style:width="{FIELD[deck.ratio].w * scale}px" style:height="{FIELD[deck.ratio].h * scale}px"><FreeLayer {path} {slide} {deck} holder={holderEl} {scale} onedit={editBlock} {textItem} /></div>
             {/if}
             {#if editing}
               <div class="pr-editcard" role="dialog" aria-label={editing.block ? 'Текст блока' : 'Текст слайда'} tabindex="-1" onkeydown={editKey}>
@@ -335,16 +427,22 @@
       </div>
     </div>
     {#if layoutOpen && slide}
-      <div class="pr-pop" role="menu" aria-label="Раскладка" style:left="{pop.x}px" style:top="{pop.y}px">
+      <div class="pr-pop" role="menu" aria-label="Раскладка" tabindex="-1" style:left="{pop.x}px" style:top="{pop.y}px" bind:this={popEl} onkeydown={menuKey} onpointerleave={() => (hl = null)}>
         {#each LAYOUTS as l (l)}
           {#if l === 'free'}<hr />{/if}
-          <button class="pr-lay" class:cur={slide.layout === l} role="menuitemradio" aria-checked={slide.layout === l} onclick={() => pick(l)}>
+          <button class="pr-lay" class:cur={slide.layout === l} class:hl={hl === l && slide.layout !== l} role="menuitemradio" aria-checked={slide.layout === l} tabindex="-1" onpointerenter={() => (hl = l)} onclick={() => pick(l)}>
             <svg width="32" height="20" viewBox="0 0 32 20" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="0.65" y="0.65" width="30.7" height="18.7" rx="2" /><path d={SCHEME[l]} /></svg>
             {LAYOUT_NAMES[l]}
             {#if slide.layout === l}<span class="chk">✓</span>{/if}
           </button>
         {/each}
       </div>
+      <!-- the card of the row the pointer is on, left of the menu: one element, its content changes (§4.1) -->
+      {#if hl}<div class="pr-hintpos" style:left="{pop.x - 308}px" style:top="{pop.y}px"><LayoutHint layout={hl} /></div>{/if}
     {/if}
+    {#if hint && slide && !layoutOpen}
+      <div class="pr-hintpos" role="presentation" style:left="{hint.x}px" style:top="{hint.y}px" onpointerenter={() => clearTimeout(qTimer)} onpointerleave={qLeave}><LayoutHint layout={slide.layout} /></div>
+    {/if}
+    <input class="pr-picker" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.png,.jpg,.jpeg,.gif,.webp,.svg" bind:this={picker} onchange={picked} tabindex="-1" aria-hidden="true" />
   {/if}
 </div>

@@ -58,16 +58,37 @@ pub(crate) fn new_window(app: AppHandle) -> impl Fn(tauri::Url, NewWindowFeature
         match built {
             Ok(window) => {
                 let w = window.clone();
-                // on its screen first (the features' place), then over its menu bar and Dock, no Space of its own
-                let _ = app.run_on_main_thread(move || {
-                    let _ = w.set_simple_fullscreen(true);
-                    let _ = w.set_focus();
+                let a = app.clone();
+                // on its screen first (the features' place), then — once WebKit has it and it is shown — over its
+                // menu bar and Dock, no Space of its own (fix-59-1 §1: set on a window not shown yet, it did nothing)
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(250));
+                    let _ = a.run_on_main_thread(move || {
+                        let _ = w.show();
+                        let _ = w.set_simple_fullscreen(true);
+                        let _ = w.set_focus();
+                    });
                 });
                 NewWindowResponse::Create { window }
             }
             Err(_) => NewWindowResponse::Deny,
         }
     }
+}
+
+/// `window.open` after an `await` too (fix-59-1 §1): WebKit lets a page open windows only right in a click unless
+/// its preferences say otherwise; the new-window handler lets only the show's blank windows through.
+pub(crate) fn allow_windows(w: &tauri::WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    let _ = w.with_webview(|v| unsafe {
+        use objc2::{msg_send, runtime::AnyObject};
+        let view = v.inner() as *mut AnyObject;
+        let conf: *mut AnyObject = msg_send![view, configuration];
+        let prefs: *mut AnyObject = msg_send![conf, preferences];
+        let _: () = msg_send![prefs, setJavaScriptCanOpenWindowsAutomatically: true];
+    });
+    #[cfg(not(target_os = "macos"))]
+    let _ = w;
 }
 
 /// The show begins: the main window hides, the Mac stays awake.

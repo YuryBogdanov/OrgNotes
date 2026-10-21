@@ -2,7 +2,7 @@
 // `ctx` from the core when it is activated. Every call is asynchronous or gives back a Dispose, and only data goes
 // in and out (JSON, HeadingRef, Date): no object of the core leaves it, so the plugins can later run isolated.
 
-export const API_VERSION = '1.19.0';
+export const API_VERSION = '1.20.0';
 
 /** The handle of a block of «Сегодня» (`ui.todayBlock`). */
 export interface TodayBlockHandle {
@@ -595,6 +595,11 @@ export interface Ctx {
      *  marked — as ⌥↩ in a list (ТЗ 56). false — the active tab is not one of the plugin's views, the interface is the
      *  old one, no such file or heading. Since 1.17. */
     openBeside(at: HeadingRef | { path: string; line: number }): boolean;
+    /** The file beside the plugin's tab now (its path, the heading's line, pinned by the user: it does not follow the
+     *  choice); null — none, or the active tab is not the plugin's. Since 1.20. */
+    beside(): { path: string; line: number; pinned: boolean } | null;
+    /** The file beside the plugin's tab closed. Since 1.20. */
+    closeBeside(): void;
     /** A show on the whole screen (ТЗ 59): the slides to the audience on a screen of their own, the presenter's view on
      *  the screen of the app's window — with one screen only `audience` (`presenter` is not called). The core opens
      *  windows without a frame on those screens and gives their root elements (the new interface's tokens and fonts

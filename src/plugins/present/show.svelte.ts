@@ -60,7 +60,10 @@ class Show {
       });
       this.handle = h;
       this.screens = h.screens;
-    } catch {
+    } catch (e) {
+      // said, not swallowed (fix-59-1 §1)
+      console.error('«Презентация»: показ не открылся', e);
+      present.ctx.ui.notify(`Показ не открылся: ${e instanceof Error ? e.message : String(e)}`);
       this.ended();
     }
   }

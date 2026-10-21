@@ -167,3 +167,45 @@
 /* the sheet «Экспорт в PDF» (§7) */
 .pr-pdf-opt { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .pr-pdf-hint { margin: 8px 0 0 24px; font-size: 12px; color: var(--ink3, var(--fg3)); }
+
+/* ---- the editor's own on the slide (fix-59-1 §3–4): never in the strip, the show, the PDF ---- */
+.pr-noimg { box-sizing: border-box; border: 2px dashed var(--lampline); background: var(--lampsoft); border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; text-align: center; color: var(--ink2); }
+.pr-noimg svg { color: var(--lampink); }
+.pr-noimg.side { flex: 0 0 40%; height: 100%; }
+.pr-noimg.full, .pr-noimg.fill { position: absolute; inset: 0; }
+.pr-noimg.full { margin: 56px 64px; }
+.pr-noimg.inline { height: 220px; margin: 0 0 0.6em; }
+.pr-noimg.over { border-color: var(--lamp); background: color-mix(in srgb, var(--lamp) 34%, transparent); }
+.pr-noimg-t { font-size: 19px; line-height: 1.35; max-width: 90%; }
+.pr-noimg-b { height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--chip2); color: var(--ink); font: inherit; font-size: 15px; cursor: default; }
+.pr-noimg-b:hover { background: color-mix(in srgb, var(--chip2) 100%, var(--ink) 6%); }
+.pr-noimg-n { font-size: 14px; color: var(--ink3); }
+.pr-noimg.missing { border-color: var(--todo); background: color-mix(in srgb, var(--todo) 10%, transparent); }
+.pr-noimg.missing svg { color: var(--todo); }
+.pr-noimg.missing .pr-noimg-t { font-family: var(--font-mono, monospace); font-size: 16px; overflow-wrap: anywhere; }
+.pr-noblocks { position: absolute; left: 25%; top: 35%; width: 50%; height: 30%; box-sizing: border-box; border: 2px dashed var(--lampline); border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 16px; text-align: center; font-size: 18px; color: var(--ink2); background: var(--lampsoft); }
+.pr-two.split-hint { position: relative; }
+.pr-two.split-hint::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1.5px dashed var(--lampline); }
+.pr-twowrap { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.pr-hint-split { position: absolute; left: 50%; top: -20px; transform: translateX(-50%); font-size: 11px; color: var(--ink3); white-space: nowrap; }
+.pr-hint { font-size: 13px; color: var(--ink3); margin-top: 6px; font-family: var(--ui, system-ui, sans-serif); }
+
+/* the card of a layout (fix-59-1 §4) */
+.pr-hintcard { position: absolute; z-index: 21; width: 300px; box-sizing: border-box; padding: 14px; background: var(--card); border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1); color: var(--ink); font-size: 13px; pointer-events: none; }
+.hc-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.hc-top svg { color: var(--ink3); flex: 0 0 auto; }
+.hc-top b { font-size: 14px; font-weight: 600; }
+.hc-words { font-size: 12.5px; line-height: 1.45; color: var(--ink2); margin-bottom: 10px; }
+.hc-words code { font-family: var(--font-mono, monospace); font-size: 11.5px; }
+.hc-cap { font-size: 10.5px; font-weight: 600; color: var(--ink3); margin-bottom: 4px; letter-spacing: 0.02em; }
+.hc-ex { margin: 0; padding: 8px 10px; border-radius: 7px; background: var(--chip); font-family: var(--font-mono, monospace); font-size: 11.5px; line-height: 1.5; color: var(--ink); white-space: pre-wrap; }
+/* «?» by the layout's button */
+.pr-q { width: 18px; height: 18px; box-sizing: border-box; padding: 0; border-radius: 9px; border: 1.3px solid var(--ink3); background: transparent; color: var(--ink3); font: 700 11px/1 var(--ui, system-ui, sans-serif); display: inline-flex; align-items: center; justify-content: center; margin-left: -2px; cursor: default; }
+.pr-q.on { border-color: var(--lampink); color: var(--lampink); background: var(--lampsoft); }
+.pr-lay.hl { background: var(--chip); }
+
+.pr-hintpos { position: absolute; z-index: 21; width: 300px; }
+.pr-hintpos > .pr-hintcard { position: static; }
+.pr-hintpos[role='presentation'] > .pr-hintcard { pointer-events: auto; }
+.pr-picker { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.pr-pop:focus { outline: none; }

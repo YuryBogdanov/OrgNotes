@@ -23,11 +23,12 @@ export const presentLook = { vars: (_appearance?: 'light' | 'dark'): string => '
 
 let current: { end(): void } | null = null;
 
-/** A blank window of the show on `s`, its document made ready: the page's styles, the root with the variables. */
-function openOn(s: Screen, name: string): { win: Window; root: HTMLElement } | null {
-  const win = window.open(`about:blank#present-${name}`, `present-${name}`, `left=${Math.round(s.x)},top=${Math.round(s.y)},width=${Math.round(s.w)},height=${Math.round(s.h)}`);
-  if (!win) return null;
+/** The document of a show's window made ready: the page's styles, the root with the variables. Again when WebKit
+ *  gave it a new blank document (its own load after the window was made) — the root is looked for first. */
+function prepare(win: Window): HTMLElement {
   const doc = win.document;
+  const had = doc.getElementById('present-root');
+  if (had) return had;
   doc.title = 'Показ';
   const base = doc.createElement('base');
   base.href = location.href; // the fonts and images of the styles, as on the page
@@ -40,10 +41,17 @@ function openOn(s: Screen, name: string): { win: Window; root: HTMLElement } | n
   }
   doc.body.setAttribute('style', 'margin:0;height:100%;overflow:hidden;background:#000');
   const root = doc.createElement('div');
+  root.id = 'present-root';
   root.setAttribute('data-ui', 'next');
   root.setAttribute('style', `${presentLook.vars()};position:fixed;inset:0;overflow:hidden`);
   doc.body.append(root);
-  return { win, root };
+  return root;
+}
+/** A blank window of the show on `s` (null: WebKit did not open it). */
+function openOn(s: Screen, name: string): { win: Window; root: HTMLElement } | null {
+  const win = window.open(`about:blank#present-${name}`, `present-${name}`, `left=${Math.round(s.x)},top=${Math.round(s.y)},width=${Math.round(s.w)},height=${Math.round(s.h)}`);
+  if (!win) return null;
+  return { win, root: prepare(win) };
 }
 
 export async function present(spec: Spec, guard: (fn: () => void) => void): Promise<Handle> {
@@ -53,7 +61,7 @@ export async function present(spec: Spec, guard: (fn: () => void) => void): Prom
   const there = all.find((s) => s !== here);
   const two = !!there && !!spec.presenter;
   const a = openOn(two ? there! : here, 'audience');
-  if (!a) throw new Error('окно показа не открылось');
+  if (!a) throw new Error('macOS не дал открыть окно');
   const p = two ? openOn(here, 'presenter') : null;
   const wins = [a, ...(p ? [p] : [])];
   let swapped = false;
@@ -70,6 +78,7 @@ export async function present(spec: Spec, guard: (fn: () => void) => void): Prom
   const end = () => {
     if (ended) return;
     ended = true;
+    clearInterval(watch);
     if (current === handle) current = null;
     for (const d of shown) if (typeof d === 'function') guard(d);
     shown = [];
@@ -77,14 +86,25 @@ export async function present(spec: Spec, guard: (fn: () => void) => void): Prom
     void invoke('present_end').catch(() => {});
     if (spec.onEnd) guard(() => spec.onEnd!());
   };
-  for (const w of wins) {
-    w.win.addEventListener('keydown', (e) => {
-      if (spec.onKey) guard(() => spec.onKey!(e));
-    });
-    // a window closed by itself (⌘W, the system): the show ends
-    w.win.addEventListener('pagehide', () => end());
-  }
+  const keys = (e: KeyboardEvent) => {
+    if (spec.onKey) guard(() => spec.onKey!(e));
+  };
+  const listen = (w: { win: Window }) => w.win.addEventListener('keydown', keys);
+  for (const w of wins) listen(w);
   draw();
+  // a window closed by itself (⌘W, the system): the show ends; its document replaced by a new blank one (WebKit's own
+  // load of the window): made ready and drawn again (fix-59-1 §1)
+  const watch = setInterval(() => {
+    if (wins.some((w) => w.win.closed)) return end();
+    let again = false;
+    for (const w of wins)
+      if (!w.win.document.getElementById('present-root')) {
+        w.root = prepare(w.win);
+        listen(w);
+        again = true;
+      }
+    if (again) draw();
+  }, 250);
   void invoke('present_begin').catch(() => {});
   a.win.focus();
   const handle: Handle & { end(): void } = {

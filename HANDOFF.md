@@ -1092,6 +1092,26 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   (the flicker), and a window kept light never saw macOS go dark. `applyAppearance`: under «Системное» the window is
   `setTheme(null)` (as macOS); a chosen «Светлое» / «Тёмное» sets it to the theme's own. Mock `plugin:window|set_theme`
   logs `window_theme`. e2e appearanceSystem.
+- **fix-59-1 A: the show opens, «Показать в тексте» closes (`docs/fix-59-1-prezentatsiya-podskazki.md` §1–2)** — the
+  main webview's `WKPreferences.javaScriptCanOpenWindowsAutomatically` (present.rs `allow_windows`, set in `setup`):
+  `window.open` after the `await` of the screens was refused by WebKit (no user activation). The show's window made
+  simple full screen 250 ms after `Create` (shown first). present.ts: `prepare` finds or makes `#present-root` — a
+  blank document WebKit replaced is made ready and drawn again (polled with `closed`; the show ends only on a closed
+  window, no `pagehide`). A failed show is said (`ui.notify('Показ не открылся: …')`). §2: FileView's `.host` is
+  positioned — the presentation (`inset: 0`) covered the file beside it (its × not clickable); ⎋ in a file beside a view
+  of a file (not taken by its editor) closes it — beside a list it stays (ТЗ 56); API 1.20 `ui.beside()` / `ui.closeBeside()`: the slide's and the block's
+  menu say «Скрыть текст» ✓ while open; the file beside follows the slide chosen unless pinned. e2e presentBeside,
+  presentShow (the notice).
+- **fix-59-1 B: images and hints (§3–4)** — render.ts `Look.editor` (the stage's slide only; never the strip, the show,
+  the PDF): `placeEl` — the place for an image in `text-image` / `image` with none (dashed `lampline` on `lampsoft`,
+  «Перетащите…», «Выбрать файл…», «видно только в редакторе»; lit `.over` while a file is dragged over it), a missing
+  image's red frame «Нет файла …» with «Заменить…» (`data-path`; a drop on it replaces too), the empty free slide
+  «Пока нет блоков…», `two` with no `-----` (a dashed middle and its words over the columns, `.pr-twowrap`), `quote`
+  with no block (the whole text quoted everywhere; its words in the editor). Elsewhere no image: the text the whole
+  width. «+ Картинка» and the buttons: a hidden `<input type=file>` (several; in `free` a cascade 4 % apart);
+  `present.replaceImage` (the link in the slide's lines, «Заменить картинку»). hints.ts (`SCHEME`, `HINTS`) +
+  LayoutHint.svelte: the card left of the layouts' menu for the row pointed (↑↓ too, one element), «?» by the
+  layout's button (300 ms hover or a click, ⎋). e2e presentHints.
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.
