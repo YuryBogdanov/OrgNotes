@@ -36,6 +36,9 @@ cat > "$bundle/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
-# a fresh copy each time (a hard link would keep the old inode when cargo replaces the binary)
+# a fresh file each time: copied over the old one it keeps that file's inode, and macOS, which caches a binary's code
+# signature by its file, kills the new one at once (exit 137, no word) — `tauri dev` then shows nothing (a hard link
+# would keep the old inode too, when cargo replaces the binary)
+rm -f "$bundle/MacOS/Panopticon"
 cp "$bin" "$bundle/MacOS/Panopticon"
 exec "$bundle/MacOS/Panopticon" "${app[@]}"

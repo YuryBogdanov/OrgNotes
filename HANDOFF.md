@@ -1122,6 +1122,9 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   0.5 s after typing and on blur, re-read when shown; «Скопировать» (`clipboard`), «Показать в Finder», «Вернуть
   стандартный…» asked, off while standard, «изменён»); the palette «Презентация: скопировать бриф для агента». (Not
   `brief.svelte.ts`: it and `Brief.svelte` are one name on macOS's file system.) e2e presentBrief.
+- **`tauri dev` started nothing (the dev runner)** — `src-tauri/scripts/runner.sh` copied the new binary over the old
+  one in `Panopticon-dev.app`: the same file (inode), whose code signature macOS has cached — the new binary was killed
+  at once (exit 137, no output). The file is removed before the copy now.
 - **«Починить» a free block (the user's ask)** — `fit` marks a free slide's block that does not fit (`.pr-box.over`;
   the stage's slide says «не помещается» on it and frames it); its menu's «Починить» (also for a block out of the
   slide) — free.ts `fixRect`: the least change, never centred: in the slide by what is out, taller by what the text
