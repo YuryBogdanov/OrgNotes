@@ -71,8 +71,10 @@
       }
     },
     "ui": {
+      "beside": "function",
       "choose": "function",
       "close": "function",
+      "closeBeside": "function",
       "currentHeading": "function",
       "currentReview": "function",
       "drawSlot": "function",
@@ -150,8 +152,10 @@
       }
     },
     "ui": {
+      "beside": "function",
       "choose": "function",
       "close": "function",
+      "closeBeside": "function",
       "currentHeading": "function",
       "currentReview": "function",
       "drawSlot": "function",

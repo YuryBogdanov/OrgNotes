@@ -10,7 +10,7 @@
   // edges and centre snapping to the margins, the centre, the other blocks and the title's bottom (a dashed guide; ⌥:
   // none), its size over it; let go — `:BOX:` in whole %, one step. The keys on a chosen block: the arrows (1 %, ⇧ 5),
   // ⌫ delete, ↩ its text. Its menu. The choice lives here only, never in the file.
-  let { path, slide, deck, holder, scale, onedit }: { path: string; slide: Slide; deck: Deck; holder: HTMLElement; scale: number; onedit: (b: { line: number; title: string }) => void } = $props();
+  let { path, slide, deck, holder, scale, onedit, textItem }: { path: string; slide: Slide; deck: Deck; holder: HTMLElement; scale: number; onedit: (b: { line: number; title: string }) => void; textItem: (ref: { path: string; line: number; title: string }) => { label: string; checked?: boolean; run(): void } } = $props();
   const ctx = present.ctx;
   const field = $derived(FIELD[deck.ratio]);
   let chosen = $state<number | null>(null); // the block's heading line
@@ -142,7 +142,7 @@
         { label: 'На передний план', disabled: slide.boxes[slide.boxes.length - 1]?.line === b.line, run: () => layer(b, true) },
         { label: 'На задний план', disabled: slide.boxes[0]?.line === b.line, run: () => layer(b, false) },
         'sep',
-        { label: 'Показать в тексте', run: () => void ctx.ui.openBeside(ref(b)) },
+        textItem(ref(b)),
         { label: 'Удалить блок…', danger: true, run: () => void remove(b) },
       ],
       { x, y },

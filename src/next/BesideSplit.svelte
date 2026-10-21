@@ -61,6 +61,12 @@
       e.preventDefault();
       e.stopPropagation();
       openAsTab();
+    } else if (e.key === 'Escape' && !e.defaultPrevented && !e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey && store.tab?.id === tabId && store.tab.kind === 'file') {
+      // ⎋ in the file beside a view of a file closes it (fix-59-1 §2: the slides), unless the editor took it (its
+      // completion, its search); beside a list it stays (ТЗ 56: ⎋ in the list closes it)
+      e.preventDefault();
+      e.stopPropagation();
+      closeBeside(tabId);
     }
   }
 </script>

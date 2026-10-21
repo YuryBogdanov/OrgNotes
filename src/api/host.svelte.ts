@@ -31,7 +31,7 @@ import PluginNav from '../PluginNav.svelte';
 import PluginReview from '../PluginReview.svelte';
 import { mountWidget } from './widgets.svelte';
 import { lists } from '../taskLists.svelte';
-import { openBeside } from '../beside.svelte';
+import { besideOf, closeBeside, openBeside } from '../beside.svelte';
 import { RIGHTS, rightsText, trust, trusted } from './trust';
 import { apiRef, coreRef, fileOf, findHeading, infoOf } from './refs';
 import { coreCommand } from './coreCommands';
@@ -761,6 +761,17 @@ class Host {
         themeVars: (a) => presentLook.vars(a === 'light' || a === 'dark' ? a : undefined),
         present: (spec) => present(spec, (fn) => this.guard(id, fn, undefined)).then((h) => (keep(() => h.end()), h)),
         exportPdf: (o) => exportPdf({ name: String(o.name ?? ''), pages: [...(o.pages ?? [])], size: { w: Number(o.size?.w), h: Number(o.size?.h) } }),
+        beside: () => {
+          const t = store.tab;
+          const own = !!t && (m.contributes.views.some((v) => v.id === t.kind) || (t.kind === 'file' && m.contributes.fileViews.some((v) => v.id === store.viewOf(t))));
+          const b = own ? besideOf(t!.id) : undefined;
+          const f = b ? store.files.find((x) => x.path === b.path) : undefined;
+          return b && f ? { path: f.name, line: b.line, pinned: !!b.pinned } : null;
+        },
+        closeBeside: () => {
+          const t = store.tab;
+          if (t && besideOf(t.id) && (m.contributes.views.some((v) => v.id === t.kind) || (t.kind === 'file' && m.contributes.fileViews.some((v) => v.id === store.viewOf(t))))) closeBeside(t.id);
+        },
         selectedLines: () => {
           const r = focusedEditor()?.lines?.();
           const f = store.fileOf(store.tab);
