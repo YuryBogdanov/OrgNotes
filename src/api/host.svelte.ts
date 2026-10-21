@@ -41,7 +41,7 @@ import { listen } from './events.svelte';
 import { clone, watch } from './watch.svelte';
 import { clipboardApi, editApi, filesApi, indexApi, netApi } from './ctxData';
 import { processApi } from './process';
-import { exportPdf, present } from './present';
+import { exportPdf, present, presentLook } from './present';
 import { put, schemaOf, settingsValues, whole, type Dynamic } from './pluginSettings';
 import { invoke, isTauri, pickSave } from '../tauri';
 import { focusedEditor } from '../editorKeys';
@@ -748,7 +748,9 @@ class Host {
         // the file beside the plugin's tab (ТЗ 56 §6): the new interface, the active tab one of its views
         openBeside: (at) => {
           const t = store.tab;
-          if (!store.nextUi || !t || !m.contributes.views.some((v) => v.id === t.kind) || !document.querySelector(`[data-beside="${CSS.escape(t.id)}"]`)) return false;
+          // the active tab one of its views, or a file shown as its view of a file (ТЗ 59)
+          const own = !!t && (m.contributes.views.some((v) => v.id === t.kind) || (t.kind === 'file' && m.contributes.fileViews.some((v) => v.id === store.viewOf(t))));
+          if (!store.nextUi || !t || !own || !document.querySelector(`[data-beside="${CSS.escape(t.id)}"]`)) return false;
           const f = fileOf(String(at?.path ?? ''));
           if (!f) return false;
           const line = Number(at.line);
@@ -756,6 +758,7 @@ class Host {
           if ('title' in at && !h) return false;
           return openBeside(t.id, { path: f.path, line: h ? h.line : line }, { keepPin: true });
         },
+        themeVars: (a) => presentLook.vars(a === 'light' || a === 'dark' ? a : undefined),
         present: (spec) => present(spec, (fn) => this.guard(id, fn, undefined)).then((h) => (keep(() => h.end()), h)),
         exportPdf: (o) => exportPdf({ name: String(o.name ?? ''), pages: [...(o.pages ?? [])], size: { w: Number(o.size?.w), h: Number(o.size?.h) } }),
         selectedLines: () => {
@@ -992,7 +995,7 @@ class Host {
         widget: (el, field, value, onChange) => mountWidget(id, el, field, value, onChange, (err) => this.fail(id, err)),
         editor: (el, h, o = {}) => {
           // the new interface gives its own editor (ТЗ 49 §7, set by next/App), the old one PluginEditor
-          const app = mount(this.editorComponent ?? PluginEditor, { target: el, props: { path: h.path, line: h.line, title: h.title, source: !!o.source, onref: (r: HeadingRef) => this.guard(id, () => o.onRef?.(r), undefined) } });
+          const app = mount(this.editorComponent ?? PluginEditor, { target: el, props: { path: h.path, line: h.line, title: h.title, source: !!o.source, end: o.caret === 'end', onref: (r: HeadingRef) => this.guard(id, () => o.onRef?.(r), undefined) } });
           const off = () => {
             void unmount(app);
           };

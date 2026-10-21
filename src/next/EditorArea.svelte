@@ -185,7 +185,8 @@
       </div>
     {/if}
   {:else if tab && file && (fileViewOf(fview) || fileTypeOf(tab.path) || stopped)}
-    <div class="view"><FileView id={fview || stopped} path={file.name} {tab} /></div>
+    <!-- the file beside a plugin's view of a file too (ТЗ 59: «Показать в тексте» of a slide) -->
+    <div class="view"><BesideSplit tabId={tab.id}><FileView id={fview || stopped} path={file.name} {tab} /></BesideSplit></div>
   {:else if file && tab}
     {#if narrowed}
       <!-- it comes out from the top in 180 ms, goes in 150; the column and the text move down and up with it (ТЗ 46 §2) -->

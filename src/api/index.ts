@@ -600,6 +600,9 @@ export interface Ctx {
      *  windows without a frame on those screens and gives their root elements (the new interface's tokens and fonts
      *  in them); the main window hides meanwhile, the Mac does not sleep. `onKey` — a key in either window; `onEnd` —
      *  the show ended (`end()`, or the windows closed). `swap()` — the two screens change places. Since 1.19. */
+    /** The new interface's CSS variables (`--card: …; --ink: …`, the fonts) of the theme shown, or of the theme of the
+     *  light or the dark place (ТЗ 57) — a slide drawn in a theme of its own. '' in the old interface. Since 1.19. */
+    themeVars(appearance?: 'light' | 'dark'): string;
     present(spec: {
       audience(el: HTMLElement): Dispose | void;
       presenter?(el: HTMLElement): Dispose | void;
@@ -620,8 +623,10 @@ export interface Ctx {
     editorLink(spec: { label(text: string, line: number): string | null; run(path: string, line: number): void }): Dispose;
     /** A heading with its subtree, narrowed, in an editor in the plugin's element (the board's card at the side): edits
      *  go to the file at once, the Org keys work. `onRef` — where the heading is now (its line, its title as edited);
-     *  `source` (since 1.18) — the new interface's editor in «Исходник» (the file as it is), not «Оформление». Since 1.5. */
-    editor(el: HTMLElement, h: HeadingRef, o?: { onRef?(h: HeadingRef): void; source?: boolean }): { focus(): void; dispose(): void };
+     *  `source` (since 1.18) — the new interface's editor in «Исходник» (the file as it is), not «Оформление»; `caret:
+     *  'end'` (since 1.19) — the new interface's editor takes the focus with the caret at the end of the subtree (a
+     *  heading just made: its text typed at once). Since 1.5. */
+    editor(el: HTMLElement, h: HeadingRef, o?: { onRef?(h: HeadingRef): void; source?: boolean; caret?: 'end' }): { focus(): void; dispose(): void };
     /** A list of tasks in the plugin's element (ТЗ 34): while the focus is in `el`, the keys of «Задачи в списках»,
      *  the palette's «ВЫДЕЛЕННАЯ ЗАДАЧА» and the inspector act on the task the list has chosen; `menu(at)` shows the
      *  core's menu of that task (status, priority, dates, tags, refile, link, the plugins' actions, `more`). The

@@ -50,7 +50,7 @@ test('the tab\'s menu: «Показывать как ›» — ✓ «Доска 
   await expect(board(page)).toBeVisible();
   await page.getByRole('tab', { name: /platform/ }).click({ button: 'right' });
   const sub = await viewsSub(page);
-  await expect(sub.getByRole('menuitem')).toHaveText([/^\s*Текст\s*$/, /Доска\s*⌥⌘B/]);
+  await expect(sub.getByRole('menuitem')).toHaveText([/^\s*Текст\s*$/, /Доска\s*⌥⌘B/, /Презентация\s*⌥⌘P/]);
   await expect(sub.getByRole('menuitem', { name: /Доска/ }).locator('.chk svg')).toHaveCount(1);
   await expect(sub).toContainText('Виды добавляют плагины');
   await sub.getByRole('menuitem', { name: 'Текст' }).click();

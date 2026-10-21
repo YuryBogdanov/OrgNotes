@@ -11,6 +11,7 @@
   import { applyAppearance } from '../appearance';
   import { tokenVars, fontCss } from './tokens';
   import { compatVars } from './compat';
+  import { themes } from '../themes.svelte';
   import { presentLook } from '../api/present';
   import { fontKind, textFontOf } from './fontList.svelte';
   import './fonts';
@@ -230,7 +231,11 @@
   setPinning(false);
   setFilePins(true); // its own pins: file tabs (ТЗ 58)
   // a plugin's show (ТЗ 59 §9.2): its windows get the variables of the root here and of a plugin's view
-  presentLook.vars = () => `${tokenVars(store.theme.app)};${compatVars(store.theme.app)};--ui:${fontCss(fonts.ui, 'ui')};--text:${textFont};--title:${fontCss(fonts.title, 'title')};--mono:${fontCss(fonts.mono, 'mono')}`;
+  presentLook.vars = (a) => {
+    const app = (a ? themes.themeFor(a) : store.theme).app;
+    const f = app.fonts;
+    return `${tokenVars(app)};${compatVars(app)};--ui:${fontCss(f.ui, 'ui')};--text:${a ? fontCss(f.ui, 'ui') : textFont};--title:${fontCss(f.title, 'title')};--mono:${fontCss(f.mono, 'mono')}`;
+  };
   searchAll.dense = true; // the search's results one line each, more of them open (ТЗ 50 §5)
   // the width of the sidebar's panel (ТЗ 50 §2: 260 by default, the rail aside), on this Mac
   const readWidth = () => {
