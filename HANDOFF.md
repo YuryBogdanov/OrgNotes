@@ -1086,6 +1086,16 @@ PATH needs `/opt/homebrew/bin` (node, cargo; Rust is Homebrew's, **no rustup**, 
   slide of its field (pt = px × 0.75: 720 × 405 for 16:9), on — A4 upright (595 × 842), the slide 48 px in and its notes
   under it; `ui.exportPdf` named by `#+TITLE:` (else the file's name). e2e presentPdf (the pages as the print sees them).
   The print itself (vector, the text selectable) is checked by hand in the built app.
+- **fix-59-1 A: the show opens, «Показать в тексте» closes (`docs/fix-59-1-prezentatsiya-podskazki.md` §1–2)** — the
+  main webview's `WKPreferences.javaScriptCanOpenWindowsAutomatically` (present.rs `allow_windows`, set in `setup`):
+  `window.open` after the `await` of the screens was refused by WebKit (no user activation). The show's window made
+  simple full screen 250 ms after `Create` (shown first). present.ts: `prepare` finds or makes `#present-root` — a
+  blank document WebKit replaced is made ready and drawn again (polled with `closed`; the show ends only on a closed
+  window, no `pagehide`). A failed show is said (`ui.notify('Показ не открылся: …')`). §2: FileView's `.host` is
+  positioned — the presentation (`inset: 0`) covered the file beside it (its × not clickable); ⎋ in a file beside a view
+  of a file (not taken by its editor) closes it — beside a list it stays (ТЗ 56); API 1.20 `ui.beside()` / `ui.closeBeside()`: the slide's and the block's
+  menu say «Скрыть текст» ✓ while open; the file beside follows the slide chosen unless pinned. e2e presentBeside,
+  presentShow (the notice).
 - **The board in the new interface (the user's ask):** the cards' titles in the interface's font (`.kb-t` 600 14 /
   1.35 `--ui`, not `--font-text` of ТЗ 49); the card at the side in «Исходник» — `ui.editor(el, ref, { source: true })`
   (API 1.18.0: the new interface's PluginEditor `rich={!source}`; the old one ignores it). README, the template.

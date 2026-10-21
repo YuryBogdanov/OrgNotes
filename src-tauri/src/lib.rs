@@ -229,9 +229,10 @@ pub fn run() {
             // the main window from its config, with the handler of `window.open` (a plugin's show, ТЗ 59 §9.2): built
             // here, not by Tauri, as only a builder takes it ("create": false in tauri.conf.json)
             if let Some(cfg) = app.config().app.windows.iter().find(|w| w.label == "main").cloned() {
-                tauri::WebviewWindowBuilder::from_config(app.handle(), &cfg)?
+                let w = tauri::WebviewWindowBuilder::from_config(app.handle(), &cfg)?
                     .on_new_window(present::new_window(app.handle().clone()))
                     .build()?;
+                present::allow_windows(&w);
             }
             #[cfg(target_os = "macos")]
             {

@@ -83,6 +83,21 @@
     }
     await present.remove(path, s);
   }
+  /** «Показать в тексте» — the file beside; while it is open «Скрыть текст» ✓ closes it (fix-59-1 §2). */
+  function textItem(ref: { path: string; line: number; title: string }) {
+    const open = !!ctx.ui.beside();
+    return open ? { label: 'Скрыть текст', checked: true, run: () => ctx.ui.closeBeside() } : { label: 'Показать в тексте', run: () => void ctx.ui.openBeside(ref) };
+  }
+  // the file beside follows the slide chosen, unless pinned there
+  $effect(() => {
+    const s = slide;
+    if (!s) return;
+    const line = s.line;
+    untrack(() => {
+      const b = ctx.ui.beside();
+      if (b && !b.pinned && b.line !== line) ctx.ui.openBeside(present.ref(path, s));
+    });
+  });
   function thumbMenu(e: MouseEvent, s: Slide) {
     e.preventDefault();
     present.choose(path, deck!.slides.indexOf(s));
@@ -90,7 +105,7 @@
       [
         { label: 'Новый слайд после', run: () => present.newSlide(path, s) },
         { label: 'Дублировать', run: () => present.duplicate(path, s) },
-        { label: 'Показать в тексте', run: () => void ctx.ui.openBeside(present.ref(path, s)) },
+        textItem(present.ref(path, s)),
         'sep',
         { label: 'Удалить слайд…', danger: true, run: () => void removeSlide(s) },
       ],
@@ -312,7 +327,7 @@
               <div class="pr-copying" style:left="{copying.x}%" style:top="{copying.y}%">Копирую…</div>
             {/if}
             {#if slide.layout === 'free' && holderEl}
-              <div class="pr-freelayer" style:width="{FIELD[deck.ratio].w * scale}px" style:height="{FIELD[deck.ratio].h * scale}px"><FreeLayer {path} {slide} {deck} holder={holderEl} {scale} onedit={editBlock} /></div>
+              <div class="pr-freelayer" style:width="{FIELD[deck.ratio].w * scale}px" style:height="{FIELD[deck.ratio].h * scale}px"><FreeLayer {path} {slide} {deck} holder={holderEl} {scale} onedit={editBlock} {textItem} /></div>
             {/if}
             {#if editing}
               <div class="pr-editcard" role="dialog" aria-label={editing.block ? 'Текст блока' : 'Текст слайда'} tabindex="-1" onkeydown={editKey}>

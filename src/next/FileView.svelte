@@ -89,7 +89,8 @@
     background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
     background-size: 24px 24px; background-position: -1px -1px;
   }
-  .host { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; color: var(--ink); font-family: var(--ui); }
+  /* positioned: a view laid over it (inset: 0) stays in it, the file beside it clear (fix-59-1 §2) */
+  .host { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; color: var(--ink); font-family: var(--ui); }
   .word { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--ink3); font-size: 13px; }
   .word b { font-size: 14px; font-weight: 500; color: var(--ink); }
   .btns { display: flex; gap: 8px; }

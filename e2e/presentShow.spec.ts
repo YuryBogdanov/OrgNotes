@@ -86,3 +86,10 @@ test('two screens: the presenter\'s view — the timer, the count, now and next,
   await expect.poll(() => pre.isClosed() && aud.isClosed()).toBe(true);
   await expect(page.locator('.pr-count')).toHaveText('СЛАЙД 3 ИЗ 3');
 });
+
+test('the window not opened (WebKit refused it): said, not swallowed', async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => (window.open = () => null));
+  await page.getByRole('button', { name: /Показать/ }).click();
+  await expect(page.getByText('Показ не открылся: macOS не дал открыть окно')).toBeVisible();
+});
