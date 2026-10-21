@@ -283,3 +283,13 @@ fn write_bytes_stays_inside_the_folder() {
     assert!(write_bytes_in(&d, &d.join(".hidden/x.png").to_string_lossy(), &[1]).is_err());
     assert!(read_bytes_in(&d, &out.to_string_lossy()).is_err());
 }
+
+// fix-59-1 §5: the agents' brief in `.orgnotes/agents/`
+#[test]
+fn agent_file_names_are_checked() {
+    let d = tmp("agents");
+    assert!(agent_file(&d, "presentation").unwrap().ends_with(".orgnotes/agents/presentation.md"));
+    for bad in ["", "../x", "a/b", "Big", "a.md"] {
+        assert!(agent_file(&d, bad).is_err(), "{bad}");
+    }
+}

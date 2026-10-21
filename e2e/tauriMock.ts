@@ -226,6 +226,14 @@ export async function installTauriMock(page: Page, files: Record<string, string>
 
         // the project config and the features' files in the notes folder (roadmap 0.6)
         read_project_config: () => disk['/mock/.orgnotes/config.json'] ?? null,
+        // the agents' briefs (fix-59-1 §5)
+        read_agent_file: (a) => disk[`${root() ?? '/mock'}/.orgnotes/agents/${a.name}.md`] ?? null,
+        write_agent_file: (a) => {
+          const p = `${root() ?? '/mock'}/.orgnotes/agents/${a.name}.md`;
+          disk[p] = a.text;
+          w.__log.push(['write_agent_file', a.name]);
+          return p;
+        },
         write_project_config: (a) => {
           disk['/mock/.orgnotes/config.json'] = a.text;
           emit();

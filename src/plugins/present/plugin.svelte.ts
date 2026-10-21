@@ -7,6 +7,8 @@ import { present, VIEW } from './state.svelte';
 import { isDeck } from './model';
 import Editor from './Editor.svelte';
 import { show } from './show.svelte';
+import { brief } from './agentBrief.svelte';
+import BriefField from './BriefField.svelte';
 import './styles.css';
 
 export default definePlugin({
@@ -16,7 +18,18 @@ export default definePlugin({
     present.readSettings();
     ctx.settings.onChange(() => present.readSettings());
     ctx.events.on('file.changed', (p) => present.refresh((p as { path: string }).path));
-    ctx.events.on('folder.changed', () => present.files.clear());
+    ctx.events.on('folder.changed', () => {
+      present.files.clear();
+      void brief.ensure(); // the brief of the agents in that folder too (fix-59-1 §5)
+    });
+    void brief.ensure();
+    ctx.settings.dynamic('brief', {
+      render: (el) => {
+        const app = mount(BriefField, { target: el });
+        return () => void unmount(app);
+      },
+    });
+    ctx.commands.on('present.copyBrief', () => void brief.copy());
     ctx.events.on('tab.active', (p) => {
       const a = p as { path: string | null; view: string | null };
       present.active = { path: a.path, view: a.view };

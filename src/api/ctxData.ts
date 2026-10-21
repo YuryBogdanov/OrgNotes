@@ -16,6 +16,21 @@ import { touches } from '../touchIndex.svelte';
 import { query } from './query';
 import { headingChanged } from './events.svelte';
 
+/** The agents' briefs, `.orgnotes/agents/<name>.md` (fix-59-1 §5): built-in plugins only. */
+export function agentsApi(): NonNullable<Ctx['agents']> {
+  const name = (n: string) => {
+    if (!/^[a-z0-9-]{1,64}$/.test(String(n))) throw new Error(`плохое имя «${n}»`);
+    return String(n);
+  };
+  return {
+    read: async (n) => (await invoke<string | null>('read_agent_file', { name: name(n) })) ?? null,
+    write: async (n, text) => void (await invoke<string>('write_agent_file', { name: name(n), text: String(text) })),
+    reveal: async (n) => {
+      const { revealItemInDir } = await import('@tauri-apps/plugin-opener');
+      await revealItemInDir(store.abs(`.orgnotes/agents/${name(n)}.md`));
+    },
+  };
+}
 export function clipboardApi(): NonNullable<Ctx['clipboard']> {
   return { write: (text) => navigator.clipboard.writeText(String(text)) };
 }

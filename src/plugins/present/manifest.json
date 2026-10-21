@@ -9,7 +9,8 @@
   "main": "main.js",
   "permissions": [
     "index.read",
-    "files.edit"
+    "files.edit",
+    "clipboard"
   ],
   "contributes": {
     "commands": [
@@ -73,6 +74,17 @@
         "synonyms": [
           "слайд"
         ]
+      },
+      {
+        "id": "present.copyBrief",
+        "title": "Презентация: скопировать бриф для агента",
+        "synonyms": [
+          "бриф",
+          "агент",
+          "ИИ",
+          "claude",
+          "prompt"
+        ]
       }
     ],
     "fileViews": [
@@ -113,6 +125,19 @@
                   }
                 ],
                 "hint": "Светлая и тёмная — темы светлого и тёмного места в «Оформлении»"
+              }
+            ]
+          },
+          {
+            "caption": "ИИ-АГЕНТЫ",
+            "fields": [
+              {
+                "key": "brief",
+                "type": "custom",
+                "where": "local",
+                "label": "Бриф для агентов",
+                "default": "",
+                "hint": "Как собирать презентации в этом формате. Дайте агенту прочитать .orgnotes/agents/presentation.md или скопируйте текст"
               }
             ]
           }

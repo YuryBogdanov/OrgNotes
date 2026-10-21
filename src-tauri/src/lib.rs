@@ -178,6 +178,8 @@ pub fn run() {
             config::write_project_config,
             config::read_touch_file,
             config::write_touch_file,
+            config::read_agent_file,
+            config::write_agent_file,
             files::create_entry,
             files::save_new_file,
             quit_app,

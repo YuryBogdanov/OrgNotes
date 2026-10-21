@@ -209,3 +209,11 @@
 .pr-hintpos[role='presentation'] > .pr-hintcard { pointer-events: auto; }
 .pr-picker { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .pr-pop:focus { outline: none; }
+
+/* «Бриф для агентов» in the settings (fix-59-1 §5.2) */
+.pr-brief { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.pr-brief-ed { width: 100%; box-sizing: border-box; min-height: calc(14 * 1.5em + 20px); resize: vertical; padding: 10px 12px; border: 1px solid var(--rule, var(--line)); border-radius: 8px; background: var(--field, var(--card)); color: var(--ink, var(--fg)); font-family: var(--font-mono, 'IBM Plex Mono', monospace); font-size: 12px; line-height: 1.5; outline: none; }
+.pr-brief-ed:focus { border-color: var(--lamp, var(--acc)); }
+.pr-brief-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pr-brief-row .pr-btn:disabled { opacity: 0.45; }
+.pr-brief-note { font-size: 12px; color: var(--ink3, var(--fg3)); }

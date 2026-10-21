@@ -101,3 +101,28 @@ pub(crate) fn migrate_config(app: &AppHandle) {
         let _ = fs::copy(old, new);
     }
 }
+
+// ---- a brief for the AI agents in the notes folder (fix-59-1 §5): `.orgnotes/agents/<name>.md` -------------------
+
+pub(crate) fn agent_file(root: &Path, name: &str) -> Res<PathBuf> {
+    if name.is_empty() || name.len() > 64 || !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+        return Err("bad agent file".into());
+    }
+    Ok(root.join(CONFIG_DIR).join("agents").join(format!("{name}.md")))
+}
+
+/// The brief's text; None when it is not there.
+#[tauri::command]
+pub(crate) fn read_agent_file(state: State<AppState>, name: String) -> Res<Option<String>> {
+    let p = agent_file(&root_of(&state)?, &name)?;
+    Ok(fs::read_to_string(p).ok())
+}
+
+#[tauri::command]
+pub(crate) fn write_agent_file(state: State<AppState>, name: String, text: String) -> Res<String> {
+    let p = agent_file(&root_of(&state)?, &name)?;
+    let dir = p.parent().ok_or("bad agent file")?;
+    fs::create_dir_all(dir)?;
+    atomic_write(&dir.join(format!(".{name}.md.tmp")), &p, text.as_bytes())?;
+    Ok(p.to_string_lossy().to_string())
+}
