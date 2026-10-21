@@ -6,6 +6,7 @@ import { mount, unmount } from 'svelte';
 import { present, VIEW } from './state.svelte';
 import { isDeck } from './model';
 import Editor from './Editor.svelte';
+import { show } from './show.svelte';
 import './styles.css';
 
 export default definePlugin({
@@ -34,6 +35,9 @@ export default definePlugin({
     const here = () => (present.active.view === VIEW ? present.active.path : null);
     ctx.commands.on('present.prev', () => void (here() && present.step(here()!, -1)));
     ctx.commands.on('present.next', () => void (here() && present.step(here()!, 1)));
+    // the show (§8): from the slide chosen, or from the first
+    ctx.commands.on('present.show', () => void (here() && show.start(here()!, present.current.get(here()!) ?? 0)));
+    ctx.commands.on('present.showFirst', () => void (here() && show.start(here()!, 0)));
     $effect.root(() => {
       $effect(() => {
         ctx.commands.setAvailable('present.toggle', !!present.active.path);
