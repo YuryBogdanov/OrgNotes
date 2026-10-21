@@ -263,6 +263,31 @@ export async function installTauriMock(page: Page, files: Record<string, string>
         export_text: (a) => {
           disk[a.path] = a.text;
         },
+        // a plugin's binary files (ТЗ 59, API 1.19): kept as «base64:…» on the mock's disk
+        read_bytes: (a) => {
+          const v = disk[a.path];
+          if (typeof v !== 'string') throw 'not a file';
+          const b64 = v.startsWith('base64:') ? v.slice(7) : btoa(unescape(encodeURIComponent(v)));
+          const bin = atob(b64);
+          const out = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+          return out.buffer;
+        },
+        write_bytes: (a) => {
+          if (a.path in disk) throw 'exists';
+          disk[a.path] = 'base64:' + a.data;
+          w.__log.push(['write_bytes', a.path]);
+          return a.path;
+        },
+        // a plugin's show (ТЗ 59 §9.2): the screens a test sets (`__screens`), else one
+        present_screens: () => w.__screens ?? [{ x: 0, y: 0, w: 1440, h: 900, main: true }],
+        present_begin: () => void w.__log.push(['present_begin']),
+        present_end: () => void w.__log.push(['present_end']),
+        // its PDF (§9.3): logged with the pages laid out for print
+        pdf_print: (a) => {
+          w.__log.push(['pdf_print', a.path, a.w, a.h, document.querySelectorAll('.pdf-pages > .pdf-page').length]);
+        },
+        pdf_done: () => true,
         import_text: (a) => {
           if (!(a.path in disk)) throw 'нет такого файла';
           return disk[a.path];

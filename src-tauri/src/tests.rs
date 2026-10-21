@@ -260,3 +260,26 @@ fn pty_output_keeps_a_cut_character_for_the_next_read() {
     // not UTF-8: the replacement character, the rest goes on
     assert_eq!(crate::pty::utf8_chunk(&mut carry, b"a\xffb"), "a\u{FFFD}b");
 }
+
+// ТЗ 59 §9.1: a plugin's images in the notes folder
+#[test]
+fn write_bytes_makes_folders_and_never_replaces() {
+    let d = tmp("bytes");
+    let p = d.join("Проекты/img/a.png");
+    let got = write_bytes_in(&d, &p.to_string_lossy(), &[1, 2, 3]).unwrap();
+    assert!(got.ends_with("Проекты/img/a.png"));
+    assert_eq!(fs::read(&p).unwrap(), vec![1, 2, 3]);
+    assert!(matches!(write_bytes_in(&d, &p.to_string_lossy(), &[4]), Err(Error::Exists)));
+    assert_eq!(read_bytes_in(&d, &p.to_string_lossy()).unwrap(), vec![1, 2, 3]);
+    assert!(!d.join("Проекты/img/.a.png.tmp").exists());
+}
+
+#[test]
+fn write_bytes_stays_inside_the_folder() {
+    let d = tmp("bytes-out");
+    let out = std::env::temp_dir().join(format!("org-test-out-{}.png", std::process::id()));
+    assert!(write_bytes_in(&d, &out.to_string_lossy(), &[1]).is_err());
+    assert!(write_bytes_in(&d, &d.join("img/../../x.png").to_string_lossy(), &[1]).is_err());
+    assert!(write_bytes_in(&d, &d.join(".hidden/x.png").to_string_lossy(), &[1]).is_err());
+    assert!(read_bytes_in(&d, &out.to_string_lossy()).is_err());
+}

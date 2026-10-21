@@ -13,14 +13,17 @@
     "edit": {
       "ensureFile": "function",
       "transaction": "function",
-      "undo": "function"
+      "undo": "function",
+      "writeBytes": "function"
     },
     "events": {
       "on": "function"
     },
     "exports": "function",
     "files": {
-      "read": "function"
+      "imageUrl": "function",
+      "read": "function",
+      "revoke": "function"
     },
     "id": "string",
     "index": {
@@ -76,6 +79,7 @@
       "drawer": "function",
       "editor": "function",
       "editorLink": "function",
+      "exportPdf": "function",
       "fileCard": "function",
       "fileView": "function",
       "form": "function",
@@ -90,6 +94,7 @@
       "openFileView": "function",
       "pickDate": "function",
       "pickPlace": "function",
+      "present": "function",
       "refile": "function",
       "review": "function",
       "saveFile": "function",
@@ -152,6 +157,7 @@
       "drawer": "function",
       "editor": "function",
       "editorLink": "function",
+      "exportPdf": "function",
       "fileCard": "function",
       "fileView": "function",
       "form": "function",
@@ -166,6 +172,7 @@
       "openFileView": "function",
       "pickDate": "function",
       "pickPlace": "function",
+      "present": "function",
       "refile": "function",
       "review": "function",
       "saveFile": "function",

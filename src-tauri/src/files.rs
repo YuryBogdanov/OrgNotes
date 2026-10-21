@@ -213,3 +213,48 @@ pub(crate) fn save_new_in(root: &Path, parent: &str, name: &str, text: &str, ove
 pub(crate) fn save_new_file(state: State<AppState>, parent: String, name: String, text: String, overwrite: bool) -> Res<String> {
     save_new_in(&root_of(&state)?, &parent, &name, &text, overwrite)
 }
+
+// ---- a plugin's binary files (ТЗ 59, API 1.19): its images in the notes folder ---------------------------------
+
+/// The bytes of a file in the notes folder (`files.imageUrl`: the page makes a `blob:` of them).
+pub(crate) fn read_bytes_in(root: &Path, path: &str) -> Res<Vec<u8>> {
+    let p = inside(root, Path::new(path))?;
+    if !p.is_file() {
+        return Err("not a file".into());
+    }
+    fs::read(p).map_err(Error::from)
+}
+
+/// A new binary file in the notes folder (`edit.writeBytes`: an image pasted into a slide). Its folders are made;
+/// one that is there already is an error — the plugin picks another name. The path's every part is a checked name
+/// and the nearest folder that exists is inside the notes folder.
+pub(crate) fn write_bytes_in(root: &Path, path: &str, bytes: &[u8]) -> Res<String> {
+    let target = PathBuf::from(path);
+    let r = fs::canonicalize(root)?;
+    let rel = target.strip_prefix(root).or_else(|_| target.strip_prefix(&r)).map_err(|_| Error::from("path outside notes folder"))?;
+    let parts: Vec<String> = rel.iter().map(|c| c.to_string_lossy().to_string()).collect();
+    if parts.is_empty() || parts.iter().any(|p| check_name(p).map_or(true, |n| &n != p)) {
+        return Err("bad name".into());
+    }
+    let full = r.join(rel);
+    if full.exists() {
+        return Err(Error::Exists);
+    }
+    let parent = full.parent().ok_or("bad name")?;
+    fs::create_dir_all(parent)?;
+    inside(&r, parent)?; // no link out of the folder on the way
+    let name = parts.last().unwrap();
+    let tmp = parent.join(format!(".{name}.tmp"));
+    atomic_write(&tmp, &full, bytes)?;
+    Ok(as_known(root, &full))
+}
+
+#[tauri::command]
+pub(crate) fn read_bytes(state: State<AppState>, path: String) -> Res<tauri::ipc::Response> {
+    Ok(tauri::ipc::Response::new(read_bytes_in(&root_of(&state)?, &path)?))
+}
+
+#[tauri::command]
+pub(crate) fn write_bytes(state: State<AppState>, path: String, data: String) -> Res<String> {
+    write_bytes_in(&root_of(&state)?, &path, &crate::exchange::from_base64(&data)?)
+}
