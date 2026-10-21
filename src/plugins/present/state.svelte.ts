@@ -125,11 +125,8 @@ class Present {
   remove(path: string, s: Slide) {
     return this.tx('Удалить слайд', (tx) => tx.remove(this.ref(path, s)));
   }
-  /** §6: an image put on a slide (dropped from Finder, pasted): copied into `img/` beside the file (`-2`, `-3` when
-   *  the name is taken), its link where the layout shows images — the first image replaced in `text-image` and
-   *  `image`, at the end of the text with the layout made `text-image` in the others, a new block at `at` (% of the
-   *  slide) in `free`. One step «Вставить картинку» (the file copied stays when it is undone). */
-  async insertImage(path: string, s: Slide, f: { name: string; base64: string }, at?: { x: number; y: number }): Promise<boolean> {
+  /** A file copied into `img/` beside the presentation (`-2`, `-3` when the name is taken): its name there, or null. */
+  private async copyImage(path: string, f: { name: string; base64: string }): Promise<string | null> {
     const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
     const m = /^(.*?)(?:\.([A-Za-z0-9]+))?$/.exec(f.name.split('/').pop() ?? '')!;
     const stem = (m[1] || 'image').replace(/[\\/:]/g, '-').replace(/^\.+/, '').trim() || 'image';
@@ -144,6 +141,33 @@ class Present {
         // taken: the next name
       }
     }
+    return name || null;
+  }
+  /** §3.4: a missing image of the slide replaced by a file chosen — its link in the slide's lines, one step. */
+  async replaceImage(path: string, s: Slide, old: string, f: { name: string; base64: string }): Promise<boolean> {
+    const name = await this.copyImage(path, f);
+    if (!name) return false;
+    const esc = old.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`\\[\\[(?:file:)?${esc}\\](\\[[^\\]]*\\])?\\]`);
+    const r = await this.tx('Заменить картинку', (tx) =>
+      tx.update(path, (text) => {
+        const lines = text.split('\n');
+        for (let i = s.line; i < Math.min(s.end, lines.length); i++)
+          if (re.test(lines[i])) {
+            lines[i] = lines[i].replace(re, `[[file:img/${name}]]$1`);
+            return lines.join('\n');
+          }
+        return null;
+      }),
+    );
+    return r === 'ok';
+  }
+  /** §6: an image put on a slide (dropped from Finder, pasted): copied into `img/` beside the file (`-2`, `-3` when
+   *  the name is taken), its link where the layout shows images — the first image replaced in `text-image` and
+   *  `image`, at the end of the text with the layout made `text-image` in the others, a new block at `at` (% of the
+   *  slide) in `free`. One step «Вставить картинку» (the file copied stays when it is undone). */
+  async insertImage(path: string, s: Slide, f: { name: string; base64: string }, at?: { x: number; y: number }): Promise<boolean> {
+    const name = await this.copyImage(path, f);
     if (!name) return false;
     const link = `[[file:img/${name}]]`;
     const ref = this.ref(path, s);
